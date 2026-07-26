@@ -1,86 +1,54 @@
 ---
 name: full-code-review
-description: Reviews a change set against an unusually strict maintainability bar, emphasizing code-judo simplification, abstraction quality, the 1k-line rule, and spaghetti growth.
-disable-model-invocation: true
+description: Review a Pulsebox change set for specification compliance, architecture erosion, audio and persistence hazards, accessibility gaps, originality risks, and maintainability; remain read-only unless fixes are explicitly requested.
 ---
 
-# Full Code Review
+# Review Pulsebox code
 
-Run a read-only **code-judo review** by default: look for restructurings that
-preserve behavior while deleting concepts, branches, wrappers, or layers.
-Do not edit files unless the user explicitly asks to apply the findings.
+Run a read-only review by default.
 
-## Review
+## Establish scope
 
-1. Establish the review surface from the user's scope, current diff, and
-   relevant canonical docs. Preserve unrelated dirty work.
-2. Read every changed file and enough callers, tests, and contracts to judge
-   the change in context.
-3. Apply every standard below. Record evidence before assigning severity.
-4. Prefer a small number of high-conviction structural findings over cosmetic
-   notes.
-5. If the user requested fixes, implement only findings within the requested
-   scope and invoke `run-quality-gate` afterward. Otherwise, remain read-only.
+1. Inspect the current diff, untracked files, and recent history.
+2. Read every changed file and the owning specification sections.
+3. Read enough callers, plugins, commands, migrations, components, and tests to
+   judge the change in context.
+4. Preserve unrelated dirty work.
 
-## Standards
+## Review standards
 
-### Code judo
+Check:
 
-- **Smell:** complexity moves without reducing what a reader must hold.
-- **Remedy:** reframe ownership or state so branches, modes, or layers vanish.
+- approved behavior and every affected acceptance criterion;
+- strict engine, state, and UI ownership;
+- plugin and parameter contracts, stable IDs, and registry-driven extension;
+- typed commands, complete undo data, and gesture coalescing;
+- AudioWorklet frame-size independence, bounded memory, smoothing, lifecycle,
+  message ordering, and offline parity;
+- versioned project data, migrations, validation, assets, and preference
+  boundaries;
+- Custom Element registration, Shadow DOM behavior, cleanup, input, focus,
+  accessibility, and supported-size layout;
+- the five-theme token contract and absence of theme-specific markup or logic;
+- prohibited frameworks, MIDI, main-thread DSP, ScriptProcessorNode, server,
+  native wrapper, PWA, and service-worker code;
+- naming, originality, shipping boundaries, and research isolation;
+- direct code, cohesive modules, explicit invariants, and removal of duplicated
+  policy or unnecessary concepts;
+- objective unit, component, browser, visual, and audio regression evidence.
 
-### 1k-line crossing
-
-- **Smell:** a change pushes a file from below 1000 lines to above it.
-- **Remedy:** decompose before landing unless the file remains compellingly
-  cohesive and the exception is justified.
-
-### Spaghetti growth
-
-- **Smell:** ad-hoc conditionals, nullable modes, or special cases spread
-  through unrelated flows.
-- **Remedy:** move the policy to the module that owns the concept or replace
-  flags with an explicit state model.
-
-### Direct over magical
-
-- **Smell:** identity wrappers, generic machinery hiding a simple shape, or
-  copy-pasted logic.
-- **Remedy:** inline, extract one pure function, or collapse duplicate paths.
-
-### Clean contracts
-
-- **Smell:** casts, unnecessary optionality, silent fallback, or ad-hoc object
-  shapes obscure an invariant.
-- **Remedy:** make the type and process boundary explicit.
-
-### Canonical ownership
-
-- **Smell:** feature logic leaks into shared code or duplicates an existing
-  helper.
-- **Remedy:** place logic in the layer that owns the documented concept and
-  reuse its canonical contract.
-
-### Atomic orchestration
-
-- **Smell:** independent work is serialized or related updates can remain
-  half-applied.
-- **Remedy:** simplify orchestration through parallel independence or one
-  atomic state transition.
-
-Use [REFERENCE.md](REFERENCE.md) only when a smell needs a concrete remedy
-pattern.
+Do not enforce an arbitrary file-size number. The specification requires
+separate cohesive modules and rejects enormous catch-all files; judge ownership
+and cognitive load with evidence.
 
 ## Output
 
-Order findings by severity. For each finding, provide the path and location,
-the structural risk, the evidence, and one actionable remedy. State explicitly
-when no blocking findings remain.
+Order findings by severity. For each finding, give the file and location,
+broken contract or concrete risk, evidence, user impact, and smallest actionable
+remedy. Treat comments as hypotheses until verified. State when no blocking
+findings remain.
 
-## Completion Criterion
+If fixes are requested, implement only confirmed in-scope findings and run the
+applicable quality gate.
 
-The read-only review is complete when every changed file is accounted for,
-every standard has been applied, each finding carries concrete evidence and an
-actionable remedy, and no file was edited. The fix branch is complete only
-when the requested findings are implemented and `run-quality-gate` outcomes
-are reported without concealing blockers.
+Use [REFERENCE.md](REFERENCE.md) for Pulsebox-specific review remedies.

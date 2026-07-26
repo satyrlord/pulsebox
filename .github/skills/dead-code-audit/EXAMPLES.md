@@ -1,24 +1,21 @@
-# Dead Code Audit Examples
+# Dead-code examples
 
-## Example 1: Audit-Only Scan
+## Custom Element
 
-- Prompt shape: "Run a dead-code scan and tell me what is really dead."
-- Good behavior: run the scan, inspect only reported artifacts, and return a
-  findings list without editing code.
-- Good result: separate provable dead code from false positives caused by entry
-  wiring or generated usage.
+A class with no TypeScript constructor call may still be live through
+customElements.define and a pulse-* tag in markup. Trace both before deleting.
 
-## Example 2: Cleanup Of One Proven Helper
+## AudioWorklet
 
-- Prompt shape: "Clean up the unused parser helper reported by the scan."
-- Good behavior: prove there are no direct uses, reflection hooks, or test
-  dependencies before deleting the smallest slice.
-- Good result: one focused deletion followed by targeted validation.
+A processor may be loaded only by addModule with a build-generated URL. Confirm
+the URL edge and processor registration string.
 
-## Example 3: False Positive From Host Wiring
+## Migration
 
-- Prompt shape: "Why did the scan mark this view model unused?"
-- Good behavior: trace the component through React tree usage, Zustand store
-  selectors, and dynamic imports before deleting it.
-- Good result: report the false positive and recommend the narrowest recurring
-  suppression only if the same pattern will keep appearing.
+A migration may be absent from the normal save path but required when importing
+an older supported .pulsebox schema. Check the version dispatcher and contract.
+
+## Asset
+
+An SVG or stylesheet may be addressed through a manifest or CSS URL. Search
+both code and generated build metadata before calling it orphaned.

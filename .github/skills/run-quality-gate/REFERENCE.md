@@ -1,49 +1,34 @@
-# Run Quality Gate Reference
+# Quality-gate reference
 
-## Discovery
+## Command discovery
 
-Read `package.json` scripts once. Prefer a repository script over a direct
-tool invocation.
+Prefer package.json scripts. The approved future command surface includes:
 
-| Gate | Command order |
-| --- | --- |
-| Problems | whole-workspace diagnostics API; otherwise `N-A` |
-| Markdown | `npm run lint:md`; `npm run markdownlint`; `npx markdownlint-cli2 "**/*.md"` |
-| ESLint | `npm run lint`; `npm run eslint`; `npx eslint .` |
-| Fallow | `npm run fallow`; `npx fallow dead-code` |
-| Unit | `npm run test:unit`; `npm test`; `npx vitest run` |
-| E2E | `npm run test:e2e`; `npm run e2e`; `npx playwright test` |
-| Unit coverage | `npm run test:coverage` |
-| E2E coverage | `npm run test:e2e:coverage` |
-| Combined report | `npm run coverage:report`; `node scripts/merge-coverage.mjs` |
+- npm run build
+- npm run test
+- npm run test:e2e
+- npm run lint
+- npm run typecheck
 
-Use ESLint auto-fix only in repair mode and inspect its diff before continuing.
+Do not assume those scripts exist. Optional Markdown, dead-code, coverage,
+visual, audio, or audit scripts become gates only after the repository defines
+them.
 
-## Coverage Interpretation
+## Phase applicability
 
-- Apply the unit threshold defined in `SKILL.md` to every reported Statements,
-  Branches, Functions, and Lines cell, globally and per file or module.
-- Treat E2E coverage as supplementary integration evidence. Do not apply the
-  70% threshold to bundled E2E coverage or combine its statement identifiers
-  numerically with unit coverage.
-- Add targeted tests or improve testability to close gaps. Follow the
-  authorization rule in `SKILL.md` for exclusions, ignores, or threshold
-  changes.
-- Record exact cells and values for every coverage blocker.
+- Specification stage: Markdown, links, consistency, and forbidden-name checks.
+- Contract stage: schema, type, serialization, migration, and architecture
+  contract tests.
+- Feature stages: affected unit, component, browser, visual, and audio checks.
+- Final stage: all required commands, supported browsers and layouts, five
+  themes, high contrast, naming, dependencies, persistence, export, and
+  acceptance criteria.
 
-## Stop Conditions
+## Stop conditions
 
-Stop the repair sequence when a command requires secrets, manual login,
-unavailable interactive access, out-of-scope changes, or a suppression the
-user has not approved. Include the smallest next action that would close the
-gate.
+Stop repair work when the next action requires a product decision, expands
+scope materially, would change a quality policy, or cannot be verified with
+available evidence. Report the exact blocker.
 
-## Report Contract
-
-Report:
-
-1. Problems, Markdown, ESLint, Fallow, Unit, E2E, and Coverage status as
-   `PASS`, `FAIL`, `BLOCKED`, or `N-A`.
-2. Commands in execution order with exit outcomes.
-3. Files changed, or `none` in verify mode.
-4. Exact remaining blockers and the smallest next action.
+Do not use an invented coverage percentage. Report measured coverage only when
+the repository defines how it is collected and interpreted.

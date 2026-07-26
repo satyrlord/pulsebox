@@ -1,23 +1,26 @@
-# Add Feature Examples
+# Feature examples
 
-## Example 1: Clarify Playback Contract
+## Project-format change
 
-- Prompt shape: "Update the playback spec for this new event-span behavior."
-- Good behavior: edit the owning playback contract doc, define success
-  criteria, and keep non-goals explicit.
-- Good result: the next implementation slice becomes unambiguous.
+Request: add a new persistent plugin parameter.
 
-## Example 2: Record A Durable Trade-Off
+Update the parameter descriptor and plugin contract, the versioned .pulsebox
+schema and migration behavior, import validation, undo behavior, unit tests,
+round-trip tests, and the affected acceptance criterion.
 
-- Prompt shape: "Record why we are not versioning `.mixjam` files."
-- Good behavior: capture the decision, rationale, and consequences in the
-  owning numbered spec under `specs/` instead of scattering the answer across
-  chat history.
-- Good result: future architecture or format work stops re-litigating the same
-  question.
+## Visual change
 
-## Example 3: Add A Glossary Term
+Request: add a new compact rack control.
 
-- Prompt shape: "Define 'output library root' so the docs stop drifting."
-- Good behavior: add the smallest durable glossary entry in the owning doc.
-- Good result: later prompts and specs use one canonical term.
+Confirm that the control belongs on the compact faceplate, dispatches a typed
+command, changes audible or documented state, works by keyboard, appears in all
+five themes, causes no supported-size overlap, and has component and browser
+evidence.
+
+## Technical change
+
+Request: use a browser API whose behavior differs across engines.
+
+Verify current Chrome, Edge, and Firefox documentation or behavior. Record the
+support contract, fallback, user-visible error, and automated or manual
+verification procedure in the owning document.

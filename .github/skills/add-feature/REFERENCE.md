@@ -1,32 +1,18 @@
-# Add Feature Reference
+# Feature decision reference
 
-## Durable Decision Workflow
+Record a decision in the owning specification or domain document when it:
 
-Code explains what exists. Documentation explains why the repo chose this
-shape instead of a nearby alternative.
+- changes approved behavior or acceptance wording;
+- changes a public, plugin, message, command, project, import, or export
+  contract;
+- changes engine, state, UI, persistence, or worklet ownership;
+- changes the browser, audio, accessibility, responsive, theme, naming, or
+  originality boundary;
+- is costly to reverse or likely to be rediscovered.
 
-Write durable documentation for:
+Keep local implementation detail in code and tests when it does not change a
+durable contract.
 
-- architecture or layering changes
-- documented project format or version changes
-- persistence contract changes
-- import or playback behavior changes that affect future compatibility
-- resolved terminology conflicts that should stay consistent across docs
-
-Use `docs/glossary.md` only for shared language that spans multiple specs or
-workflows. Pick one preferred term, keep definitions tight, and record
-relationships or flagged ambiguities only when future readers would otherwise
-reuse the wrong term.
-
-## Decision-Record Threshold
-
-Record a decision durably only when all three are true:
-
-- hard to reverse
-- surprising without context
-- the result of a real trade-off
-
-Use the lightest structure that still records the trade-off clearly: one
-small block stating context, decision, and why this path won. Add `Status`,
-`Considered Options`, or `Consequences` sections only when they add genuine
-value for the decision at hand.
+For each durable decision, record the chosen behavior, why it is needed,
+rejected alternatives that materially affect later work, and the exact
+acceptance or verification consequence. Keep one owner for each fact.

@@ -1,7 +1,6 @@
 ---
 name: deslop
 description: Remove AI slop, including low-value and misleading test code, from every file in the repository while preserving behavior and genuine information.
-disable-model-invocation: true
 ---
 
 # Deslop

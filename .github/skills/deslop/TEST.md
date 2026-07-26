@@ -94,8 +94,9 @@ Keep a candidate when context proves its value. In particular:
 
 ## Detection and cleanup
 
-1. Read `vitest.config.ts`, `playwright.config.ts`, the shared test setup, the
-   production owner, the owning spec, the whole test file, and one sibling.
+1. Read the current package scripts, Vitest and Playwright configuration when
+   they exist, the shared setup, the production owner, the owning specification
+   contract, the whole test file, and one sibling.
    Finish when the runner, environment, fixtures, and claimed contracts are
    known.
 2. Run the candidate unchanged with the narrowest command that actually
@@ -115,11 +116,12 @@ Keep a candidate when context proves its value. In particular:
      and the retained suite still catches the same relevant defect,
    - **replace** a weak sole test with a meaningful contract test instead of
      removing the only intended protection.
-5. Run every edited test, then its owning project. Use
-   `npx vitest run <file> --project=<renderer|backend>` for unit/backend files.
-   Use `npx playwright test <file> --project=<name>` for E2E files. Run
-   `npm test` after Vitest cleanup; build and run the affected Electron project
-   after E2E cleanup.
+5. Run every edited test with the narrowest discovered repository command,
+   then its owning unit, component, browser, or visual project. Run the full
+   affected suite after cleanup. For browser changes, build and serve the
+   production Pulsebox application and run the applicable Chrome, Edge, and
+   Firefox Playwright projects. Do not invent commands when configuration is
+   absent.
 6. Report kept, refactored, merged, deleted, and replaced tests separately.
    Name any skipped mutation check, pre-existing failure, undiscovered file, or
    unverified runtime surface.

@@ -1,72 +1,48 @@
 ---
 name: handoff
-description: Transfer session state to a fresh agent as a minimal, lossless state-transfer document.
-argument-hint: "What will the next session be used for?"
-disable-model-invocation: true
+description: Create a concise Pulsebox session or phase handoff that lets a fresh agent resume from verified repository state without reopening settled decisions.
 ---
 
-# Handoff
+# Create a Pulsebox handoff
 
-Produce a **state-transfer .md file** — the minimum payload a fresh agent
-needs to resume this session without re-litigating decisions already made.
-Save to the tmp folder of the current workspace.
+## Choose the artifact
 
-## Self-Critique Phase (Before Writing)
+- For a temporary session transfer, write to an ignored temporary path chosen
+  by the user or current workflow.
+- For a durable phase or project handoff, update HANDOFF.md when it exists.
+- Do not duplicate facts already owned by the specification, architecture,
+  project-format, theme, instrument, effect, commit, issue, or test report.
+  Link to them.
 
-Before composing the handoff, run a brief self-critique to surface gaps and
-unstated assumptions. Log the results; do not start fixing them — that turns
-two minutes into another hour. The handoff carries them forward.
+## Verify before writing
 
-1. **What are you least confident about?** List what you did not properly
-   investigate. For each item, name a concrete command or test that would
-   verify or disprove it. If you cannot name a cheap check, the uncertainty
-   is likely filler.
-2. **What did you skip, defer, or not investigate?** Be explicit — not "the
-   tests pass" but "edge case X was never tested; error path Y was not
-   exercised."
-3. **What assumptions went unstated?** Surface reasoning shortcuts you took
-   for granted. Overconfident errors are harder to spot than uncertain ones.
-4. **What is the biggest thing the user might be missing?** Surface blind
-   spots you see but they have not considered.
+Inspect current HEAD, status, diff, relevant test results, and the last concrete
+action. Run a self-critique:
 
-Capture these findings under the "Open questions" section (below) or as a
-short appendix at the end of the handoff.
+1. List least-confident work with a concrete verification command or procedure.
+2. List skipped, incomplete, or deferred work.
+3. Surface previously unstated assumptions.
+4. Name the largest remaining blind spot.
 
-## Completion Criterion
+For a completion handoff, fix acceptance-blocking gaps before writing. For an
+intentional mid-task transfer, label blockers and next actions without claiming
+completion.
 
-The handoff is done when a fresh agent, given only this document and the
-repo, can state the current task, the last concrete action taken, and the
-exact next step — without asking a single clarifying question.
+## Required sections
 
-## Required Sections
+1. Current task.
+2. Verified state and last completed action.
+3. Decisions made and their owning documents.
+4. Verification commands and results.
+5. Exact next step.
+6. Blocking questions only.
+7. Files touched.
+8. Suggested repository skills.
+9. Self-critique and remaining blind spot.
 
-1. **Current task** — one sentence. What we are building or fixing.
-2. **State snapshot** — the last concrete action taken, and the immediate
-   next step. Be specific: file paths, line numbers, command to run.
-3. **Decisions made** — what was ruled in, what was ruled out, and why. This
-   is the highest-value section; it prevents re-litigation.
-4. **Open questions** — only the ones that block the next step. Skip
-   resolved questions and future-phase unknowns.
-5. **Files touched** — paths, not contents. Reference diffs or commits when
-   available.
-6. **Suggested skills** — the repo skills the next agent should invoke, in
-   order.
+Use plain Markdown and concise bullets. Exclude conversation history, obsolete
+dead ends, copied source contents, credentials, personal data, and unsupported
+claims.
 
-## What to Exclude
-
-- Content already captured in artifacts (PRDs, plans, ADRs, issues, commits,
-  diffs). Reference them by path or URL.
-- Conversation history, dead ends, or discarded approaches — unless the
-  *reason* for discarding is a durable decision.
-- Sensitive information: API keys, passwords, PII.
-
-## Format
-
-Plain Markdown. No boilerplate headers beyond the sections above. Prefer
-bullet lists over prose paragraphs.
-
-## Tailoring
-
-If the user passed arguments, treat them as a description of the next
-session's focus. Weight the state snapshot and suggested skills toward that
-focus.
+Finish when a fresh agent can identify the current task, verified state, and
+exact next action using only the handoff and repository.

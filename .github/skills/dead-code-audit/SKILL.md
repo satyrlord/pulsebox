@@ -1,102 +1,52 @@
 ---
 name: dead-code-audit
-description: >
-  Audits the MixJam Electron (MJE) codebase for dead TypeScript code, orphan
-  files, and unused symbols across main and renderer processes.
+description: Audit Pulsebox for provably unreachable TypeScript, Web Components, plugins, AudioWorklets, styles, assets, exports, and dependencies; remove findings only when cleanup is explicitly requested.
 ---
 
-# Dead Code Audit
+# Audit dead code
 
-## Goal
+## Establish the current graph
 
-Gather deterministic **evidence** of dead code in the TypeScript codebase
-(main + renderer processes) — hard proof, not suspicion. Inspect only the
-reported findings and either:
+1. Read AGENTS.md and the relevant product contracts.
+2. Read package.json and tool configuration when they exist.
+3. Identify actual application, test, worklet, worker, plugin, theme, and build
+   entry points.
+4. Run the repository dead-code, typecheck, lint, and build scripts only when
+   they are present and current.
 
-- report live findings and validated false positives, or
-- remove provably dead code when the user explicitly asked for cleanup.
+The repository may not have implementation tooling yet. Do not treat the
+imported .fallowrc.json as valid until its entry points match current Pulsebox
+files and a package script invokes it.
 
-Use this skill for dead-code work only. Ordinary review, security review,
-performance review, and merge-readiness review are out of scope here — that
-is `full-code-review`'s domain.
+## Prove each finding
 
-## Read First
+For every candidate, inspect:
 
-1. `AGENTS.md`
+- static imports and dynamic imports;
+- customElements.define registrations and element names in markup;
+- plugin registry and manifest references;
+- AudioWorklet and worker URL construction;
+- typed event names, command unions, selectors, and serialization;
+- Shadow DOM styles, CSS custom properties, inline SVG, Canvas, and asset URLs;
+- migration and import paths;
+- tests, fixtures, build inputs, and public documentation.
 
-## Run Fallow Static Analysis First
+Static analysis is evidence, not permission to delete. Project migrations can
+be live even when ordinary call sites are absent.
 
-Before gathering other evidence, run Fallow from the repository root:
+## Act only within scope
 
-```PowerShell
-npm run fallow
-```
+- In audit mode, report findings and false positives without editing.
+- In cleanup mode, remove the smallest proven dead slice.
+- Preserve research/ as non-shipping research when it complies with the
+  originality boundary; absence from the production graph alone is not proof
+  that approved research is unwanted.
+- Re-run the narrowest graph, type, lint, test, and build checks after each
+  coherent deletion.
 
-Treat its output as findings, not permission to edit. In audit-only mode,
-record and triage findings without changing files. In cleanup mode, edit only
-findings covered by the user's request and the Deletion Standard.
+## Completion
 
-If Fallow fails to run, report the exact failure and stop.
-
-## Gather Evidence
-
-Run from the repository root and collect findings from:
-
-```PowerShell
-# TypeScript compiler diagnostics (unused variables, unreachable code, unused parameters)
-npm run typecheck
-
-# ESLint diagnostics (unused imports, unused variables, dead code patterns)
-npm run lint
-```
-
-For symbols the compiler cannot judge (unused exports, orphan files,
-unreferenced CSS or assets), search for references with `rg`
-across the project.
-
-If typecheck or lint fails, preserve the diagnostics as evidence. Do not delete
-anything until the relevant failure is understood and the deletion can be
-validated independently.
-
-## Weigh the Evidence
-
-For each finding, gather the smallest local proof before editing:
-
-- direct usages and references
-- entrypoint wiring (main process, preload, renderer), React component
-  tree, or IPC glue
-- reflection, serialization, CSS class references, or dynamic imports
-- contextBridge API surface — symbols exposed to the renderer may appear
-  unused in the main process but are consumed over IPC
-- tests or fixtures that rely on the symbol or file
-
-If the evidence shows the finding is a false positive (still alive through
-one of these paths), report the concrete reason rather than deleting.
-
-## Act on the Evidence
-
-1. If the request is audit-only, report findings and their evidence without
-   editing.
-2. If the request includes cleanup and the evidence meets the Deletion
-   Standard in [REFERENCE.md](REFERENCE.md), delete the smallest slice that
-   removes it.
-3. After each deletion, run Audit Validation before widening scope.
-4. For false positives, suggest the narrowest suppression or config
-   refinement only when the same false positive is likely to recur.
-
-## Completion Criterion
-
-The audit is complete when:
-
-- the requested audit or cleanup scope is explicit,
-- every reported finding has been triaged as live, false positive, or removed,
-- the evidence for each decision is explicit,
-- no cleanup was performed without proof,
-- and Audit Validation passes after every edit, or the exact blocker is
-  reported without claiming completion.
-
-## Deep Reference
-
-Use [REFERENCE.md](REFERENCE.md) for the Deletion Standard, False Positive
-Checklist, Reporting contract, and Audit Validation steps. Use
-[EXAMPLES.md](EXAMPLES.md) for concrete audit and cleanup scenarios.
+Classify every candidate as live, false positive, removed, or unresolved.
+Provide concrete evidence for each classification and do not claim a clean
+audit when required tooling is absent. Use [REFERENCE.md](REFERENCE.md) for the
+deletion standard and [EXAMPLES.md](EXAMPLES.md) for common Pulsebox roots.

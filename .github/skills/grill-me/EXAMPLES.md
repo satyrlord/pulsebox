@@ -1,22 +1,24 @@
-# Grill Me Examples
+# Grill examples
 
-## Example 1: Pressure-Test an Architecture Change
+## Audio contract
 
-- Prompt shape: "Grill me on this tracker-dropout architecture change."
-- Good behaviour: ask one high-risk question at a time and force resolution
-  of release risk, rollback, and ownership assumptions.
-- Good result: a smaller decision tree and one clear next owning skill.
+Prompt: "Grill me on adding fixed-block DSP."
 
-## Example 2: Branch Reduction Before Spec Work
+Start with whether the algorithm can process host-supplied frame counts. Then
+resolve bounded buffering, latency, offline parity, sample-rate coverage, and
+the rendered-audio verifier.
 
-- Prompt shape: "I have two ways to store debug artifacts. Grill me."
-- Good behaviour: challenge scope, persistence, safety, and doc ownership
-  before any spec text is written.
-- Good result: a stable choice or a clearly human-only unresolved decision.
+## Project data
 
-## Example 3: Naming and Terminology Check
+Prompt: "Grill me on storing per-project theme choices."
 
-- Prompt shape: "Help me choose the right term for this new import seam."
-- Good behaviour: cross-check `docs/glossary.md` before asking the user to
-  coin a new term.
-- Good result: one canonical term ready for `add-feature`.
+First surface that the approved contract makes theme and contrast global local
+preferences. Ask whether the user intends to reopen that decision before
+discussing schema design.
+
+## UI scope
+
+Prompt: "Grill me on a compact mobile layout."
+
+Start with the approved 1280 x 720 editing minimum and mobile exclusion. Do not
+design the layout until the user explicitly changes that product boundary.

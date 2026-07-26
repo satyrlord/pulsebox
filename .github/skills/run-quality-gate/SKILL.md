@@ -1,63 +1,57 @@
 ---
 name: run-quality-gate
-description: Runs the repository quality gate in verification or repair mode. Use to assess release readiness, clear diagnostics, fix lint or test failures, or enforce the unit-coverage policy.
+description: Run or repair the Pulsebox checks that exist for the current phase, including documentation, lint, typecheck, unit, component, browser, visual, build, naming, dependency, and audio evidence.
 ---
 
-# Run Quality Gate
+# Run the Pulsebox quality gate
 
-Run a fixed **gate** sequence with objective command evidence.
+## Select a mode
 
-## Select Mode
+- In verify mode, run safe applicable checks and report failures without
+  editing source, tests, or configuration.
+- In repair mode, fix only root causes within the requested scope and re-run
+  each affected check.
 
-- **Verify mode:** use when the user asks whether the branch passes. Run every
-  applicable gate and report failures without editing source, tests, or config.
-- **Repair mode:** use when the user asks to clean or fix the branch. Close each
-  gate before moving to the next; edit only causes within the requested
-  repository scope.
+Never add suppressions, exclusions, disabled rules, or lower thresholds without
+explicit approval.
 
-Never introduce suppressions, exclusions, disabled rules, or lower thresholds
-without explicit user approval.
+## Discover the gate
 
-Read [REFERENCE.md](REFERENCE.md) once before execution for command discovery,
-coverage interpretation, stop conditions, and the report contract.
+1. Read AGENTS.md and the current specification phase.
+2. Read package.json and test or tool configuration when they exist.
+3. Use repository scripts as the command source.
+4. Mark a planned but absent check as not available. Do not invent its command,
+   coverage threshold, or pass result.
 
-## Gates
+At the current specification-only stage, product build, lint, typecheck, and
+test gates are unavailable because package.json and product code do not exist.
+Markdown and repository-consistency checks may still apply.
 
-Run in this order:
+## Run applicable checks
 
-1. **Problems:** use a whole-workspace diagnostics API when one is available.
-   Otherwise mark this gate `N-A` with the missing capability; do not claim the
-   Problems panel is empty.
-2. **Markdown:** run the discovered repository Markdown command or the
-   documented fallback. Pass only on zero findings.
-3. **ESLint:** run the discovered lint command. Pass only on a clean exit.
-4. **Fallow:** run the dead-code command. Pass only on zero findings.
-5. **Unit:** run the discovered unit suite. Pass when all tests pass; use `N-A`
-   only when no suite exists.
-6. **E2E:** run the discovered Electron E2E suite. Pass when all tests pass; use
-   `N-A` only when no suite exists.
-7. **Coverage:** run unit coverage, supplementary E2E coverage when available,
-   and the combined report. Pass only when every reported unit Statements,
-   Branches, Functions, and Lines cell is at least 70%.
+Use this order when each check exists:
 
-In verify mode, continue after a failed gate when later commands remain safe
-and independent. In repair mode, stop at a condition defined in
-[REFERENCE.md](REFERENCE.md).
+1. Markdown and document links.
+2. Case-insensitive naming and originality audit.
+3. Prohibited and unused dependency audit.
+4. Lint.
+5. Typecheck.
+6. Unit and component tests.
+7. Production build.
+8. Playwright tests in supported browsers.
+9. Visual regression at required sizes, themes, and high contrast.
+10. Stage-specific rendered-audio, persistence, import/export, or performance
+    checks.
+11. Dead-code and coverage tools only when configured and documented.
 
-## Repair Loop
+Continue independent safe checks after a failure in verify mode. In repair
+mode, capture the exact diagnostic, fix the smallest root cause, and re-run the
+same check before moving on.
 
-For each open gate in repair mode:
+## Report
 
-1. Capture the exact failing command and diagnostic.
-2. Identify the smallest root cause.
-3. Apply the smallest in-scope repair.
-4. Re-run that gate until it passes or reaches a stop condition.
-5. Record every changed file before advancing.
+For every check, report the command or procedure, status, and concise evidence.
+Use pass, fail, blocked, or not available. Claim an overall pass only when every
+required and applicable check passes.
 
-## Completion Criterion
-
-The gate run is complete when every applicable gate has an objective status,
-commands and outcomes are recorded in order, no unauthorized suppression or
-edit occurred, and the final output satisfies the report contract in
-[REFERENCE.md](REFERENCE.md). Claim an overall pass only when every applicable
-gate passes.
+Read [REFERENCE.md](REFERENCE.md) for discovery and stop conditions.
