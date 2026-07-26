@@ -2,22 +2,14 @@
 
 **Status:** Approved authoritative product specification  
 **Version:** 1.0  
-**Approval date:** 2026-07-26  
-**Source documents:** `spec-001-pulsebox-agent-brief.md` and `spec-000-pulsebox-agent-brief.md`  
+**Approval date:** 2026-07-26
 **Purpose:** Define the single authoritative Pulsebox product contract by preserving the functional union of both source specifications and incorporating every product-owner decision recorded on 2026-07-26.
 
 > This document is final for the approved MVP scope. It contains no unresolved product decisions. Later accepted changes must update this file in the same change.
 
 ---
 
-## 0. Merge policy
-
-This document treats the two source specifications as complementary:
-
-- The detailed application specification supplies the visual shell, exact desktop composition, component model, control behavior, persistence baseline, accessibility requirements, testing matrix, and default `Neon Basement` project.
-- The broader agent brief supplies the deeper audio architecture, module plugin model, per-voice drum architecture, advanced sequencing, live input, generators, pattern banks, song timeline, automation, modular effect chains, themes, user samples, crash recovery, and audio export.
-
-The merged product keeps the union of those capabilities unless two requirements cannot coexist. Every identified conflict has been resolved. Section 25 records the approved decisions and their IDs for traceability.
+## 0. Overview
 
 Governance:
 

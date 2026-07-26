@@ -1,40 +1,25 @@
 ---
 name: skills-router
-description: Find the right user-invoked skill. Use when you know there is a skill for the job but cannot remember its name.
-disable-model-invocation: true
+description: Select the right Pulsebox repository skill when the user asks what workflow or skill should handle a task.
 ---
 
-# Skill Router
+# Select a Pulsebox skill
 
-User-invoked skills spend no context load, but that only helps if you can
-remember which one to type. This skill is the index.
+Read [the catalog](../README.md). Choose the smallest skill that owns the
+request:
 
-## Type these yourself (user-invoked)
+- add-feature for specification or contract changes;
+- dead-code-audit for reachability and safe deletion;
+- design-pulsebox-ui for layout, styling, theme, control, or accessibility work;
+- deslop for repository-wide evidence-backed cleanup;
+- diagnose for an unproven failure or performance regression;
+- full-code-review for a read-only change-set review;
+- grill-me for unresolved product or architecture decisions;
+- handoff for durable state transfer;
+- improve-codebase-architecture for broad architecture opportunities;
+- refactor for narrow behavior-preserving cleanup;
+- run-quality-gate for phase-applicable repository checks;
+- verify for built-browser and rendered-audio evidence.
 
-- `deslop` — Remove AI slop from the repository while preserving behavior.
-- `full-code-review` — Run a strict, read-only code-judo review.
-- `generate-mix` — Generate or revise the saved mixer test song.
-- `handoff` — Transfer session state to a fresh agent.
-- `improve-codebase-architecture` — Surface architectural friction and propose
-  deepening opportunities.
-- `design-router` — pick a bundled design theme  
-
-## Describe the task and let the agent pick (model-invoked)
-
-If the task matches one of these triggers, just describe it; the agent will fire
-the skill:
-
-- `add-feature` — spec, decisions, and durable docs for new work
-- `dead-code-audit` — find and optionally remove dead code
-- `diagnose` — controlled bug or regression diagnosis
-- `grill-me` — decision-tree design grilling
-- `refactor` — behavior-preserving cleanup
-- `run-quality-gate` — run or repair the repository quality gate
-- `verify` — verify renderer changes against real Chromium
-
-See [README.md](../README.md) for the categorized skill list.
-
-## Completion Criterion
-
-Routing is complete when one skill is named and the reason it fits the request
-is stated.
+Use one primary skill. Add another only when the task truly crosses workflows.
+State the selected skill and why. Do not invoke a deleted or nonexistent skill.
