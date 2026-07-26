@@ -53,7 +53,19 @@ Project-owned entity IDs use lowercase UUID version 4 text in the form
 `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`, where `y` is `8`, `9`, `a`, or `b`. This
 applies to projects, module instances, effect instances, patterns, notes, steps,
 automation lanes, scenes, sections, clips, and user-created asset records. IDs
-are stable across reorder, save, export, import, and migration.
+are stable across reorder, save, export, ordinary import, and migration. The
+explicit Import as copy action in section 9.4 remaps only the project ID,
+lineage ID, and revision epoch; its project-scoped entity IDs remain stable.
+
+Across stored heads, a project-scoped entity identity is the tuple of project
+ID, lineage ID, typed ID. A lineage ID remains stable across ordinary saves,
+counter rollover, export, ordinary import, and migrations. The explicit Replace
+existing and Undo replace actions start new lineages and require complete state
+and engine replacement; code must not correlate their equal typed IDs with an
+older lineage.
+
+A lineage ID and revision epoch each use the same canonical UUID version 4 form.
+They are metadata tokens, not project-owned entity IDs.
 
 Fixed rack locations use `slot-01` through `slot-08`. Fixed send buses use
 `send-a` through `send-d`. Array positions are never durable references.
@@ -210,12 +222,15 @@ id                  project UUID
 name                non-empty user-visible name
 createdAt           timestamp
 modifiedAt          timestamp, not earlier than createdAt
+lineageId           UUID
+revisionEpoch       UUID
 revision            integer from 0 through 9007199254740991
 pinned              boolean
 ```
 
-Export does not change `revision` or `modifiedAt`. A successful save increments
-the stored revision once and writes the commit time to `modifiedAt`.
+`revisionEpoch` and `revision` form one revision token. Export changes neither
+the token nor `modifiedAt`. A successful save advances the token once and writes
+the commit time to `modifiedAt`. Section 11.1 defines counter rollover.
 
 ### 5.3 Plugin requirements and instances
 
@@ -315,8 +330,29 @@ required.
 tempo steps, and time-signature events. Every entity uses a stable UUID and
 references module and pattern IDs rather than array positions. Durations and
 positions use non-negative integer ticks. Tempo is finite and inside the
-registered tempo parameter range. A time signature has a numerator from 1
-through 32 and a power-of-two denominator from 1 through 32.
+registered tempo parameter range.
+
+A `TimeSignatureEvent` contains exactly:
+
+```text
+id                  event UUID
+positionTicks       non-negative safe integer
+numerator           integer from 1 through 32
+denominator         1, 2, 4, 8, 16, or 32
+```
+
+The ordered list has exactly one anchor at tick 0. The anchor is the first event
+and cannot be deleted or moved away from tick 0, although its numerator and
+denominator are editable. No two events may share a tick.
+
+Validate bar boundaries from left to right. For an event at tick `T`, let `P` be
+the preceding event tick and let its signature be `N/D`. Its bar length is
+`N * 960 * 4 / D` ticks, which is an integer for every allowed denominator. `T`
+is valid only when `(T - P)` is an exact non-negative multiple of that bar
+length. The new signature applies starting at `T`. Creating, moving, deleting,
+or editing an event revalidates the complete ordered list, because changing an
+earlier event can invalidate later boundaries. A collision or invalidated later
+event rejects the command or import atomically and reports every affected event.
 
 An `AutomationLane` contains:
 
@@ -637,8 +673,9 @@ graph:
 7. Resolve plugin and pack compatibility without substituting content.
 8. Run deterministic migrations and allowed safe repairs on a detached copy,
    then repeat complete schema and reference validation.
-9. Run storage quota preflight.
-10. Commit all records in one IndexedDB transaction and only then replace the
+9. Resolve any local project-ID collision under section 9.4.
+10. Run storage quota preflight.
+11. Commit all records in one IndexedDB transaction and only then replace the
     active project.
 
 Security-limit failures may stop immediately. For bounded semantic validation,
@@ -663,15 +700,48 @@ value, new value, and rule.
 
 Parsing, hashing, decoding inspection, migration, repair, quota calculation, and
 candidate engine preparation happen outside the active project and outside the
-final transaction. The final read-write transaction includes the new project
-head, its immutable unique asset blobs, reference counts, and initial recovery
-record. An abort leaves the previous project and active audio graph unchanged
-and removes all candidate writes.
+final transaction. Engine preparation occurs only after collision resolution and
+any resulting remap has passed complete validation again. The final read-write
+transaction includes the new project head, its immutable unique asset blobs,
+reference counts, and initial recovery record. An abort leaves the previous
+project and active audio graph unchanged and removes all candidate writes.
 
 The UI swaps to the imported state only after the transaction completes and the
 engine confirms that required plugins can prepare it. Compatible project load
 uses playback-safe graph replacement. A rejected import never appears in the
 project selector and never changes undo history.
+
+### 9.4 Existing project-ID collisions
+
+Ordinary import rejects before mutation when `ProjectMetadata.id` already has a
+local project head. The collision report names the local and imported project
+revision tokens and offers three explicit resolution actions:
+
+- **Open existing** discards the detached import candidate and opens the local
+  head without writing data.
+- **Import as copy** assigns a new project UUID, lineage ID, and revision epoch,
+  sets revision to 0, and sets both timestamps to the action time. All
+  project-scoped module, pattern, event, effect, lane, scene, section,
+  asset-record, and migration IDs remain unchanged because their identity is
+  scoped by the new project and lineage IDs. Content IDs and pack IDs also
+  remain unchanged. Rack-collapse preferences are not copied. The remapped
+  candidate receives complete validation again before quota preflight and
+  commit.
+- **Replace existing** keeps the existing project UUID and `createdAt`, writes
+  the imported musical state and name under a new lineage ID and revision epoch,
+  sets revision to 0, and sets `modifiedAt` to the action time. All imported
+  project-scoped IDs and internal references remain unchanged within that new
+  lineage. The prior local head is written to recovery, active command history
+  is cleared, and the engine receives a complete replacement in the same
+  transaction boundary. Failure changes neither head. The completion notice
+  offers **Undo replace**, which atomically restores the prior content under
+  another new lineage ID and revision epoch at revision 0. No old revision token
+  is reused.
+
+These are collision-resolution actions, not a confirmation dialog. No action is
+preselected. Closing the report leaves both the local project and imported file
+unchanged. A same-ID candidate is never allowed to overwrite a local head merely
+because its numeric counter or timestamp is newer.
 
 ## 10. Browser storage and stable origin
 
@@ -760,13 +830,19 @@ belong to the next revision.
 
 A save transaction:
 
-1. reads the current stored revision;
+1. reads the current stored revision token;
 2. creates one canonical detached snapshot of the intended revision;
 3. writes new immutable asset blobs and reference-count changes;
 4. writes the previous head into recovery history;
-5. replaces the project head with revision `stored revision + 1`;
+5. replaces the project head with the next revision token;
 6. removes recovery records beyond the retention rule;
 7. reports saved only after the transaction `complete` event.
+
+When the stored counter is below `9007199254740991`, the next token keeps the
+epoch and increments the counter by one. When it equals that maximum, the save
+uses a newly generated UUID epoch and counter 0. Counter rollover occurs inside
+the same transaction as the save. It keeps the project ID stable and broadcasts
+the complete new token. Tests inject the epoch factory.
 
 An aborted transaction changes none of those records. Save status returns to
 dirty with the specific error. Undo history is runtime state and is not written
@@ -782,17 +858,19 @@ pruned by recovery maintenance.
 
 At startup, Pulsebox validates the current head. If it is missing or invalid, it
 selects the newest fully valid retained head without overwriting it, reports the
-recovered revision and timestamp, and requires a new successful save before that
-revision becomes current. Recovery is announced through visible text and an ARIA
-live region.
+recovered revision token and timestamp, and requires a new successful save
+before that revision becomes current. Recovery is announced through visible text
+and an ARIA live region.
 
 ### 11.3 Multiple tabs
 
-Tabs broadcast committed project ID and revision. A tab whose base revision is
-older shows a non-blocking stale-state warning before its next save. Last writer
-wins remains authoritative: the later save transaction re-reads the current
-stored revision, writes its complete in-memory snapshot as the next revision,
-and does not create an automatic conflict copy.
+Tabs broadcast the committed project ID and complete revision token. A tab whose
+base token does not exactly equal the stored token shows a non-blocking
+stale-state warning before its next save. Last writer wins remains
+authoritative: the later save transaction re-reads the current stored token,
+writes its complete in-memory snapshot under the next token, and does not create
+an automatic conflict copy. Revision tokens are equality and concurrency
+markers; clients do not order different epochs by UUID or counter.
 
 ## 12. Canonical serialization
 
@@ -820,8 +898,8 @@ Canonical portable export uses ZIP Store for every entry. Entries are ordered as
 `manifest.json` followed by asset paths in bytewise ascending order. Each entry
 has the fixed ZIP timestamp `1980-01-01T00:00:00`, regular-file mode `0644`, no
 extra fields, and no comments. CRC-32 and sizes are written in both headers.
-Repeated export of the same committed revision and the same export choice must
-produce byte-identical output.
+Repeated export of the same committed revision token and the same export choice
+must produce byte-identical output.
 
 ## 13. Portable export and round trips
 
@@ -880,6 +958,7 @@ automate them in unit and browser tests.
 - Invalid UTF-8, duplicate JSON keys, excess nesting, excess members, excess
   array length, non-finite number spellings, unsafe integer, and lone surrogate.
 - Duplicate, malformed, dangling, wrong-kind, and unstable IDs.
+- Existing project-ID collision with no selected resolution action.
 - Nine rack slots with all over-cap slots listed in the report.
 - Cyclic routing, invalid parameter values that cannot be safely repaired, and
   missing protected limiter.
@@ -899,6 +978,9 @@ automate them in unit and browser tests.
   successful resolution after reinstalling exact content.
 - Complete multi-step project and plugin migrations with deterministic output,
   plus failure at each intermediate step.
+- A time-signature anchor, valid multi-signature bar sequence, duplicate tick,
+  non-boundary event, and an earlier edit that invalidates multiple later
+  events.
 
 ### 14.4 Storage and recovery fixtures
 
@@ -910,6 +992,13 @@ automate them in unit and browser tests.
   head fallback, and blob reference-count retention.
 - Two tabs saving stale revisions, with warning and verified last-writer-wins
   output.
+- Revision increment at the maximum-minus-one counter and epoch rollover at the
+  maximum counter.
+- Same-ID Open existing, Import as copy, Replace existing, and cancelled
+  resolution, including metadata remapping, cross-lineage equal typed IDs,
+  recovery, Undo replace, and atomic rollback.
+- Equal module IDs across Replace and Undo-replace lineages, proving that
+  lineage-keyed rack-collapse preferences do not leak.
 - Pack install and project import failures that leave no partial records.
 - Referenced-pack removal blocked with a usage report and unreferenced removal
   completed atomically.

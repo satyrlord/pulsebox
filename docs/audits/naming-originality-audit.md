@@ -29,6 +29,9 @@ visual assets exist yet.
 - Removed the stale imported dead-code configuration that named an Electron,
   JSX, and nonexistent worklet source tree.
 - Removed Electron main, preload, build, and distribution ignore entries.
+- Removed stale broad ignores for codec, data, WAV, CSV, and build-configuration
+  paths so future reviewed source, fixtures, factory audio, and tool contracts
+  cannot be omitted silently.
 - Normalized `Pulsebox` capitalization in agent entry documents.
 - Renamed the authoritative specification to `SPEC.md` and updated repository
   links.

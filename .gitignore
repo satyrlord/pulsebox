@@ -1,24 +1,12 @@
-# Source data (read-only, large, not tracked in VCS)
-archive/
-
-# Proprietary DLLs, compiled tools, and cross-verification scripts
-# (Windows-only; binary; potential copyright concerns)
-codec/
-
 # Project configuration and agent instructions (workspace-local)
 .github/agents
 .github/instructions
 .github/prompts
 .github/references
 
-# Extracted audio output (derived from copyrighted source material)
-output/
-
-# Binary file types — never track regardless of location
-*.wav
+# Local binaries and secrets
 *.exe
 *.dll
-*.csv
 *.log
 .env.local
 
@@ -28,12 +16,9 @@ build/
 dist/
 out/
 release/
-data/
 
 # TSC build artifacts
 *.tsbuildinfo
-vite.config.js
-vitest.config.js
 coverage/
 coverage-unit/
 coverage-e2e/

@@ -168,7 +168,8 @@ must be newly created for Pulsebox.
    switching themes, opening editors, and reordering modules must not produce a
    dropout or click.
 4. **Undo is the safety system.** User edits go through a command layer.
-   Continuous gestures coalesce into one history entry.
+   Continuous gestures coalesce into one history entry. Active history is
+   bounded, expires oldest entries first, and never makes a valid new edit fail.
 5. **Core controls remain visible.** Compact panels expose the controls needed
    for fast sound design. Expanded editors expose deeper parameters without
    replacing the underlying state.
@@ -186,8 +187,10 @@ Deep effect editors use the already established 760 × 680 editor format.
 Playback continues underneath. The editor restores focus when closed.
 
 Pulsebox uses no destructive confirmation dialogs. Destructive edits happen
-immediately, preserve full undo data, and produce a non-blocking Undo
-notification and ARIA live announcement.
+immediately, preserve complete recovery data while their bounded history entry
+is retained, and produce a non-blocking Undo notification and ARIA live
+announcement. When the history budget is full, the oldest retained entries
+expire before the new action commits.
 
 ---
 
@@ -1071,10 +1074,12 @@ Each slot supports:
 - Visible level.
 - Pattern activity.
 
-Rack-module collapse is a lightweight local UI preference keyed by project ID
-and stable module ID. It is not project data, is not included in portable files,
-and does not create an undo entry. Removing a module removes its local collapse
-preference; Undo restores the module expanded.
+Rack-module collapse is a lightweight local UI preference keyed by project ID,
+project lineage ID, and stable module ID. It is not project data, is not
+included in portable files, and does not create an undo entry. Removing a module
+removes its local collapse preference; Undo restores the module expanded. A
+whole-project Replace, Undo replace, or Import as copy cannot inherit another
+lineage's collapse state even when module IDs match.
 
 Collapsed slots remain usable and show:
 
@@ -1659,6 +1664,12 @@ event is a structural Song command attached to a bar boundary. It stores a
 numerator from 1 through 32 and a denominator of 1, 2, 4, 8, 16, or 32. Moving,
 creating, or deleting one event is undoable. Recording parameter movement never
 creates or changes a time-signature event.
+
+Song always has one non-deletable time-signature anchor at tick 0. Later events
+are unique and ordered by tick. A later event is on a bar boundary only when its
+distance from the preceding event is an exact multiple of that preceding
+signature's bar length, `numerator * 960 * 4 / denominator` ticks. Any edit
+revalidates all later events atomically as defined in `PROJECT-FORMAT.md`.
 
 Whenever transport Record is armed, every user parameter movement records
 automatically into the target parameter lane. The resulting take is one undoable
@@ -2439,6 +2450,12 @@ Include:
 - Pattern changes.
 - Sample assignment.
 
+The combined active Undo and Redo history keeps at most 100 entries and 64 MiB
+of canonical patch JSON. One entry is at most 17 MiB. New committed edits clear
+Redo and evict the oldest Undo entries as needed; they do not fail merely
+because history is full. Retained entries pin referenced immutable blobs. The
+exact accounting and eviction contract is in `ARCHITECTURE.md`.
+
 Exclude:
 
 - Meter frames.
@@ -2458,6 +2475,8 @@ Unit tests:
 - Selectors.
 - Undo and redo.
 - Gesture coalescing.
+- Undo/Redo count and byte eviction boundaries, Redo clearing, blob pins, and a
+  maximum-before/maximum-after entry below the proven encoding cap.
 - Migrations.
 - Import validation.
 - Pattern timing.
@@ -2475,6 +2494,7 @@ Unit tests:
 - Automation step timing, overwrite, and sample-and-hold behavior.
 - Theme token validation.
 - Time-signature event validation and bar-boundary behavior.
+- Same-project-ID import resolution and revision-epoch rollover.
 - Archive traversal, collision, expansion, and record-count rejection.
 - Plugin version and pack-reference validation.
 - Storage quota failure and atomic rollback.
@@ -2689,7 +2709,7 @@ Phase 2: Remaining instruments, sample layers, eight-slot rack, overview,
 internal voice mixers.
 
 Phase 3: Pattern banks, piano roll, drum grid, live input, generators,
-transforms, full undo.
+transforms, bounded full Undo.
 
 Phase 4: Main mixer, voice inserts, module pedalboards, send chains, master
 chain, complete effect catalog.
@@ -2732,7 +2752,9 @@ this table is the traceability record.
   default synth-heavy, Hybrid Nine blended, digital modules sample-heavy with
   lo-fi enabled.
 - **D06.** No destructive confirmation dialogs. Actions happen immediately and
-  preserve complete Undo.
+  preserve complete Undo while their bounded active-history entry is retained. A
+  new action evicts older history rather than failing for lack of history
+  capacity.
 - **D07.** The supported editing workspace begins at 1280 CSS pixels wide.
 - **D08.** Deep effect editors use the established 760 × 680 playback-safe modal
   overlay.
@@ -2841,10 +2863,23 @@ this table is the traceability record.
 - **D55.** Time signatures are structural Song events at bar boundaries, not
   parameter automation targets.
 - **D56.** Rack-module collapse is a local UI preference, is not portable
-  project data, and is excluded from undo.
+  project data, is lineage-keyed, and is excluded from undo.
 - **D57.** Objective audio, browser, accessibility, startup, and first-use
   evidence uses the thresholds and procedures in section 24.4 and the Phase 0
   domain contracts.
+- **D58.** Same-project-ID import never overwrites silently. Open existing,
+  Import as copy, and Replace existing follow the atomic identity and recovery
+  rules in `PROJECT-FORMAT.md`.
+- **D59.** A project revision is an epoch UUID plus a safe-integer counter. At
+  the counter maximum, an atomic save keeps the project ID, generates a new
+  epoch, and resets the counter to zero.
+- **D60.** Active Undo and Redo share a 100-entry, 64 MiB canonical-patch
+  budget; each entry is at most 17 MiB under the proven encoding bound,
+  referenced blobs are pinned, and oldest Undo entries expire before a new edit
+  commits.
+- **D61.** Song has one time-signature anchor at tick 0. Later time signatures
+  are unique ordered events validated against the preceding signature's exact
+  bar length, and every structural edit revalidates later events atomically.
 
 ## 26. Acceptance criteria
 
@@ -2899,8 +2934,9 @@ The merged MVP is complete only when:
 32. Deliberate parameter moves record while transport Record is armed, use the
     dedicated 1/16 automation grid by default, write to the active pattern or
     Song arrangement by mode, and apply the last-value-wins hold rule.
-33. Undo and redo cover all committed edits and destructive actions use no
-    confirmation dialog.
+33. Undo and redo cover every retained committed edit; destructive actions use
+    no confirmation dialogs, and a new valid action evicts oldest history rather
+    than failing because the active-history budget is full.
 34. Autosave, recovery, explicit Save, import, export, and migrations are
     atomic. Quota failure preserves the last committed project, leaves the
     editor dirty, reports recovery actions, and keeps portable Export available.
@@ -2998,11 +3034,25 @@ The merged MVP is complete only when:
 79. Time signatures are validated structural Song events at bar boundaries, are
     editable through undoable commands, and are never written by parameter
     automation recording.
-80. Rack-module collapse persists only as a local UI preference keyed by project
-    and module, does not travel in `.pulsebox` files, and creates no undo entry.
+80. Rack-module collapse persists only as a local UI preference keyed by
+    project, project lineage, and module, does not travel in `.pulsebox` files,
+    creates no undo entry, and never leaks across whole-project replacement
+    lineages.
 81. Every referenced plugin is required and known at a compatible version;
     missing pack references use the degraded, reference-preserving recovery
     behavior in `PROJECT-FORMAT.md`.
+82. A same-project-ID import makes no change until the user chooses Open
+    existing, Import as copy, or Replace existing; every path follows the exact
+    remapping, recovery, validation, and rollback contract.
+83. Project revision tokens advance atomically and roll from the maximum safe
+    counter to counter zero under a new epoch without changing the project ID.
+84. Active Undo and Redo enforce the 100-entry, 64 MiB combined budget, 17 MiB
+    per-entry limit, encoding-envelope limit, oldest-first eviction, Redo
+    clearing, and blob-pin release, including a maximum-before/maximum-after
+    fixture.
+85. Time-signature imports and edits enforce the tick-zero anchor, unique ticks,
+    exact preceding-signature bar-boundary calculation, and atomic downstream
+    revalidation.
 
 ## 27. Out of scope
 

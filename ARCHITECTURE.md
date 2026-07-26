@@ -203,6 +203,11 @@ contracts shall define:
 
 ```ts
 type ProjectId = string & { readonly __brand: "ProjectId" };
+type ProjectLineageId = string & { readonly __brand: "ProjectLineageId" };
+interface ProjectRevision {
+  readonly epoch: string;
+  readonly counter: number;
+}
 type RackSlotId = string & { readonly __brand: "RackSlotId" };
 type ModuleInstanceId = string & { readonly __brand: "ModuleInstanceId" };
 type VoiceId = string & { readonly __brand: "VoiceId" };
@@ -218,8 +223,12 @@ type ContentId = string & { readonly __brand: "ContentId" };
 
 Instance and musical-entity IDs shall be lowercase canonical UUID strings
 generated with a cryptographically strong browser source. Tests shall inject a
-deterministic ID factory. IDs shall never be reused within a project, including
-after undo removes an entity and a later command creates another entity.
+deterministic ID factory. Identity across stored heads is project ID, lineage
+ID, and typed entity ID. An entity ID shall never be reused for a different
+entity within one lineage, including after Undo removes an entity and a later
+command creates another entity. Whole-project Replace and Undo replace start new
+lineages and use complete state and engine replacement, as defined in
+`PROJECT-FORMAT.md`.
 
 The eight MVP rack positions shall use the fixed `RackSlotId` values `slot-01`
 through `slot-08`. The four sends shall use `send-a` through `send-d`. Module
@@ -436,9 +445,9 @@ interface PulseStore {
 
 State shall be treated as immutable at the public boundary. Commands shall be
 discriminated unions. Each command shall include a unique `commandId`, a stable
-command type, a typed payload, an expected project revision, an origin, and an
-optional gesture ID. Wall-clock time may be metadata but shall not decide
-musical behavior or command validity.
+command type, a typed payload, an expected complete project revision token, an
+origin, and an optional gesture ID. Wall-clock time may be metadata but shall
+not decide musical behavior or command validity.
 
 Dispatch shall validate the full command before mutation. A command shall either
 apply one complete transition or no transition. Validation errors shall name the
@@ -455,7 +464,8 @@ recording shall never create or edit one of these events.
 
 The composition boundary shall translate accepted state changes into a minimal
 typed `EngineDelta`. It shall not send whole project objects for ordinary edits.
-Every delta shall carry the accepted project revision and stable target IDs.
+Every delta shall carry the accepted complete project revision token and stable
+target IDs.
 
 If the engine rejects a delta because of a fault or stale engine revision,
 project state shall remain authoritative. The controller shall report the
@@ -467,10 +477,12 @@ selection, and decoder progress are transient. They shall not enter project
 history or portable serialization.
 
 Rack-module collapse shall be a lightweight local UI preference keyed by
-`ProjectId` and `ModuleInstanceId`. It shall use the state-owned preference
-port, shall not enter project data or portable files, and shall not create an
-undo entry. Removing a module shall remove its collapse preference. Undoing
-removal shall restore the module expanded.
+`ProjectId`, `ProjectLineageId`, and `ModuleInstanceId`. It shall use the
+state-owned preference port, shall not enter project data or portable files, and
+shall not create an undo entry. Removing a module shall remove its collapse
+preference. Undoing removal shall restore the module expanded. Whole-project
+Replace, Undo replace, and Import as copy use a different project or lineage
+key, so equal module IDs never inherit another lineage's preference.
 
 ### 7.3 Undo and inverse data
 
@@ -483,9 +495,21 @@ Undo and redo shall each apply atomically through the same validation and
 engine-projection path as a new command. Undo shall not replay pointer events or
 call UI component methods.
 
-The recovery history shall be bounded by the persistence contract. A command
-whose inverse would exceed a declared bound shall be rejected before mutation
-with an actionable error; it shall not become partly undoable.
+Active Undo and Redo history has a combined maximum of 100 entries and 64 MiB of
+canonical inverse and forward-patch JSON. Shared immutable asset and pack blobs
+do not count toward the JSON budget; each retained entry pins every blob it
+references through the persistence port.
+
+One entry is limited to 17 MiB. Its canonical before-fragment and after-fragment
+are each bounded by the 8 MiB project-manifest limit. The typed command, paths,
+IDs, version, and entry envelope together are separately limited to 64 KiB.
+Therefore the maximum encoded entry is at most 16 MiB plus 64 KiB and fits the
+17 MiB limit. A valid committed project edit shall always fit that bound. Before
+appending a new entry, clear Redo and evict the oldest Undo entries until both
+combined limits will hold. Eviction releases their blob pins atomically. Undo
+and Redo move an entry between stacks without changing the combined budget. The
+UI exposes only retained entries as available. A valid destructive action shall
+not be rejected because history is full; older entries expire first.
 
 ### 7.4 Gesture coalescing
 
@@ -542,17 +566,19 @@ interface EngineMessageEnvelope<TKind extends string, TPayload> {
   readonly nodeId: string;
   readonly sequence: number;
   readonly kind: TKind;
-  readonly projectRevision?: number;
+  readonly projectRevision?: ProjectRevision;
   readonly requestId?: string;
   readonly audioFrame?: number;
   readonly payload: TPayload;
 }
 ```
 
-`sequence`, `projectRevision`, and `audioFrame` shall be non-negative safe
-integers. Sequence numbers start at zero for each direction and session and
-increase by one. A session shall be replaced before a counter can exceed
-`Number.MAX_SAFE_INTEGER`; wraparound is prohibited.
+`sequence`, `projectRevision.counter`, and `audioFrame` shall be non-negative
+safe integers. `projectRevision.epoch` shall be a canonical UUID. Sequence
+numbers start at zero for each direction and session and increase by one. A
+session shall be replaced before a sequence can exceed
+`Number.MAX_SAFE_INTEGER`; sequence wraparound is prohibited. Project revision
+rollover follows `PROJECT-FORMAT.md`.
 
 ### 8.2 Message families
 
@@ -596,9 +622,9 @@ stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
 
 An acknowledgement shall identify the highest contiguous applied sequence and
-project revision. A snapshot becomes authoritative only after acknowledgement.
-The controller shall not free state or sample transfer data still required by an
-unacknowledged message.
+complete project revision token. A snapshot becomes authoritative only after
+acknowledgement. The controller shall not free state or sample transfer data
+still required by an unacknowledged message.
 
 ### 8.4 Bounds and backpressure
 
@@ -852,9 +878,10 @@ requests, persistent-storage behavior, atomic saves, pack storage, archive
 validation, limits, recovery pruning, and emergency portable export are owned by
 `PROJECT-FORMAT.md` and shall be tested through the state-owned ports.
 
-Last-writer-wins behavior shall compare committed project revisions, not
-timestamps alone. Cross-tab notices may warn a stale tab but shall not create a
-lock or conflict copy.
+Last-writer-wins behavior shall compare complete committed revision tokens for
+equality, not timestamps or numeric counters alone. Cross-tab notices may warn a
+stale tab but shall not create a lock or conflict copy. Epoch rollover and
+same-project-ID import resolution are owned by `PROJECT-FORMAT.md`.
 
 ## 13. Test seams
 

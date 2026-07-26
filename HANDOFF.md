@@ -1,9 +1,9 @@
 # Phase 0 handoff
 
-**Date:** 2026-07-26  
-**Repository revision inspected:** `7d166c5` plus the current working-tree
-documentation repair  
-**Phase state:** Phase 0 contract work complete pending independent review
+- **Date:** 2026-07-26
+- **Base revision inspected:** `c461f41`
+- **Phase state:** Phase 0 contract work complete with no unresolved review
+  blocker
 
 ## Outcome
 
@@ -33,7 +33,15 @@ The normative document set is:
 - Monitor is exclusive physical-output pre-fader listen. It does not double the
   program path and is excluded from saved and exported project state.
 - Time signatures are undoable structural Song events, not parameter automation.
+- Time signatures use one tick-zero anchor and exact preceding-signature
+  bar-boundary validation with atomic downstream revalidation.
 - Rack-module collapse is a local preference, not project state or undo state.
+- Project identity separates project, lineage, and revision tokens. Same-ID
+  import has explicit Open existing, Import as copy, and Replace existing paths.
+- Revision counters roll atomically to a new epoch at the safe-integer maximum.
+- Active Undo and Redo share explicit count and byte budgets, prove the
+  worst-case entry encoding fits, evict oldest entries, and pin referenced
+  blobs.
 - User themes use an allowlisted token grammar with numeric contrast and target
   checks.
 - Asset and pack blobs stay pinned while current, recovery, pending-operation,
@@ -46,6 +54,8 @@ The normative document set is:
 - Added the architecture, project-format, theming, README, handoff, sample
   policy, and naming/originality documents required for Phase 0.
 - Removed stale Electron/JSX dead-code configuration and ignore entries.
+- Removed broad stale ignores that could hide decoder code, test data, WAV/CSV
+  fixtures, or required build configuration.
 - Removed the empty lockfile because no package manifest or dependency tree
   exists yet.
 - Normalized the product name to `Pulsebox` in prose.
@@ -56,11 +66,14 @@ Completed against the current working tree:
 
 - Prettier formatting for every changed Markdown file.
 - `npx --yes markdownlint-cli2 "**/*.md" "#node_modules"`: zero issues.
-- Local Markdown link scan: pending final rerun after this handoff was created.
+- Local Markdown link scan: every target resolves.
+- External contract-link scan: all 10 W3C, WHATWG, and MDN targets returned
+  HTTP 200.
 - Stale-path and stale-name scan: zero findings.
 - Prohibited manufacturer and historical model-name scan: zero findings in the
   current repository scope.
-- `git diff --check`: no whitespace errors before the final handoff edit.
+- Built-in palette matrix: 185 of 185 specified contrast pairs pass.
+- `git diff --check`: no whitespace errors.
 
 Product build, typecheck, lint, unit, browser, visual, persistence, and audio
 checks are not available. Phase 1 must create their scripts before any such
@@ -68,12 +81,10 @@ result can be claimed.
 
 ## Next action
 
-Start Phase 1 only after the independent Phase 0 review has no unresolved
-acceptance blocker. Phase 1 should create the strict TypeScript and Vite
-toolchain, the required command surface, architectural import guards, and the
-smallest application shell at the canonical strict-port origin. It must not
-begin instrument or effect implementation before the shared typed contracts are
-executable and tested.
+Phase 1 can now create the strict TypeScript and Vite toolchain, the required
+command surface, architectural import guards, and the smallest application shell
+at the canonical strict-port origin. It must not begin instrument or effect
+implementation before the shared typed contracts are executable and tested.
 
 ## Close-out risks and limits
 
@@ -96,5 +107,12 @@ executable and tested.
 
 ## Independent review
 
-Pending. The final review result and any resulting repairs will replace this
-paragraph before close-out.
+The clean-context review found four initial blockers: undefined same-project-ID
+import behavior, revision-counter exhaustion, an unspecified Undo/Redo bound,
+and an incomplete time-signature record and boundary algorithm. Its focused
+follow-ups found two sizing and identity defects in the first repair, then a
+lineage leak in rack-collapse preferences.
+
+All findings were repaired in the owning contracts. The final focused check
+confirmed that lineage-aware preference identity closes the last blocker and
+reported no remaining contradiction in the reviewed scope.

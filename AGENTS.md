@@ -47,8 +47,8 @@ emoji in code, comments, tests, specifications, documentation, or skills.
 
 ## Product boundary
 
-- Build a fully client-side, desktop-first browser application that runs on
-  localhost.
+- Build a fully client-side, desktop-first browser application that runs locally
+  in a browser.
 - Use `http://127.0.0.1:4173` as the canonical development and production-build
   origin. Fail when that port is unavailable instead of selecting another one.
 - A repository-owned static-file launcher is delivery tooling, not a product
@@ -142,8 +142,10 @@ framework dependencies.
 
 - Route committed user edits through typed commands.
 - Coalesce a continuous gesture into one undo entry.
-- Use immediate destructive actions with full undo, a non-blocking Undo notice,
-  and an ARIA live announcement. Do not add confirmation dialogs.
+- Use immediate destructive actions with complete Undo while their bounded
+  active-history entry is retained, a non-blocking Undo notice, and an ARIA live
+  announcement. Evict older history rather than reject a valid new action. Do
+  not add confirmation dialogs.
 - Store projects and assets in IndexedDB. Store only lightweight global UI
   preferences in local storage.
 - Keep project documents versioned, validated, and migration-aware.

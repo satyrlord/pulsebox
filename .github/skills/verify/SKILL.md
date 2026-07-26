@@ -1,6 +1,9 @@
 ---
 name: verify
-description: Verify nontrivial Pulsebox changes in the production browser build with behavioral, layout, theme, accessibility, persistence, and rendered-audio evidence across supported browsers.
+description:
+  Verify nontrivial Pulsebox changes in the production browser build with
+  behavioral, layout, theme, accessibility, persistence, and rendered-audio
+  evidence across supported browsers.
 ---
 
 # Verify Pulsebox
@@ -9,19 +12,18 @@ description: Verify nontrivial Pulsebox changes in the production browser build 
 
 1. Read AGENTS.md, the changed specification contract, package scripts, and
    Playwright configuration.
-2. Build the production browser application and serve that output on localhost
-   using the repository command.
+2. Build the production browser application and serve that output at the exact
+   canonical origin `http://127.0.0.1:4173` using the repository command.
 3. Use deterministic project state and assets. Do not use a static design
    prototype as product proof.
 4. Close browsers and local servers reliably after the run.
 
-If the build or serve commands do not exist, report verification as blocked.
-Do not substitute the prototype or claim a browser pass.
+If the build or serve commands do not exist, report verification as blocked. Do
+not substitute the prototype or claim a browser pass.
 
 ## Drive the changed behavior
 
-- Use Playwright browser contexts for current stable Chrome, Edge, and Firefox
-  where the repository supports them.
+- Use Playwright browser contexts for current stable Chrome, Edge, and Firefox.
 - Interact through the user-visible surface, including open Shadow DOM roots.
 - Unlock Web Audio through a valid user gesture before testing audible actions.
 - Verify keyboard and pointer paths, focus restoration, typed command effects,
