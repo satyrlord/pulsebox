@@ -1,0 +1,64 @@
+# Source data (read-only, large, not tracked in VCS)
+archive/
+
+# Proprietary DLLs, compiled tools, and cross-verification scripts
+# (Windows-only; binary; potential copyright concerns)
+codec/
+
+# Project configuration and agent instructions (workspace-local)
+.github/agents
+.github/instructions
+.github/prompts
+.github/references
+
+# Extracted audio output (derived from copyrighted source material)
+output/
+
+# Binary file types — never track regardless of location
+*.wav
+*.exe
+*.dll
+*.csv
+*.log
+.env.local
+
+# Node.js
+node_modules/
+build/
+dist/
+dist-electron/
+out/
+release/
+data/
+
+# TSC build artifacts
+*.tsbuildinfo
+vite.config.js
+vitest.config.js
+electron.vite.config.js
+electron.vite.config.d.ts
+src/main/*.js
+src/main/*.d.ts
+src/preload/*.js
+src/preload/*.d.ts
+coverage/
+coverage-unit/
+coverage-e2e/
+.nyc_output/
+playwright-report/
+test-results/
+tmp/
+# Test temp directories created by ad-hoc local runs outside the shared .tmp/ root.
+tmp-*
+
+# VS Code workspace settings
+.vscode/
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Generated one-off outputs
+logs/
+.claude/
+.impeccable/

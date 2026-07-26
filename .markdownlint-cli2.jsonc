@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/main/schema/markdownlint-cli2-config-schema.json",
+  "config": {
+    "MD013": {
+      "line_length": 200
+    }
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "tmp/**",
+    ".git/**",
+    // Generated agent-skill output; gitignored, same as tmp/ and the reports.
+    ".impeccable/**",
+    "**/node_modules/**",
+    "**/HTML-REPORT.md",
+    "playwright-report/**",
+    "test-results/**"
+  ]
+}
