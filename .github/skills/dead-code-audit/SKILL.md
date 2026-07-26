@@ -1,6 +1,9 @@
 ---
 name: dead-code-audit
-description: Audit Pulsebox for provably unreachable TypeScript, Web Components, plugins, AudioWorklets, styles, assets, exports, and dependencies; remove findings only when cleanup is explicitly requested.
+description:
+  Audit Pulsebox for provably unreachable TypeScript, Web Components, plugins,
+  AudioWorklets, styles, assets, exports, and dependencies; remove findings only
+  when cleanup is explicitly requested.
 ---
 
 # Audit dead code
@@ -14,9 +17,9 @@ description: Audit Pulsebox for provably unreachable TypeScript, Web Components,
 4. Run the repository dead-code, typecheck, lint, and build scripts only when
    they are present and current.
 
-The repository may not have implementation tooling yet. Do not treat the
-imported .fallowrc.json as valid until its entry points match current Pulsebox
-files and a package script invokes it.
+The repository may not have implementation tooling yet. Do not invent entry
+points or treat a planned tool as configured until current files and a package
+script prove it.
 
 ## Prove each finding
 
@@ -31,8 +34,8 @@ For every candidate, inspect:
 - migration and import paths;
 - tests, fixtures, build inputs, and public documentation.
 
-Static analysis is evidence, not permission to delete. Project migrations can
-be live even when ordinary call sites are absent.
+Static analysis is evidence, not permission to delete. Project migrations can be
+live even when ordinary call sites are absent.
 
 ## Act only within scope
 
@@ -47,6 +50,6 @@ be live even when ordinary call sites are absent.
 ## Completion
 
 Classify every candidate as live, false positive, removed, or unresolved.
-Provide concrete evidence for each classification and do not claim a clean
-audit when required tooling is absent. Use [REFERENCE.md](REFERENCE.md) for the
+Provide concrete evidence for each classification and do not claim a clean audit
+when required tooling is absent. Use [REFERENCE.md](REFERENCE.md) for the
 deletion standard and [EXAMPLES.md](EXAMPLES.md) for common Pulsebox roots.

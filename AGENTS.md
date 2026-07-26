@@ -7,18 +7,17 @@ emoji in code, comments, tests, specifications, documentation, or skills.
 
 ## Source of truth
 
-- Read [the unified product specification](docs/pulsebox-unified-spec-v1.0.md)
-  in full before planning or changing product code.
+- Read [the unified product specification](SPEC.md) in full before planning or
+  changing product code.
 - Treat that file as the approved MVP contract and acceptance source.
-- The specification calls the future living document SPEC.md. The repository
-  has not made that rename yet. Do not create a second product specification.
-- A direct product-owner decision overrides the specification. Update the
-  owning specification, implementation, tests, and user documentation together.
+- Do not create a second product specification.
+- A direct product-owner decision overrides the specification. Update the owning
+  specification, implementation, tests, and user documentation together.
 - Do not silently remove a requirement to resolve a contradiction. Report the
   conflict and obtain a product decision when the current repository cannot
   resolve it.
-- Files under design/ are prototypes and visual evidence. They are not
-  normative unless the specification or user explicitly makes them so.
+- Files under design/ are prototypes and visual evidence. They are not normative
+  unless the specification or user explicitly makes them so.
 
 ## Current repository state
 
@@ -36,8 +35,8 @@ emoji in code, comments, tests, specifications, documentation, or skills.
   and final review.
 - Use exploration workers for independent, read-heavy work. Use execution
   workers for narrow work with an objective verifier.
-- Give delegated work a bounded scope, expected output, and verification
-  method. Avoid overlapping edits.
+- Give delegated work a bounded scope, expected output, and verification method.
+  Avoid overlapping edits.
 - Use higher reasoning for architecture, audio, persistence, security,
   concurrency, and ambiguous product contracts.
 - Before material work, inspect all applicable current documentation and code.
@@ -50,8 +49,12 @@ emoji in code, comments, tests, specifications, documentation, or skills.
 
 - Build a fully client-side, desktop-first browser application that runs on
   localhost.
-- Do not add a server, accounts, cloud sync, collaboration, a native wrapper,
-  a PWA, a service worker, or an install flow.
+- Use `http://127.0.0.1:4173` as the canonical development and production-build
+  origin. Fail when that port is unavailable instead of selecting another one.
+- A repository-owned static-file launcher is delivery tooling, not a product
+  server component. It serves only the built client and exposes no API.
+- Do not add a server, accounts, cloud sync, collaboration, a native wrapper, a
+  PWA, a service worker, or an install flow.
 - Support current stable Chrome, Edge, and Firefox. Safari is outside MVP
   support.
 - Keep the editable workspace usable from 1280 x 720 CSS pixels upward. Below
@@ -113,10 +116,10 @@ framework dependencies.
 - The UI owns Web Components, layout, input, accessibility, themes, and visual
   patching. It dispatches typed commands and never edits the audio graph.
 - Define the base plugin manifest, instrument and effect contracts, parameter
-  descriptors, command model, message protocol, project schema, and theme
-  tokens before implementing instruments or effects.
-- Add an instrument or effect through its plugin folder and registry entry.
-  Do not spread product-specific branches through shared engine, state,
+  descriptors, command model, message protocol, project schema, and theme tokens
+  before implementing instruments or effects.
+- Add an instrument or effect through its plugin folder and registry entry. Do
+  not spread product-specific branches through shared engine, state,
   persistence, mixer, automation, or UI code.
 - Use stable typed IDs and parameter IDs. Do not use array positions as durable
   references.
@@ -139,14 +142,14 @@ framework dependencies.
 
 - Route committed user edits through typed commands.
 - Coalesce a continuous gesture into one undo entry.
-- Use immediate destructive actions with full undo, a non-blocking Undo
-  notice, and an ARIA live announcement. Do not add confirmation dialogs.
+- Use immediate destructive actions with full undo, a non-blocking Undo notice,
+  and an ARIA live announcement. Do not add confirmation dialogs.
 - Store projects and assets in IndexedDB. Store only lightweight global UI
   preferences in local storage.
 - Keep project documents versioned, validated, and migration-aware.
-- Treat imported project data as untrusted. Reject executable content,
-  unsafe paths, invalid structures, unknown required plugins, and projects
-  exceeding eight rack slots as specified.
+- Treat imported project data as untrusted. Reject executable content, unsafe
+  paths, invalid structures, unknown or incompatible referenced plugins, and
+  projects exceeding eight rack slots as specified in PROJECT-FORMAT.md.
 - Keep live audio objects, meter frames, hover, focus, playheads, and temporary
   previews out of serialized state.
 - Preserve project migration paths that remain part of the current format
@@ -164,29 +167,31 @@ framework dependencies.
   hierarchy in the specification.
 - Use the approved tactile studio visual language and the five themes: rack,
   mono, cosmic, analog, and rust. The rack theme is the default.
-- Do not add glassmorphism, floating translucent cards, excessive glow,
-  generic dashboard styling, mobile-style pills, or decorative fake controls.
+- Do not add glassmorphism, floating translucent cards, excessive glow, generic
+  dashboard styling, mobile-style pills, or decorative fake controls.
 - Every visible operational control must change state, sound, navigation, or a
   documented preference.
-- Make every interactive feature keyboard-operable. Prefer native semantics,
-  use ARIA only when needed, preserve visible focus, restore modal focus, and
-  never rely on color alone.
+- Make every interactive feature keyboard-operable. Prefer native semantics, use
+  ARIA only when needed, preserve visible focus, restore modal focus, and never
+  rely on color alone.
 - Pause nonessential visual animation when hidden.
 
 ## Commands and verification
 
 - When package.json exists, treat its scripts as the executable command source.
-- The required command surface is npm install, npm run dev, npm run build,
-  npm run test, npm run test:e2e, npm run lint, and npm run typecheck.
+- The required command surface is npm install, npm run dev, npm run build, npm
+  run start, npm run test, npm run test:e2e, npm run lint, and npm run
+  typecheck.
 - Do not invent a command or quality threshold that the repository has not
   defined.
 - Every implementation task needs an objective verification method.
 - Add and run the smallest relevant unit, component, Playwright, or visual
   regression check for each changed contract.
 - Verify the production build in real browser contexts, not only a DOM shim.
-- Cover current stable Chrome, Edge, and Firefox where practical.
-- Verify supported layouts at 1536 x 1024, 1440 x 900, 1366 x 768, and
-  1280 x 720, plus the below-minimum notice.
+- Cover current stable Chrome, Edge, and Firefox. Automate every deterministic
+  path and record the required manual audio checks for each browser.
+- Verify supported layouts at 1536 x 1024, 1440 x 900, 1366 x 768, and 1280 x
+  720, plus the below-minimum notice.
 - Use deterministic state, meters, animation, and audio fixtures for visual or
   rendered-audio assertions.
 - For performance claims, record the browser, sample rate, exposed buffer
@@ -203,20 +208,20 @@ framework dependencies.
 - Do not add temporary compatibility scaffolding unless it serves a real
   deployment, review, rollback, migration, or risk-control need.
 - Keep comments focused on non-obvious contracts and browser or audio hazards.
-- Update the unified specification in the same change as every accepted
-  product change or bug fix.
-- Add the planned ARCHITECTURE.md, THEMING.md, PROJECT-FORMAT.md, README.md,
-  HANDOFF.md, and domain documentation when their owning implementation phase
-  begins. Do not create placeholder documents that claim unimplemented facts.
+- Update the unified specification in the same change as every accepted product
+  change or bug fix.
+- Keep ARCHITECTURE.md, THEMING.md, PROJECT-FORMAT.md, README.md, HANDOFF.md,
+  and domain documentation current when their owning contracts change. Do not
+  claim that planned implementation exists.
 
 ## Close-out
 
 - Inspect the current workspace state and recent history before summarizing.
-- Run a self-critique and fix every acceptance-blocking gap before declaring
-  the requested work complete.
+- Run a self-critique and fix every acceptance-blocking gap before declaring the
+  requested work complete.
 - Re-run affected checks after each fix.
-- For large, high-risk, or difficult changes, request an independent review
-  from a clean context. Ask: "Evaluate this work. What may have been missed?"
+- For large, high-risk, or difficult changes, request an independent review from
+  a clean context. Ask: "Evaluate this work. What may have been missed?"
 - In the final handoff, record:
   1. least-confident changes and a concrete verification procedure for each;
   2. skipped, incomplete, or deferred work;

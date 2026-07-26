@@ -26,7 +26,6 @@ output/
 node_modules/
 build/
 dist/
-dist-electron/
 out/
 release/
 data/
@@ -35,12 +34,6 @@ data/
 *.tsbuildinfo
 vite.config.js
 vitest.config.js
-electron.vite.config.js
-electron.vite.config.d.ts
-src/main/*.js
-src/main/*.d.ts
-src/preload/*.js
-src/preload/*.d.ts
 coverage/
 coverage-unit/
 coverage-e2e/
