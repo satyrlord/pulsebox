@@ -1,9 +1,6 @@
 ---
 name: dead-code-audit
-description:
-  Audit Pulsebox for provably unreachable TypeScript, Web Components, plugins,
-  AudioWorklets, styles, assets, exports, and dependencies; remove findings only
-  when cleanup is explicitly requested.
+description: Use when the user asks whether Pulsebox code, assets, or dependencies are still reachable, or wants dead code found or removed; or when another skill needs reachability proven.
 ---
 
 # Audit dead code
@@ -14,12 +11,11 @@ description:
 2. Read package.json and tool configuration when they exist.
 3. Identify actual application, test, worklet, worker, plugin, theme, and build
    entry points.
-4. Run the repository dead-code, typecheck, lint, and build scripts only when
-   they are present and current.
+4. Run the repository dead-code, typecheck, lint, and build scripts that
+   `package.json` defines.
 
-The repository may not have implementation tooling yet. Do not invent entry
-points or treat a planned tool as configured until current files and a package
-script prove it.
+Do not invent entry points or treat a planned tool as configured until current
+files and a package script prove it.
 
 ## Prove each finding
 

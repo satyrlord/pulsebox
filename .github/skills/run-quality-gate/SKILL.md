@@ -1,6 +1,6 @@
 ---
 name: run-quality-gate
-description: Run or repair the Pulsebox checks that exist for the current phase, including documentation, lint, typecheck, unit, component, browser, visual, build, naming, dependency, and audio evidence.
+description: Use when the user wants the Pulsebox quality gate run, checks or CI repaired, or asks whether a change is ready to land; or when another skill needs the gate after a change.
 ---
 
 # Run the Pulsebox quality gate
@@ -17,15 +17,14 @@ explicit approval.
 
 ## Discover the gate
 
-1. Read AGENTS.md and the current specification phase.
-2. Read package.json and test or tool configuration when they exist.
-3. Use repository scripts as the command source.
+1. Read repository root `AGENTS.md`, [docs/SPEC.md](../../../docs/SPEC.md), and
+   the current implementation status in
+   [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md).
+2. Read `package.json` and the current test and tool configuration.
+3. Use the scripts in `package.json` as the only command source. Never run a
+   command you did not read there this session.
 4. Mark a planned but absent check as not available. Do not invent its command,
    coverage threshold, or pass result.
-
-At the current specification-only stage, product build, lint, typecheck, and
-test gates are unavailable because package.json and product code do not exist.
-Markdown and repository-consistency checks may still apply.
 
 ## Run applicable checks
 

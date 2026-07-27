@@ -1,7 +1,9 @@
 # Pulsebox theming contract
 
-**Status:** Normative Phase 0 contract  
-**Contract version:** 1  
+**Status:** Normative contract with Phase 1 token and control implementation
+
+**Contract version:** 1
+
 **Owner:** UI layer
 
 This document defines the complete theme boundary for the Pulsebox MVP. It
@@ -554,5 +556,6 @@ The release evidence for each browser records:
 
 Acceptance criteria 39 through 41 and 67 pass only when this evidence is
 complete, all required checks pass, and the implementation matches this
-contract. The repository is currently at the contract stage, so this document
-does not claim that implementation or browser evidence already exists.
+contract. Phase 1 implements the five built-in token sets, high contrast, and
+the current control primitives. Full-shell theme switching and final visual
+evidence across later MVP components remain future work.

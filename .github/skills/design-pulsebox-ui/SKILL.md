@@ -1,16 +1,26 @@
 ---
 name: design-pulsebox-ui
-description: Design, implement, audit, or verify Pulsebox interface work against the approved rack layout, native Web Component model, five themes, responsive sizes, accessibility rules, and playback-safe interaction contract.
+description: Use when the user wants Pulsebox interface work designed, built, audited, or fixed — rack layout, Web Components, themes, controls, or accessibility.
 ---
 
 # Design Pulsebox UI
 
+## Select a mode
+
+- In audit mode, remain read-only. Report evidence-backed usability, layout,
+  accessibility, theme, and interaction findings. Do not require implementation
+  or visual-regression artifacts to complete the audit.
+- In implementation mode, edit only when the user explicitly requests a design
+  or fix. Keep contracts, source, tests, and user documentation aligned.
+- In verification mode, remain read-only unless the user also requests repair.
+  Exercise the built product and record objective browser evidence.
+
 ## Read first
 
-1. Read AGENTS.md.
-2. Read the full approved product specification.
+1. Read repository root `AGENTS.md`.
+2. Read [docs/SPEC.md](../../../docs/SPEC.md) in full.
 3. Re-read sections 8, 10, 11, 22, 24.1, and 24.3 for the changed surface.
-4. Read THEMING.md when it exists.
+4. Read [docs/THEMING.md](../../../docs/THEMING.md).
 5. Treat files under design/ as non-normative prototypes unless the user or
    specification explicitly adopts a detail.
 
@@ -55,6 +65,12 @@ description: Design, implement, audit, or verify Pulsebox interface work against
 
 ## Completion
 
-Finish only when the owning specification, implementation, component tests,
-Playwright coverage, and visual evidence agree. Report any browser or
-audibility claim that still needs a documented manual check.
+- Audit mode: finish with prioritized findings, evidence, affected contracts,
+  and concrete verification or repair steps.
+- Implementation mode: finish only when the owning specification,
+  implementation, tests, user documentation, and required evidence agree.
+- Verification mode: finish with the exact build, browsers, viewports, themes,
+  assertions, and limitations exercised.
+
+Report any browser or audibility claim that still needs a documented manual
+check.

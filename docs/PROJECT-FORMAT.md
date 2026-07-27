@@ -932,8 +932,11 @@ canonical JSON bytes after the round trip.
 
 ## 14. Required verification fixtures
 
-Phase 0 schema work must create fixture definitions. Phase 7 implementation must
-automate them in unit and browser tests.
+The Phase 0 fixture definitions are the typed catalog in
+[`tests/unit/contracts/project-format-fixtures.ts`](../tests/unit/contracts/project-format-fixtures.ts).
+Its unit test enforces unique IDs and the required group totals. Phase 7 must
+replace each input classification with concrete archive, project, storage, and
+recovery fixtures, then automate their outcomes in unit and browser tests.
 
 ### 14.1 Valid golden fixtures
 

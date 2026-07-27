@@ -5,9 +5,14 @@ Imperative rules for AI coding agents working on Pulsebox.
 Use simple English. Prefer short sentences and a plain structure. Do not use
 emoji in code, comments, tests, specifications, documentation, or skills.
 
+Pulsebox is a fully client-side, desktop-first modular groove workstation for
+Chrome, Edge, and Firefox. It is built with strict TypeScript, native Web
+Components, Web Audio, and AudioWorklet. No UI framework, no server product
+component, no MIDI.
+
 ## Source of truth
 
-- Read [the unified product specification](SPEC.md) in full before planning or
+- Read [the unified product specification](docs/SPEC.md) in full before planning or
   changing product code.
 - Treat that file as the approved MVP contract and acceptance source.
 - Do not create a second product specification.
@@ -17,16 +22,28 @@ emoji in code, comments, tests, specifications, documentation, or skills.
   conflict and obtain a product decision when the current repository cannot
   resolve it.
 - Files under design/ are prototypes and visual evidence. They are not normative
-  unless the specification or user explicitly makes them so.
+  unless the specification or user explicitly makes them so. This includes
+  `design/image-gen-mock.png` and `design/claude-mock-up.html`.
+
+Owning contract documents:
+
+- [SPEC.md](docs/SPEC.md) owns approved product behavior and acceptance criteria.
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) owns layers, plugin manifests, the command
+  model, the worklet protocol, ID families, test seams, and audio verification
+  tolerances.
+- [PROJECT-FORMAT.md](docs/PROJECT-FORMAT.md) owns the project schema, IndexedDB
+  storage, migrations, import validation, and portable `.pulsebox` archives.
+- [THEMING.md](docs/THEMING.md) owns the theme token vocabulary and the user-theme
+  import contract.
 
 ## Current repository state
 
-- The repository is at the specification and prototype stage.
-- There is no product source tree, package manifest, or test configuration yet.
-- Do not claim that build, lint, typecheck, test, or browser checks pass until
-  their scripts exist and have been run.
-- Phase 0 must establish contracts, architecture, project schema, theme tokens,
-  legal boundaries, and review evidence before feature implementation.
+- Phase 0 contracts are complete and the Phase 1 foundation is runnable.
+- The repository has a strict TypeScript product source tree, package manifest,
+  unit tests, and production-browser tests.
+- Claim checks only when their current scripts have been run successfully.
+- Later MVP phases remain governed by `docs/SPEC.md`; do not claim that their planned
+  persistence, instruments, mixer, effects, editors, or export exist.
 
 ## Roles and workflow
 
@@ -37,6 +54,9 @@ emoji in code, comments, tests, specifications, documentation, or skills.
   workers for narrow work with an objective verifier.
 - Give delegated work a bounded scope, expected output, and verification method.
   Avoid overlapping edits.
+- `.github/skills/` holds the repository workflows, including add-feature,
+  design-pulsebox-ui, run-quality-gate, full-code-review, verify, refactor,
+  dead-code-audit, and handoff. Use skills-router when the right one is unclear.
 - Use higher reasoning for architecture, audio, persistence, security,
   concurrency, and ambiguous product contracts.
 - Before material work, inspect all applicable current documentation and code.
@@ -124,6 +144,45 @@ framework dependencies.
 - Use stable typed IDs and parameter IDs. Do not use array positions as durable
   references.
 
+## Repository map
+
+The three domain layers and the wiring-only composition boundary live here:
+
+| Path              | Layer       | Owns                                                                                       |
+| ----------------- | ----------- | ------------------------------------------------------------------------------------------ |
+| `src/main.ts`     | composition | Object creation, port injection, command routing, startup and shutdown                     |
+| `src/engine/`     | engine      | AudioContext, AudioNodes, worklets, transport clock, scheduling, decoding, offline render  |
+| `src/state/`      | state       | Project data, typed commands, undo and redo, selectors, serialization, persistence ports   |
+| `src/ui/`         | UI          | Custom elements, layout, input, focus, accessibility, themes, DOM patching                 |
+| `src/contracts/`  | contracts   | Data-only shared types with no singleton, browser handle, or algorithm                     |
+
+Cross-layer imports go through the owning layer's `public.ts`
+(`src/engine/public.ts`, `src/state/public.ts`, `src/ui/public.ts`). Two guards
+enforce this:
+
+- `no-restricted-imports` per layer in `eslint.config.mjs`.
+- The AST policy in `tests/unit/architecture/source-policy.ts`, which also fails
+  on JSX and TSX, UI framework imports, `ScriptProcessorNode`, any identifier or
+  string matching `midi`, service-worker code, and product-specific plugin-ID
+  branching outside a plugin folder or the registry.
+
+Read that policy file before adding a source directory or a shared branch.
+
+An instrument or effect folder follows the current module shape under
+`src/engine/modules/<plugin-id>/`:
+
+- `manifest.ts` declares the base manifest, parameter descriptors, meters,
+  defaults, and the UI manifest including its `moduleAccent` tokens.
+- `dsp-core.ts` holds pure, testable DSP.
+- `<name>.worklet.ts` is the AudioWorkletProcessor.
+- `adapter.ts` loads the worklet module and owns its nodes. It imports the
+  worklet through a Vite `?worker&url` import, not a hand-written path.
+- `runtime.ts` implements the lifecycle the engine drives.
+
+`PulseStore` in `src/state/pulse-store.ts` is the only mutation path. Its history
+limits are 100 entries, 64 MiB combined, and 17 MiB per entry, enforced by
+evicting the oldest entries rather than rejecting a valid new action.
+
 ## Audio
 
 - Run custom synthesis and DSP in AudioWorklet processors.
@@ -151,7 +210,7 @@ framework dependencies.
 - Keep project documents versioned, validated, and migration-aware.
 - Treat imported project data as untrusted. Reject executable content, unsafe
   paths, invalid structures, unknown or incompatible referenced plugins, and
-  projects exceeding eight rack slots as specified in PROJECT-FORMAT.md.
+  projects exceeding eight rack slots as specified in docs/PROJECT-FORMAT.md.
 - Keep live audio objects, meter frames, hover, focus, playheads, and temporary
   previews out of serialized state.
 - Preserve project migration paths that remain part of the current format
@@ -186,6 +245,10 @@ framework dependencies.
   typecheck.
 - Do not invent a command or quality threshold that the repository has not
   defined.
+- To narrow a run: `npx vitest run tests/unit/state/pulse-store.test.ts` for one
+  unit file, `npx vitest run -t "name"` for one test, and
+  `npx playwright test tests/e2e/app-shell.spec.ts --project=chrome` for one
+  browser spec. `npm run test:e2e` builds and serves before running.
 - Every implementation task needs an objective verification method.
 - Add and run the smallest relevant unit, component, Playwright, or visual
   regression check for each changed contract.
@@ -212,7 +275,7 @@ framework dependencies.
 - Keep comments focused on non-obvious contracts and browser or audio hazards.
 - Update the unified specification in the same change as every accepted product
   change or bug fix.
-- Keep ARCHITECTURE.md, THEMING.md, PROJECT-FORMAT.md, README.md, HANDOFF.md,
+- Keep docs/ARCHITECTURE.md, docs/THEMING.md, docs/PROJECT-FORMAT.md, README.md,
   and domain documentation current when their owning contracts change. Do not
   claim that planned implementation exists.
 
@@ -230,5 +293,5 @@ framework dependencies.
   3. previously unstated assumptions;
   4. the largest remaining blind spot;
   5. independent review findings when one was required.
-- Record only verified non-blocking limitations, future work, and known issues
-  in HANDOFF.md.
+- Record verified non-blocking limitations, future work, and known issues in
+  their owning specification, issue, or verification report.

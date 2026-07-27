@@ -2,17 +2,11 @@
 
 ## Command discovery
 
-Prefer package.json scripts. The approved future command surface includes:
-
-- npm run build
-- npm run test
-- npm run test:e2e
-- npm run lint
-- npm run typecheck
-
-Do not assume those scripts exist. Optional Markdown, dead-code, coverage,
-visual, audio, or audit scripts become gates only after the repository defines
-them.
+Every check in the ordered run list is required when `package.json` defines a
+script for it. Report a required check as blocked when its script is missing
+rather than substituting a hand-written command. Optional Markdown, dead-code,
+coverage, visual, audio, or audit scripts become gates only after the
+repository defines them.
 
 ## Phase applicability
 

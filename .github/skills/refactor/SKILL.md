@@ -1,14 +1,15 @@
 ---
 name: refactor
-description: Make a narrow, behavior-preserving Pulsebox cleanup that reduces complexity without changing approved product behavior or public contracts.
+description: Use when the user wants to restructure, clean up, simplify, or reorganize Pulsebox code without changing behavior, or when another skill needs a behavior-preserving change.
 ---
 
 # Refactor Pulsebox
 
 Read AGENTS.md, the owning specification sections, the affected implementation,
-and its tests. Keep the change narrow and validate after each coherent step.
+and its tests. Keep the change minimal and validate after each coherent step.
 Do not mix a refactor with a feature or drive-by cleanup.
 
+A refactor is safe exactly when it moves code without crossing a **seam**.
 Protect these Pulsebox seams:
 
 - Engine, state, and UI ownership. Do not move DOM into engine or state, live
@@ -25,10 +26,10 @@ Protect these Pulsebox seams:
 - Themes. Preserve the token contract and avoid theme-specific TypeScript or
   markup.
 
-Add a focused regression test before a risky structural change. Use
-dead-code-audit for broad reachability cleanup and add-feature if an approved
-contract must change.
+Add a focused regression test before a structural change that touches a seam.
+Use dead-code-audit for broad reachability cleanup and add-feature if an
+approved contract must change.
 
-Complete only when behavior and contracts are unchanged, complexity is
-measurably lower, all affected checks pass, and every changed line serves the
-refactor.
+Complete only when every seam above is intact, behavior and contracts are
+unchanged, complexity is measurably lower, all affected checks pass, and every
+changed line serves the refactor.

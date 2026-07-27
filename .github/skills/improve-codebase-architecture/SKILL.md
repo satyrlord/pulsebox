@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Audit Pulsebox architecture and propose high-leverage improvements to engine, state, UI, plugin, persistence, worklet, and theme boundaries without implementing them unless requested.
+description: Use when the user asks what Pulsebox architecture should change, where boundaries are eroding, or how to reduce structural friction; or when another skill surfaces an architecture gap.
 ---
 
 # Improve Pulsebox architecture
@@ -9,15 +9,13 @@ Remain read-only unless implementation is explicitly requested.
 
 ## Establish the system
 
-Read AGENTS.md, the full approved specification, ARCHITECTURE.md when it exists,
-the current source tree, tests, and dependency graph.
-
-If product code does not exist yet, review the planned contracts and repository
-plan. Do not invent implementation findings.
+Read repository root `AGENTS.md`, [docs/SPEC.md](../../../docs/SPEC.md),
+[docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md), the current source tree,
+tests, and dependency graph.
 
 ## Find leverage
 
-Look for:
+Leverage lives where a **seam** is missing, misplaced, or leaking. Look for:
 
 - engine, state, and UI responsibilities leaking across boundaries;
 - shallow wrappers that do not hide complexity;

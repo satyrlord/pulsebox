@@ -1,11 +1,12 @@
 # Pulsebox
 
-Pulsebox is a planned desktop-first modular groove workstation for current
-Chrome, Edge, and Firefox. It is a fully client-side browser application. The
-repository is in Phase 0: product and architecture contracts exist, but product
-source, package scripts, and tests do not exist yet.
+Pulsebox is a desktop-first modular groove workstation for current Chrome,
+Edge, and Firefox. It is a fully client-side browser application. The Phase 1
+foundation is runnable: it includes the strict TypeScript toolchain, native Web
+Components, typed state and plugin contracts, an AudioWorklet Acid Bass path,
+transport, and three exposed rack slots.
 
-The authoritative product contract is [SPEC.md](SPEC.md).
+The authoritative product contract is [SPEC.md](docs/SPEC.md).
 
 ## Product boundary
 
@@ -20,19 +21,21 @@ The authoritative product contract is [SPEC.md](SPEC.md).
 
 ## Current status
 
-Phase 0 owns contracts and review evidence. It does not claim a runnable
-application. Start Phase 1 only after the Phase 0 documents and checks pass.
+Phase 0 contracts are complete. Phase 1 foundation work is implemented. See the
+[Phase 1 verification evidence](docs/verification/phase-1.md) for current check
+results. The final MVP features in later roadmap phases are not implemented yet.
 
 Current owners:
 
-- [SPEC.md](SPEC.md): approved product behavior and acceptance criteria.
-- [ARCHITECTURE.md](ARCHITECTURE.md): layers, commands, plugins, protocols,
+- [SPEC.md](docs/SPEC.md): approved product behavior and acceptance criteria.
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): layers, commands, plugins, protocols,
   runtime, audio ownership, and verification seams.
-- [PROJECT-FORMAT.md](PROJECT-FORMAT.md): projects, packs, validation, storage,
+- [PROJECT-FORMAT.md](docs/PROJECT-FORMAT.md): projects, packs, validation, storage,
   migrations, and portable archives.
-- [THEMING.md](THEMING.md): theme tokens, safe import, high contrast, and theme
+- [THEMING.md](docs/THEMING.md): theme tokens, safe import, high contrast, and theme
   verification.
-- [HANDOFF.md](HANDOFF.md): verified phase state and next action.
+- [docs/instruments/acid-bass.md](docs/instruments/acid-bass.md): Acid Bass
+  identity, parameters, behavior, and verification boundary.
 - [docs/user-sample-policy.md](docs/user-sample-policy.md): accepted samples,
   ownership, privacy, and user-facing failure behavior.
 - [docs/audits/naming-originality-audit.md](docs/audits/naming-originality-audit.md):
@@ -40,7 +43,7 @@ Current owners:
 
 ## Commands
 
-The required future command surface is:
+The command surface is:
 
 ```text
 npm install
@@ -53,10 +56,9 @@ npm run lint
 npm run typecheck
 ```
 
-These commands are not available until Phase 1 creates `package.json` and the
-product toolchain. `npm run dev` and `npm run start` must both use the canonical
-origin with strict-port behavior. `npm run start` will serve only the built
-static client and expose no product API.
+`npm run dev` and `npm run start` both use the canonical origin with strict-port
+behavior. `npm run start` serves only the built static client and exposes no
+product API. Run `npm run build` before `npm run start`.
 
 ## Architecture
 
@@ -65,30 +67,31 @@ no DOM dependency. State owns serializable data and reversible commands and has
 no DOM or live audio objects. UI owns Web Components and dispatches typed
 commands without editing the audio graph.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the normative contracts.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the normative contracts.
 
 ## State and undo
 
 Committed edits use typed commands. Continuous gestures create one history
-entry. Destructive actions happen immediately, retain full recovery data, and
-produce a non-blocking Undo notice. Meter frames, playheads, focus, hover, audio
-power, and rack-collapse preferences are not project data.
+entry. The product contract requires destructive actions to happen immediately,
+retain full recovery data, and produce a non-blocking Undo notice. Meter frames,
+playheads, focus, hover, audio power, and rack-collapse preferences are not
+project data.
 
 ## Audio
 
-Custom synthesis and DSP run in AudioWorklet processors. Suitable native Web
-Audio nodes remain behind engine-owned adapters. Processors accept the host
-frame count and never assume a 128-frame quantum. WAV, AIFF, and FLAC use the
-Pulsebox-owned bundled decoder path so supported formats do not vary by browser.
+The Phase 1 custom synthesis path runs in an AudioWorklet processor. Suitable
+native Web Audio nodes remain behind engine-owned adapters. The processor
+accepts the host frame count and never assumes a 128-frame quantum. The bundled
+WAV, AIFF, and FLAC decoder foundation is present; sample-import UI and
+cross-browser format fixtures remain later work.
 
 ## Persistence
 
-Projects and assets live in IndexedDB at the canonical origin. Saves, imports,
-and migrations are atomic. Portable `.pulsebox` files are bounded ZIP-compatible
-archives. Browser quota failure preserves the last committed project and keeps
-portable Export available.
+`docs/PROJECT-FORMAT.md` defines the future IndexedDB, atomic save, import,
+migration, recovery, and portable `.pulsebox` behavior. Persistence and portable
+project operations are not implemented in the Phase 1 foundation.
 
-See [PROJECT-FORMAT.md](PROJECT-FORMAT.md).
+See [PROJECT-FORMAT.md](docs/PROJECT-FORMAT.md).
 
 ## Accessibility
 
@@ -99,25 +102,27 @@ conformance below its documented 1280 × 720 editing boundary.
 
 ## Keyboard shortcuts
 
-The specification currently owns the approved shortcuts, including Space for
-play or pause, Escape for Stop, platform-standard undo and redo, and the editor
-selection and clipboard commands. A user-facing shortcut reference is created
-with the owning Phase 1 and Phase 3 UI work so it cannot claim unimplemented
-behavior.
+The specification owns the approved shortcuts. Phase 1 implements Space for
+play or pause, Escape for Stop, and platform-standard undo and redo. The future
+shortcut reference will expand with the Phase 3 editor commands so it does not
+claim unimplemented behavior.
 
 ## Known limitations
 
-- There is no product source or package manifest.
-- No build, typecheck, product lint, unit, browser, visual, persistence, or
-  rendered-audio result can be claimed yet.
+- Persistence, portable projects, the full eight-slot rack, remaining
+  instruments, mixer, effects, advanced editors, and export belong to later
+  roadmap phases.
+- Acid Bass currently implements its Phase 1 sound and compact-rack foundation;
+  its expanded editor remains planned.
+- Browser tests prove AudioWorklet activation. Final release still requires the
+  specified rendered-audio, startup, and physical listening procedures.
 - Files under `design/` are non-normative prototypes, not production evidence.
-- Named historical research is allowed only under non-shipping `research/` and
-  does not yet exist.
+- Named historical research remains isolated under non-shipping `research/`.
 
 ## Adding an instrument
 
 Define one plugin folder and registry entry that implement the base and
-instrument contracts in `ARCHITECTURE.md`. Use stable IDs, add schema and
+instrument contracts in `docs/ARCHITECTURE.md`. Use stable IDs, add schema and
 migration coverage, keep product-specific branches out of shared layers, write
 the sanitized instrument design document, and update affected acceptance
 criteria and verification evidence.
@@ -131,6 +136,6 @@ documentation, and acceptance evidence together.
 
 ## Adding a theme
 
-Add one built-in token set conforming to [THEMING.md](THEMING.md). Do not add
+Add one built-in token set conforming to [THEMING.md](docs/THEMING.md). Do not add
 theme-specific TypeScript or markup. Verify every component, supported viewport,
 focus state, meter, and high-contrast overlay before accepting it.

@@ -1,9 +1,6 @@
 ---
 name: verify
-description:
-  Verify nontrivial Pulsebox changes in the production browser build with
-  behavioral, layout, theme, accessibility, persistence, and rendered-audio
-  evidence across supported browsers.
+description: Use when the user wants proof a Pulsebox change actually works in the real browser build, or asks for browser, layout, theme, or audio evidence; or when another skill needs production-build evidence.
 ---
 
 # Verify Pulsebox

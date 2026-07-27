@@ -1,17 +1,20 @@
 # Pulsebox Architecture Contract
 
-**Status:** Normative Phase 0 contract  
-**Applies to:** Pulsebox MVP  
+**Status:** Normative architecture contract
+
+**Applies to:** Pulsebox MVP
+
 **Authority:** [`SPEC.md`](SPEC.md) remains the product and acceptance source.
 This document owns the durable architecture details that implement that
 specification.  
-**Implementation state:** Contract only. No product source tree or test suite
-exists yet.
+**Implementation state:** The Phase 1 contracts, layer guards, state spine,
+AudioWorklet spine, transport, bundled decoder adapter, and native UI foundation
+exist. Later roadmap layers remain contract-only where noted.
 
 ## 1. Purpose and interpretation
 
-This document defines the architecture that future Pulsebox code shall follow.
-It does not claim that the architecture is implemented.
+This document defines the architecture that Pulsebox code shall follow. An
+implemented Phase 1 slice does not imply that later MVP systems exist.
 
 The words **must**, **must not**, **shall**, **shall not**, **should**, and
 **may** are normative. A product-owner decision recorded in `SPEC.md` overrides
@@ -311,6 +314,10 @@ interface BasePluginManifest {
 }
 ```
 
+`PluginUiManifest.moduleAccent` declaratively supplies the four fixed module
+accent tokens owned by `THEMING.md`. Shared UI applies those values generically;
+it does not branch on a plugin ID, short label, or instrument name.
+
 `pluginVersion` shall use semantic-version syntax. `stateSchemaVersion` shall be
 a positive integer and shall change only when serialized plugin state changes.
 `cpuClass` is informational and shall not become a release threshold.
@@ -547,6 +554,11 @@ bursts on one and two targets, no-op commits, Undo, and Redo.
 
 ## 8. Engine controller and AudioWorklet protocol
 
+The Phase 1 Acid Bass adapter and processor implement this protocol. Focused
+tests cover both endpoints, queue and message bounds, lifecycle, and bounded
+recovery. Current browser and command evidence is recorded in
+[`verification/phase-1.md`](verification/phase-1.md).
+
 ### 8.1 Scope and version
 
 The controller-to-worklet protocol shall be a discriminated message protocol
@@ -622,9 +634,16 @@ stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
 
 An acknowledgement shall identify the highest contiguous applied sequence and
-complete project revision token. A snapshot becomes authoritative only after
-acknowledgement. The controller shall not free state or sample transfer data
-still required by an unacknowledged message.
+complete project revision token. That token is the receiver's own current
+revision, which legitimately runs ahead of the acknowledged envelope when that
+envelope was stale. The controller shall therefore not require the two to match;
+it shall treat only an acknowledgement of a sequence it never sent as a fault.
+
+An acknowledgement clears the acknowledged envelopes whatever its disposition. A
+`stale` disposition means the receiver deliberately ignored the envelope, so its
+values shall not be recorded as the acknowledged snapshot. A snapshot becomes
+authoritative only after acknowledgement. The controller shall not free state or
+sample transfer data still required by an unacknowledged message.
 
 ### 8.4 Bounds and backpressure
 
@@ -706,7 +725,10 @@ Rules:
 - `suspended` retains bounded state but produces no new musical activity.
 - `faulted` shall use the plugin's declared safe silence or dry bypass behavior.
 - `disposing` shall stop scheduling, apply a bounded release or micro-fade,
-  disconnect nodes, close ports, and release references.
+  disconnect nodes, close ports, and release references. A receiver may confirm
+  disposal re-entrantly inside the posting call, so a controller shall capture
+  the node it needs before posting and shall re-read its own state afterwards
+  rather than trusting a value narrowed before that call.
 - `disposed` is terminal. Messages or graph use after disposal shall fail a
   test.
 
@@ -912,7 +934,10 @@ live/offline parity, and declared latency and tail rules.
 Architecture tests shall fail on prohibited cross-layer imports, direct UI audio
 access, state-held browser objects, unregistered plugin branches,
 `ScriptProcessorNode`, main-thread custom DSP, MIDI code, a service worker, a
-PWA manifest, or a product API endpoint.
+PWA manifest, or a product API endpoint. The current AST and artifact guard is
+implemented in `tests/unit/architecture/source-policy.ts`; it also scans delivery
+scripts so a static launcher cannot silently grow a product API, and rejects
+GitHub Pages deployment actions under `.github/workflows/`.
 
 ## 14. Objective audio verification
 
@@ -1043,11 +1068,11 @@ This document is complete as a contract when:
 4. The theme contract owns every user-theme token and validation rule.
 5. Every future implementation phase has an objective test seam and evidence
    requirement.
-6. No document claims that product code, build scripts, or tests already exist.
+6. Documentation distinguishes implemented Phase 1 work from planned later
+   phases and cites current checks for implementation claims.
 
-Phase 0 is a document gate. It is exempt from the later-phase
-runnable-application rule because there is no product source tree yet. Phase 1
-shall not begin until every acceptance-blocking Phase 0 conflict is resolved.
+Phase 0 was the document gate. Its acceptance-blocking conflicts were resolved
+before the Phase 1 product source tree was created.
 
 ## 18. Primary technical references
 

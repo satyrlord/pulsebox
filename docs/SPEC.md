@@ -188,9 +188,9 @@ Playback continues underneath. The editor restores focus when closed.
 
 Pulsebox uses no destructive confirmation dialogs. Destructive edits happen
 immediately, preserve complete recovery data while their bounded history entry
-is retained, and produce a non-blocking Undo notification and ARIA live
-announcement. When the history budget is full, the oldest retained entries
-expire before the new action commits.
+is retained, and produce a non-blocking notification with an operable Undo
+action and an ARIA live announcement. When the history budget is full, the
+oldest retained entries expire before the new action commits.
 
 ---
 
@@ -2129,7 +2129,7 @@ Target:
 Apart from the functional first-sound metric above, the MVP has no normative
 hardware class, CPU percentage, buffer-size threshold, or timed stress benchmark
 as a release gate. Performance profiling remains required for engineering
-diagnosis and `HANDOFF.md`, but it is informational rather than a pass-or-fail
+diagnosis and verification reports, but it is informational rather than a pass-or-fail
 acceptance criterion.
 
 ---
@@ -2650,7 +2650,6 @@ Deliver:
 - `ARCHITECTURE.md`
 - `THEMING.md`
 - `PROJECT-FORMAT.md`
-- `HANDOFF.md`
 - `README.md`
 - One sanitized approved instrument design specification per module in
   `docs/instruments/`.
@@ -2703,7 +2702,13 @@ link, naming, and contract-consistency checks. It does not require a runnable
 product application or product tests.
 
 Phase 1: Application shell, controls, state spine, AudioWorklet spine,
-transport, Acid Bass, three-slot functional rack.
+transport, Acid Bass, three-slot functional rack. During Phase 1, the first
+three slots of the durable eight-slot model are exposed. The development seed
+loads Acid Bass in slot 01 and leaves slots 02 and 03 available for Add or
+Duplicate. This seed is not the final default project or the secondary starter
+template. Current Phase 1 implementation evidence belongs in
+[`verification/phase-1.md`](verification/phase-1.md), not in later-phase product
+claims.
 
 Phase 2: Remaining instruments, sample layers, eight-slot rack, overview,
 internal voice mixers.
@@ -2729,8 +2734,9 @@ completed scope.
 
 Run a self-critique. Fix every acceptance-blocking gap before declaring the
 product complete. Re-run affected tests after each fix. Record only remaining
-non-blocking limitations, future work, and verified known issues in
-`HANDOFF.md`. The former instruction to stop after finding gaps is removed.
+non-blocking limitations, future work, and verified known issues in their owning
+specification, issue, or verification report. The former instruction to stop
+after finding gaps is removed.
 
 ---
 

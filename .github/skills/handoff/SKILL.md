@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Create a concise Pulsebox session or phase handoff that lets a fresh agent resume from verified repository state without reopening settled decisions.
+description: Use when the user wants to hand off, wrap up, or write up a Pulsebox session or phase so a fresh agent can resume.
 ---
 
 # Create a Pulsebox handoff
@@ -9,7 +9,10 @@ description: Create a concise Pulsebox session or phase handoff that lets a fres
 
 - For a temporary session transfer, write to an ignored temporary path chosen
   by the user or current workflow.
-- For a durable phase or project handoff, update HANDOFF.md when it exists.
+- For a durable phase or project handoff, use a persistent artifact selected by
+  the user, such as an existing issue, report, or repository file. An ignored
+  temporary path is not durable. Do not create a permanent repository handoff
+  file unless the user explicitly requests one.
 - Do not duplicate facts already owned by the specification, architecture,
   project-format, theme, instrument, effect, commit, issue, or test report.
   Link to them.
@@ -34,7 +37,7 @@ completion.
 2. Verified state and last completed action.
 3. Decisions made and their owning documents.
 4. Verification commands and results.
-5. Exact next step.
+5. Exact next step, or `No next action` when the work is complete.
 6. Blocking questions only.
 7. Files touched.
 8. Suggested repository skills.
@@ -45,4 +48,5 @@ dead ends, copied source contents, credentials, personal data, and unsupported
 claims.
 
 Finish when a fresh agent can identify the current task, verified state, and
-exact next action using only the handoff and repository.
+next action using only the handoff and repository, or can tell that no action
+remains after completed work.

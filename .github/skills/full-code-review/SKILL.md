@@ -1,11 +1,11 @@
 ---
 name: full-code-review
-description: Review a Pulsebox change set for specification compliance, architecture erosion, audio and persistence hazards, accessibility gaps, originality risks, and maintainability; remain read-only unless fixes are explicitly requested.
+description: Use when the user wants a Pulsebox change set, diff, branch, or pending work reviewed before it lands.
 ---
 
 # Review Pulsebox code
 
-Run a read-only review by default.
+Review read-only. Edit only when the user explicitly requests fixes.
 
 ## Establish scope
 
@@ -17,7 +17,8 @@ Run a read-only review by default.
 
 ## Review standards
 
-Check:
+Most defects here are a **seam** crossed — code that migrated across an
+ownership boundary it should have respected. Check:
 
 - approved behavior and every affected acceptance criterion;
 - strict engine, state, and UI ownership;

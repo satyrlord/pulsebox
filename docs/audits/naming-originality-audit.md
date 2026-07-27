@@ -1,16 +1,19 @@
-# Phase 0 naming and originality audit
+# Naming, dependency, and originality audit
 
-**Date:** 2026-07-26  
-**Repository state:** specification and non-normative prototype stage  
-**Result:** pass for the current shipping-text and dependency scope
+**Date:** 2026-07-27
+
+**Repository state:** Phase 1 runnable foundation
+
+**Result:** pass for the current source, shipping text, build, and dependency
+scope
 
 ## Scope
 
-The audit covered repository public documentation, agent instructions,
-repository configuration, package metadata, and file names. The `design/`
-directory was classified as non-shipping prototype evidence under `AGENTS.md`.
-No production source, factory projects, samples, presets, icons, or shipping
-visual assets exist yet.
+The audit covered product source, public documentation, agent instructions,
+repository configuration, package metadata, lockfile, dependency tree, build
+output, and file names. The `design/` and `research/` directories are
+non-shipping evidence. No factory samples, presets, icons, or shipping binary
+assets exist yet.
 
 ## Checks
 
@@ -19,12 +22,14 @@ visual assets exist yet.
 - Reviewed visible product naming and capitalization.
 - Reviewed file and configuration paths for remnants from earlier products or
   prohibited native-wrapper architecture.
-- Confirmed that no dependency manifest or lock exists at the contract-only
-  stage.
+- Inspected the complete dependency tree for prohibited UI frameworks and the
+  direct decoder chain for pinned versions and licenses.
+- Built the production artifact and inspected its file list to confirm that
+  `design/` and `research/` are excluded.
 - Confirmed that policy documents may name prohibited technologies only to state
   the prohibition.
 
-## Repairs made
+## Repairs and controls
 
 - Removed the stale imported dead-code configuration that named an Electron,
   JSX, and nonexistent worklet source tree.
@@ -32,18 +37,35 @@ visual assets exist yet.
 - Removed stale broad ignores for codec, data, WAV, CSV, and build-configuration
   paths so future reviewed source, fixtures, factory audio, and tool contracts
   cannot be omitted silently.
+- Removed a GitHub Pages deployment workflow that violated the canonical local
+  origin and added an artifact-policy regression against Pages deployment
+  actions.
 - Normalized `Pulsebox` capitalization in agent entry documents.
-- Renamed the authoritative specification to `SPEC.md` and updated repository
-  links.
+- Moved the authoritative contracts under `docs/` and updated repository links.
+- Added source-policy tests that reject prohibited frameworks, JSX, MIDI,
+  service workers and PWA manifests, `ScriptProcessorNode`, executable
+  main-thread DSP-core imports, direct UI audio handles, state-held browser
+  objects, product API endpoints, layer violations, and shared-layer
+  product-specific plugin branches.
+- Added an exact package lock and static build launcher for the canonical
+  strict-port origin.
 
 ## Current evidence
 
-- No prohibited historical product or manufacturer name occurs in a current
-  shipping candidate.
-- No shipping dependency manifest or lock exists.
+- No prohibited historical product or manufacturer name occurs in the current
+  source, package metadata, public documents, or built artifact.
+- The prohibited framework dependency query is empty.
+- `npm audit` reports zero vulnerabilities across 174 installed dependencies.
+- Bundled decoder packages are pinned to `@audio/decode-wav` 1.4.3,
+  `@audio/decode-aiff` 1.2.3, and `@audio/decode-flac` 1.2.3. Their package
+  metadata and the transitive `@wasm-audio-decoders/flac` 0.2.10 metadata
+  declare the MIT license.
 - `PULSEBOX` remains reserved for the application mark and browser title;
   documentation uses `Pulsebox`.
 - The six approved instrument names and IDs remain those in `SPEC.md`.
+- The current build contains only `index.html`, CSS, the application module, and
+  the Acid Bass worklet asset. Current command and browser evidence is in
+  [`../verification/phase-1.md`](../verification/phase-1.md).
 
 ## Required future audit
 

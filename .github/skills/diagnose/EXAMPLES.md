@@ -1,23 +1,28 @@
 # Diagnose Examples
 
-## Example 1: Tracker Dropout With Unclear Root Cause
+## Example 1: AudioWorklet dropout with unclear root cause
 
-- Prompt shape: "Diagnose these recurring dropout bars in one song."
-- Good behavior: build one feedback loop, rank hypotheses, instrument one seam
-  at a time, and stop guessing.
-- Good result: a validated root cause or a tighter owning seam for the next
-  slice.
+- Prompt shape: "Playback clicks after I add the eighth rack module."
+- Good behavior: reproduce in a production browser build with deterministic
+  project state, record browser and sample rate, and instrument one engine or
+  worklet seam at a time.
+- Good result: a validated scheduling, allocation, graph, or message-protocol
+  cause with a rendered-audio regression procedure.
 
-## Example 2: Flaky Setup Crash
+## Example 2: Flaky project reload failure
 
-- Prompt shape: "The setup flow sometimes crashes when I open a picker."
-- Good behavior: confirm a reproducible loop first, then isolate whether the
-  fault is dialog hosting, UI thread affinity, or async state handling.
-- Good result: one local repair plus a guard validation step.
+- Prompt shape: "A saved project sometimes reopens with an empty rack."
+- Good behavior: capture the project document and IndexedDB state, then isolate
+  serialization, validation, migration, asset lookup, and UI hydration in that
+  order.
+- Good result: one proven owning seam and a deterministic save-reload regression
+  test that preserves the original failing fixture.
 
-## Example 3: Import Performance Regression
+## Example 3: Sample-import performance regression
 
-- Prompt shape: "Import got slower after this refactor; diagnose it."
-- Good behavior: capture a baseline, compare candidate hot paths, and measure
-  before changing code.
-- Good result: a quantified regression source, not a speculative optimization.
+- Prompt shape: "Importing a large sample pack got slower after this refactor."
+- Good behavior: use one representative pack, record browser, asset sizes,
+  codecs, workload, and timings, then compare decode, hashing, validation, and
+  IndexedDB write paths before changing code.
+- Good result: a quantified Pulsebox regression source and a repeatable
+  benchmark, not a speculative optimization.

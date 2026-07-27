@@ -2,7 +2,7 @@
 
 This document defines the user-facing sample boundary for Pulsebox. The
 normative storage and validation details are in
-[PROJECT-FORMAT.md](../PROJECT-FORMAT.md).
+[PROJECT-FORMAT.md](PROJECT-FORMAT.md).
 
 ## Accepted sources
 
