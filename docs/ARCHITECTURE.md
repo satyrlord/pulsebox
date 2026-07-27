@@ -207,8 +207,14 @@ contracts shall define:
 ```ts
 type ProjectId = string & { readonly __brand: "ProjectId" };
 type ProjectLineageId = string & { readonly __brand: "ProjectLineageId" };
+type StateRevisionEpoch = string & { readonly __brand: "StateRevisionEpoch" };
+type RevisionEpoch = string & { readonly __brand: "RevisionEpoch" };
+interface StateRevision {
+  readonly epoch: StateRevisionEpoch;
+  readonly counter: number;
+}
 interface ProjectRevision {
-  readonly epoch: string;
+  readonly epoch: RevisionEpoch;
   readonly counter: number;
 }
 type RackSlotId = string & { readonly __brand: "RackSlotId" };
@@ -223,6 +229,15 @@ type SceneId = string & { readonly __brand: "SceneId" };
 type AssetId = string & { readonly __brand: "AssetId" };
 type ContentId = string & { readonly __brand: "ContentId" };
 ```
+
+`StateRevision` orders accepted in-memory commands and engine projections. It
+advances for each accepted project edit, Undo, and Redo. At the maximum counter,
+it generates a new state-revision epoch and continues at zero. It is runtime
+coordination data and is not written to `ProjectMetadata`.
+
+`ProjectRevision` is the committed browser-storage token defined by
+`PROJECT-FORMAT.md`. It advances only inside a successful save transaction. The
+two revision types are distinct and shall not be assigned to each other.
 
 Instance and musical-entity IDs shall be lowercase canonical UUID strings
 generated with a cryptographically strong browser source. Tests shall inject a
@@ -452,7 +467,7 @@ interface PulseStore {
 
 State shall be treated as immutable at the public boundary. Commands shall be
 discriminated unions. Each command shall include a unique `commandId`, a stable
-command type, a typed payload, an expected complete project revision token, an
+command type, a typed payload, an expected complete state revision token, an
 origin, and an optional gesture ID. Wall-clock time may be metadata but shall
 not decide musical behavior or command validity.
 
@@ -471,7 +486,7 @@ recording shall never create or edit one of these events.
 
 The composition boundary shall translate accepted state changes into a minimal
 typed `EngineDelta`. It shall not send whole project objects for ordinary edits.
-Every delta shall carry the accepted complete project revision token and stable
+Every delta shall carry the accepted complete state revision token and stable
 target IDs.
 
 If the engine rejects a delta because of a fault or stale engine revision,
@@ -578,7 +593,7 @@ interface EngineMessageEnvelope<TKind extends string, TPayload> {
   readonly nodeId: string;
   readonly sequence: number;
   readonly kind: TKind;
-  readonly projectRevision?: ProjectRevision;
+  readonly projectRevision?: StateRevision;
   readonly requestId?: string;
   readonly audioFrame?: number;
   readonly payload: TPayload;
@@ -586,11 +601,12 @@ interface EngineMessageEnvelope<TKind extends string, TPayload> {
 ```
 
 `sequence`, `projectRevision.counter`, and `audioFrame` shall be non-negative
-safe integers. `projectRevision.epoch` shall be a canonical UUID. Sequence
+safe integers. The protocol field `projectRevision` carries a `StateRevision`,
+and its epoch shall be a canonical UUID. Sequence
 numbers start at zero for each direction and session and increase by one. A
 session shall be replaced before a sequence can exceed
-`Number.MAX_SAFE_INTEGER`; sequence wraparound is prohibited. Project revision
-rollover follows `PROJECT-FORMAT.md`.
+`Number.MAX_SAFE_INTEGER`; sequence wraparound is prohibited. State-revision
+rollover does not alter the persisted project revision.
 
 ### 8.2 Message families
 
@@ -601,11 +617,17 @@ Controller-to-processor messages shall be limited to:
 - `state-snapshot`;
 - `parameter-batch`;
 - `event-batch`;
+- `clear-scheduled-events`;
 - `transport`;
 - `sample-attach` and `sample-release`;
 - `reset` and `all-notes-off`;
 - `suspend` and `resume`; and
 - `dispose`.
+
+`clear-scheduled-events` removes only queued future musical events at the
+processor. It does not reset DSP state, end the currently sounding voice, or
+suspend the node. The controller uses it before a bounded reschedule, including
+when a live tempo change replaces events inside the lookahead horizon.
 
 Processor-to-controller messages shall be limited to:
 
@@ -634,7 +656,7 @@ stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
 
 An acknowledgement shall identify the highest contiguous applied sequence and
-complete project revision token. That token is the receiver's own current
+complete state revision token. That token is the receiver's own current
 revision, which legitimately runs ahead of the acknowledged envelope when that
 envelope was stale. The controller shall therefore not require the two to match;
 it shall treat only an acknowledgement of a sequence it never sent as a fault.
@@ -894,6 +916,12 @@ asset-reference updates, and new revision metadata atomically according to
 `PROJECT-FORMAT.md`. A failed transaction shall leave the previous committed
 revision loadable. Engine caches and decoded buffers shall not participate in a
 persistence transaction.
+
+The repository receives project content plus the last committed
+`ProjectRevision`. It shall not serialize the in-memory `StateRevision` used by
+commands and engine projections. A successful transaction assigns the next
+`ProjectRevision` to the stored head; later in-memory edits continue with their
+independent state-revision sequence.
 
 The canonical origin in section 2 is part of persistence identity. Quota
 requests, persistent-storage behavior, atomic saves, pack storage, archive

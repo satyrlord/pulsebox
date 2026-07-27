@@ -1032,6 +1032,8 @@ Requirements:
 - Two-digit slot number.
 - Add, Remove, Duplicate, and Swap actions.
 - Disabled states are visible and semantic.
+- Rack action hit targets remain distinct from module controls and do not
+  overlap them at any supported viewport.
 - Overview-only mode shows all slots as compact strips.
 
 Interactions:
@@ -2020,7 +2022,9 @@ Stereo width:
 
 - Reads audio context time.
 - Schedules ahead.
-- Supports tempo change during playback.
+- Supports tempo change during playback without changing the current musical
+  position. The engine discards only queued future events and rebuilds them on
+  the new tempo grid.
 - Supports swing.
 - Supports deterministic humanization.
 - Supports pattern and song modes.
@@ -2090,6 +2094,8 @@ project limits before publishing an asset.
 
 - Resume audio only from a direct user gesture.
 - Clearly show locked, active, suspended, and unavailable states.
+- A terminal audio-processor fault stops transport and disables audible
+  operations while leaving editing available.
 - Editing remains functional if Web Audio is blocked or unavailable.
 - No fake meters while stopped.
 - Demo animation, if used, is deterministic and clearly non-audio.

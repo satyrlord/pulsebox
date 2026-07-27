@@ -1,0 +1,73 @@
+import { parseMeterId, parseParameterId, parsePluginId, type ParameterDescriptor } from "../../../contracts/parameters";
+import type { InstrumentPluginManifest } from "../../../contracts/plugins";
+import { DEFAULT_BASS_PARAMETERS } from "./dsp-core";
+
+function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
+  if (!result.ok) throw new Error("Acid Bass contains an invalid stable identifier.");
+  return result.value;
+}
+
+const parameterId = (value: string) => required(parseParameterId(value));
+
+const parameters: readonly ParameterDescriptor[] = Object.freeze([
+  { id: parameterId("tune"), name: "Tune", valueType: "float", minimum: -24, maximum: 24, defaultValue: 0, step: 1, unit: "semitones", displayPrecision: 0, resetValue: 0, smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+  { id: parameterId("cutoff"), name: "Cutoff", valueType: "float", minimum: 40, maximum: 12000, defaultValue: 720, step: 1, unit: "hertz", displayPrecision: 0, resetValue: 720, smoothing: { curve: "exponential", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "internal" },
+  { id: parameterId("resonance"), name: "Resonance", valueType: "float", minimum: 0, maximum: 0.92, defaultValue: 0.38, step: 0.01, unit: "ratio", displayPrecision: 2, resetValue: 0.38, smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+  { id: parameterId("envelope-amount"), name: "Envelope amount", shortLabel: "Env", valueType: "float", minimum: 0, maximum: 1, defaultValue: 0.52, step: 0.01, unit: "ratio", displayPrecision: 2, resetValue: 0.52, smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "internal" },
+  { id: parameterId("decay"), name: "Decay", valueType: "float", minimum: 0.02, maximum: 2, defaultValue: 0.28, step: 0.01, unit: "seconds", displayPrecision: 2, resetValue: 0.28, smoothing: { curve: "exponential", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+  { id: parameterId("accent-amount"), name: "Accent amount", shortLabel: "Accent", valueType: "float", minimum: 0, maximum: 1, defaultValue: 0.45, step: 0.01, unit: "ratio", displayPrecision: 2, resetValue: 0.45, smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+  { id: parameterId("waveform"), name: "Waveform", valueType: "enum", defaultValue: "saw", enumValues: ["saw", "square"], unit: "none", displayPrecision: 0, resetValue: "saw", smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+  { id: parameterId("glide"), name: "Glide", valueType: "float", minimum: 0, maximum: 1, defaultValue: 0.08, step: 0.01, unit: "ratio", displayPrecision: 2, resetValue: 0.08, smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+  { id: parameterId("volume"), name: "Volume", valueType: "float", minimum: 0, maximum: 1, defaultValue: 0.62, step: 0.01, unit: "ratio", displayPrecision: 2, resetValue: 0.62, smoothing: { curve: "linear", durationMilliseconds: 8 }, workletRate: "message", automation: "step", modulation: "none" },
+]);
+
+export const ACID_BASS_MANIFEST = Object.freeze({
+  manifestSchemaVersion: 1,
+  pluginId: required(parsePluginId("bass-mono")),
+  kind: "instrument",
+  productName: "Acid Bass",
+  shortLabel: "BASS",
+  pluginVersion: "1.0.0",
+  stateSchemaVersion: 1,
+  apiVersion: 1,
+  engineProtocolVersion: 1,
+  parameters,
+  meters: [{ id: required(parseMeterId("output-level")), name: "Output level" }],
+  defaultState: {
+    tune: DEFAULT_BASS_PARAMETERS.tune,
+    cutoff: DEFAULT_BASS_PARAMETERS.cutoff,
+    resonance: DEFAULT_BASS_PARAMETERS.resonance,
+    "envelope-amount": DEFAULT_BASS_PARAMETERS.envelopeAmount,
+    decay: DEFAULT_BASS_PARAMETERS.decay,
+    "accent-amount": DEFAULT_BASS_PARAMETERS.accentAmount,
+    waveform: DEFAULT_BASS_PARAMETERS.waveform,
+    glide: DEFAULT_BASS_PARAMETERS.glide,
+    volume: DEFAULT_BASS_PARAMETERS.volume,
+  },
+  ui: {
+    moduleAccent: {
+      accent: "#9BE564",
+      accentMuted: "#496B36",
+      led: "#B8FF7A",
+      controlRing: "#79B84D",
+    },
+    compactControls: parameters.filter((parameter) => parameter.id !== "waveform").map((parameter, position) => ({ position, parameterId: parameter.id })),
+    detailedEditorSections: [{ id: "sound", name: "Sound", parameterIds: parameters.map((parameter) => parameter.id) }],
+  },
+  automation: "step",
+  cpuClass: "light",
+  compatibility: { acceptedStateSchemaVersions: [1], migrations: [] },
+  voices: [{ id: "main", name: "Main voice", outputChannels: 2 }],
+  acceptedEvents: [{ id: "note", kind: "note" }],
+  patternCompatibility: ["notes"],
+  voiceStealing: { maximumVoices: 1, priority: "oldest", releaseMilliseconds: 25 },
+  retriggerPolicy: "legato",
+  chokePolicy: "none",
+  inputChannels: 0,
+  outputChannels: 2,
+  supportsSampleLayers: false,
+  processorFactoryKey: "bass-mono-worklet",
+  renderCapabilities: { live: true, offline: false },
+} satisfies InstrumentPluginManifest);
+
+export const ACID_BASS_DEFAULT_PARAMETERS = ACID_BASS_MANIFEST.defaultState;

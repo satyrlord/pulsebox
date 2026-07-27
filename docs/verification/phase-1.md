@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-27  
 **Scope:** Phase 1 runnable foundation and 2026-07-27 audit repairs  
-**Baseline commit:** `8061152db5561a03171f0ab51f7333c9af3e72bb`
+**Baseline commit:** `2075b959aef031dcb0799912c32ebfea8d26ef3e`
 
 Verification was performed against the current dirty working tree. The baseline
 commit predates the Phase 1 source and these repairs, so the commit alone cannot
@@ -27,14 +27,12 @@ reproduce the results.
 | --- | --- |
 | `npm run lint` | Passed with zero warnings. |
 | `npm run typecheck` | Passed. |
-| `npm run test` | Passed: 17 files and 86 tests. |
-| `npm run test:e2e` | Passed: 60 of 60 cases in Chrome, Edge, and Firefox against the built artifact. |
+| `npm run test` | Passed: 17 files and 106 tests. |
+| `npm run test:e2e` | Passed: 87 of 87 cases in Chrome, Edge, and Firefox against the built artifact. |
 | `npm run build` | Passed; emitted the client CSS/module and Acid Bass worklet. |
-| `npm audit --json` | Passed with 0 vulnerabilities across 174 dependencies. |
-| Markdown lint | Passed with 0 issues across 94 files. |
+| `npm ls --all` | Passed; only platform and tool optional dependencies were absent. |
 | Relative Markdown links | Passed as part of `npm run test`. |
 | Naming/originality scan | Passed with no prohibited-name match in shipping source, tests, scripts, configuration, or public documentation. |
-| Repository skill validation | All 13 skills passed structural validation; the `.github` and `.agents` views matched for all 28 files. |
 | `git diff --check` | Passed. |
 
 Focused protocol evidence passed 21 tests after the browser diagnosis and
@@ -62,6 +60,16 @@ check. It built the client, started the repository static launcher on the
 canonical port, and passed 60 of 60 cases across Chrome, Edge, and Firefox. The
 three added cases cover the wheel-burst coalescing boundary. This closes the
 earlier gap where only the development server had been exercised.
+
+The final full-code-review run passed 87 of 87 cases against the production
+artifact. It adds command-history availability, stable focused controls,
+pointer-paint gesture coalescing, rack action boundaries, module removal Undo,
+supported-viewport rack geometry, range cancellation and key-repeat lifecycle,
+tempo-projection ownership, and control finalization coverage. Its first
+attempt found that module controls overlapped rack action hit targets in every
+browser. Moving actions into a bounded rack column repaired the defect; the two
+affected interactions then passed six focused cross-browser cases before the
+complete matrix was repeated.
 
 After the final fault-recovery repair, a current-source Play activation smoke
 again reached `Audio active` in Chrome, Edge, and Firefox.
@@ -123,6 +131,75 @@ defects, all repaired:
 together through a structured-clone transport and is the regression seam for all
 three. The two stale-revision cases were confirmed to fail against the previous
 controller logic and pass after the repair.
+
+## Full-code-review engine repairs
+
+The 2026-07-27 full-code review repaired seven engine contract gaps:
+
+- live tempo edits now preserve transport ticks, clear only queued future
+  events, and rebuild the schedule on the new tempo grid with a bounded lead;
+- every Acid Bass numeric parameter follows its declared eight-millisecond
+  smoothing curve, and waveform edits use a matching crossfade;
+- module disposal keeps the processor connected for a bounded release tail;
+- automatic processor recovery publishes typed recovering, recovered, and
+  terminal-fault states through the runtime boundary;
+- WAV, AIFF/AIFC, and FLAC inputs are preflighted for supported encoding and
+  declared decoded size before a bundled decoder runs;
+- the manifest truthfully declares live rendering available and offline
+  rendering unavailable;
+- `SampleDecoder` and its result types are exported through the engine public
+  boundary.
+
+Focused engine and contract verification passed 56 tests. The regression set
+includes the exact frame after a 120-to-240 BPM live edit, a failed automatic
+recovery handshake, the delayed disposal exchange between the real adapter and
+processor, smoothing trajectories, and declared-size decoder rejection before
+decoder invocation.
+
+## Full-code-review state and UI repairs
+
+The same review repaired the state and UI contract gaps:
+
+- project tempo is durable and undoable, while runtime transport state remains
+  transient;
+- runtime state revisions are distinct from persisted project-format revisions;
+- history capacity is planned before mutation, continuous gestures coalesce,
+  and no-op gestures leave no history entry;
+- Undo and Redo reconcile selected and collapsed module references and expose
+  accurate action availability; their global shortcuts remain available from
+  non-editing operational controls;
+- composition owns only wiring, while the UI owns mounting and keyed rack
+  patching that preserves focused controls;
+- tempo synchronization uses its own state selector, so unrelated project edits
+  do not clear and rebuild the live schedule;
+- range and pattern gestures finalize exactly once, share one gesture identity,
+  and participate in one Undo entry;
+- rack actions expose correct disabled semantics and non-overlapping hit targets;
+- terminal AudioWorklet faults are visible, stop transport, and disable audible
+  operations without disabling project editing; the runtime also enters a
+  terminal unavailable state and rejects later activation attempts.
+
+The final static and automated evidence is 106 unit tests, 87 production-browser
+cases, lint with zero warnings, a clean strict typecheck, dependency-tree
+inspection, a production build, and a clean diff check.
+
+## Full-code-review independent follow-up
+
+The required clean-context reviewer found four further gaps. All four were
+repaired before the final gate:
+
+- tempo edits now have one projection owner, advance the runtime state revision,
+  and clear the future schedule exactly once;
+- successful processor recovery rebuilds the recovered module's current
+  scheduling window instead of leaving a note gap behind the advanced horizon;
+- Escape restores a range gesture's captured value without a commit, while
+  repeated keyboard changes commit once on key release or focus loss;
+- WAVE extensible preflight validates the complete canonical PCM or IEEE-float
+  subformat GUID instead of trusting its first word.
+
+The reviewer reported no further code finding after these four repairs. The
+remaining blind spots below are retained rather than represented as passing
+evidence.
 
 ## Remaining verification
 

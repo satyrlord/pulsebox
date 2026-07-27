@@ -232,6 +232,12 @@ pinned              boolean
 the token nor `modifiedAt`. A successful save advances the token once and writes
 the commit time to `modifiedAt`. Section 11.1 defines counter rollover.
 
+This committed `ProjectRevision` is distinct from the runtime `StateRevision`
+used to order in-memory commands and engine projections. `StateRevision` is not
+a project-manifest field and is never serialized. Unsaved edits may advance the
+runtime state revision many times while the last committed project revision
+remains unchanged.
+
 ### 5.3 Plugin requirements and instances
 
 A `PluginRequirement` contains:
@@ -827,6 +833,10 @@ milliseconds after the last committed edit and no later than 5 seconds after the
 first unsaved edit in a continuous series. Explicit Save starts the same
 transaction immediately. Saving never blocks editing; edits made during a save
 belong to the next revision.
+
+The "next revision" in this section means the next committed
+`ProjectRevision`. It does not reuse or derive its counter from the runtime
+`StateRevision`.
 
 A save transaction:
 

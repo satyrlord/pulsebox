@@ -17,8 +17,16 @@ instrument.
 
 The Phase 1 path is one saw or square oscillator, a resonant state-variable
 low-pass stage, one decaying amplitude and filter envelope, an accent response,
-glide, smoothed output level, and a conservative output clamp. The processor
-uses the audio host's supplied frame count and the context sample rate.
+glide, smoothed output level, and a conservative output clamp. Every numeric
+parameter follows its manifest-declared eight-millisecond trajectory. Waveform
+edits use an eight-millisecond linear crossfade. The processor uses the audio
+host's supplied frame count and the context sample rate.
+
+Live tempo edits keep the current transport tick position, discard only queued
+future events, and schedule the new tempo grid from a bounded twenty-millisecond
+lead. They do not silence or suspend the current voice. Module removal sends a
+note release and leaves the worklet connected for 100 milliseconds before final
+disposal, so the DSP's bounded release can finish without a hard output cut.
 
 The full expanded editor remains governed by `SPEC.md`. Its second oscillator,
 sub oscillator, alternate filter model, detailed envelope, response curve, and
@@ -42,6 +50,9 @@ without adding shared-engine product branches.
 Committed edits use these stable IDs. The worklet adapter translates them to
 internal DSP field names. Project state never stores live audio objects.
 
+The Phase 1 runtime supports live rendering. Offline rendering is explicitly
+unavailable until a real offline plugin runtime is implemented and verified.
+
 ## Pattern and voice behavior
 
 - One voice is active at a time.
@@ -55,6 +66,11 @@ internal DSP field names. Project state never stores live audio objects.
 
 - Deterministic DSP unit tests run at 44.1 and 48 kHz and with non-128 block
   sizes.
+- Unit regressions verify the exact eight-millisecond parameter trajectory,
+  waveform crossfade, release tail, and first rescheduled event frame after a
+  live tempo edit.
+- Controller-to-processor pairing verifies that tempo rescheduling clears only
+  future events, while module disposal uses the bounded release path.
 - Production-browser tests activate the AudioWorklet path in Chrome, Edge, and
   Firefox.
 - Parameter and pattern edits, Undo, rack add, and the three exposed Phase 1
