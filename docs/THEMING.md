@@ -7,9 +7,15 @@
 **Owner:** UI layer
 
 This document defines the complete theme boundary for the Pulsebox MVP. It
-specializes sections 11, 23.1, 24.1, 24.3, and acceptance criteria 39 through 41
-and 67 of `SPEC.md`. If this document and `SPEC.md` disagree, update both in the
-same accepted product change before implementation.
+specializes section 11 of the
+[product and design foundations specification](specs/spec-001-product-and-design-foundations.md),
+section 23.1 of the
+[persistence and export specification](specs/spec-009-persistence-and-export.md),
+sections 24.1 and 24.3 of the
+[quality and delivery specification](specs/spec-010-quality-and-delivery.md), and
+acceptance criteria 39 through 41 and 67 of
+[release acceptance](specs/spec-012-release-acceptance.md). Reconcile all
+affected owners in the same accepted product change before implementation.
 
 ## 1. Scope and invariants
 
@@ -37,8 +43,8 @@ The following rules are mandatory:
 
 Built-in values are product-owned design data. A change to a built-in value or
 to this token vocabulary is a product-contract change. It requires an update to
-this document, the relevant tests, and `SPEC.md` when user-visible behavior
-changes.
+this document, the relevant tests, and the owning product specification when
+user-visible behavior changes.
 
 ## 2. Built-in theme direction
 

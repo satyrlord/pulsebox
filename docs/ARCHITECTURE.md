@@ -4,9 +4,9 @@
 
 **Applies to:** Pulsebox MVP
 
-**Authority:** [`SPEC.md`](SPEC.md) remains the product and acceptance source.
-This document owns the durable architecture details that implement that
-specification.  
+**Authority:** The indexed [product specification set](specs/spec-000-index.md)
+remains the product and acceptance source. This document owns the durable
+architecture details that implement that specification set.
 **Implementation state:** The Phase 1 contracts, layer guards, state spine,
 AudioWorklet spine, transport, bundled decoder adapter, and native UI foundation
 exist. Later roadmap layers remain contract-only where noted.
@@ -17,9 +17,9 @@ This document defines the architecture that Pulsebox code shall follow. An
 implemented Phase 1 slice does not imply that later MVP systems exist.
 
 The words **must**, **must not**, **shall**, **shall not**, **should**, and
-**may** are normative. A product-owner decision recorded in `SPEC.md` overrides
-this document. The two files shall be updated together if an accepted decision
-changes a boundary defined here.
+**may** are normative. A product-owner decision recorded in the owning product
+specification overrides this document. The affected documents shall be updated
+together if an accepted decision changes a boundary defined here.
 
 Pulsebox shall remain:
 
@@ -833,7 +833,8 @@ can be rebuilt deterministically.
 
 ### 11.1 Program routing
 
-The program path shall follow the routing in `SPEC.md`: voice processing to
+The program path shall follow the routing in the
+[mixer and effects specification](specs/spec-007-mixer-and-effects.md): voice processing to
 module sum, module inserts, channel processing, fader, sends, send returns,
 master chain, monitor-only mono fold-down where selected, and physical output.
 Offline rack and return stems shall branch at their specified pre-master points.
@@ -1023,7 +1024,8 @@ Each supported browser shall also prove in the production build:
 
 - audio remains locked until a valid gesture and editing still works while
   locked;
-- the first-sound timer uses the exact start event defined in `SPEC.md`;
+- the first-sound timer uses the exact start event defined in the
+  [audio engine and transport specification](specs/spec-004-audio-engine-and-transport.md);
 - play, pause, stop, tempo change, quantized launch, and pattern/song switching
   are audibly and visibly coherent;
 - a compatible module or effect edit does not suspend the context or rebuild
@@ -1086,8 +1088,8 @@ action. No recovery path shall require a destructive confirmation dialog.
 
 This document is complete as a contract when:
 
-1. `SPEC.md`, `ARCHITECTURE.md`, `THEMING.md`, and `PROJECT-FORMAT.md` use the
-   same terms and do not contradict each other.
+1. The indexed product specifications, `ARCHITECTURE.md`, `THEMING.md`, and
+   `PROJECT-FORMAT.md` use the same terms and do not contradict each other.
 2. The base manifest, instrument contract, effect contract, parameter
    descriptor, command model, and worklet protocol have independent architecture
    review.

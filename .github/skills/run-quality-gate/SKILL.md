@@ -17,8 +17,10 @@ explicit approval.
 
 ## Discover the gate
 
-1. Read repository root `AGENTS.md`, [docs/SPEC.md](../../../docs/SPEC.md), and
-   the current implementation status in
+1. Read repository root `AGENTS.md`, the
+   [product specification index](../../../docs/specs/spec-000-index.md), each
+   applicable owning specification and dependency, and the current
+   implementation status in
    [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md).
 2. Read `package.json` and the current test and tool configuration.
 3. Use the scripts in `package.json` as the only command source. Never run a

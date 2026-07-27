@@ -12,10 +12,13 @@ component, no MIDI.
 
 ## Source of truth
 
-- Read [the unified product specification](docs/SPEC.md) in full before planning or
-  changing product code.
-- Treat that file as the approved MVP contract and acceptance source.
-- Do not create a second product specification.
+- Start with [the product specification index](docs/specs/spec-000-index.md)
+  before planning or changing product code. Follow its build order and read each
+  applicable owning specification and dependency in full.
+- Treat the indexed specification set as the approved MVP contract and
+  acceptance source.
+- Do not create a competing product specification or restore a duplicated
+  unified specification.
 - A direct product-owner decision overrides the specification. Update the owning
   specification, implementation, tests, and user documentation together.
 - Do not silently remove a requirement to resolve a contradiction. Report the
@@ -27,7 +30,9 @@ component, no MIDI.
 
 Owning contract documents:
 
-- [SPEC.md](docs/SPEC.md) owns approved product behavior and acceptance criteria.
+- [The specification index](docs/specs/spec-000-index.md) owns build order and
+  requirement routing. Its child specifications own approved product behavior,
+  decisions, and acceptance criteria.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) owns layers, plugin manifests, the command
   model, the worklet protocol, ID families, test seams, and audio verification
   tolerances.
@@ -42,8 +47,9 @@ Owning contract documents:
 - The repository has a strict TypeScript product source tree, package manifest,
   unit tests, and production-browser tests.
 - Claim checks only when their current scripts have been run successfully.
-- Later MVP phases remain governed by `docs/SPEC.md`; do not claim that their planned
-  persistence, instruments, mixer, effects, editors, or export exist.
+- Later MVP phases remain governed by the indexed specification set under
+  `docs/specs/`; do not claim that their planned persistence, instruments,
+  mixer, effects, editors, or export exist.
 
 ## Roles and workflow
 
@@ -273,8 +279,8 @@ evicting the oldest entries rather than rejecting a valid new action.
 - Do not add temporary compatibility scaffolding unless it serves a real
   deployment, review, rollback, migration, or risk-control need.
 - Keep comments focused on non-obvious contracts and browser or audio hazards.
-- Update the unified specification in the same change as every accepted product
-  change or bug fix.
+- Update the owning product specification in the same change as every accepted
+  product change or bug fix.
 - Keep docs/ARCHITECTURE.md, docs/THEMING.md, docs/PROJECT-FORMAT.md, README.md,
   and domain documentation current when their owning contracts change. Do not
   claim that planned implementation exists.

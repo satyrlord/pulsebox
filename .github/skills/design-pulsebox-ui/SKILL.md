@@ -18,8 +18,15 @@ description: Use when the user wants Pulsebox interface work designed, built, au
 ## Read first
 
 1. Read repository root `AGENTS.md`.
-2. Read [docs/SPEC.md](../../../docs/SPEC.md) in full.
-3. Re-read sections 8, 10, 11, 22, 24.1, and 24.3 for the changed surface.
+2. Read the [specification index](../../../docs/specs/spec-000-index.md), then
+   the applicable build-order specifications and dependencies in full.
+3. Re-read sections 8, 10, and 22 in the
+   [application shell and controls specification](../../../docs/specs/spec-003-application-shell-and-controls.md),
+   section 11 in the
+   [product and design foundations specification](../../../docs/specs/spec-001-product-and-design-foundations.md),
+   and sections 24.1 and 24.3 in the
+   [quality and delivery specification](../../../docs/specs/spec-010-quality-and-delivery.md)
+   for the changed surface.
 4. Read [docs/THEMING.md](../../../docs/THEMING.md).
 5. Treat files under design/ as non-normative prototypes unless the user or
    specification explicitly adopts a detail.

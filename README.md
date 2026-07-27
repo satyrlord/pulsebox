@@ -6,7 +6,9 @@ foundation is runnable: it includes the strict TypeScript toolchain, native Web
 Components, typed state and plugin contracts, an AudioWorklet Acid Bass path,
 transport, and three exposed rack slots.
 
-The authoritative product contract is [SPEC.md](docs/SPEC.md).
+The authoritative product contract starts at the
+[specification index](docs/specs/spec-000-index.md). Its child specifications
+are arranged in normative build order.
 
 ## Product boundary
 
@@ -27,7 +29,8 @@ results. The final MVP features in later roadmap phases are not implemented yet.
 
 Current owners:
 
-- [SPEC.md](docs/SPEC.md): approved product behavior and acceptance criteria.
+- [Specification index](docs/specs/spec-000-index.md): ordered product behavior,
+  decision, and acceptance owners.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): layers, commands, plugins, protocols,
   runtime, audio ownership, and verification seams.
 - [PROJECT-FORMAT.md](docs/PROJECT-FORMAT.md): projects, packs, validation, storage,

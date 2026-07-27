@@ -1,8 +1,8 @@
 # Pulsebox agent skills
 
 Repository-local skills for repeatable Pulsebox work. Every skill is subordinate
-to [AGENTS.md](../../AGENTS.md) and
-[docs/SPEC.md](../../docs/SPEC.md).
+to [AGENTS.md](../../AGENTS.md) and the
+[product specification index](../../docs/specs/spec-000-index.md).
 
 Read `package.json` for the current script surface. It is the single source of
 truth for runnable commands; do not copy the list into a skill.

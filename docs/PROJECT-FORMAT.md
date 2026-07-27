@@ -6,9 +6,10 @@
 
 This document defines the durable project, asset-pack, browser-storage, import,
 save, recovery, and portable-export contract for Pulsebox. It refines the
-approved requirements in `SPEC.md`. If this document and `SPEC.md` disagree, the
-product decision must be reconciled in both documents before product code is
-changed.
+approved requirements in the
+[persistence and export specification](specs/spec-009-persistence-and-export.md).
+If the documents disagree, reconcile the product decision in both before
+product code is changed.
 
 The format is data only. An importer must never evaluate a value as code, load a
 URL named by imported data, or resolve an archive name as a host file-system

@@ -7,8 +7,10 @@ description: Use when the user wants a Pulsebox plan or design grilled, stress-t
 
 ## Prepare
 
-Read repository root `AGENTS.md`, [docs/SPEC.md](../../../docs/SPEC.md), the
-applicable canonical domain documents under `docs/`, and any implementation
+Read repository root `AGENTS.md`, the
+[product specification index](../../../docs/specs/spec-000-index.md), every
+applicable owning specification and dependency, the canonical domain documents
+under `docs/`, and any implementation
 that the plan says already exists. Do not ask a question the repository or
 current primary documentation can answer.
 
@@ -28,8 +30,9 @@ parent branch. Do not jump to a child before its parent is resolved.
 
 Remain read-only unless the user explicitly authorizes workspace edits. After
 each accepted product decision, record the owning-document change that would be
-needed. If edits are authorized, update `docs/SPEC.md` or the applicable
-canonical domain document. Do not create a parallel decision document.
+needed. If edits are authorized, update the owning file under `docs/specs/` or
+the applicable canonical domain document. Do not create a parallel decision
+document.
 
 ## Conclude
 

@@ -62,7 +62,8 @@ assets exist yet.
   declare the MIT license.
 - `PULSEBOX` remains reserved for the application mark and browser title;
   documentation uses `Pulsebox`.
-- The six approved instrument names and IDs remain those in `SPEC.md`.
+- The six approved instrument names and IDs remain those in the
+  [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
 - The current build contains only `index.html`, CSS, the application module, and
   the Acid Bass worklet asset. Current command and browser evidence is in
   [`../verification/phase-1.md`](../verification/phase-1.md).

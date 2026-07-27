@@ -28,7 +28,9 @@ lead. They do not silence or suspend the current voice. Module removal sends a
 note release and leaves the worklet connected for 100 milliseconds before final
 disposal, so the DSP's bounded release can finish without a hard output cut.
 
-The full expanded editor remains governed by `SPEC.md`. Its second oscillator,
+The full expanded editor remains governed by the
+[rack and instruments specification](../specs/spec-005-rack-and-instruments.md).
+Its second oscillator,
 sub oscillator, alternate filter model, detailed envelope, response curve, and
 voice monitor are later work. They must extend the plugin folder and manifest
 without adding shared-engine product branches.
@@ -75,5 +77,8 @@ unavailable until a real offline plugin runtime is implemented and verified.
   Firefox.
 - Parameter and pattern edits, Undo, rack add, and the three exposed Phase 1
   slots have browser coverage.
-- Final acceptance still requires the full rendered-audio, startup, and manual
-  listening procedures in `SPEC.md` and `ARCHITECTURE.md`.
+- Final acceptance still requires the rendered-audio, startup, and manual
+  listening procedures in the
+  [audio engine and transport specification](../specs/spec-004-audio-engine-and-transport.md),
+  [release acceptance](../specs/spec-012-release-acceptance.md), and
+  [`ARCHITECTURE.md`](../ARCHITECTURE.md).

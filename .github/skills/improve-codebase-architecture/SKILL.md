@@ -9,7 +9,9 @@ Remain read-only unless implementation is explicitly requested.
 
 ## Establish the system
 
-Read repository root `AGENTS.md`, [docs/SPEC.md](../../../docs/SPEC.md),
+Read repository root `AGENTS.md`, the
+[product specification index](../../../docs/specs/spec-000-index.md), the
+[technical foundations specification](../../../docs/specs/spec-002-technical-foundations.md),
 [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md), the current source tree,
 tests, and dependency graph.
 

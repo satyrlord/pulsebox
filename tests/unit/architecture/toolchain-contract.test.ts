@@ -17,7 +17,7 @@ const REQUIRED_FILES = [
   "README.md",
   "docs/ARCHITECTURE.md",
   "docs/PROJECT-FORMAT.md",
-  "docs/SPEC.md",
+  "docs/specs/spec-000-index.md",
   "docs/THEMING.md",
   "index.html",
   "package-lock.json",

@@ -7,15 +7,17 @@ description: Use when the user wants a Pulsebox feature added or changed, or a p
 
 ## Read first
 
-1. Read repository root `AGENTS.md` and
-   [docs/SPEC.md](../../../docs/SPEC.md) in full.
+1. Read repository root `AGENTS.md` and the
+   [product specification index](../../../docs/specs/spec-000-index.md). Follow
+   its build order and read the applicable owner and dependencies in full.
 2. Find every existing requirement and acceptance criterion that owns the
    requested behavior.
 3. Inspect the current implementation and tests when they exist.
 4. Verify unstable browser or Web Audio facts with current primary sources.
 
-The authoritative file is `docs/SPEC.md`. Do not create a second competing
-specification.
+The indexed files under `docs/specs/` form the authoritative product
+specification. Do not create a competing specification or duplicate the full
+contract in one file.
 
 ## Define the change
 
@@ -33,7 +35,9 @@ silently dropping existing scope.
 
 ## Update the owning documents
 
-- Update `docs/SPEC.md` for every accepted product or bug change.
+- Update the smallest owning specification under `docs/specs/` for every
+  accepted product or bug change. Update the index only when ownership or build
+  order changes.
 - Update `docs/ARCHITECTURE.md` for durable layer or dependency decisions.
 - Update `docs/THEMING.md` for token or theme-contract changes.
 - Update `docs/PROJECT-FORMAT.md` for serialization, import, migration, asset,
