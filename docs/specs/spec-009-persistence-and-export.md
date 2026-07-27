@@ -66,7 +66,7 @@ IndexedDB stores:
 - Mixer.
 - Effects.
 - Samples.
-- Playlist and arrangement.
+- Playlist.
 - Timing.
 
 Local storage stores only preferences such as:
@@ -92,8 +92,8 @@ A `.pulsebox` project has:
 - Stable IDs.
 - Plugin versions.
 - Parameter state.
-- Pattern banks.
-- Song arrangement.
+- Named project Patterns and their per-module parts.
+- Ordered named-Pattern Playlist.
 - Automation.
 - Mixer and routing.
 - Effect chains.

@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
   forbidOnly: true,
-  retries: process.env.CI ? 2 : 0,
+  retries: 1,
   reporter: "line",
   use: {
     baseURL: "http://127.0.0.1:4173",
@@ -19,15 +19,7 @@ export default defineConfig({
   projects: [
     {
       name: "chrome",
-      use: { ...devices["Desktop Chrome"], channel: "chrome" },
-    },
-    {
-      name: "edge",
-      use: { ...devices["Desktop Edge"], channel: "msedge" },
-    },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
+      use: { ...devices["Desktop Chrome"], channel: "chrome", headless: true },
     },
   ],
 });

@@ -5,9 +5,9 @@
 <title>PULSEBOX</title>
 <style>
 /* ==========================================================================
-   PULSEBOX v4 — rack cockpit
-   topbar / browser + slots / rack units / right tabs
-   pattern + piano roll + feel + playlist / bottom bar
+   PULSEBOX v4 — approved rack-cockpit composition target
+   topbar / browser + slots / rack units / right tabs + 2x2 A-D channel sends
+   pattern + module-aware piano roll + playlist / collapsible bottom workspace
    Themes are tokens only. Geometry never moves.
    ========================================================================== */
 :root, html[data-theme="rack"]{
@@ -122,6 +122,7 @@ html[data-theme="rust"]{
 }
 
 *{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
 html,body{height:100%;}
 body{
   background:var(--surface-app);color:var(--text-primary);
@@ -130,6 +131,8 @@ body{
   display:grid;grid-template-rows:56px minmax(0,1.12fr) minmax(240px,.88fr) 38px;
   -webkit-font-smoothing:antialiased;
 }
+body.workspace-collapsed{grid-template-rows:56px minmax(0,1fr) 0 38px;}
+body.workspace-collapsed .botrow{display:none;}
 .num{font-family:var(--type-num);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
 button,input,select{font:inherit;color:inherit;}
 button{background:none;border:0;cursor:pointer;}
@@ -156,10 +159,13 @@ button{background:none;border:0;cursor:pointer;}
 
 /* ==================== TOP BAR ==================== */
 .topbar{
-  min-width:0;overflow:hidden;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-3);
+  min-width:0;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) 148px minmax(0,1fr);
+  align-items:center;gap:var(--space-2);padding:0 var(--space-2);
   background:var(--mat-plate);border-bottom:1px solid var(--edge-hairline);
   box-shadow:inset 0 1px 0 var(--edge-highlight),0 4px 14px rgba(0,0,0,.45);z-index:40;
 }
+.header-left,.header-right{min-width:0;display:flex;align-items:center;gap:var(--space-1);}
+.header-right{justify-content:flex-end;}
 .iconbtn{
   width:36px;height:34px;flex:none;border-radius:var(--edge-radius-ctl);display:grid;place-items:center;
   color:var(--text-secondary);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));
@@ -167,16 +173,17 @@ button{background:none;border:0;cursor:pointer;}
 }
 .iconbtn:hover{color:var(--text-primary);}
 .iconbtn:active{box-shadow:var(--sink-1);}
+.iconbtn.on{color:var(--signal-play);box-shadow:var(--lift-1),0 0 9px color-mix(in srgb,var(--signal-play) 42%,transparent);}
 .iconbtn svg{width:15px;height:15px;fill:currentColor;}
 .iconbtn.ghost{background:none;box-shadow:none;width:26px;}
 .projbox{
   height:34px;flex:none;display:flex;align-items:center;gap:var(--space-1);padding:0 var(--space-2);
   border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);
 }
-.projbox .pname{width:118px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:var(--size-3);}
+.projbox .pname{width:88px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:var(--size-3);}
 .tdiv{width:1px;height:30px;flex:none;background:var(--edge-hairline);box-shadow:1px 0 0 var(--edge-highlight);}
 .tbtn{
-  width:40px;height:34px;flex:none;border-radius:var(--edge-radius-ctl);display:grid;place-items:center;
+  width:34px;height:34px;flex:none;border-radius:var(--edge-radius-ctl);display:grid;place-items:center;
   color:var(--text-secondary);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));
   box-shadow:var(--lift-1);
 }
@@ -197,35 +204,37 @@ button{background:none;border:0;cursor:pointer;}
   color:var(--accent-lamp);text-shadow:0 0 8px var(--accent-dim);line-height:1.1;}
 .lcd .lcdlbl{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.16em;text-transform:uppercase;
   color:var(--text-secondary);}
-.lcd.tempo{width:96px;cursor:ns-resize;}
+.lcd.tempo{width:82px;cursor:ns-resize;padding-inline:8px;}
 .lcd.tempo input{background:none;border:0;width:66px;font:inherit;font-family:var(--type-num);
   font-size:var(--size-4);color:var(--accent-lamp);text-shadow:0 0 8px var(--accent-dim);}
-.lcd.clock{width:158px;}
+.lcd.clock{width:142px;}
 .wordmark{
-  flex:none;font-family:var(--type-display);font-size:var(--size-5);text-transform:uppercase;letter-spacing:.22em;
+  height:34px;display:grid;place-items:center;font-family:var(--type-display);font-size:var(--size-5);
+  text-transform:uppercase;letter-spacing:.22em;border:1px solid var(--edge-hairline);
+  border-radius:10px;background:var(--surface-recess);box-shadow:var(--sink-2);
   color:var(--text-primary);text-shadow:0 1px 0 var(--text-engraved-lo),0 -1px 0 var(--text-engraved-hi);
-  width:168px;text-align:center;overflow:hidden;white-space:nowrap;
+  width:148px;text-align:center;overflow:hidden;white-space:nowrap;
 }
 .tapbtn{
-  width:46px;height:38px;flex:none;border-radius:var(--edge-radius-ctl);
+  width:38px;height:38px;flex:none;border-radius:var(--edge-radius-ctl);
   font-family:var(--type-display);font-size:var(--size-2);letter-spacing:.1em;text-transform:uppercase;
   color:var(--text-secondary);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));
   box-shadow:var(--lift-1);
 }
 .tapbtn:active{box-shadow:var(--sink-1);}
-.lrbtns{display:flex;flex:none;border-radius:var(--edge-radius-ctl);overflow:hidden;box-shadow:var(--lift-1);}
-.lrbtns button{width:28px;height:34px;font-size:var(--size-2);color:var(--text-muted);
+.mode-toggle{display:flex;flex:none;border-radius:var(--edge-radius-ctl);overflow:hidden;box-shadow:var(--lift-1);}
+.mode-toggle button{height:34px;padding:0 7px;font-family:var(--type-display);font-size:9px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);
   background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));}
-.lrbtns button.on{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent-lamp),color-mix(in srgb,var(--accent-lamp) 72%,black));}
+.mode-toggle button.on{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent-lamp),color-mix(in srgb,var(--accent-lamp) 72%,black));}
+.meter-mode{width:42px;height:34px;flex:none;border-radius:var(--edge-radius-ctl);
+  font-family:var(--type-display);font-size:var(--size-2);color:var(--text-primary);
+  background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
 .mastermeter{flex:none;display:flex;align-items:center;gap:var(--space-2);}
-.mastermeter canvas{width:210px;height:16px;background:var(--surface-well);border-radius:2px;box-shadow:var(--sink-1);}
-.mastermeter .mdb{width:64px;text-align:right;font-family:var(--type-num);font-size:var(--size-3);color:var(--text-secondary);}
-.themesel{
-  height:34px;width:92px;flex:none;padding:0 var(--space-1);border:0;border-radius:var(--edge-radius-ctl);
-  background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);
-  color:var(--text-secondary);font-family:var(--type-display);font-size:var(--size-2);
-  letter-spacing:.08em;text-transform:uppercase;
-}
+.meterpair{width:180px;display:grid;grid-template-columns:10px 1fr;grid-template-rows:1fr 1fr;gap:2px 4px;}
+.meterpair span{font-family:var(--type-num);font-size:8px;line-height:7px;color:var(--text-muted);}
+.meterpair canvas{width:166px;height:7px;background:var(--surface-well);border-radius:2px;box-shadow:var(--sink-1);}
+.mastermeter .mdb{width:58px;text-align:right;font-family:var(--type-num);font-size:var(--size-2);color:var(--text-secondary);}
 
 /* ==================== KNOBS ==================== */
 .knob{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
@@ -286,15 +295,8 @@ button{background:none;border:0;cursor:pointer;}
   grid-template-columns:182px 116px minmax(0,1fr) 336px;gap:5px;padding:5px 5px 2px;}
 
 /* ---------- module browser ---------- */
-.browser .btabs{flex:none;display:flex;gap:2px;padding:var(--space-1);}
-.browser .btabs button{
-  flex:1;height:24px;border-radius:3px;font-family:var(--type-display);font-size:var(--size-1);
-  letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);
-  background:var(--surface-well);box-shadow:var(--sink-1);}
-.browser .btabs button.on{color:var(--accent-ink);
-  background:linear-gradient(180deg,var(--accent-lamp),color-mix(in srgb,var(--accent-lamp) 72%,black));}
 .browser .bfilter{
-  flex:none;margin:0 var(--space-1) var(--space-1);height:24px;display:flex;align-items:center;gap:5px;
+  flex:none;margin:var(--space-1);height:24px;display:flex;align-items:center;gap:5px;
   padding:0 var(--space-2);border-radius:3px;background:var(--surface-well);box-shadow:var(--sink-1);
   font-size:var(--size-1);color:var(--text-secondary);}
 .browser .bfilter i{width:5px;height:5px;border-radius:50%;background:var(--accent-lamp);
@@ -346,6 +348,13 @@ button{background:none;border:0;cursor:pointer;}
   font-family:var(--type-display);letter-spacing:.06em;text-transform:uppercase;
   background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
 .slotacts button:hover{color:var(--text-primary);}
+.contextmenu{position:fixed;z-index:50;min-width:142px;padding:4px;border:1px solid var(--edge-hairline);
+  border-radius:4px;background:var(--surface-raised);box-shadow:var(--lift-3);}
+.contextmenu button{width:100%;height:28px;padding:0 9px;border-radius:3px;text-align:left;
+  color:var(--text-primary);font-size:var(--size-2);}
+.contextmenu button:hover,.contextmenu button:focus-visible{background:var(--surface-plate-top);color:var(--accent-lamp);}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);
+  white-space:nowrap;border:0;}
 
 /* ---------- rack ---------- */
 .rack{background:var(--surface-chassis);}
@@ -491,6 +500,25 @@ button{background:none;border:0;cursor:pointer;}
 .fcap::after{content:"";position:absolute;left:2px;right:2px;top:50%;height:2px;margin-top:-1px;border-radius:1px;
   background:var(--k);box-shadow:0 0 4px color-mix(in srgb,var(--k) 55%,transparent);}
 .mmeter{width:8px;background:var(--surface-well);border-radius:2px;box-shadow:var(--sink-1);}
+.mstrip .sendgrid{
+  width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;
+}
+.sendbtn{
+  --send-k:var(--mod-fx);position:relative;min-width:0;height:17px;border-radius:2px;
+  display:grid;place-items:center;font-family:var(--type-display);font-size:var(--size-1);font-weight:600;
+  color:var(--text-muted);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));
+  box-shadow:var(--lift-1);
+}
+.sendbtn[data-send="A"]{--send-k:var(--mod-bass);}
+.sendbtn[data-send="B"]{--send-k:var(--mod-sev);}
+.sendbtn[data-send="C"]{--send-k:var(--mod-five);}
+.sendbtn[data-send="D"]{--send-k:var(--mod-nine);}
+.sendbtn.on{
+  color:var(--accent-ink);background:linear-gradient(180deg,var(--send-k),color-mix(in srgb,var(--send-k) 68%,black));
+  box-shadow:var(--sink-1);
+}
+.sendbtn.on::after{content:"";position:absolute;inset:2px;border:1px solid currentColor;border-radius:1px;opacity:.7;}
+.sendbtn:disabled{cursor:default;opacity:.28;box-shadow:var(--sink-1);}
 .mstrip .msbtns{display:flex;gap:2px;}
 .msbtn{width:17px;height:16px;border-radius:2px;font-size:var(--size-1);font-weight:600;display:grid;place-items:center;
   color:var(--text-muted);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
@@ -532,11 +560,9 @@ button{background:none;border:0;cursor:pointer;}
 .mknobs{display:flex;justify-content:space-around;gap:2px;margin-top:5px;}
 .mcard .mknobs .knob{flex:1 1 0;width:auto;min-width:0;}
 .mstrip .knob.sm{width:100%;}
-.feelitem .knob{width:100%;}
-
 /* ==================== BOTTOM ROW ==================== */
 .botrow{min-width:0;min-height:0;display:grid;
-  grid-template-columns:182px minmax(0,1fr) 116px 200px;gap:5px;padding:2px 5px 5px;}
+  grid-template-columns:182px minmax(0,1fr) 200px;gap:5px;padding:2px 5px 5px;}
 /* pattern panel */
 .patpanel .pbody{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:var(--space-2);}
 .pfield{display:flex;flex-direction:column;gap:3px;}
@@ -550,19 +576,17 @@ button{background:none;border:0;cursor:pointer;}
 .addpat{height:28px;border-radius:3px;border:1.4px dashed var(--text-muted);color:var(--text-muted);
   font-size:var(--size-4);line-height:1;}
 .addpat:hover{border-color:var(--accent-lamp);color:var(--accent-lamp);}
-.ptabs{flex:none;display:flex;gap:2px;padding:var(--space-1);}
-.ptabs button{flex:1;height:24px;border-radius:3px;font-family:var(--type-display);font-size:var(--size-1);
-  letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
-.ptabs button.on{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent-lamp),color-mix(in srgb,var(--accent-lamp) 72%,black));}
 /* piano roll */
-.rolltools{flex:none;height:28px;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-2);
+.rolltools{flex:none;height:34px;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-2);
   border-bottom:1px solid var(--edge-hairline);box-shadow:0 1px 0 var(--edge-highlight);}
-.tool{width:26px;height:20px;border-radius:3px;display:grid;place-items:center;color:var(--text-muted);
-  background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
-.tool svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.6;}
-.tool.on{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent-lamp),color-mix(in srgb,var(--accent-lamp) 72%,black));}
 .rolltools select{height:22px;border:0;border-radius:3px;background:var(--surface-well);box-shadow:var(--sink-1);
   color:var(--text-secondary);font-size:var(--size-1);padding:0 var(--space-1);}
+.timingctl{display:grid;grid-template-columns:auto 78px 30px;align-items:center;gap:4px;
+  font-family:var(--type-display);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
+.timingctl input{width:78px;height:16px;accent-color:var(--accent-lamp);}
+.timingctl output{font-family:var(--type-num);font-size:10px;color:var(--text-secondary);text-align:right;}
+.gridstatus{height:20px;padding:0 6px;display:grid;place-items:center;border-radius:3px;
+  font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
 .rollctx{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
   text-transform:uppercase;color:var(--mod-bass);}
 .rollbody{flex:1;min-height:0;display:flex;flex-direction:column;}
@@ -578,32 +602,28 @@ button{background:none;border:0;cursor:pointer;}
   display:flex;align-items:center;border-bottom:1px solid var(--edge-hairline);
   background:linear-gradient(90deg,var(--surface-raised),var(--surface-plate-bot));}
 .prkey.acc{background:linear-gradient(90deg,var(--surface-well),var(--surface-recess));color:transparent;}
+.prkey.voice{padding-left:5px;color:var(--text-secondary);background:linear-gradient(90deg,var(--surface-raised),var(--surface-plate-bot));}
 .prgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-2);overflow:hidden;}
 .prgrid .grow{position:absolute;left:0;right:0;border-bottom:1px solid rgba(255,255,255,.028);}
 .prgrid .gbeat{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.045);}
 .prgrid .gbar{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.1);}
 .prgrid .note{position:absolute;border-radius:2px;
   background:linear-gradient(180deg,var(--mod-bass),color-mix(in srgb,var(--mod-bass) 62%,black));
-  box-shadow:0 0 6px color-mix(in srgb,var(--mod-bass) 42%,transparent),inset 0 1px 0 rgba(255,255,255,.25);}
+  box-shadow:0 0 6px color-mix(in srgb,var(--mod-bass) 42%,transparent),inset 0 1px 0 rgba(255,255,255,.25);
+  cursor:move;}
+.prgrid .note::after{content:"";position:absolute;right:0;top:0;bottom:0;width:5px;cursor:ew-resize;
+  border-right:1px solid color-mix(in srgb,var(--text-primary) 65%,transparent);}
+.prgrid .note.slide::before{content:"S";position:absolute;left:3px;top:0;font:700 9px var(--type-display);color:var(--accent-ink);}
+.prgrid .trigger{position:absolute;border-radius:2px;background:linear-gradient(180deg,var(--mod-six),color-mix(in srgb,var(--mod-six) 58%,black));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 0 5px color-mix(in srgb,var(--mod-six) 34%,transparent);}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--text-primary);opacity:.85;z-index:4;
   box-shadow:0 0 6px rgba(255,255,255,.4);}
 .vellane{flex:none;height:44px;display:flex;border-top:1px solid var(--edge-hairline);box-shadow:0 -1px 0 var(--edge-highlight);}
-.vellane .vlbl{width:56px;flex:none;display:flex;flex-direction:column;justify-content:center;padding-left:5px;}
-.vellane .vlbl b{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.12em;text-transform:uppercase;
-  color:var(--text-muted);font-weight:400;}
-.vellane .vlbl span{font-family:var(--type-num);font-size:12px;color:var(--text-secondary);}
+.vellane .vlbl{width:56px;flex:none;display:grid;place-items:center;padding:4px;}
+.vellane .vlbl select{width:50px;height:24px;border:0;border-radius:3px;background:var(--surface-well);
+  color:var(--text-secondary);font-family:var(--type-display);font-size:9px;text-transform:uppercase;box-shadow:var(--sink-1);}
 .vellane .vgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-1);}
 .vellane .vbar{position:absolute;bottom:0;width:3px;border-radius:1px 1px 0 0;background:var(--mod-bass);opacity:.85;}
-/* feel panel */
-.feelpanel .fbody{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:space-evenly;padding:var(--space-2);}
-.feelitem{display:flex;flex-direction:column;align-items:center;gap:2px;}
-.feelitem .fval{font-family:var(--type-num);font-size:var(--size-3);color:var(--accent-lamp);}
-.quantrow{width:100%;display:flex;align-items:center;gap:5px;}
-.quantrow .qslot{flex:1;height:5px;border-radius:3px;background:var(--surface-well);box-shadow:var(--sink-1);position:relative;}
-.quantrow .qslot i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent-lamp);
-  box-shadow:0 0 6px var(--accent-dim);}
-.quantrow .qval{font-family:var(--type-num);font-size:12px;color:var(--text-secondary);width:32px;text-align:right;}
 /* playlist */
 .playlist .plbody{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:3px;}
 .plrow{
@@ -614,10 +634,10 @@ button{background:none;border:0;cursor:pointer;}
 .plrow .plnum{font-family:var(--type-num);font-size:var(--size-1);color:var(--text-secondary);width:14px;}
 .plrow .plname{flex:1;font-size:var(--size-2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .plrow .plbars{font-family:var(--type-num);font-size:12px;color:var(--text-secondary);}
-.addsection{flex:none;margin:0 var(--space-2) var(--space-2);height:26px;border-radius:3px;
+.addpattern{flex:none;margin:0 var(--space-2) var(--space-2);height:26px;border-radius:3px;
   border:1.4px dashed var(--text-muted);color:var(--text-muted);
   font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;text-transform:uppercase;}
-.addsection:hover{border-color:var(--accent-lamp);color:var(--accent-lamp);}
+.addpattern:hover{border-color:var(--accent-lamp);color:var(--accent-lamp);}
 
 /* ==================== BOTTOM BAR ==================== */
 .botbar{
@@ -625,20 +645,14 @@ button{background:none;border:0;cursor:pointer;}
   background:var(--mat-plate);border-top:1px solid var(--edge-hairline);
   box-shadow:inset 0 1px 0 var(--edge-highlight);
 }
-.segbtns{display:flex;gap:2px;flex:none;}
-.segbtns button{
-  height:24px;padding:0 var(--space-3);border-radius:3px;
-  font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;text-transform:uppercase;
-  color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
-.segbtns button.on{color:var(--text-primary);
-  background:linear-gradient(180deg,var(--surface-raised),var(--surface-plate-bot));box-shadow:var(--lift-1);}
-.segbtns button.on::before{content:"•";color:var(--accent-lamp);margin-right:5px;}
 .botbar .txtbtn{
   height:24px;padding:0 var(--space-2);border-radius:3px;display:flex;align-items:center;gap:5px;
   font-size:var(--size-2);color:var(--text-secondary);}
 .botbar .txtbtn:hover{color:var(--text-primary);background:var(--surface-plate-bot);}
 .botbar .txtbtn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.6;}
 .botbar .txtbtn[disabled]{opacity:.35;cursor:default;}
+.collapsebtn svg{transition:transform var(--motion-base) var(--motion-ease);}
+body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 
 /* Narrow desktops: the step row drops to its own line inside the unit rather
    than squeezing to nothing. The rails still run the full height. */
@@ -666,61 +680,61 @@ button{background:none;border:0;cursor:pointer;}
   <symbol id="i-back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-gear" viewBox="0 0 16 16"><path d="M8 5.4A2.6 2.6 0 108 10.6 2.6 2.6 0 008 5.4zm-5.5 2l1.4-.3.4-1-.8-1.2 1.3-1.3 1.2.8 1-.4.3-1.4h1.9l.3 1.4 1 .4 1.2-.8 1.3 1.3-.8 1.2.4 1 1.4.3v1.9l-1.4.3-.4 1 .8 1.2-1.3 1.3-1.2-.8-1 .4-.3 1.4H7.3l-.3-1.4-1-.4-1.2.8-1.3-1.3.8-1.2-.4-1-1.4-.3z" fill="none" stroke="currentColor" stroke-width="1.05"/></symbol>
   <symbol id="i-metro" viewBox="0 0 16 16"><path d="M6 2h4l3 12H3z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 12L11 4" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+  <symbol id="i-power" viewBox="0 0 16 16"><path d="M8 1.5v6M4.2 3.8a5 5 0 107.6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-undo" viewBox="0 0 16 16"><path d="M6 3L2 7l4 4M2 7h7a4 4 0 010 8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10 3l4 4-4 4M14 7H7a4 4 0 000 8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-save" viewBox="0 0 16 16"><path d="M2.6 2.6h8.2l2.6 2.6v8.2H2.6zM5.4 2.6V6h5.2V2.6M5.4 13.4V9.6h5.2v3.8"/></symbol>
-  <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M3.5 2.5l9 5.5-9 5.5z"/></symbol>
-  <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M11.5 2.5l2 2-8 8-2.6.6.6-2.6z"/></symbol>
-  <symbol id="i-erase" viewBox="0 0 16 16"><path d="M3 11l5-5 4 4-3 3H5zM13 13H7"/></symbol>
   <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.4A2.9 2.9 0 018 4.8a2.9 2.9 0 015.5 1.6C13.5 10 8 13.5 8 13.5z" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
   <symbol id="i-shuffle" viewBox="0 0 16 16"><path d="M2 4h3l6 8h3M2 12h3l6-8h3M12 2l2 2-2 2M12 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
 </defs></svg>
 
 <!-- ============================ TOP BAR ============================ -->
 <header class="topbar">
-  <button class="iconbtn" title="Menu." aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
-  <div class="projbox">
-    <button class="iconbtn ghost" title="Previous project." aria-label="Previous project"><svg><use href="#i-back"/></svg></button>
-    <span class="pname">Neon Basement</span>
-    <button class="iconbtn ghost" title="Shuffle the arrangement." aria-label="Shuffle"><svg><use href="#i-shuffle"/></svg></button>
-    <button class="iconbtn ghost" title="Add to favourites." aria-label="Favourite"><svg><use href="#i-heart"/></svg></button>
+  <div class="header-left">
+    <button class="iconbtn" title="Menu." aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
+    <div class="projbox">
+      <button class="iconbtn ghost" title="Previous project." aria-label="Previous project"><svg><use href="#i-back"/></svg></button>
+      <span class="pname">Neon Basement</span>
+      <button class="iconbtn ghost" title="Add to favourites." aria-label="Favourite"><svg><use href="#i-heart"/></svg></button>
+    </div>
+    <div class="mode-toggle" id="transportMode" aria-label="Transport mode">
+      <button class="on" type="button" data-mode="pattern" aria-pressed="true">Pattern</button>
+      <button type="button" data-mode="song" aria-pressed="false">Song</button>
+    </div>
+    <span class="tdiv"></span>
+    <button class="tbtn play" id="btnPlay" title="Play." aria-label="Play"><svg><use href="#i-play"/></svg></button>
+    <button class="tbtn" id="btnStop" title="Stop. Returns to the start." aria-label="Stop"><svg><use href="#i-stop"/></svg></button>
+    <button class="tbtn rec" id="btnRec" title="Record." aria-label="Record"><svg><use href="#i-rec"/></svg></button>
+    <div class="lcd tempo" id="tempoDrag" title="Tempo. Drag up or down, or click to type.">
+      <span class="lcdval"><input class="num" id="tempoInput" value="128.0" inputmode="decimal" aria-label="Tempo in BPM"></span>
+      <span class="lcdlbl">BPM</span>
+    </div>
+    <button class="tapbtn" id="btnTap" title="Tap four times to set the tempo.">Tap</button>
   </div>
-  <span class="tdiv"></span>
-  <button class="tbtn play" id="btnPlay" title="Play." aria-label="Play"><svg><use href="#i-play"/></svg></button>
-  <button class="tbtn" id="btnStop" title="Stop. Returns to the start." aria-label="Stop"><svg><use href="#i-stop"/></svg></button>
-  <button class="tbtn rec" id="btnRec" title="Record." aria-label="Record"><svg><use href="#i-rec"/></svg></button>
-  <span class="tdiv"></span>
-  <div class="lcd tempo" id="tempoDrag" title="Tempo. Drag up or down, or click to type.">
-    <span class="lcdval"><input class="num" id="tempoInput" value="128.0" inputmode="decimal" aria-label="Tempo in BPM"></span>
-    <span class="lcdlbl">BPM</span>
-  </div>
-  <button class="tapbtn" id="btnTap" title="Tap four times to set the tempo.">Tap</button>
   <span class="wordmark">PULSEBOX</span>
-  <div class="lcd clock" title="Position. Elapsed time above, bar, beat and tick below.">
-    <span class="lcdval num" id="clockTime">00:00.000</span>
-    <span class="lcdlbl num" id="clockBbt">001 : 1 : 000</span>
+  <div class="header-right">
+    <div class="lcd clock" title="Position. Elapsed time above, bar, beat and tick below.">
+      <span class="lcdval num" id="clockTime">00:00.000</span>
+      <span class="lcdlbl num" id="clockBbt">001 : 1 : 000</span>
+    </div>
+    <button class="iconbtn" id="btnMetro" title="Metronome." aria-label="Metronome"><svg><use href="#i-metro"/></svg></button>
+    <button class="iconbtn on" id="btnPower" type="button" aria-pressed="true" title="Audio engine power." aria-label="Audio engine power"><svg><use href="#i-power"/></svg></button>
+    <button class="meter-mode" id="meterMode" type="button" aria-label="Master meter mode: left and right" aria-pressed="false" title="Switch master analysis between left/right and mid/side.">L/R</button>
+    <div class="mastermeter">
+      <div class="meterpair" aria-label="Two-channel master meter">
+        <span id="meterLabelA">L</span><canvas id="masterMeterA" width="332" height="14"></canvas>
+        <span id="meterLabelB">R</span><canvas id="masterMeterB" width="332" height="14"></canvas>
+      </div>
+      <span class="mdb num" id="masterDb">&minus;6.1&thinsp;dB</span>
+    </div>
+    <button class="iconbtn" title="Settings. Themes are selected here." aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
   </div>
-  <span class="gap"></span>
-  <button class="iconbtn" id="btnMetro" title="Metronome." aria-label="Metronome"><svg><use href="#i-metro"/></svg></button>
-  <div class="lrbtns" title="Monitor the left or right side of the mix.">
-    <button id="monL">L</button><button id="monR">R</button>
-  </div>
-  <div class="mastermeter">
-    <canvas id="masterCanvas" width="420" height="32"></canvas>
-    <span class="mdb num" id="masterDb">&minus;6.1&thinsp;dB</span>
-  </div>
-  <select class="themesel" id="themeSel" title="Theme. Changes how Pulsebox looks. Nothing moves." aria-label="Theme">
-    <option value="rack">Rack</option><option value="mono">Mono</option><option value="cosmic">Cosmic</option>
-    <option value="analog">Analog</option><option value="rust">Rust</option>
-  </select>
-  <button class="iconbtn" title="Settings." aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
 </header>
 
 <!-- ============================ MID ROW ============================ -->
 <div class="midrow">
   <!-- module browser -->
   <aside class="panel browser" aria-label="Module browser">
-    <div class="btabs"><button class="on">Rack</button><button>Library</button></div>
     <div class="bfilter"><i></i>All modules</div>
     <div class="blist" id="blist"></div>
   </aside>
@@ -729,8 +743,6 @@ button{background:none;border:0;cursor:pointer;}
   <aside class="panel slots" aria-label="Slots">
     <div class="slist" id="slist"></div>
     <div class="slotacts">
-      <button title="Add a module to the next free slot.">+ Add</button>
-      <button title="Remove the selected module.">&minus;</button>
       <button title="Duplicate the selected module.">Copy</button>
     </div>
   </aside>
@@ -797,22 +809,18 @@ button{background:none;border:0;cursor:pointer;}
 </div>
 
 <!-- ============================ BOTTOM ROW ============================ -->
-<div class="botrow">
+<div class="botrow" id="editorWorkspace">
   <aside class="panel patpanel" aria-label="Pattern">
-    <div class="ptabs"><button class="on">Pattern</button><button>Song</button></div>
+    <div class="phead"><h2>Pattern</h2><span class="gap"></span><span class="screw"></span></div>
     <div class="pbody">
       <div class="pfield"><label>Pattern</label>
-        <div class="pstepper"><button title="Previous pattern.">&lsaquo;</button>
-          <span class="pv" id="patNum">1 &ndash; 1</span>
-          <button title="Next pattern.">&rsaquo;</button></div></div>
-      <div class="pfield"><label>Length</label>
+        <div class="pstepper"><button id="patPrev" title="Previous pattern.">&lsaquo;</button>
+          <span class="pv" id="patName">Verse</span>
+          <button id="patNext" title="Next pattern.">&rsaquo;</button></div></div>
+      <div class="pfield"><label>Duration</label>
         <div class="pstepper"><button title="Shorter.">&minus;</button>
-          <span class="pv" id="patLen">16</span>
+          <span class="pv" id="patLen">16 bars</span>
           <button title="Longer.">+</button></div></div>
-      <div class="pfield"><label>Shuffle</label>
-        <div class="pstepper"><button title="Less shuffle.">&minus;</button>
-          <span class="pv" id="patShuf">54&thinsp;%</span>
-          <button title="More shuffle.">+</button></div></div>
       <div class="pfield"><label>Scale</label>
         <select title="Scale. Notes snap to this."><option>Chromatic</option><option>Minor</option>
           <option>Dorian</option><option>Phrygian</option><option>Pentatonic</option></select></div>
@@ -822,15 +830,17 @@ button{background:none;border:0;cursor:pointer;}
 
   <section class="panel" aria-label="Piano roll">
     <div class="rolltools">
-      <button class="tool on" title="Select."><svg><use href="#i-arrow"/></svg></button>
-      <button class="tool" title="Draw notes."><svg><use href="#i-pencil"/></svg></button>
-      <button class="tool" title="Erase notes."><svg><use href="#i-erase"/></svg></button>
-      <span class="tdiv" style="height:18px"></span>
-      <select title="Snap. New notes land on this grid."><option>1/16</option><option>1/8</option><option>1/16 T</option><option>Off</option></select>
-      <select title="Timing feel."><option>Straight</option><option>Swung</option><option>Shuffled</option></select>
-      <select title="What the lower lane edits."><option>Velocity</option><option>Cutoff</option><option>Accent</option></select>
+      <span class="gridstatus" title="The MVP Pattern grid is fixed at one sixteenth.">1/16</span>
+      <label class="timingctl">Swing
+        <input id="swingSlider" type="range" min="0" max="100" value="54" aria-label="Pattern Swing">
+        <output id="swingValue">54%</output>
+      </label>
+      <label class="timingctl">Humanize
+        <input id="humanizeSlider" type="range" min="0" max="100" value="12" aria-label="Pattern Humanize">
+        <output id="humanizeValue">12%</output>
+      </label>
       <span class="gap"></span>
-      <span class="rollctx">Acid Bass &mdash; Pattern 1</span>
+      <span class="rollctx">Acid Bass &mdash; Verse</span>
     </div>
     <div class="rollbody">
       <div class="rollbar"><span class="rbcorner">BASS</span><div class="rbmeasures" id="rbmeasures"></div></div>
@@ -839,49 +849,33 @@ button{background:none;border:0;cursor:pointer;}
         <div class="prgrid" id="prgrid"><div class="playhead" id="rollPlayhead" style="left:0%"></div></div>
       </div>
       <div class="vellane">
-        <div class="vlbl"><b>Vel</b><span>100</span></div>
+        <div class="vlbl"><select id="laneSelect" title="Choose the lower lane." aria-label="Lower lane">
+          <option>Velocity</option><option>Accent</option><option>Probability</option>
+        </select></div>
         <div class="vgrid" id="vgrid"></div>
       </div>
     </div>
   </section>
 
-  <aside class="panel feelpanel" aria-label="Feel">
-    <div class="phead"><h2>Feel</h2></div>
-    <div class="fbody">
-      <div class="feelitem">
-        <div class="knob xl" data-param="Swing" data-unit="pct" data-min="0" data-max="100" data-value="54" data-default="50" title="Swing. Delays every second sixteenth."></div>
-      </div>
-      <div class="feelitem">
-        <div class="knob" data-param="Humanize" data-unit="pct" data-min="0" data-max="100" data-value="12" data-default="0" title="Humanize. Loosens timing and velocity a little."></div>
-      </div>
-      <div class="quantrow" title="Quantize strength.">
-        <div class="qslot"><i style="width:100%"></i></div>
-        <span class="qval">100&thinsp;%</span>
-      </div>
-    </div>
-  </aside>
-
   <aside class="panel playlist" aria-label="Playlist">
     <div class="phead"><h2>Playlist</h2><span class="gap"></span><span class="screw"></span></div>
     <div class="plbody" id="plbody"></div>
-    <button class="addsection">+ Add section</button>
+    <button class="addpattern">+ Add Pattern</button>
   </aside>
 </div>
 
 <!-- ============================ BOTTOM BAR ============================ -->
 <footer class="botbar">
-  <div class="segbtns">
-    <button class="on">Workspace</button><button>Performance</button>
-  </div>
-  <span class="gap"></span>
-  <div class="segbtns">
-    <button class="on" id="tabSeq">Sequencer</button><button id="tabRoll">Piano roll</button>
-  </div>
+  <button class="txtbtn collapsebtn" id="workspaceToggle" type="button" aria-expanded="true" aria-controls="editorWorkspace" title="Collapse the lower editor."><svg><use href="#i-back"/></svg><span>Collapse editor</span></button>
   <span class="gap"></span>
   <button class="txtbtn" id="btnUndo" disabled title="Nothing to undo yet"><svg><use href="#i-undo"/></svg>Undo</button>
   <button class="txtbtn" id="btnRedo" disabled title="Nothing to redo"><svg><use href="#i-redo"/></svg>Redo</button>
   <button class="txtbtn" title="Save the project."><svg><use href="#i-save"/></svg>Save</button>
 </footer>
+<div class="contextmenu" id="moduleMenu" role="menu" aria-label="Module actions" hidden>
+  <button id="deleteModule" type="button" role="menuitem">Delete module</button>
+</div>
+<div class="sr-only" id="announcer" aria-live="polite"></div>
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -1039,6 +1033,14 @@ const MODS=[
           ["Filter","hz",120,12000,6000,6000,"log"],["Pan","pan",-50,50,0,0],["Level","db",-60,6,-5,0]],
    voices:["Shaker","Bongo","Conga","Tambourine","Cowbell","Claves","Click","Noise"]},
 ];
+const PROJECT_PATTERNS=[
+  {name:"Intro",bars:8,swing:52,humanize:8},
+  {name:"Verse",bars:16,swing:54,humanize:12},
+  {name:"Break",bars:8,swing:50,humanize:18},
+  {name:"Drop",bars:16,swing:57,humanize:10},
+  {name:"Outro",bars:8,swing:51,humanize:6},
+];
+let activePatternIndex=1;
 /* seeded patterns so the mockup shows musical content, not noise */
 const seedRand=(s=>()=>((s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff))(7);
 const PATTERNS={};
@@ -1070,17 +1072,27 @@ MODS.forEach(m=>{
 
 /* ================= slots ================= */
 const slist=$("#slist");
+const loadedSlots=new Map();
+const presentModules=new Set(MODS.map(m=>m.id));
 MODS.forEach((m,i)=>{
   const d=document.createElement("div");
   d.className="slot"+(i===0?" on":"");
+  d.tabIndex=0;
   d.style.setProperty("--mod-accent",`var(--mod-${m.id})`);
   d.dataset.mod=m.id;
   const mini=Array.from({length:8},(_,s)=>`<i class="${PATTERNS[m.id][0][s*2]?"a":""}"></i>`).join("");
   d.innerHTML=`<span class="snum num">${String(i+1).padStart(2,"0")}</span>
     <div class="scard" title="${m.name} in slot ${i+1}."><span class="sn">${m.label}</span><span class="smini">${mini}</span></div>`;
+  loadedSlots.set(m.id,{el:d,html:d.innerHTML,index:i});
   slist.appendChild(d);
   d.addEventListener("click",()=>{
+    if(!presentModules.has(m.id)){
+      setModulePresent(m.id,true);
+      pushUndo(`Add ${m.name}`,()=>setModulePresent(m.id,false),()=>setModulePresent(m.id,true));
+      return;
+    }
     $$(".slot").forEach(s=>s.classList.remove("on")); d.classList.add("on");
+    renderEditor(m.id);
     const u=$(`.unit[data-mod="${m.id}"]`); if(u) u.scrollIntoView({behavior:"smooth",block:"nearest"});
   });
 });
@@ -1130,7 +1142,7 @@ function unitHTML(m){
         <button class="vnext" title="Next voice." aria-label="Next voice">&rsaquo;</button>
       </span>
       <span class="gap" style="flex:1"></span>
-      <span class="slbl">1 &ndash; 1</span>
+      <span class="slbl pattern-name">Verse</span>
     </div>
     <div class="steps">${steps}</div>
     <div class="stepnums">${nums}</div>
@@ -1146,11 +1158,75 @@ function unitHTML(m){
 MODS.forEach(m=>{
   const u=document.createElement("article");
   u.className="unit"; u.dataset.mod=m.id;
+  u.tabIndex=0;
   u.setAttribute("aria-label", `${m.name}, ${m.type}, slot ${MODS.indexOf(m)+1}`);
   u.innerHTML=unitHTML(m);
   rackscroll.appendChild(u);
 });
 initKnobs(document);
+
+/* module removal lives in one pointer- and keyboard-accessible context menu */
+const moduleMenu=$("#moduleMenu"), deleteModule=$("#deleteModule"), announcer=$("#announcer");
+let menuModule=null, menuTrigger=null;
+function announce(message){announcer.textContent="";requestAnimationFrame(()=>announcer.textContent=message);}
+function closeModuleMenu(restore=true){
+  moduleMenu.hidden=true;
+  if(restore&&menuTrigger?.isConnected&&!menuTrigger.hidden) menuTrigger.focus();
+  menuModule=null; menuTrigger=null;
+}
+function openModuleMenu(mid,trigger,x,y){
+  if(!presentModules.has(mid)) return;
+  menuModule=mid; menuTrigger=trigger; moduleMenu.hidden=false;
+  const r=moduleMenu.getBoundingClientRect();
+  moduleMenu.style.left=clamp(x,4,innerWidth-r.width-4)+"px";
+  moduleMenu.style.top=clamp(y,4,innerHeight-r.height-4)+"px";
+  deleteModule.focus();
+}
+function setModulePresent(mid,present){
+  const m=MODS.find(item=>item.id===mid), slotData=loadedSlots.get(mid);
+  if(!m||!slotData) return;
+  const {el:slot,html,index}=slotData;
+  if(present){
+    presentModules.add(mid); slot.classList.remove("empty"); slot.innerHTML=html;
+  }else{
+    presentModules.delete(mid); slot.classList.add("empty","on");
+    slot.innerHTML=`<span class="snum num">${String(index+1).padStart(2,"0")}</span>
+      <div class="scard" title="Empty slot ${index+1}. Click to add ${m.name}."><span>empty</span><span>+</span></div>`;
+  }
+  const unit=$(`.unit[data-mod="${mid}"]`); if(unit) unit.hidden=!present;
+  const strip=$(`.mstrip[data-mod="${mid}"]`);
+  if(strip){
+    strip.classList.toggle("empty",!present);
+    strip.querySelector(".mtag").textContent=present?m.label:String(index+1).padStart(2,"0");
+    strip.title=present?`Channel ${String(index+1).padStart(2,"0")} — ${m.name}`:`Channel ${String(index+1).padStart(2,"0")} — Empty`;
+    strip.querySelectorAll("button").forEach(button=>button.disabled=!present);
+    strip.querySelectorAll(".knob,.fader").forEach(control=>{
+      control.tabIndex=present?0:-1; control.setAttribute("aria-disabled",String(!present));
+    });
+  }
+  announce(present?`${m.name} added to slot ${index+1}.`:`${m.name} deleted from slot ${index+1}. Undo is available.`);
+}
+function bindModuleMenu(el,mid){
+  el.addEventListener("contextmenu",e=>{e.preventDefault();openModuleMenu(mid,el,e.clientX,e.clientY);});
+  el.addEventListener("keydown",e=>{
+    if(e.key==="ContextMenu"||(e.shiftKey&&e.key==="F10")){
+      e.preventDefault();const r=el.getBoundingClientRect();openModuleMenu(mid,el,r.left+18,r.top+18);
+    }
+  });
+}
+MODS.forEach(m=>{
+  bindModuleMenu(loadedSlots.get(m.id).el,m.id);
+  bindModuleMenu($(`.unit[data-mod="${m.id}"]`),m.id);
+});
+deleteModule.addEventListener("click",()=>{
+  const mid=menuModule, m=MODS.find(item=>item.id===mid); closeModuleMenu(false);
+  if(!m||!presentModules.has(mid)) return;
+  setModulePresent(mid,false);
+  pushUndo(`Delete ${m.name}`,()=>setModulePresent(mid,true),()=>setModulePresent(mid,false));
+});
+addEventListener("pointerdown",e=>{if(!moduleMenu.hidden&&!e.target.closest("#moduleMenu"))closeModuleMenu(false);});
+addEventListener("keydown",e=>{if(e.key==="Escape"&&!moduleMenu.hidden){e.preventDefault();closeModuleMenu();}});
+addEventListener("resize",()=>closeModuleMenu(false));
 
 /* voice cycling + step toggles */
 $$(".useq").forEach(seq=>{
@@ -1185,17 +1261,34 @@ $$(".useq").forEach(seq=>{
 $$(".upill").forEach(p=>{ if(p.textContent!=="On") p.addEventListener("click",()=>p.classList.toggle("on")); });
 
 /* ================= mixer strips ================= */
-const CH=[...MODS.map((m,i)=>({label:m.label,name:m.name,mod:m.id,db:-6+i*0.4})),
-  {label:null,name:"Channel 7",mod:null,db:-60},{label:null,name:"Channel 8",mod:null,db:-60}];
+const SEND_IDS=["A","B","C","D"];
+const SEND_NAMES=["Analog echo","Plate reverb","Stereo width","Drive"];
+const SEND_DEFAULTS=[
+  [true,false,false,false],
+  [true,true,false,false],
+  [false,true,false,true],
+  [false,true,true,false],
+  [false,false,true,false],
+  [false,false,true,true],
+];
+const CH=[...MODS.map((m,i)=>({label:m.label,name:m.name,mod:m.id,db:-6+i*0.4,sends:SEND_DEFAULTS[i].slice()})),
+  {label:null,name:"Channel 7",mod:null,db:-60,sends:[false,false,false,false]},
+  {label:null,name:"Channel 8",mod:null,db:-60,sends:[false,false,false,false]}];
 CH.forEach((c,i)=>c.num=String(i+1).padStart(2,"0"));
 const mixstrips=$("#mixstrips");
 CH.forEach((c,i)=>{
   const d=document.createElement("div");
   d.className="mstrip";
+  if(c.mod) d.dataset.mod=c.mod;
   if(c.mod) d.style.setProperty("--mod-accent",`var(--mod-${c.mod})`);
   d.title=`Channel ${c.num} — ${c.name}`;
   d.innerHTML=`<span class="mtag">${c.label||c.num}</span>
     <div class="knob sm" data-param="Pan" data-unit="pan" data-min="-50" data-max="50" data-value="0" data-default="0" title="Pan ${c.name}."></div>
+    <div class="sendgrid" aria-label="${c.name} sends">${c.sends.map((active,sendIndex)=>
+      `<button class="sendbtn${active?" on":""}" type="button" data-send="${SEND_IDS[sendIndex]}"
+        aria-label="${c.name} send ${SEND_IDS[sendIndex]} to ${SEND_NAMES[sendIndex]}"
+        aria-pressed="${active}" title="Send ${SEND_IDS[sendIndex]} — ${SEND_NAMES[sendIndex]}. Click to preview its active state."
+        ${c.mod?"":"disabled"}>${SEND_IDS[sendIndex]}</button>`).join("")}</div>
     <div class="fwrap"><div class="fader" title="${c.name} level."><div class="ffill"></div><div class="fcap"></div></div>
       <canvas class="mmeter" data-chm="${i}" width="16" height="240"></canvas></div>
     <div class="msbtns"><button class="msbtn solo" title="Solo.">S</button><button class="msbtn mute" title="Mute.">M</button></div>`;
@@ -1213,6 +1306,17 @@ CH.forEach((c,i)=>{
   f.addEventListener("pointerup",()=>{if(!dg)return;const p=dg.v,n=c.db;dg=null;
     if(Math.abs(p-n)>0.05) pushUndo(`${c.name} to ${fmt(n,"db")}`,()=>{c.db=p;paint();},()=>{c.db=n;paint();});});
   d.querySelectorAll(".msbtn").forEach(b=>b.addEventListener("click",()=>b.classList.toggle("on")));
+  d.querySelectorAll(".sendbtn").forEach((b,sendIndex)=>b.addEventListener("click",()=>{
+    const previous=c.sends[sendIndex], next=!previous;
+    const paintSend=value=>{
+      c.sends[sendIndex]=value;
+      b.classList.toggle("on",value);
+      b.setAttribute("aria-pressed",String(value));
+    };
+    paintSend(next);
+    pushUndo(`${c.name} send ${SEND_IDS[sendIndex]} ${next?"on":"off"}`,
+      ()=>paintSend(previous),()=>paintSend(next));
+  }));
 });
 /* master strip */
 (()=>{
@@ -1222,8 +1326,16 @@ CH.forEach((c,i)=>{
     <div class="knob sm" data-param="Width" data-unit="pct" data-min="0" data-max="200" data-value="100" data-default="100" title="Stereo width."></div>
     <div class="fwrap"><div class="fader" title="Master level."><div class="ffill" style="height:82%"></div><div class="fcap" style="bottom:calc(82% - 6.5px)"></div></div>
       <canvas class="mmeter" data-chm="master" width="16" height="240"></canvas></div>
-    <div class="msbtns"><button class="msbtn" title="Dim the master.">D</button></div>`;
+    <div class="msbtns"><button class="msbtn master-fx-bypass" aria-pressed="false"
+      title="Bypass user master effects. Master gain and the protected limiter stay active.">FX</button></div>`;
   mixstrips.appendChild(d);
+  const bypass=d.querySelector(".master-fx-bypass");
+  bypass.addEventListener("click",()=>{
+    const next=!bypass.classList.contains("on");
+    const apply=value=>{bypass.classList.toggle("on",value);bypass.setAttribute("aria-pressed",String(value));};
+    apply(next);
+    pushUndo("Master effects "+(next?"bypassed":"active"),()=>apply(!next),()=>apply(next));
+  });
 })();
 initKnobs(mixstrips);
 
@@ -1284,6 +1396,7 @@ $$(".rtabs button").forEach(b=>b.addEventListener("click",()=>{
 }));
 
 /* ================= piano roll ================= */
+let activeEditorModule="bass";
 const KEYS=["C5","B4","A#4","A4","G#4","G4","F#4","F4","E4","D#4","D4","C#4","C4","B3","A#3","A3","G#3","G3","F#3","F3","E3","D#3","D3","C#3","C3"];
 const prkeys=$("#prkeys"), prgrid=$("#prgrid"), vgrid=$("#vgrid"), rbm=$("#rbmeasures");
 KEYS.forEach(k=>{
@@ -1302,31 +1415,179 @@ for(let b=1;b<16;b++){
 const NOTES=[];
 for(let i=0;i<34;i++){
   const step=Math.floor(seedRand()*64);
-  NOTES.push({x:step*(100/64), w:100/64*(seedRand()>0.75?2:1), row:6+Math.floor(seedRand()*14), vel:55+Math.floor(seedRand()*45)});
+  NOTES.push({x:step*(100/64), w:100/64*(seedRand()>0.75?2:1), row:6+Math.floor(seedRand()*14),
+    vel:55+Math.floor(seedRand()*45),slide:i%9===0});
 }
-NOTES.forEach(n=>{
-  const d=document.createElement("div"); d.className="note";
-  d.style.left=n.x+"%"; d.style.width=(n.w*0.92)+"%";
-  d.style.top=`calc(${n.row*rowH}% + 1px)`;
-  d.style.height=`calc(${rowH}% - 2px)`;
-  prgrid.appendChild(d);
-  const v=document.createElement("div"); v.className="vbar";
-  v.style.left=`calc(${n.x}% + 1px)`; v.style.height=(n.vel*0.8)+"%";
-  vgrid.appendChild(v);
+function attachNote(n){
+  if(n.el?.isConnected) return;
+  if(n.el){n.paint();prgrid.appendChild(n.el);vgrid.appendChild(n.velEl);return;}
+  const d=n.el||document.createElement("div"), v=n.velEl||document.createElement("div");
+  n.el=d; n.velEl=v; d.className="note"+(n.slide?" slide":""); v.className="vbar";
+  d.tabIndex=0; d.setAttribute("role","button");
+  const paint=()=>{
+    d.style.left=n.x+"%"; d.style.width=(n.w*0.92)+"%";
+    d.style.top=`calc(${n.row*rowH}% + 1px)`; d.style.height=`calc(${rowH}% - 2px)`;
+    d.setAttribute("aria-label",`${KEYS[n.row]}, position ${Math.round(n.x/(100/64))+1}, duration ${Math.max(1,Math.round(n.w/(100/64)))} steps`);
+    d.title="Drag to move; drag the right edge to resize; right-click to delete.";
+    v.style.left=`calc(${n.x}% + 1px)`; v.style.height=(n.vel*0.8)+"%";
+  };
+  n.paint=paint; paint(); prgrid.appendChild(d); vgrid.appendChild(v);
+  const remove=()=>{d.remove();v.remove();};
+  const commitDelete=()=>{
+    if(!d.isConnected)return;remove();
+    pushUndo(`Delete ${KEYS[n.row]} note`,()=>attachNote(n),remove);
+  };
+  d.addEventListener("contextmenu",e=>{e.preventDefault();commitDelete();});
+  d.addEventListener("keydown",e=>{if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();commitDelete();}});
+  let drag=null;
+  d.addEventListener("pointerdown",e=>{
+    if(e.button!==0)return;e.stopPropagation();d.setPointerCapture(e.pointerId);
+    const rect=d.getBoundingClientRect();
+    drag={startX:e.clientX,startY:e.clientY,x:n.x,w:n.w,row:n.row,
+      mode:e.clientX<=rect.left+6?"resize-left":e.clientX>=rect.right-6?"resize-right":"move"};
+  });
+  d.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    const step=100/64,delta=(e.clientX-drag.startX)/(prgrid.clientWidth||1)*100;
+    if(drag.mode==="resize-right"){
+      const width=clamp(drag.w+delta,step,100-drag.x);n.w=e.altKey?width:Math.max(step,Math.round(width/step)*step);
+    }else if(drag.mode==="resize-left"){
+      const end=drag.x+drag.w,raw=clamp(drag.x+delta,0,end-step);
+      n.x=e.altKey?raw:Math.round(raw/step)*step;n.w=end-n.x;
+    }else{
+      const x=clamp(drag.x+delta,0,100-drag.w);n.x=e.altKey?x:Math.round(x/step)*step;
+      n.row=clamp(drag.row+Math.round((e.clientY-drag.startY)/(prgrid.clientHeight||1)*KEYS.length),0,KEYS.length-1);
+    }
+    paint();
+  });
+  d.addEventListener("pointerup",()=>{
+    if(!drag)return;const before={x:drag.x,w:drag.w,row:drag.row},after={x:n.x,w:n.w,row:n.row};drag=null;
+    const overlap=NOTES.some(other=>other!==n&&other.el?.isConnected&&other.row===n.row&&n.x<other.x+other.w&&n.x+n.w>other.x);
+    if(overlap){n.x=before.x;n.w=before.w;n.row=before.row;paint();return;}
+    if(Math.abs(before.x-after.x)<.01&&Math.abs(before.w-after.w)<.01&&before.row===after.row)return;
+    const apply=value=>{n.x=value.x;n.w=value.w;n.row=value.row;paint();};
+    pushUndo(`Edit ${KEYS[n.row]} note`,()=>apply(before),()=>apply(after));
+  });
+}
+NOTES.forEach(attachNote);
+prgrid.addEventListener("pointerdown",e=>{
+  if(activeEditorModule!=="bass"||e.button!==0||e.target.closest(".note"))return;
+  const r=prgrid.getBoundingClientRect(),step=100/64;
+  const n={x:clamp(Math.floor((e.clientX-r.left)/r.width*64)*step,0,100-step),w:step,
+    row:clamp(Math.floor((e.clientY-r.top)/r.height*KEYS.length),0,KEYS.length-1),vel:80};
+  if(NOTES.some(other=>other.el?.isConnected&&other.row===n.row&&n.x<other.x+other.w&&n.x+n.w>other.x))return;
+  NOTES.push(n);attachNote(n);n.el.focus();
+  const remove=()=>{n.el.remove();n.velEl.remove();};
+  pushUndo(`Add ${KEYS[n.row]} note`,remove,()=>attachNote(n));
 });
 
+function addGridLines(rows){
+  const height=100/rows;
+  for(let i=0;i<rows;i++){
+    const line=document.createElement("div");line.className="grow";line.style.top=((i+1)*height)+"%";prgrid.appendChild(line);
+  }
+  for(let step=1;step<16;step++){
+    const line=document.createElement("div");line.className=step%4===0?"gbar":"gbeat";
+    line.style.left=(step*6.25)+"%";prgrid.appendChild(line);
+  }
+}
+function addDrumTrigger(mid,row,step){
+  const m=MODS.find(item=>item.id===mid);
+  if(!m||!PATTERNS[mid][row][step])return;
+  const trigger=document.createElement("button");
+  trigger.className="trigger";trigger.type="button";
+  trigger.style.left=`calc(${step*6.25}% + 1px)`;
+  trigger.style.width="calc(6.25% - 2px)";
+  trigger.style.top=`calc(${row*(100/m.voices.length)}% + 1px)`;
+  trigger.style.height=`calc(${100/m.voices.length}% - 2px)`;
+  trigger.setAttribute("aria-label",`${m.voices[row]}, step ${step+1}`);
+  const remove=()=>{PATTERNS[mid][row][step]=false;trigger.remove();};
+  const restore=()=>{PATTERNS[mid][row][step]=true;if(activeEditorModule===mid)addDrumTrigger(mid,row,step);};
+  trigger.addEventListener("contextmenu",event=>{
+    event.preventDefault();remove();pushUndo(`Delete ${m.voices[row]} trigger`,restore,remove);
+  });
+  trigger.addEventListener("keydown",event=>{
+    if(event.key==="Delete"||event.key==="Backspace"){
+      event.preventDefault();remove();pushUndo(`Delete ${m.voices[row]} trigger`,restore,remove);
+    }
+  });
+  prgrid.appendChild(trigger);
+}
+function paintDrumTrigger(event){
+  const m=MODS.find(item=>item.id===activeEditorModule);
+  if(!m||m.kind==="bass")return;
+  const rect=prgrid.getBoundingClientRect();
+  const step=clamp(Math.floor((event.clientX-rect.left)/rect.width*16),0,15);
+  const row=clamp(Math.floor((event.clientY-rect.top)/rect.height*m.voices.length),0,m.voices.length-1);
+  if(PATTERNS[m.id][row][step])return;
+  PATTERNS[m.id][row][step]=true;addDrumTrigger(m.id,row,step);
+}
+let paintingDrums=false;
+prgrid.addEventListener("pointerdown",event=>{
+  if(activeEditorModule==="bass"||event.button!==0||event.target.closest(".trigger"))return;
+  paintingDrums=true;prgrid.setPointerCapture(event.pointerId);paintDrumTrigger(event);
+});
+prgrid.addEventListener("pointermove",event=>{if(paintingDrums)paintDrumTrigger(event);});
+prgrid.addEventListener("pointerup",()=>paintingDrums=false);
+
+function renderEditor(mid){
+  const m=MODS.find(item=>item.id===mid);
+  if(!m)return;
+  activeEditorModule=mid;
+  prkeys.replaceChildren();
+  prgrid.replaceChildren();
+  vgrid.replaceChildren();
+  const playhead=document.createElement("div");playhead.className="playhead";playhead.id="rollPlayhead";playhead.style.left="0%";
+  prgrid.appendChild(playhead);
+  $(".rollbar .rbcorner").textContent=m.kind==="bass"?"PITCH":"VOICE";
+  $(".rollctx").textContent=`${m.name} — ${PROJECT_PATTERNS[activePatternIndex].name}`;
+  if(m.kind==="bass"){
+    KEYS.forEach(key=>{
+      const row=document.createElement("div");row.className="prkey"+(key.includes("#")?" acc":"");
+      row.textContent=key.includes("#")?"":key;prkeys.appendChild(row);
+    });
+    addGridLines(KEYS.length);
+    NOTES.forEach(note=>{note.el?.remove();note.velEl?.remove();attachNote(note);});
+    return;
+  }
+  m.voices.forEach(name=>{const row=document.createElement("div");row.className="prkey voice";row.textContent=name;prkeys.appendChild(row);});
+  addGridLines(m.voices.length);
+  PATTERNS[mid].forEach((steps,row)=>steps.forEach((on,step)=>{if(on)addDrumTrigger(mid,row,step);}));
+}
+
 /* ================= playlist ================= */
-const SECTIONS=[["Intro",8],["Verse",16],["Break",8],["Drop",16],["Outro",8]];
 const plbody=$("#plbody");
-SECTIONS.forEach(([n,b],i)=>{
+const playlistRows=[];
+function showActivePattern(index){
+  activePatternIndex=(index+PROJECT_PATTERNS.length)%PROJECT_PATTERNS.length;
+  const pattern=PROJECT_PATTERNS[activePatternIndex];
+  $("#patName").textContent=pattern.name; $("#patLen").textContent=`${pattern.bars} bars`;
+  $$(".pattern-name").forEach(el=>el.textContent=pattern.name);
+  const module=MODS.find(item=>item.id===activeEditorModule);
+  $(".rollctx").textContent=`${module?.name||"Acid Bass"} — ${pattern.name}`;
+  $("#swingSlider").value=pattern.swing;$("#swingValue").textContent=pattern.swing+"%";
+  $("#humanizeSlider").value=pattern.humanize;$("#humanizeValue").textContent=pattern.humanize+"%";
+  playlistRows.forEach((row,i)=>row.classList.toggle("on",i===activePatternIndex));
+}
+PROJECT_PATTERNS.forEach(({name:n,bars:b},i)=>{
   const d=document.createElement("div");
   d.className="plrow"+(i===1?" on":"");
   d.innerHTML=`<span class="plnum num">${String(i+1).padStart(2,"0")}</span>
     <span class="plname">${n}</span><span class="plbars num">${b} bars</span>`;
   d.title=`${n} — ${b} bars. Click to jump here.`;
   plbody.appendChild(d);
-  d.addEventListener("click",()=>{$$(".plrow").forEach(r=>r.classList.remove("on"));d.classList.add("on");});
+  playlistRows.push(d);
+  d.addEventListener("click",()=>showActivePattern(i));
 });
+$("#patPrev").addEventListener("click",()=>showActivePattern(activePatternIndex-1));
+$("#patNext").addEventListener("click",()=>showActivePattern(activePatternIndex+1));
+$("#swingSlider").addEventListener("input",event=>{
+  PROJECT_PATTERNS[activePatternIndex].swing=+event.target.value;$("#swingValue").textContent=event.target.value+"%";
+});
+$("#humanizeSlider").addEventListener("input",event=>{
+  PROJECT_PATTERNS[activePatternIndex].humanize=+event.target.value;$("#humanizeValue").textContent=event.target.value+"%";
+});
+showActivePattern(activePatternIndex);
 
 /* ================= transport + clock + meters ================= */
 let tempo=128, t0=0, elapsed=0;
@@ -1338,7 +1599,33 @@ btnPlay.addEventListener("click",()=>{playing=!playing;btnPlay.classList.toggle(
 btnStop.addEventListener("click",()=>{playing=false;elapsed=0;stepPos=0;btnPlay.classList.remove("on");updateClock();});
 btnRec.addEventListener("click",()=>btnRec.classList.toggle("on"));
 $("#btnMetro").addEventListener("click",e=>e.currentTarget.classList.toggle("on"));
-$$(".lrbtns button").forEach(b=>b.addEventListener("click",()=>b.classList.toggle("on")));
+$("#btnPower").addEventListener("click",event=>{
+  const next=!event.currentTarget.classList.contains("on");
+  event.currentTarget.classList.toggle("on",next);event.currentTarget.setAttribute("aria-pressed",String(next));
+});
+let meterModeMS=false;
+$("#meterMode").addEventListener("click",event=>{
+  meterModeMS=!meterModeMS;
+  event.currentTarget.textContent=meterModeMS?"M/S":"L/R";
+  event.currentTarget.setAttribute("aria-pressed",String(meterModeMS));
+  event.currentTarget.setAttribute("aria-label",meterModeMS?"Master meter mode: mid and side":"Master meter mode: left and right");
+  $("#meterLabelA").textContent=meterModeMS?"M":"L";
+  $("#meterLabelB").textContent=meterModeMS?"S":"R";
+});
+$$("#transportMode button").forEach(button=>button.addEventListener("click",()=>{
+  $$("#transportMode button").forEach(candidate=>{
+    const active=candidate===button;
+    candidate.classList.toggle("on",active);
+    candidate.setAttribute("aria-pressed",String(active));
+  });
+}));
+$("#workspaceToggle").addEventListener("click",event=>{
+  const collapsed=document.body.classList.toggle("workspace-collapsed");
+  event.currentTarget.setAttribute("aria-expanded",String(!collapsed));
+  event.currentTarget.title=collapsed?"Expand the lower editor.":"Collapse the lower editor.";
+  event.currentTarget.querySelector("span").textContent=collapsed?"Expand editor":"Collapse editor";
+  $("#editorWorkspace").setAttribute("aria-hidden",String(collapsed));
+});
 addEventListener("keydown",e=>{
   if(e.code==="Space"&&!e.target.closest("input,select")){e.preventDefault();btnPlay.click();}
 });
@@ -1392,8 +1679,8 @@ function paintMeter(cv,lv,vertical=true){
     else ctx.fillRect(i*6+1,2,4,H-4);
   }
 }
-const chMeters=$$("[data-chm]"), masterCanvas=$("#masterCanvas"), masterDb=$("#masterDb");
-const lv={ch:CH.map(()=>0),master:0};
+const chMeters=$$("[data-chm]"), masterMeterA=$("#masterMeterA"), masterMeterB=$("#masterMeterB"), masterDb=$("#masterDb");
+const lv={ch:CH.map(()=>0),master:0,masterL:0,masterR:0};
 let lastStep=-1;
 function tick(now){
   if(playing){
@@ -1406,7 +1693,9 @@ function tick(now){
         const m=MODS.find(x=>x.id===c.mod);
         if(m && PATTERNS[m.id].some(row=>row[stepPos])) lv.ch[i]=0.45+seedRand()*0.5;
       });
-      lv.master=0.55+seedRand()*0.35;
+      lv.masterL=0.52+seedRand()*0.38;
+      lv.masterR=0.48+seedRand()*0.4;
+      lv.master=Math.max(lv.masterL,lv.masterR);
       /* playhead on the step lamps */
       $$(".useq .steps").forEach(s=>{
         [...s.children].forEach((b,i)=>b.classList.toggle("playhead",i===stepPos));
@@ -1415,29 +1704,18 @@ function tick(now){
     }
     updateClock();
   } else {
-    lv.ch=lv.ch.map(v=>v*0.9); lv.master*=0.9;
+    lv.ch=lv.ch.map(v=>v*0.9); lv.master*=0.9;lv.masterL*=0.9;lv.masterR*=0.9;
   }
-  lv.ch=lv.ch.map(v=>v*0.965); lv.master*=0.97;
+  lv.ch=lv.ch.map(v=>v*0.965); lv.master*=0.97;lv.masterL*=0.97;lv.masterR*=0.97;
   chMeters.forEach((cv,i)=>paintMeter(cv, cv.dataset.chm==="master"?lv.master:lv.ch[i]));
-  paintMeter(masterCanvas,lv.master,false);
+  const meterA=meterModeMS?(lv.masterL+lv.masterR)/2:lv.masterL;
+  const meterB=meterModeMS?Math.abs(lv.masterL-lv.masterR)/2:lv.masterR;
+  paintMeter(masterMeterA,meterA,false);paintMeter(masterMeterB,meterB,false);
   masterDb.innerHTML = lv.master<0.02 ? "&minus;Inf" : fmt(-60+lv.master*60,"db").replace("-","&minus;");
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
-/* ================= misc toggles ================= */
-$$(".segbtns").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
-  g.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
-})));
-$$(".btabs button,.ptabs button").forEach(b=>b.addEventListener("click",()=>{
-  b.parentElement.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
-}));
-$$(".rolltools .tool").forEach(b=>b.addEventListener("click",()=>{
-  $$(".rolltools .tool").forEach(x=>x.classList.remove("on")); b.classList.add("on");
-}));
-$("#themeSel").addEventListener("change",e=>{
-  document.documentElement.dataset.theme=e.target.value; drawEq(); drawComp();
-});
 </script>
 </body>
 </html>

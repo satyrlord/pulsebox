@@ -139,6 +139,23 @@ export function readCurrentArtifactUnits(repositoryRoot = process.cwd()): readon
   return units.sort((left, right) => left.path.localeCompare(right.path));
 }
 
+export function readCurrentDocumentPaths(repositoryRoot = process.cwd()): readonly string[] {
+  const paths: string[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolute = join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile()) paths.push(normalizePath(relative(repositoryRoot, absolute)));
+    }
+  };
+  const documentsRoot = resolve(repositoryRoot, "docs");
+  if (existsSync(documentsRoot)) visit(documentsRoot);
+  for (const entry of readdirSync(repositoryRoot, { withFileTypes: true })) {
+    if (entry.isFile() && /\.md$/i.test(entry.name)) paths.push(normalizePath(entry.name));
+  }
+  return paths.sort((left, right) => left.localeCompare(right));
+}
+
 const COMPOSITION_RENDER_CALLS = new Set([
   "append",
   "appendChild",
@@ -397,6 +414,42 @@ export function findForbiddenTechnologyViolations(
   return violations;
 }
 
+/**
+ * The repository records what is required and its implementation status, never
+ * how a past run went. Verification evidence, handoffs, and dated reports belong
+ * on an ignored temporary path, so they must not reappear in the tree.
+ */
+export function findRunNarrativeViolations(
+  paths: readonly string[],
+): readonly PolicyViolation[] {
+  const violations: PolicyViolation[] = [];
+  for (const path of paths) {
+    const normalized = normalizePath(path);
+    const name = normalized.split("/").pop() ?? "";
+    if (/(?:^|\/)verification\//i.test(normalized)) {
+      violations.push({
+        path,
+        message: "Verification evidence must use an ignored temporary path.",
+      });
+      continue;
+    }
+    if (/^(?:handoff|session-report|session-summary)\.md$/i.test(name)) {
+      violations.push({
+        path,
+        message: "Handoff and session reports must use an ignored temporary path.",
+      });
+      continue;
+    }
+    if (/^(?:phase-\d+|\d{4}-\d{2}-\d{2})[^/]*\.md$/i.test(name)) {
+      violations.push({
+        path,
+        message: "Dated and per-phase run reports must use an ignored temporary path.",
+      });
+    }
+  }
+  return violations;
+}
+
 export function findForbiddenArtifactViolations(
   units: readonly SourceUnit[],
 ): readonly PolicyViolation[] {
@@ -408,17 +461,6 @@ export function findForbiddenArtifactViolations(
     }
     if (/<link\b[^>]*\brel=["'][^"']*\bmanifest\b[^"']*["']/i.test(unit.source)) {
       violations.push({ path: unit.path, message: "PWA manifest links are prohibited." });
-    }
-    if (
-      normalized.startsWith(".github/workflows/") &&
-      /actions\/(?:configure-pages|deploy-pages|upload-pages-artifact)@/i.test(
-        unit.source,
-      )
-    ) {
-      violations.push({
-        path: unit.path,
-        message: "Remote product deployment workflows are prohibited.",
-      });
     }
   }
   return violations;

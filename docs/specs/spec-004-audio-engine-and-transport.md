@@ -24,6 +24,7 @@ Far left:
 
 Transport group:
 
+- Compact Pattern/Song transport-scope toggle.
 - Play.
 - Stop.
 - Record.
@@ -33,7 +34,10 @@ Transport group:
 
 Center:
 
-- `PULSEBOX`.
+- `PULSEBOX`, fixed to the horizontal center of the viewport independently of
+  the width of the groups on either side.
+- The app mark uses a restrained inset or recessed surround matching the
+  approved design target.
 
 Position group:
 
@@ -44,11 +48,15 @@ Position group:
 Master group:
 
 - Audio-engine power.
-- Stereo or mono.
-- Left and right meters.
+- One two-state analysis toggle labeled `L/R` or `M/S`.
+- Two master meter bars. In `L/R` they show left and right. In `M/S` they
+  show mid and side.
 - Peak indicator.
 - Master dB value.
 - Settings.
+
+The header has no theme selector. Theme and high-contrast selection exists only
+on the Settings page when that page is implemented.
 
 Behavior:
 
@@ -56,11 +64,12 @@ Behavior:
   editor.
 - Escape stops playback.
 - Space pauses in place. Stop halts playback and returns to the last explicit
-  transport start marker, defaulting to pattern step 1 in Pattern mode or Song
-  bar 1 in Song mode. Repeated Stop presses have no second behavior.
+  transport start marker, defaulting to Pattern step 1 in Pattern mode or the
+  first Playlist row in Song mode. Repeated Stop presses have no second
+  behavior.
 - The transport start marker updates when the user positions the playhead while
   stopped or starts playback from a manually selected location. Loop wraps,
-  quantized pattern launches, scene launches, and automatic playhead movement do
+  quantized Pattern switches and automatic playhead movement do
   not move the marker.
 - Record arms or disarms.
 - Tempo range is approximately 40 to 240 BPM.
@@ -75,22 +84,27 @@ Behavior:
 - Pin project toggles whether the current project appears at the top of the
   project selector. It uses `aria-pressed` and persists as project metadata.
 
-The master Mono control is a monitor-only fold-down placed after the master
-chain. It affects live listening and the displayed master meters. It does not
-alter project audio state and is excluded from master WAV and stem export.
+The `L/R`/`M/S` control changes analysis only. It never changes live audio,
+project state, automation, undo history, or export. Meter mode is a transient
+monitoring preference. `M = (L + R) / 2` and `S = (L - R) / 2` for displayed
+analysis.
+
+The separate master Mono control remains in the Master studio view. It is a
+monitor-only fold-down placed after the master chain, affects live listening and
+the displayed master meters, and is excluded from project audio state, master
+WAV export, and stem export.
 
 ---
 
 ## 17. Timing
 
-Global controls:
+Pattern properties shown as horizontal sliders in the Piano Roll header:
 
 - Swing, default 54%.
 - Humanize, default 12%.
-- Quantize strength, default 100%.
-- Reset.
-- Optional lock.
-- Grid display and timing status.
+- Quantize strength is fixed at 100% in the MVP and is not a visible control.
+- The Pattern grid is fixed at 1/16. There is no Straight selector, grid
+  selector, triplet selector, or persistent snap-off control in the MVP.
 
 Behavior:
 
@@ -98,12 +112,12 @@ Behavior:
 - Humanize changes timing and velocity deterministically.
 - A stored pattern seed produces repeatable playback.
 - Changing the seed creates a new deterministic variation.
-- Quantize strength blends events toward the grid.
+- Alt-drag temporarily bypasses the 1/16 snap for a pitched note gesture.
 - Timing is audible.
 - Visual playheads reflect timing where practical.
 - Tempo changes during playback are supported.
-- Tempo automation and structural time-signature events are supported in Song
-  mode.
+- Selectable grids, triplets, persistent snap-off, per-voice grid resolution,
+  tempo automation, and time-signature timelines are post-MVP work.
 
 ---
 
@@ -143,7 +157,7 @@ Behavior:
 - Supports swing.
 - Supports deterministic humanization.
 - Supports pattern and song modes.
-- Supports quantized pattern and scene launches.
+- Supports quantized named Pattern launches.
 - Keeps visual playheads separate.
 
 A scheduling interval around 20 to 30 milliseconds and a horizon around 80 to
@@ -250,8 +264,9 @@ Target:
 Apart from the functional first-sound metric above, the MVP has no normative
 hardware class, CPU percentage, buffer-size threshold, or timed stress benchmark
 as a release gate. Performance profiling remains required for engineering
-diagnosis and verification reports, but it is informational rather than a pass-or-fail
-acceptance criterion.
+diagnosis, but it is informational rather than a pass-or-fail acceptance
+criterion, and its output belongs in the run report to the user rather than in
+the repository tree.
 
 ---
 

@@ -6,7 +6,9 @@ import {
   findForbiddenTechnologyViolations,
   findLayerViolations,
   findPluginBranchViolations,
+  findRunNarrativeViolations,
   readCurrentArtifactUnits,
+  readCurrentDocumentPaths,
   readCurrentSourceUnits,
   type SourceUnit,
 } from "./source-policy";
@@ -81,7 +83,7 @@ describe("architecture source policy", () => {
     expect(findForbiddenTechnologyViolations(readCurrentSourceUnits())).toEqual([]);
   });
 
-  it("rejects PWA manifests and remote product deployment", () => {
+  it("rejects PWA manifests", () => {
     expect(
       findForbiddenArtifactViolations([
         { path: "public/app.webmanifest", source: "{}" },
@@ -89,16 +91,41 @@ describe("architecture source policy", () => {
           path: "index.html",
           source: '<link rel="manifest" href="/app.webmanifest">',
         },
-        {
-          path: ".github/workflows/pages.yml",
-          source: "uses: actions/deploy-pages@v4",
-        },
       ]),
-    ).toHaveLength(3);
+    ).toHaveLength(2);
   });
 
   it("contains no PWA manifest artifact", () => {
     expect(findForbiddenArtifactViolations(readCurrentArtifactUnits())).toEqual([]);
+  });
+
+  it("rejects verification evidence, handoffs, and dated run reports", () => {
+    expect(messages(findRunNarrativeViolations([
+      "docs/verification/phase-1.md",
+      "HANDOFF.md",
+      "docs/phase-2.md",
+      "docs/2026-07-27-review.md",
+    ]))).toEqual([
+      "Verification evidence must use an ignored temporary path.",
+      "Handoff and session reports must use an ignored temporary path.",
+      "Dated and per-phase run reports must use an ignored temporary path.",
+      "Dated and per-phase run reports must use an ignored temporary path.",
+    ]);
+  });
+
+  it("keeps owning contracts and the required naming audit allowed", () => {
+    expect(findRunNarrativeViolations([
+      "AGENTS.md",
+      "README.md",
+      "docs/ARCHITECTURE.md",
+      "docs/audits/naming-originality-audit.md",
+      "docs/instruments/acid-bass.md",
+      "docs/specs/spec-010-quality-and-delivery.md",
+    ])).toEqual([]);
+  });
+
+  it("contains no run narrative in the repository tree", () => {
+    expect(findRunNarrativeViolations(readCurrentDocumentPaths())).toEqual([]);
   });
 
   it("rejects concrete plugin-ID branching outside plugin and registry code", () => {

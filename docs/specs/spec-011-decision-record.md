@@ -43,9 +43,10 @@ this table is the traceability record.
   separate; export also includes the master mix.
 - **D13.** Voice-level send controls are removed. Sends exist only on the parent
   module channel.
-- **D14.** Patterns have a nominal 1–64-step span; drum voices may override
-  length and resolution and wrap independently.
-- **D15.** Pattern positions use flat numbers `1` through `32`.
+- **D14.** Each module part inside a named Pattern has a nominal 1–64-step cycle;
+  drum voices may override length and resolution and wrap independently.
+- **D15.** A project has 1 through 32 stable named Patterns. The UI identifies
+  them by names such as Intro and Verse, never compound numbers such as `1 - 1`.
 - **D16.** User themes import only through the bounded, allowlisted JSON token
   schema in `THEMING.md`; raw CSS and resource-loading or declaration-injecting
   values are rejected.
@@ -82,9 +83,9 @@ this table is the traceability record.
   transport Record is armed.
 - **D32.** AudioWorklet plugins process the host-supplied frame count and never
   hard-code 128 frames; fixed-block algorithms use bounded internal buffering.
-- **D33.** Pattern mode records automation into the active pattern; Song mode
-  records into the arrangement; the dedicated grid defaults to 1/16, last value
-  wins per cell, and one gesture or pass is one undo entry.
+- **D33.** Automation always records into the active Pattern, including during
+  Song playback. The fixed grid is 1/16, last value wins per cell, and one
+  gesture or pass is one undo entry.
 - **D34.** A `.pulsebox` file is a ZIP-compatible archive with root
   `manifest.json` and imported assets under `assets/`.
 - **D35.** Imports containing more than eight rack slots are rejected in full
@@ -93,8 +94,9 @@ this table is the traceability record.
   includes the master chain.
 - **D37.** WAV export does not normalize, uses deterministic TPDF dither, and
   resamples offline to 44.1 kHz at high quality.
-- **D38.** All eight instrument strips remain visible; empty slots use disabled
-  strips labeled `Empty`.
+- **D38.** Whenever the Mixer studio view is active, all eight instrument strips
+  remain simultaneously visible; empty slots use disabled strips labeled
+  `Empty`.
 - **D39.** The minimum supported viewport is 1280 × 720. Below it, autosave
   continues and Save, portable Export, and a read-only project summary remain
   accessible behind a clear notice.
@@ -107,9 +109,9 @@ this table is the traceability record.
 - **D42.** Monitor is exclusive physical-output PFL for one post-insert,
   pre-fader channel. The master program keeps rendering but is not physically
   output while Monitor is active, so the selected channel is never doubled.
-- **D43.** Workspace returns to the last Rack/Edit/Song view; Performance opens
-  the live trigger surface; Sequencer and Piano roll switch editors inside
-  Workspace only.
+- **D43.** One header Pattern/Song toggle selects transport scope. One
+  module-aware Piano Roll edits the selected Pattern, the Playlist orders
+  Patterns into a Song, and the bottom bar only collapses or expands the editor.
 - **D44.** One effect is pinned as each send card's focus; the first effect is
   pinned by default, and its declared compact controls supply the four macros.
 - **D45.** Sixteen rack slots remain an explicit post-MVP target while the MVP
@@ -117,15 +119,16 @@ this table is the traceability record.
 - **D46.** The compact `Mix` control is send-chain return level from silence to
   unity; the source stays dry and individual effects retain wet/dry controls.
 - **D47.** Pause preserves position; Stop returns to the last explicit start
-  marker, defaulting to Pattern step 1 or Song bar 1; repeated Stop has no
-  second action.
+  marker, defaulting to Pattern step 1 or the first Playlist row; repeated Stop
+  has no second action.
 - **D48.** Patterns longer than sixteen steps use sixteen-step pages, playback
   follow by default, and an optional viewed-page lock.
 - **D49.** Channel mute silences main and sends; global solo passes only soloed
   channels and their sends, and shared returns contain only surviving soloed
   sources.
-- **D50.** Mono is a monitor-only fold-down after the master chain. It affects
-  live listening and meters but not WAV or stem export.
+- **D50.** Header L/R and M/S are transient meter-analysis modes and never alter
+  audio or export. Mono remains a separate transient monitor-only fold-down in
+  the Master studio view and does not affect WAV or stem export.
 - **D51.** Development and built-app launch use `http://127.0.0.1:4173` with
   strict-port behavior. The static-file launcher exposes no product API.
 - **D52.** WAV, AIFF, and FLAC import uses bundled deterministic decoders behind
@@ -135,8 +138,8 @@ this table is the traceability record.
 - **D54.** Saves and imports are atomic, storage persistence is requested after
   an explicit gesture, quota failure preserves the last committed project, and
   portable Export remains available.
-- **D55.** Time signatures are structural Song events at bar boundaries, not
-  parameter automation targets.
+- **D55.** The MVP uses fixed 4/4 musical structure. Editable time-signature
+  events and timelines are post-MVP.
 - **D56.** Rack-module collapse is a local UI preference, is not portable
   project data, is lineage-keyed, and is excluded from undo.
 - **D57.** Objective audio, browser, accessibility, startup, and first-use
@@ -152,7 +155,28 @@ this table is the traceability record.
   budget; each entry is at most 17 MiB under the proven encoding bound,
   referenced blobs are pinned, and oldest Undo entries expire before a new edit
   commits.
-- **D61.** Song has one time-signature anchor at tick 0. Later time signatures
-  are unique ordered events validated against the preceding signature's exact
-  bar length, and every structural edit revalidates later events atomically.
+- **D61.** Song is an ordered list of named-Pattern references with repeat
+  counts. The MVP has no lane timeline, clip transforms, tempo timeline, or
+  time-signature timeline.
+- **D62.** `docs/design/claude-mock-up.html` is the approved shell composition
+  target. Its compact right studio column uses mutually exclusive Mixer,
+  Effects, and Master views; effects are never duplicated beside or below the
+  mixer; and every instrument strip shows A–D send buttons in a 2 × 2 grid.
+- **D63.** The module browser is one un-tabbed list. Empty-slot plus controls are
+  the only visible rack Add actions, and module deletion lives in an accessible
+  context menu rather than a persistent minus button. The piano-roll header has
+  no local Play, pen, or erase buttons: Pattern mode uses global Play, left-click
+  creates, right-click deletes, and dragging moves or resizes pitched notes. A
+  named, project-wide Pattern is also the Playlist building block; separate
+  Section and Scene entities do not exist.
+- **D64.** The approved compact header has no theme selector; themes live in
+  Settings. Its centered recessed app mark is independent of side-group widths,
+  its two master meters toggle between L/R and M/S analysis, and its compact
+  Pattern/Song switch sits left of transport. The lower workspace has one
+  collapse toggle, one module-aware Piano Roll, Pattern-owned Swing and Humanize
+  sliders, a fixed 1/16 grid, and no Performance, full Song timeline, Feel
+  module, Straight selector, local Play, pen, or erase tools. Monophonic pitched
+  notes move and resize and support slides; drum triggers paint as fixed one-cell
+  events. The master-effects bypass leaves master gain and the protected limiter
+  active.
 

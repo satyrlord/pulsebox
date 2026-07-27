@@ -81,7 +81,7 @@ Rules:
 - Short labels are no longer than four characters.
 - Use short labels on faceplates, compact rack cards, rack-overview markers,
   mixer strips, and dense selectors.
-- Use full names in the library, help text, accessible names, detailed editors,
+- Use full names in the module browser, help text, accessible names, detailed editors,
   and documentation.
 - Do not invent additional visible names for the six instruments.
 - Internal stable IDs are not visible product names.
@@ -255,6 +255,8 @@ active theme.
 Theme and high-contrast settings are global UI preferences stored in local
 storage. Projects never change the user's appearance settings and do not
 serialize a theme override. New installations start with the `rack` theme.
+Theme and high-contrast selection appears only on the Settings page when that
+page is implemented. The application header never contains a theme selector.
 
 ### 11.5 CSS implementation
 

@@ -143,7 +143,7 @@ describe("product specification structure", () => {
       .matchAll(/^[0-9]+\. \*\*AC-([0-9]{3})\.\*\*/gmu)]
       .map((match) => Number(match[1]));
 
-    expect(decisionIds).toEqual(range(1, 61));
+    expect(decisionIds).toEqual(range(1, 64));
     expect(acceptanceIds).toEqual(range(1, 85));
   });
 

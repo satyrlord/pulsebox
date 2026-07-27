@@ -16,7 +16,7 @@ truth for runnable commands; do not copy the list into a skill.
 | diagnose                      | Reproduce and isolate difficult browser, state, persistence, audio, or performance failures.                   |
 | full-code-review              | Review a change set against the specification and Pulsebox architecture.                                       |
 | grill-me                      | Resolve material product or architecture choices through structured questions.                                 |
-| handoff                       | Create a durable phase or session handoff with evidence and open limits.                                       |
+| handoff                       | Hand off a session or phase to a fresh agent, outside the repository tree.                                     |
 | improve-codebase-architecture | Find and plan high-leverage architecture improvements.                                                         |
 | refactor                      | Make a small behavior-preserving structural improvement.                                                       |
 | run-quality-gate              | Run the repository checks that actually exist for the current phase.                                           |

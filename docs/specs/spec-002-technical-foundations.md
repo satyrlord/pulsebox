@@ -298,8 +298,8 @@ Use typed composed events such as:
 - `pulse-channel-change`
 - `pulse-effect-change`
 - `pulse-pattern-change`
-- `pulse-section-select`
-- `pulse-section-reorder`
+- `pulse-pattern-select`
+- `pulse-pattern-reorder`
 - `pulse-automation-change`
 - `pulse-transport-command`
 

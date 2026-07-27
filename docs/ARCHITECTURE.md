@@ -224,8 +224,6 @@ type PatternId = string & { readonly __brand: "PatternId" };
 type NoteEventId = string & { readonly __brand: "NoteEventId" };
 type EffectInstanceId = string & { readonly __brand: "EffectInstanceId" };
 type AutomationLaneId = string & { readonly __brand: "AutomationLaneId" };
-type SectionId = string & { readonly __brand: "SectionId" };
-type SceneId = string & { readonly __brand: "SceneId" };
 type AssetId = string & { readonly __brand: "AssetId" };
 type ContentId = string & { readonly __brand: "ContentId" };
 ```
@@ -255,7 +253,7 @@ shall change the slot-to-module mapping without changing the module, pattern,
 automation, mixer, or effect instance IDs.
 
 Arrays may encode display order. An array index shall never be serialized as the
-identity of a module, plugin instance, pattern, event, lane, scene, section,
+identity of a module, plugin instance, pattern, event, lane, playlist clip,
 asset, or routing target.
 
 ### 5.2 Plugin and parameter identifiers
@@ -394,7 +392,9 @@ global UI preferences shall not be parameters or automation targets.
 An instrument manifest shall add:
 
 - stable voice or lane descriptors;
-- accepted event forms and pattern compatibility;
+- accepted event forms, Pattern compatibility, and one editor capability:
+  `monophonic-pitched`, `drum-triggers`, or reserved post-MVP
+  `polyphonic-pitched`;
 - maximum polyphony and deterministic voice-stealing rules;
 - retrigger, choke, and release rules;
 - input and output channel descriptors;
@@ -476,11 +476,10 @@ apply one complete transition or no transition. Validation errors shall name the
 invalid field and recovery action. Engine work shall begin only after the state
 transition is accepted.
 
-Time signature shall be structural Song data, not a parameter or automation
-lane. Creating, moving, or deleting a time-signature event shall be an undoable
-structural command at a bar boundary. Its numerator shall be an integer from 1
-through 32. Its denominator shall be one of 1, 2, 4, 8, 16, or 32. Parameter
-recording shall never create or edit one of these events.
+The MVP musical structure is fixed at 4/4 and its Pattern grid is fixed at 1/16.
+Playlist placement, reorder, repeat-count, duplicate, and delete operations are
+undoable structural commands. There are no time-signature events, Song
+automation lanes, or arrangement-timeline commands in format version 1.
 
 ### 7.2 Engine projection
 
@@ -494,8 +493,8 @@ project state shall remain authoritative. The controller shall report the
 mismatch, suspend affected audio safely, and attempt one bounded full engine
 projection. It shall not mutate project state to match a failed graph.
 
-Meter frames, playheads, hover, focus, drag previews, audio power, monitor
-selection, and decoder progress are transient. They shall not enter project
+Meter frames, meter-analysis mode, playheads, hover, focus, drag previews, audio
+power, monitor selection, and decoder progress are transient. They shall not enter project
 history or portable serialization.
 
 Rack-module collapse shall be a lightweight local UI preference keyed by
@@ -510,8 +509,9 @@ key, so equal module IDs never inherit another lineage's preference.
 
 Every committed project edit shall store either a complete inverse command or a
 bounded reversible patch with the data needed to restore stable IDs and
-references. Destructive edits shall retain the removed module, patterns, mixer
-state, automation, assets references, and effect chains needed by Undo.
+references. Destructive module edits shall retain the removed module, its parts
+from every named Pattern, mixer state, automation, asset references, and effect
+chains needed by Undo.
 
 Undo and redo shall each apply atomically through the same validation and
 engine-projection path as a new command. Undo shall not replay pointer events or
@@ -571,8 +571,7 @@ bursts on one and two targets, no-op commits, Undo, and Redo.
 
 The Phase 1 Acid Bass adapter and processor implement this protocol. Focused
 tests cover both endpoints, queue and message bounds, lifecycle, and bounded
-recovery. Current browser and command evidence is recorded in
-[`verification/phase-1.md`](verification/phase-1.md).
+recovery.
 
 ### 8.1 Scope and version
 
@@ -840,6 +839,15 @@ master chain, monitor-only mono fold-down where selected, and physical output.
 Offline rack and return stems shall branch at their specified pre-master points.
 Only the master export shall include the master chain.
 
+Master-effects bypass shall switch around every user master effect as one
+click-safe graph operation, then pass through master gain and the protected
+limiter. It shall not change the limiter instance's detailed bypass state.
+
+The header meters shall observe the post-master, post-monitor-mode signal through
+a non-audible analysis branch. L/R mode displays channel magnitudes. M/S mode
+derives `M = (L + R) / 2` and `S = (L - R) / 2` for analysis only. Switching
+meter mode shall not reconnect, sum, or otherwise alter the audible path.
+
 Mute and global solo shall gate both a channel's program path and its four sends
 as specified. Graph changes shall alter gains or bounded switches and shall not
 rebuild the whole mixer.
@@ -965,8 +973,9 @@ access, state-held browser objects, unregistered plugin branches,
 `ScriptProcessorNode`, main-thread custom DSP, MIDI code, a service worker, a
 PWA manifest, or a product API endpoint. The current AST and artifact guard is
 implemented in `tests/unit/architecture/source-policy.ts`; it also scans delivery
-scripts so a static launcher cannot silently grow a product API, and rejects
-GitHub Pages deployment actions under `.github/workflows/`.
+scripts so a static launcher cannot silently grow a product API. Publishing the
+static build to GitHub Pages under `.github/workflows/` is permitted, because it
+ships the same backend-free artifact rather than introducing a product server.
 
 ## 14. Objective audio verification
 
@@ -1071,7 +1080,7 @@ action. No recovery path shall require a destructive confirmation dialog.
 | Decision            | Accepted                                                                    | Rejected                                                                         | Verification consequence                                                              |
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Domain shape        | Strict engine, state, and UI layers with a wiring-only composition boundary | UI-owned audio, state-held audio nodes, or one global application object         | Static import tests and injected-port unit tests are required                         |
-| Runtime             | Static build at exact `http://127.0.0.1:4173` with strict port              | Variable ports, `localhost`, `file:`, remote hosting, or a product backend       | Persistence and browser evidence use the canonical origin; a port conflict must fail  |
+| Runtime             | Static build at exact `http://127.0.0.1:4173` with strict port; the same static artifact may also be published to GitHub Pages | Variable ports, `localhost`, `file:`, or a product backend       | Persistence and browser evidence use the canonical origin; a port conflict must fail  |
 | Plugin model        | Build-time registry with typed instrument/effect specializations            | Runtime executable plugins or one untyped plugin interface                       | Registry conformance and no-product-branch tests are required                         |
 | Project edits       | Atomic typed commands with one history entry per gesture                    | Direct mutation or one history entry per pointer event                           | Command, coalescing, Undo, Redo, and cancellation suites are required                 |
 | Worklet control     | Versioned, sequenced, acknowledged, bounded messages                        | Unversioned objects, unbounded posting, or direct UI ports                       | Protocol fuzzing, queue-limit, stale, duplicate, gap, and recovery tests are required |

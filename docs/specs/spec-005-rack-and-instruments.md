@@ -4,7 +4,7 @@
 **Spec ID:** `spec-005`  
 **Build order:** 5 of 10  
 **Depends on:** [Audio engine and transport](spec-004-audio-engine-and-transport.md)  
-**Owns:** Default projects, module library, rack behavior, and instrument
+**Owns:** Default projects, the unified module browser, rack behavior, and instrument
 modules.  
 **Acceptance IDs:** `AC-007` through `AC-010`, `AC-021`, `AC-077`, and
 `AC-080` in [release acceptance](spec-012-release-acceptance.md).
@@ -44,7 +44,7 @@ Rack order:
 
 The MVP rack contains exactly eight slots.
 
-Default playlist sections:
+Default named Patterns:
 
 1. Intro, 8 bars.
 2. Verse, 16 bars.
@@ -87,16 +87,14 @@ It must contain two independent basslines and an original drum pattern.
 
 ---
 
-## 13. Module library and rack overview
+## 13. Module browser and rack overview
 
-### 13.1 Library
+### 13.1 Unified module browser
 
-Tabs:
+The module browser has one un-tabbed list. It does not split the same module
+definitions into separate Rack and Library views.
 
-- Rack.
-- Library.
-
-Library content:
+Browser content:
 
 - Category or filter control.
 - Six instrument definitions.
@@ -125,7 +123,12 @@ Requirements:
 - Empty labels and add controls.
 - Selected border and accent marker.
 - Two-digit slot number.
-- Add, Remove, Duplicate, and Swap actions.
+- Duplicate and Swap actions for the selected loaded module.
+- No persistent Add or Remove buttons below the slot list. The plus control in
+  each empty slot is the only visible Add action in the overview.
+- A loaded module's context menu contains `Delete module`. Pointer users open it
+  with right-click. Keyboard users open the same menu with the Menu key or
+  Shift+F10.
 - Disabled states are visible and semantic.
 - Rack action hit targets remain distinct from module controls and do not
   overlap them at any supported viewport.
@@ -139,8 +142,11 @@ Interactions:
 - Show insertion marker.
 - Support keyboard reorder.
 - Announce results through an ARIA live region.
-- Preserve module IDs, patterns, automation, mixer routing, and effect chains
+- Preserve module IDs, named-Pattern parts, automation, mixer routing, and effect chains
   when reordered.
+- Delete a loaded module through `Delete module` in its context menu. The menu
+  is not right-click-only: it is focusable, keyboard-operable, and exposes the
+  same command through the standard keyboard context-menu gesture.
 
 ---
 
@@ -192,12 +198,14 @@ Empty slots show an Add control.
 
 Removing a module:
 
+- Starts from `Delete module` in the loaded module's context menu. There is no
+  separate minus button in the rack overview.
 - Happens immediately with no confirmation dialog and exposes Undo.
 - Releases its audio resources safely.
 - Clears its matching mixer channel and leaves the corresponding disabled
   visible strip labeled `Empty`; it never creates a mixer bank.
 - Preserves full recovery data in undo history.
-- Undo restores the module, patterns, mixer state, automation, sample
+- Undo restores the module, its named-Pattern parts, mixer state, automation, sample
   references, and effect chains.
 
 Swapping a module:

@@ -7,7 +7,7 @@
 **Owns:** Mixer, routing, Monitor, inserts, send chains, master chain, and
 effects.  
 **Acceptance IDs:** `AC-018` through `AC-020`, `AC-022` through `AC-028`,
-`AC-062`, `AC-068`, and `AC-074` through `AC-076` in
+`AC-062`, `AC-068`, `AC-074` through `AC-076`, and `AC-085` in
 [release acceptance](spec-012-release-acceptance.md).
 
 ---
@@ -32,10 +32,9 @@ The established visible mixer contains:
 
 - Exactly eight visible instrument channel strips, including disabled `Empty`
   strips.
-- Slim and expanded strip states.
-- One expanded strip at a time.
+- One fixed compact strip geometry for every instrument channel.
 - One master strip.
-- Four send controls per channel.
+- Four A–D send buttons per instrument channel in a visible 2 × 2 grid.
 - Meter.
 - Vertical fader.
 - Pan.
@@ -48,9 +47,17 @@ The established visible mixer contains:
 - Insert-chain access.
 - A clear indicator when any send is active.
 
-The slim state keeps meter, fader, mute, solo, module identity, and compact send
-controls visible. The expanded state enlarges pan, sends, meter detail, Monitor,
-and insert-chain access.
+The compact state keeps meter, fader, pan, mute, solo, module identity, and all
+four send buttons visible. Selecting a channel does not change strip width or
+create an expanded strip. Monitor, meter detail, and insert-chain editing use a
+transient focus-managed channel detail surface. Opening that surface does not
+resize the mixer or expose a duplicate effects bank.
+
+Each send button is identified by both its visible letter and accessible name.
+The buttons remain in A, B / C, D reading order. A button opens the standard
+send-value surface for amount and pre-fader or post-fader mode. Zero amount is
+shown as inactive; a non-zero amount is shown with a non-color active cue. Empty
+channel send buttons remain visible but disabled.
 
 Selecting a rack module selects its mixer channel. Selecting a mixer channel
 selects the matching module.
@@ -66,9 +73,10 @@ channel from being doubled. Only one channel may be monitored at a time. Monitor
 selection is transient session state and is not serialized, restored, included
 in portable project files, or rendered into audio exports.
 
-The master strip and all eight instrument strips remain visible at supported
-wide layouts. Empty strips are disabled and labeled `Empty`. There are no hidden
-mixer banks in the MVP.
+The master strip and all eight instrument strips remain visible whenever the
+Mixer studio tab is active at a supported layout. Empty strips are disabled and
+labeled `Empty`. There are no hidden mixer banks in the MVP. Effects and Master
+replace the Mixer view inside the same compact studio column.
 
 ### 19.3 Internal drum-voice mixer
 
@@ -95,8 +103,8 @@ Approved hierarchy:
 
 - One insert slot per drum voice.
 - One eight-slot pedalboard per rack module.
-- The module pedalboard is the same chain opened from the rack and the expanded
-  mixer strip.
+- The module pedalboard is the same chain opened from the rack and the mixer
+  channel detail surface.
 - Four send-bus chains.
 - One master chain with at least six slots.
 
@@ -171,10 +179,11 @@ Effect variants or modes provide the compact default identities:
 
 The reverb detailed editor retains the previously designed shimmer capability.
 
-### 20.3 Compact A–D bank
+### 20.3 Compact A–D Effects view
 
-The established compact bank remains anchored to the right of the mixer. Each
-card summarizes one send-bus effect chain.
+The Effects studio tab contains four compact A–D cards. Each card summarizes one
+send-bus effect chain. The Effects view replaces the Mixer view inside the same
+compact studio column; it is never duplicated beside or below the mixer.
 
 Default primary effects:
 
@@ -183,7 +192,7 @@ Default primary effects:
 - C: Stereo width.
 - D: Drive.
 
-Each approximately 110-pixel compact slot contains:
+Each compact slot contains:
 
 - Bus letter.
 - Primary effect name.
@@ -230,6 +239,11 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - Independent amount per channel.
 - Pre-fader or post-fader per channel and bus.
 - Default post-fader.
+- Each instrument strip exposes A–D as a 2 × 2 button grid in A, B / C, D
+  reading order.
+- Activating a send button opens its amount and pre/post value surface; the
+  compact button itself shows disabled, zero, and non-zero states without
+  relying on color alone.
 - Effect chains receive sends and return to master.
 - Routing prevents feedback loops.
 - Send return level is automatable.
@@ -242,6 +256,10 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - Limiter in the last slot.
 - Limiter protected from removal.
 - Limiter may be bypassed.
+- One master-effects bypass toggles all user master effects while leaving master
+  gain and the protected limiter active.
+- Master-effects bypass is project-owned, undoable, playback-safe, and visually
+  distinct from the limiter's own detailed bypass.
 - Peak reset.
 - Metering before and after the chain.
 

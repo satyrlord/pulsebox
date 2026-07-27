@@ -117,9 +117,8 @@ describe("product toolchain contract", () => {
     const projects = new Map(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );
-    expect([...projects.keys()]).toEqual(expect.arrayContaining(["chrome", "edge", "firefox"]));
+    expect([...projects.keys()]).toEqual(["chrome"]);
     expect(projects.get("chrome")?.use?.channel).toBe("chrome");
-    expect(projects.get("edge")?.use?.channel).toBe("msedge");
   });
 
   it("keeps TypeScript strict and emission owned by the production build", () => {

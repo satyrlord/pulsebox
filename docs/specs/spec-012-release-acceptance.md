@@ -16,8 +16,10 @@ The merged MVP is complete only when:
 1. **AC-001.** It is a real strict-TypeScript application.
 2. **AC-002.** It uses native DOM and Web Components.
 3. **AC-003.** It contains no UI framework or virtual DOM.
-4. **AC-004.** Its 1536 × 1024 composition follows the approved rack, mixer, FX, and editor
-   hierarchy.
+4. **AC-004.** Its 1536 × 1024 composition follows
+   `docs/design/claude-mock-up.html`: the rack remains dominant and the compact
+   right studio column provides mutually exclusive Mixer, Effects, and Master
+   views with no duplicate effects region.
 5. **AC-005.** It remains usable without overlap at 1280 × 720 and at larger supported
    sizes; below either minimum dimension, the approved notice and limited Save,
    portable Export, autosave, and read-only summary behavior works.
@@ -26,7 +28,11 @@ The merged MVP is complete only when:
 7. **AC-007.** All six instruments exist.
 8. **AC-008.** Eight rack slots work and no ninth instrument can be added in the MVP.
 9. **AC-009.** Duplicate instruments work.
-10. **AC-010.** Add, select, collapse, expand, swap, duplicate, remove, and reorder work.
+10. **AC-010.** Add, select, collapse, expand, swap, duplicate, remove, and
+    reorder work. Empty-slot plus controls are the only visible rack Add action;
+    `Delete module` is in the loaded module context menu and works by right-click
+    and the standard keyboard context-menu gesture; no persistent Add or minus
+    buttons exist below the slot list.
 11. **AC-011.** Compact step editing works.
 12. **AC-012.** Piano-roll note creation, movement, resizing, deletion, velocity, selection,
     and quantization work.
@@ -35,16 +41,18 @@ The merged MVP is complete only when:
 14. **AC-014.** Computer-keyboard live input and recording work through physical key
     positions.
 15. **AC-015.** Pattern generation and transforms work.
-16. **AC-016.** Every module has at least 32 flat-numbered patterns.
+16. **AC-016.** A project supports 1 through 32 stable named Patterns. Each
+    Pattern contains compatible per-module parts and is identified by its name,
+    never a compound number such as `1 - 1`.
 17. **AC-017.** Quantized pattern switching works.
 18. **AC-018.** The mixer exposes exactly eight visible instrument channels plus one master
     channel; empty channels are disabled and labeled `Empty`.
 19. **AC-019.** No mixer banking, channels 9–16, or horizontal mixer scrolling exists in the
     MVP.
-20. **AC-020.** Mute, solo, fader, pan, four module-level sends, and exclusive
-    single-channel pre-fader Monitor audition affect audio as specified. Monitor
-    never doubles the selected channel, and displayed master meters follow the
-    physical monitor signal while it is active.
+20. **AC-020.** Mute, solo, fader, pan, the visible 2 × 2 A–D module-send grid,
+    and exclusive single-channel pre-fader Monitor audition affect audio as
+    specified. Monitor never doubles the selected channel, and displayed master
+    meters follow the physical monitor signal while it is active.
 21. **AC-021.** Voice level, tune, decay, pan, blend, mute, solo, and voice inserts affect
     audio; voice-level sends do not exist.
 22. **AC-022.** Voice inserts work.
@@ -56,12 +64,15 @@ The merged MVP is complete only when:
 27. **AC-027.** A–D defaults match the approved compact effect design and use circular
     return Mix controls.
 28. **AC-028.** The reverb shimmer feature works.
-29. **AC-029.** The full Song timeline works.
-30. **AC-030.** Sections, clips, scenes, and step automation work.
+29. **AC-029.** The ordered named-Pattern Playlist supports add, choose, reorder,
+    repeat, duplicate, delete, Undo, and Redo without a separate full timeline.
+30. **AC-030.** Pattern mode loops the selected named Pattern and Song mode plays
+    Playlist rows and repeats in order. Section and Scene do not exist as
+    separate entities.
 31. **AC-031.** Pattern and Song transport modes switch without stopping.
-32. **AC-032.** Deliberate parameter moves record while transport Record is armed, use the
-    dedicated 1/16 automation grid by default, write to the active pattern or
-    Song arrangement by mode, and apply the last-value-wins hold rule.
+32. **AC-032.** Deliberate parameter moves record into the active Pattern while
+    transport Record is armed in either transport mode, use the fixed 1/16
+    automation grid, and apply the last-value-wins hold rule.
 33. **AC-033.** Undo and redo cover every retained committed edit; destructive actions use
     no confirmation dialogs, and a new valid action evicts oldest history rather
     than failing because the active-history budget is full.
@@ -76,8 +87,9 @@ The merged MVP is complete only when:
     the master chain.
 38. **AC-038.** Projects reload and sound the same within the deterministic manifest,
     schedule, and rendered-sample limits in section 24.4.
-39. **AC-039.** Theme switching does not interrupt audio or shift layout; theme and contrast
-    persist globally and never travel in project files.
+39. **AC-039.** Theme switching from Settings does not interrupt audio or shift
+    layout; theme and contrast persist globally, never travel in project files,
+    and have no selector in the application header.
 40. **AC-040.** All five themes and high-contrast mode pass the numeric accessibility checks
     in section 24.1 at every supported viewport.
 41. **AC-041.** User theme import enforces the complete bounded allowlist and safe value
@@ -131,14 +143,27 @@ The merged MVP is complete only when:
     insert chains.
 63. **AC-063.** On a warm cache, audible playback begins within three seconds in every run
     of the five-run, per-browser procedure in section 21.8.
-64. **AC-064.** Workspace, Performance, Sequencer, Piano roll, Rack, Edit, and Song
-    navigation follow the approved hierarchy defined in section 8.6.
-65. **AC-065.** The Pattern inspector defaults to pattern `1`, and studio tabs work.
+64. **AC-064.** The compact Pattern/Song toggle sits left of transport and
+    changes transport scope without stopping. The bottom bar's single editor
+    toggle collapses and restores the complete lower workspace without changing
+    project or playback state. Workspace, Performance, Sequencer, Rack, Edit,
+    and full Song-timeline navigation do not exist in the MVP.
+65. **AC-065.** The Pattern inspector has no Pattern/Song subtabs and defaults to
+    `Verse` in the supplied project; studio tabs work;
+    and only the selected Mixer, Effects, or Master studio pane is visible,
+    interactive, and exposed to assistive technology.
 66. **AC-066.** Nonessential visual animation pauses when hidden.
 67. **AC-067.** CSS token, spacing, radius, scrollbar, and supported-viewport rules are
     followed.
-68. **AC-068.** The visible mixer supports slim and single-expanded strip states.
-69. **AC-069.** The piano-roll toolbar and four-bar default timeline work.
+68. **AC-068.** The visible mixer uses fixed compact strips. Every instrument
+    strip keeps its A–D sends visible as a 2 × 2 button grid, and channel
+    selection or detail editing does not resize the mixer.
+69. **AC-069.** One module-aware Piano Roll switches between monophonic pitched
+    rows and named drum-voice rows. Its header has no local Play, pen, or erase
+    buttons. Monophonic notes create, delete, move, resize, and slide without
+    overlapping sounding notes. Drum triggers add or paint as fixed one-cell
+    events, delete by right-click or keyboard, allow simultaneous voices, and do
+    not resize. Pattern playback uses global Play.
 70. **AC-070.** Step automation contains no line or curve segments.
 71. **AC-071.** The engine, state, and UI remain slot-count agnostic for the explicit
     sixteen-slot post-MVP target without enabling more than eight slots in the
@@ -153,15 +178,20 @@ The merged MVP is complete only when:
 75. **AC-075.** Channel mute silences main and sends; global solo passes only soloed
     channels and their sends; shared returns contain only surviving soloed
     sources.
-76. **AC-076.** Mono folds down live monitoring after the master chain, changes the
-    displayed meters, and does not affect WAV or stem export.
+76. **AC-076.** The header always shows two master meters and one L/R or M/S
+    analysis toggle that changes no audio, project state, automation, Undo, or
+    export. Mono remains a separate transient control in the Master studio view,
+    folds down live monitoring after the master chain, and does not affect WAV
+    or stem export.
 77. **AC-077.** At least four of five unfamiliar participants start the supplied loop
     without assistance within one minute under the procedure in section 24.4.
 78. **AC-078.** Development and built-product launch use `http://127.0.0.1:4173`; a busy
     port fails visibly instead of selecting a different origin.
-79. **AC-079.** Time signatures are validated structural Song events at bar boundaries, are
-    editable through undoable commands, and are never written by parameter
-    automation recording.
+79. **AC-079.** The Piano Roll header shows Pattern-owned horizontal Swing and
+    Humanize sliders and a Velocity lane selector in place of `Vel 100`. The
+    MVP uses fixed 1/16 timing, fixed 100% quantize strength, Alt-drag temporary
+    snap override, and no Straight, grid, triplet, or persistent snap-off
+    control.
 80. **AC-080.** Rack-module collapse persists only as a local UI preference keyed by
     project, project lineage, and module, does not travel in `.pulsebox` files,
     creates no undo entry, and never leaks across whole-project replacement
@@ -178,7 +208,7 @@ The merged MVP is complete only when:
     per-entry limit, encoding-envelope limit, oldest-first eviction, Redo
     clearing, and blob-pin release, including a maximum-before/maximum-after
     fixture.
-85. **AC-085.** Time-signature imports and edits enforce the tick-zero anchor, unique ticks,
-    exact preceding-signature bar-boundary calculation, and atomic downstream
-    revalidation.
+85. **AC-085.** Master-effects bypass is project-owned, undoable, playback-safe,
+    and bypasses user master effects while leaving master gain and the protected
+    limiter active. The limiter keeps its own detailed bypass.
 

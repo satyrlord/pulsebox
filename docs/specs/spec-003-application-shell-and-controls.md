@@ -18,14 +18,14 @@ manage their own overflow.
 
 ### 8.1 Main rows
 
-1. Transport bar: approximately 64 to 70 pixels.
+1. Application header: approximately 56 to 64 pixels.
 2. Main rack and studio workspace: flexible; target at least 430 pixels on
    taller displays and allow a compact minimum near 350 pixels at the supported
    720-pixel height.
-3. Lower editor workspace: approximately 260 to 300 pixels on taller displays
-   and approximately 210 to 230 pixels at the supported 720-pixel height. Use
-   internal tabs and scrolling rather than shrinking controls below their
-   minimum sizes.
+3. Collapsible lower editor workspace: approximately 260 to 300 pixels on
+   taller displays and approximately 210 to 230 pixels at the supported
+   720-pixel height. Use internal scrolling rather than shrinking controls
+   below their minimum sizes.
 4. Bottom workspace bar: approximately 40 to 46 pixels.
 
 At 1280 × 720, the complete row stack, inter-region gaps, and borders must fit
@@ -37,56 +37,70 @@ overflow.
 At 1536 × 1024:
 
 - A full-width transport spans the top.
-- A module library sits on the far left.
-- A narrow rack overview sits beside the library.
+- A unified module browser sits on the far left.
+- A narrow rack overview sits beside the browser.
 - A large central rack shows six compact modules.
-- The studio region contains the mixer on its left and the four-slot effects
-  bank on its right.
-- The effects bank never overlaps the mixer.
-- The mixer receives slightly more vertical space than surrounding studio
-  panels.
-- The lower editor shows the pattern inspector, piano roll or drum grid, timing
-  controls, and compact playlist or section navigator.
-- The bottom workspace bar remains visible.
+- A compact studio column sits on the right and provides mutually exclusive
+  Mixer, Effects, and Master tabs.
+- Mixer is the default studio view. Effects and Master replace it inside the
+  same column rather than appearing beside or below it.
+- Each instrument channel in the Mixer view includes four A–D send buttons in
+  a visible 2 × 2 grid.
+- Send-chain content appears only in the Effects view. Pulsebox never renders a
+  second or persistent duplicate effects bank beside the mixer.
+- The lower editor shows the Pattern inspector, one module-aware Piano Roll,
+  Pattern timing controls, and the compact named-Pattern Playlist.
+- The bottom bar remains visible and can collapse or restore the complete lower
+  editor with one action.
 
-The rack remains the central sound-design surface. The mixer is the central
-mixing feature and receives stronger visual weight than a minor sidebar.
+The rack remains the central sound-design surface. The studio column stays
+compact so mixer routing remains immediately available without taking visual
+priority from the rack.
 
-### 8.3 Workspace modes
+For the shell surfaces covered by this specification,
+[`docs/design/claude-mock-up.html`](../design/claude-mock-up.html) is the
+approved visual composition target, including the 2 × 2 A–D send grid added to
+each instrument channel. It owns visual proportion, placement, density, and the
+single-column tabbed studio composition. The product specifications continue to
+own behavior, state, accessibility, audio routing, and responsive acceptance.
+Other files under `docs/design/` remain non-normative visual evidence.
 
-Provide:
+### 8.3 Pattern and Song transport modes
 
-- Rack.
-- Edit.
-- Song.
+The application header provides one compact rectangular two-state toggle,
+immediately to the left of the transport controls:
 
-Rack mode emphasizes the module library, overview, rack faceplates, mixer, and
-effects.
+- Pattern plays and loops the selected named Pattern.
+- Song plays the ordered named-Pattern Playlist.
 
-Edit mode emphasizes the active module editor, piano roll or drum grid, timing
-lanes, and automation.
+This toggle changes transport scope. It does not replace the rack or open a
+second workspace. The lower editor remains the single place for editing the
+selected Pattern and its Playlist context. Switching modes never stops playback.
 
-Song mode provides the full arrangement timeline, scenes, section markers, and
-automation lanes.
+The MVP has no separate Rack, Edit, Workspace, Performance, Sequencer, or full
+Song-timeline navigation mode. Live Pattern launch, a lane-based arrangement
+timeline, clip transforms, Song automation, tempo timelines, and time-signature
+timelines are post-MVP work.
 
-Switching modes never stops playback.
-
-### 8.4 Mixer geometry already carried forward
+### 8.4 Compact mixer geometry
 
 The studio mixer uses:
 
-- Eight permanently visible instrument channel strips. Empty rack slots retain
-  disabled strips labeled `Empty`.
+- Eight simultaneously visible instrument channel strips whenever Mixer is the
+  active studio view. Empty rack slots retain disabled strips labeled `Empty`.
 - One master strip.
-- Four send controls per visible channel.
+- Four A–D send buttons per instrument channel, arranged as a visible 2 × 2
+  grid inside the strip. Empty-channel send buttons remain visible but disabled.
 - A vertical fader.
 - A loudness meter.
 - Pan, mute, and solo.
-- A slightly taller section than adjacent panels.
+- One fixed compact strip geometry. Selecting a channel must not widen its strip
+  or force horizontal mixer scrolling.
 
-The four-slot FX bank is anchored to the right of the mixer. Each compact FX
-slot keeps its Edit control in the existing unused space and uses a circular Mix
-control. The compact slot height remains approximately 110 pixels.
+The mixer occupies the Mixer tab of the compact studio column. The four send
+chains occupy the Effects tab of that same column. The two views are never
+visible simultaneously, so effects are not duplicated beside or below the
+mixer.
 
 The MVP has eight rack slots, eight corresponding instrument channel strips, and
 one master strip. No mixer banking, horizontal scrolling, or channels 9–16 exist
@@ -100,29 +114,28 @@ The studio region provides:
 - Effects.
 - Master.
 
-On wide screens:
+At every supported width:
 
 - Mixer is selected by default.
-- The mixer presents all eight instrument strips, including disabled `Empty`
-  strips, with the compact FX bank to its right.
-- Effects opens detailed send-chain and effect editing without changing the
-  compact bank geometry.
+- Mixer presents all eight instrument strips, including disabled `Empty`
+  strips, and one master strip. Each instrument strip keeps its 2 × 2 A–D send
+  grid visible.
+- Effects replaces the Mixer view and presents the four modular send-chain
+  summaries plus detailed-chain entry points.
 - Master opens master routing, master-chain, and output metering.
+- Only the active studio view is visible and interactive. Inactive panes are
+  hidden and removed from keyboard navigation and the accessibility tree.
 - The active tab is a UI preference, not core project data.
 
-On narrower screens, these tabs select the entire studio view.
+The compact studio column keeps the approved visual proportion at wide sizes.
+Responsive rules may reduce its padding, but they do not create a persistent
+second effects region or enlarge it into a dominant mixer surface.
 
-### 8.6 Bottom workspace bar
+### 8.6 Bottom bar
 
 Left:
 
-- Workspace mode.
-- Performance mode.
-
-Center:
-
-- Sequencer.
-- Piano roll.
+- One lower-editor collapse or expand toggle.
 
 Right:
 
@@ -132,22 +145,24 @@ Right:
 
 Behavior:
 
-- Active modes use a thin accent underline and stronger text.
+- The collapse toggle exposes its expanded state and has a clear accessible
+  name in both states.
 - Undo and redo disable correctly.
 - Save exposes clean, dirty, saving, saved, and error states.
 - All actions have keyboard shortcuts and accessible names.
 - No button is decorative.
-- Workspace returns to the most recently used Rack, Edit, or Song view.
-  Performance opens the live scene-and-pattern trigger surface. Sequencer and
-  Piano roll switch the active editor inside Workspace only.
+- Collapsing removes the complete lower editor from layout, keyboard navigation,
+  and the accessibility tree so the rack receives the available height.
+- Expanding restores the editor, its scroll positions, selection, and focus
+  context without changing playback or project data.
 
 ### 8.7 Responsive behavior
 
 - The minimum supported viewport is 1280 × 720 CSS pixels.
 - At 1440 pixels and above, show the complete primary composition.
-- From 1280 to 1439 pixels, reduce nonessential padding, allow the library to
-  collapse, and tab less essential studio details while keeping the rack and
-  transport fully usable.
+- From 1280 to 1439 pixels, reduce nonessential padding, allow the module browser to
+  collapse, and compact the studio column while keeping the rack and transport
+  fully usable. Studio panes remain mutually exclusive at every width.
 - Below either minimum dimension, replace the editable workspace with a clear
   unsupported-size notice. Autosave continues, and Save, portable Export, and a
   read-only project summary remain accessible.
@@ -169,7 +184,7 @@ Recommended hierarchy:
 - `pulse-app`
   - `pulse-transport-bar`
   - `pulse-main-workspace`
-    - `pulse-module-library`
+    - `pulse-module-browser`
     - `pulse-rack-overview`
     - `pulse-rack`
       - `pulse-rack-module`
@@ -183,14 +198,8 @@ Recommended hierarchy:
   - `pulse-editor-workspace`
     - `pulse-pattern-inspector`
     - `pulse-piano-roll`
-    - `pulse-drum-grid`
-    - `pulse-timing-panel`
     - `pulse-playlist-summary`
     - `pulse-automation-editor`
-  - `pulse-song-workspace`
-    - `pulse-song-timeline`
-    - `pulse-scene-list`
-    - `pulse-automation-lanes`
   - `pulse-workspace-bar`
   - shared controls:
     - `pulse-knob`

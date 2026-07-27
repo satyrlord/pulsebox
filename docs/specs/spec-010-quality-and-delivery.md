@@ -42,7 +42,7 @@ spacing exception. Focus is visible and not fully obscured.
 - High-contrast mode.
 - Pointer targets meeting the size or spacing rule above.
 - Notes and steps expose meaningful text alternatives.
-- Keyboard reorder for rack slots, effects, patterns, and song sections.
+- Keyboard reorder for rack slots, effects, named Patterns, and playlist clips.
 
 ### 24.2 Undo and redo
 
@@ -56,8 +56,7 @@ Include:
 - Mixer changes.
 - Effect changes.
 - Chain changes.
-- Playlist and arrangement changes.
-- Scene changes.
+- Playlist changes.
 - Pattern changes.
 - Sample assignment.
 
@@ -93,7 +92,7 @@ Unit tests:
 - Pattern timing.
 - Swing.
 - Deterministic humanization.
-- Quantize strength.
+- Fixed 1/16 Pattern timing and Alt-drag snap override.
 - Mixer solo logic.
 - Voice solo logic.
 - Effect sends.
@@ -104,7 +103,7 @@ Unit tests:
 - Voice stealing.
 - Automation step timing, overwrite, and sample-and-hold behavior.
 - Theme token validation.
-- Time-signature event validation and bar-boundary behavior.
+- Playlist ordering and repeat-count validation.
 - Same-project-ID import resolution and revision-epoch rollover.
 - Archive traversal, collision, expansion, and record-count rejection.
 - Plugin version and pack-reference validation.
@@ -120,13 +119,17 @@ Component tests:
 - Fader keyboard behavior.
 - Toggle ARIA.
 - Step painting.
-- Velocity drag.
+- Drum-trigger painting and pitched-note move and resize.
 - Module add and remove.
 - Module reorder.
 - Playlist reorder.
 - Pattern reorder.
 - Effect reorder.
 - Piano-roll creation, move, and resize.
+- Module-aware Piano Roll switching between monophonic pitched and drum-trigger
+  modes.
+- Pattern Swing and Humanize sliders.
+- Lower-editor collapse and restore.
 - Focus restoration.
 - Live keyboard map focus rules.
 
@@ -147,9 +150,10 @@ Playwright:
 - Change sends.
 - Enable and reorder effects.
 - Open detailed effect editor.
-- Rename and reorder a section.
-- Place a clip.
-- Trigger a scene.
+- Rename and reorder a named Pattern.
+- Reorder the Playlist and change a row repeat count.
+- Switch the header meter between L/R and M/S without changing audio.
+- Toggle master-effects bypass while the protected limiter stays active.
 - Save and reload.
 - Crash recovery.
 - Export and import.
@@ -157,7 +161,7 @@ Playwright:
 - Keyboard-only use.
 - Supported layouts at 1536 × 1024, 1440 × 900, 1366 × 768, and 1280 × 720, plus
   the unsupported-size notice below either minimum dimension.
-- Theme switch during playback.
+- Change theme from Settings during playback.
 - Canonical-origin and strict-port launch behavior.
 - First-run supplied-loop path from empty browser storage.
 - Missing-pack degraded load and recovery.
@@ -317,20 +321,19 @@ transport, Acid Bass, three-slot functional rack. During Phase 1, the first
 three slots of the durable eight-slot model are exposed. The development seed
 loads Acid Bass in slot 01 and leaves slots 02 and 03 available for Add or
 Duplicate. This seed is not the final default project or the secondary starter
-template. Current Phase 1 implementation evidence belongs in
-[`verification/phase-1.md`](../verification/phase-1.md), not in later-phase product
-claims.
+template.
 
 Phase 2: Remaining instruments, sample layers, eight-slot rack, overview,
 internal voice mixers.
 
-Phase 3: Pattern banks, piano roll, drum grid, live input, generators,
+Phase 3: Named project Patterns, module-aware Piano Roll, live input, generators,
 transforms, bounded full Undo.
 
 Phase 4: Main mixer, voice inserts, module pedalboards, send chains, master
 chain, complete effect catalog.
 
-Phase 5: Song timeline, scenes, automation, transport modes.
+Phase 5: Named-Pattern Playlist, Pattern automation, and Pattern/Song transport
+modes.
 
 Phase 6: Five themes, user theme import, accessibility, default projects, visual
 polish, performance measurements.
@@ -346,8 +349,11 @@ completed scope.
 Run a self-critique. Fix every acceptance-blocking gap before declaring the
 product complete. Re-run affected tests after each fix. Record only remaining
 non-blocking limitations, future work, and verified known issues in their owning
-specification, issue, or verification report. The former instruction to stop
-after finding gaps is removed.
+specification or issue.
+
+Verification runs, evidence, and check results are not repository content. Write
+them to an ignored temporary path and report them to the user. The repository
+records what is required and its implementation status, not how a past run went.
 
 ---
 

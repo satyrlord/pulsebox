@@ -37,9 +37,6 @@ assets exist yet.
 - Removed stale broad ignores for codec, data, WAV, CSV, and build-configuration
   paths so future reviewed source, fixtures, factory audio, and tool contracts
   cannot be omitted silently.
-- Removed a GitHub Pages deployment workflow that violated the canonical local
-  origin and added an artifact-policy regression against Pages deployment
-  actions.
 - Normalized `Pulsebox` capitalization in agent entry documents.
 - Moved the authoritative contracts under `docs/` and updated repository links.
 - Added source-policy tests that reject prohibited frameworks, JSX, MIDI,
@@ -65,8 +62,7 @@ assets exist yet.
 - The six approved instrument names and IDs remain those in the
   [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
 - The current build contains only `index.html`, CSS, the application module, and
-  the Acid Bass worklet asset. Current command and browser evidence is in
-  [`../verification/phase-1.md`](../verification/phase-1.md).
+  the Acid Bass worklet asset.
 
 ## Required future audit
 

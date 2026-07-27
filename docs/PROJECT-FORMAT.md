@@ -53,7 +53,7 @@ All limits in this document are inclusive unless a rule says otherwise.
 Project-owned entity IDs use lowercase UUID version 4 text in the form
 `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`, where `y` is `8`, `9`, `a`, or `b`. This
 applies to projects, module instances, effect instances, patterns, notes, steps,
-automation lanes, scenes, sections, clips, and user-created asset records. IDs
+automation lanes, clips, and user-created asset records. IDs
 are stable across reorder, save, export, ordinary import, and migration. The
 explicit Import as copy action in section 9.4 remaps only the project ID,
 lineage ID, and revision epoch; its project-scoped entity IDs remain stable.
@@ -199,8 +199,8 @@ migrations          MigrationRecord[]
 extensions          ExtensionRecord[] (optional)
 ```
 
-The combined number of note, trigger, step-property, automation, tempo,
-time-signature, scene-launch, and arrangement-clip events is at most 1,000,000.
+The combined number of note, trigger, step-property, automation, and Playlist
+placement records is at most 1,000,000.
 The limit is checked after safe migration as well as before it.
 
 An `ExtensionRecord` follows section 5.8. A `MigrationRecord` contains exactly:
@@ -303,18 +303,26 @@ record with:
 - a stable module UUID;
 - a required instrument plugin reference and plugin state;
 - enabled, mute, solo, level, and output-routing state;
-- a selected pattern ID or `null`;
-- references to its pattern bank and module effect chain.
+- a reference to its module effect chain.
 
 The eight-slot array is an MVP file-format limit. Slot-count-agnostic code may
 support later migrations, but a format-1 importer rejects a ninth slot and
 reports every over-cap slot before applying any state.
 
-A module has at least 32 `Pattern` records with unique positions 1 through 32. A
-pattern contains a stable UUID, owning module UUID, flat position, name, color,
-nominal step count from 1 through 64, unsigned 32-bit seed, creation and
-modification timestamps, plugin event records, and referenced automation lane
-IDs.
+The root `patterns` array contains 1 through 32 project-wide `Pattern` records.
+A Pattern contains a stable UUID, unique user-visible name, color, positive
+duration in bars, Swing from 0 through 100 percent, Humanize from 0 through 100
+percent, unsigned 32-bit seed, creation and modification timestamps, referenced
+automation lane IDs, and at most one `PatternPart` per occupied module ID. A
+PatternPart contains the module ID, a nominal step count from 1 through 64,
+plugin event records, and referenced automation lane IDs. The part cycle repeats
+across the Pattern duration. A drum voice may store its own bounded cycle length
+in plugin-validated event data. The MVP grid is fixed at 1/16 and is not stored
+as a selectable Pattern property.
+
+Pattern array order is display order only. It is not identity and is never shown
+as a compound module-and-pattern number. Removing a module removes its parts from
+every Pattern as one undoable command.
 
 The host envelope for a plugin event contains:
 
@@ -333,40 +341,28 @@ required.
 
 ### 5.6 Song and automation
 
-`SongState` contains ordered sections, scenes, arrangement clips, loop markers,
-tempo steps, and time-signature events. Every entity uses a stable UUID and
-references module and pattern IDs rather than array positions. Durations and
-positions use non-negative integer ticks. Tempo is finite and inside the
-registered tempo parameter range.
-
-A `TimeSignatureEvent` contains exactly:
+`SongState` contains exactly one ordered `playlist` array. Each placement
+contains exactly:
 
 ```text
-id                  event UUID
-positionTicks       non-negative safe integer
-numerator           integer from 1 through 32
-denominator         1, 2, 4, 8, 16, or 32
+id                  placement UUID
+patternId           referenced Pattern UUID
+repeatCount         integer from 1 through 64
 ```
 
-The ordered list has exactly one anchor at tick 0. The anchor is the first event
-and cannot be deleted or moved away from tick 0, although its numerator and
-denominator are editable. No two events may share a tick.
-
-Validate bar boundaries from left to right. For an event at tick `T`, let `P` be
-the preceding event tick and let its signature be `N/D`. Its bar length is
-`N * 960 * 4 / D` ticks, which is an integer for every allowed denominator. `T`
-is valid only when `(T - P)` is an exact non-negative multiple of that bar
-length. The new signature applies starting at `T`. Creating, moving, deleting,
-or editing an event revalidates the complete ordered list, because changing an
-earlier event can invalidate later boundaries. A collision or invalidated later
-event rejects the command or import atomically and reports every affected event.
+Playlist order is array order, not identity. Every reference must resolve to a
+Pattern in the same project. At least one placement is required. Pattern names
+and duration are read from the referenced Pattern and are not duplicated in the
+placement. There are no Section, Scene, lane, arrangement-clip, tempo-event,
+time-signature-event, or Song-automation records in format version 1. Musical
+structure is fixed at 4/4 for the MVP.
 
 An `AutomationLane` contains:
 
 - a stable lane UUID;
 - scope, target instance ID, and stable parameter ID;
-- `pattern` or `song` context and its owning ID;
-- a positive integer grid size in ticks;
+- `pattern` context and its owning Pattern ID;
+- a fixed grid size of 240 ticks, equal to 1/16 at 960 ticks per quarter note;
 - ordered steps containing a non-negative tick and one JSON scalar value.
 
 Two steps in one lane may not occupy the same tick. Automation contains only
@@ -379,7 +375,7 @@ parameter descriptors validate every automation value.
 send definitions in bus order, and one master record. Channel records reference
 fixed slot IDs. They contain finite parameter values, four send amounts and
 pre/post modes, mute, solo, and stable module-chain references. Transient
-Monitor selection and monitor-only Mono state are absent.
+Monitor selection, monitor-only Mono state, and L/R or M/S meter mode are absent.
 
 `EffectsState` contains:
 
@@ -387,12 +383,15 @@ Monitor selection and monitor-only Mono state are absent.
 - one ordered module chain per occupied module;
 - four ordered send chains;
 - one ordered master chain;
+- one `masterEffectsBypassed` boolean;
 - the pinned compact-focus instance for each send chain or `null`.
 
 Every effect slot is `null` or contains a stable effect instance. Routing is
 limited to the main path and sends A through D. Cycles, feedback edges, unknown
 destinations, a missing protected final limiter, or more slots than the owning
-chain contract permits are structural errors.
+chain contract permits are structural errors. `masterEffectsBypassed` bypasses
+the user master effects before the protected limiter. It never bypasses master
+gain or the limiter and is independent of the limiter instance's own bypass.
 
 ### 5.8 Extensions
 
@@ -728,8 +727,8 @@ revision tokens and offers three explicit resolution actions:
   head without writing data.
 - **Import as copy** assigns a new project UUID, lineage ID, and revision epoch,
   sets revision to 0, and sets both timestamps to the action time. All
-  project-scoped module, pattern, event, effect, lane, scene, section,
-  asset-record, and migration IDs remain unchanged because their identity is
+  project-scoped module, pattern, event, effect, lane, clip, asset-record, and
+  migration IDs remain unchanged because their identity is
   scoped by the new project and lineage IDs. Content IDs and pack IDs also
   remain unchanged. Rack-collapse preferences are not copied. The remapped
   candidate receives complete validation again before quota preflight and
@@ -992,9 +991,8 @@ recovery fixtures, then automate their outcomes in unit and browser tests.
   successful resolution after reinstalling exact content.
 - Complete multi-step project and plugin migrations with deterministic output,
   plus failure at each intermediate step.
-- A time-signature anchor, valid multi-signature bar sequence, duplicate tick,
-  non-boundary event, and an earlier edit that invalidates multiple later
-  events.
+- A valid ordered Playlist, a dangling Pattern reference, duplicate placement
+  IDs, an empty Playlist, and repeat counts below and above the valid range.
 
 ### 14.4 Storage and recovery fixtures
 

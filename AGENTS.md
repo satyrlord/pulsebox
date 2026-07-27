@@ -300,4 +300,19 @@ evicting the oldest entries rather than rejecting a valid new action.
   4. the largest remaining blind spot;
   5. independent review findings when one was required.
 - Record verified non-blocking limitations, future work, and known issues in
-  their owning specification, issue, or verification report.
+  their owning specification or issue.
+
+## Verification output is not repository content
+
+- The repository records what is required and its implementation status. It does
+  not record how a past run went.
+- Write verification runs, evidence, check results, audit narratives, and
+  handoffs to an ignored temporary path. Never add them to the repository tree.
+- Do not create a `docs/verification/` folder, a phase or session report, or any
+  dated evidence file.
+- Report run results in the reply to the user. Anyone who needs current results
+  re-runs the command.
+- When a run reveals a durable requirement or a real limitation, put that fact in
+  its owning specification and discard the run narrative.
+- Do not write repository prose describing what a previous agent found, repaired,
+  removed, or superseded. Change the affected file and let the diff carry it.

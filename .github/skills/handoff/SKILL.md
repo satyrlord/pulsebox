@@ -7,12 +7,15 @@ description: Use when the user wants to hand off, wrap up, or write up a Pulsebo
 
 ## Choose the artifact
 
-- For a temporary session transfer, write to an ignored temporary path chosen
-  by the user or current workflow.
-- For a durable phase or project handoff, use a persistent artifact selected by
-  the user, such as an existing issue, report, or repository file. An ignored
-  temporary path is not durable. Do not create a permanent repository handoff
-  file unless the user explicitly requests one.
+- Write the handoff to an ignored temporary path, or report it directly to the
+  user. That is the default for every handoff, session or phase.
+- Never add a handoff, session report, or evidence file to the repository tree.
+  Do not create `HANDOFF.md`, a `docs/verification/` entry, or any dated report.
+  A handoff describes a moment in time; the repository records what is required
+  and its implementation status.
+- When a handoff contains a durable requirement, decision, or verified
+  limitation, write that fact into its owning specification and leave the rest of
+  the narrative out of the repository.
 - Do not duplicate facts already owned by the specification, architecture,
   project-format, theme, instrument, effect, commit, issue, or test report.
   Link to them.

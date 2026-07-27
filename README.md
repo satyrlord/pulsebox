@@ -23,9 +23,10 @@ are arranged in normative build order.
 
 ## Current status
 
-Phase 0 contracts are complete. Phase 1 foundation work is implemented. See the
-[Phase 1 verification evidence](docs/verification/phase-1.md) for current check
-results. The final MVP features in later roadmap phases are not implemented yet.
+Phase 0 contracts are complete. Phase 1 foundation work is implemented. Run
+`npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e` for
+current check results. The final MVP features in later roadmap phases are not
+implemented yet.
 
 Current owners:
 
@@ -119,7 +120,10 @@ claim unimplemented behavior.
   its expanded editor remains planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
-- Files under `design/` are non-normative prototypes, not production evidence.
+- Files under `design/` are normally non-normative prototypes, not production
+  evidence. `docs/design/claude-mock-up.html` is the specification-approved
+  visual composition target; behavioral and release evidence still comes from
+  the owning specifications and production checks.
 - Named historical research remains isolated under non-shipping `research/`.
 
 ## Adding an instrument

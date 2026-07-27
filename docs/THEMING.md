@@ -428,6 +428,11 @@ Appearance is one global local-storage preference. The UI layer owns the key
 canonical user-theme object is installed. The entire stored value is limited to
 16,384 UTF-8 bytes. No other layer reads or writes this key.
 
+Theme selection, high-contrast selection, user-theme import, and user-theme
+deletion are exposed only on the Settings page when that page is implemented.
+The application header has no appearance selector. This placement rule does not
+change the preference envelope or theme-service ownership.
+
 On startup, missing or invalid preference data resolves to `rack`, high contrast
 off, and no user theme. The UI reports corrupt stored data once per session and
 replaces it only after the user makes a valid appearance choice. Projects never
