@@ -266,6 +266,14 @@ must also have a text, shape, boundary, or icon cue using overlay colors.
 - The application host sets one `data-theme` value for a built-in theme or
   `user`, plus one independent `data-high-contrast` boolean state.
 - Only the central theme service may write palette properties onto the host.
+- Built-in themes and the high-contrast overlay are stylesheet rules selected by
+  that host state. The service sets the state and writes no inline palette
+  property for them. An inline property outranks an attribute selector, so
+  painting a built-in palette inline would freeze the palette and make every
+  later theme change a no-op.
+- An imported user theme has no stylesheet rule, so the service writes its
+  canonical tokens inline. High contrast is resolved into that inline write,
+  because the overlay rule cannot outrank an inline property.
 - Components use semantic tokens. They do not use literal theme palette colors
   except for the required `rack` fallback beside `var()`.
 - Reusable Shadow-DOM controls inherit public tokens. Private component tokens
@@ -567,6 +575,13 @@ The release evidence for each browser records:
 
 Acceptance criteria 39 through 41 and 67 pass only when this evidence is
 complete, all required checks pass, and the implementation matches this
-contract. Phase 1 implements the five built-in token sets, high contrast, and
-the current control primitives. Full-shell theme switching and final visual
-evidence across later MVP components remain future work.
+contract.
+
+The current implementation provides the five built-in token sets, the
+high-contrast overlay, the appearance preference envelope with its cross-tab
+and storage-failure behavior, the bounded user-theme import validator, the
+numeric contrast checks, and the current control primitives. The Settings page
+that exposes theme selection, contrast selection, user-theme import, and
+user-theme deletion is not implemented yet, so those operations are reachable
+only through the theme service. Visual regression snapshots across later MVP
+components also remain future work.

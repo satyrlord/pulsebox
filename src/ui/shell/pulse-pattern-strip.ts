@@ -54,49 +54,83 @@ export class PulsePatternStrip extends HTMLElement {
           gap: 2px;
           min-width: 416px;
         }
+        /*
+         * A step is a recessed well holding a step pad. The pad lights with the
+         * module accent when the step is active; the well itself stays dark, so
+         * a full row of active steps still reads as a sequencer, not a bar.
+         */
         button {
           position: relative;
+          display: grid;
           min-width: var(--pulse-target-min, 24px);
           min-height: var(--pulse-target-min, 24px);
+          place-items: center;
           border: var(--pulse-border-thin, 1px) solid var(--pulse-color-border-default, #6d7881);
           border-radius: 2px;
           padding: 0;
           color: var(--pulse-color-text-muted, #919ba3);
           background: var(--pulse-color-surface-inset, #080a0c);
+          box-shadow: inset 0 1px 2px 0 #00000073;
           font: var(--pulse-type-10, 10px) / 1 var(--pulse-font-mono, ui-monospace, monospace);
           cursor: pointer;
           outline: var(--pulse-operational-outline, 0 solid transparent);
           outline-offset: -2px;
         }
-        button:nth-child(4n + 1) {
-          border-inline-start-color: var(--pulse-color-border-strong, #aab4bc);
-        }
-        button[data-active="true"] {
-          border-color: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
-          color: var(--pulse-color-on-accent, #07110b);
-          background: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
-          box-shadow: inset 0 -3px 0 var(--pulse-color-on-accent, #07110b);
-        }
-        button[data-current="true"]::after {
-          position: absolute;
-          inset: 2px;
-          border: 1px solid currentColor;
-          content: "";
+        /* The lit pad. Inactive steps keep an unlit pad so the grid reads evenly. */
+        .pad {
+          width: 10px;
+          height: 10px;
+          border: var(--pulse-border-thin, 1px) solid var(--pulse-color-control-track, #6f7b84);
+          border-radius: 2px;
+          background: var(--pulse-color-meter-track, #20262b);
           pointer-events: none;
         }
+        /* Every fourth step starts a beat and carries a stronger boundary. */
+        button:nth-child(4n + 1) {
+          border-inline-start-color: var(--pulse-color-border-strong, #aab4bc);
+          border-inline-start-width: var(--pulse-border-strong, 2px);
+        }
+        /*
+         * Active state uses the lit pad plus a strengthened cell boundary, so
+         * it never depends on colour alone.
+         */
+        button[data-active="true"] {
+          border-color: var(--pulse-color-border-strong, #aab4bc);
+        }
+        button[data-active="true"] .pad {
+          border-color: var(--module-led, var(--pulse-color-control-fill, #b0f2ca));
+          background: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+        }
+        /* Playhead outline on the cell the transport is currently sounding. */
+        button[data-current="true"] {
+          box-shadow:
+            inset 0 0 0 2px var(--pulse-color-border-strong, #aab4bc),
+            inset 0 1px 2px 0 #00000073;
+        }
+        /* Accent, tie, and slide are shape cues drawn beside the pad. */
         button[data-accent="true"] {
           border-block-start-width: 3px;
+          border-block-start-color: var(--pulse-color-border-strong, #aab4bc);
+        }
+        button[data-accent="true"] .pad {
+          width: 13px;
+          height: 13px;
         }
         button[data-tie="true"]::before {
           position: absolute;
-          inset-inline: 25%;
+          inset-inline: 20%;
           inset-block-end: 3px;
           height: 2px;
-          background: currentColor;
+          background: var(--pulse-color-text-secondary, #bac2c8);
           content: "";
         }
-        button[data-slide="true"] {
-          clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%);
+        button[data-slide="true"]::after {
+          position: absolute;
+          inset-block-start: 2px;
+          inset-inline-end: 2px;
+          border-block-end: 5px solid var(--pulse-color-text-secondary, #bac2c8);
+          border-inline-start: 5px solid transparent;
+          content: "";
         }
         button:disabled {
           color: var(--pulse-color-text-muted, #919ba3);
@@ -119,6 +153,9 @@ export class PulsePatternStrip extends HTMLElement {
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.index = String(index);
+      const pad = document.createElement("span");
+      pad.className = "pad";
+      button.append(pad);
       this.#buttons.push(button);
       this.#grid.append(button);
     }
@@ -202,9 +239,9 @@ export class PulsePatternStrip extends HTMLElement {
 
   #buttonFromEvent(event: Event): HTMLButtonElement | undefined {
     const target = event.target;
-    return target instanceof HTMLButtonElement && target.dataset.index !== undefined
-      ? target
-      : undefined;
+    if (!(target instanceof HTMLElement)) return undefined;
+    const button = target.closest("button");
+    return button?.dataset.index !== undefined ? button : undefined;
   }
 
   #onClick(event: MouseEvent): void {
@@ -239,8 +276,10 @@ export class PulsePatternStrip extends HTMLElement {
   #onPointerMove(event: PointerEvent): void {
     if (this.#paintPointer !== event.pointerId) return;
     const target = this.shadowRoot?.elementFromPoint(event.clientX, event.clientY);
-    const button = target instanceof HTMLButtonElement ? target : undefined;
-    if (button === undefined || button.disabled) return;
+    // The pad is `pointer-events: none`, but guard the closest button anyway so
+    // any future cell child cannot break painting.
+    const button = target instanceof HTMLElement ? target.closest("button") : null;
+    if (button === null || button.disabled) return;
     const index = Number(button.dataset.index);
     if (
       this.#steps[index]?.active !== this.#paintActive &&
@@ -261,7 +300,7 @@ export class PulsePatternStrip extends HTMLElement {
       if (state.probability !== undefined) {
         descriptors.push(`${String(Math.round(state.probability * 100))}% probability`);
       }
-      button.textContent = String(index + 1);
+      // The pad is the persistent child; never replace it with text content.
       button.disabled = this.disabled || state.disabled === true;
       button.dataset.active = String(state.active);
       button.dataset.accent = String(state.accent === true);

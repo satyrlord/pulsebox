@@ -14,8 +14,10 @@ primary product owner.
 The merged MVP is complete only when:
 
 1. **AC-001.** It is a real strict-TypeScript application.
-2. **AC-002.** It uses native DOM and Web Components.
-3. **AC-003.** It contains no UI framework or virtual DOM.
+2. **AC-002.** Its UI layer uses one component model consistently across the
+   shell, rack, mixer, effects, and editors.
+3. **AC-003.** Its dependency tree contains no unused or undeclared runtime
+   dependency.
 4. **AC-004.** Its 1536 × 1024 composition follows
    `docs/design/claude-mock-up.html`: the rack remains dominant and the compact
    right studio column provides mutually exclusive Mixer, Effects, and Master
@@ -50,8 +52,9 @@ The merged MVP is complete only when:
     Pattern contains compatible per-module parts and is identified by its name,
     never a compound number such as `1 - 1`.
 17. **AC-017.** Quantized pattern switching works.
-18. **AC-018.** The mixer exposes exactly eight visible instrument channels plus one master
-    channel; empty channels are disabled and labeled `Empty`.
+18. **AC-018.** The mixer exposes exactly eight visible instrument channels plus
+    one master channel; empty channels are disabled, identified visually by
+    their two-digit slot numbers, and expose their Empty state accessibly.
 19. **AC-019.** No mixer banking, channels 9–16, or horizontal mixer scrolling exists in the
     MVP.
 20. **AC-020.** Mute, solo, fader, pan, the visible 2 × 2 A–D module-send grid,
@@ -135,8 +138,8 @@ The merged MVP is complete only when:
     Chrome, Edge, and Firefox release channels. Exact versions are recorded, and
     any physical-audio-only claim has a passing manual procedure in all three
     browsers.
-57. **AC-057.** The production build completes without unresolved imports, framework
-    dependencies, a service worker, or PWA packaging.
+57. **AC-057.** The production build completes without unresolved imports, a
+    service worker, or PWA packaging.
 58. **AC-058.** The legal audit permits named historical sources only under non-shipping
     `/research` and verifies that shipped factory voice lists, ranges, curves,
     defaults, sound targets, layouts, assets, and public text remain original
@@ -159,10 +162,15 @@ The merged MVP is complete only when:
     interactive, and exposed to assistive technology.
 66. **AC-066.** Nonessential visual animation pauses when hidden.
 67. **AC-067.** CSS token, spacing, radius, scrollbar, and supported-viewport rules are
-    followed.
+    followed. At 1568 × 1003, the semantic composition follows the approved
+    raster reference's major row and column geometry, density, materials,
+    typography scale, and control sizing without replacing semantic controls
+    with raster artwork.
 68. **AC-068.** The visible mixer uses fixed compact strips. Every instrument
     strip keeps its A–D sends visible as a 2 × 2 button grid, and channel
-    selection or detail editing does not resize the mixer.
+    selection or detail editing does not resize the mixer. Empty strips remain
+    visible under their two-digit slot numbers, and the master strip keeps its
+    noninteractive A–D return labels visible without creating a feedback route.
 69. **AC-069.** One module-aware Piano Roll switches between monophonic pitched
     rows and named drum-voice rows. Its header has no local Play, pen, or erase
     buttons. Monophonic notes create, delete, move, resize, and slide without

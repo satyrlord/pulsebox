@@ -15,35 +15,41 @@
    larger knobs with glowing value arcs and labels above, chunkier pull
    handles with socket bolts, blooming step lamps, silver fader caps,
    plain-text wordmark.
+   Pass 3: native 1568 x 1003 composition geometry, measured directly from
+   the approved reference image.
+   Pass 4: measurement-driven pixel parity pass — decorative measured piano
+   gutter, target-matched mixer levels, caps, sends and meter ladders,
+   voice-0 lamp fixtures, uniform rack-knob arc fixture, reference waveform,
+   and topbar/bottom-bar alignment tuned against per-pixel diffs.
    ========================================================================== */
 :root, html[data-theme="rack"]{
   --surface-app:#08090a; --surface-rail:#101214; --surface-chassis:#141618;
-  --surface-plate-top:#212528; --surface-plate-bot:#131619; --surface-plate-brush:rgba(255,255,255,.02);
+  --surface-plate-top:#1d2022; --surface-plate-bot:#121517; --surface-plate-brush:rgba(255,255,255,.012);
   --surface-recess:#0b0d0e; --surface-well:#060708; --surface-raised:#2e3236;
   --edge-highlight:rgba(255,255,255,.09); --edge-shadow:rgba(0,0,0,.65); --edge-hairline:rgba(0,0,0,.78);
   --edge-radius-panel:8px; --edge-radius-ctl:6px; --edge-radius-chip:4px;
-  --metal-cap-top:#33383c; --metal-cap-bot:#101315; --metal-skirt-a:#282c30; --metal-skirt-b:#15181a;
+  --metal-cap-top:#2c3034; --metal-cap-bot:#0e1113; --metal-skirt-a:#282c30; --metal-skirt-b:#15181a;
   --metal-screw-top:#565b60; --metal-screw-bot:#1d2023;
   --metal-rail-a:#2a2e31; --metal-rail-b:#121416;
-  --cap-hi:#e8ebed; --cap-lo:#9aa0a6;
-  --accent-lamp:#7ddb4f; --accent-dim:rgba(125,219,79,.25); --accent-glow:rgba(125,219,79,.45); --accent-ink:#0a1206;
+  --cap-hi:#d9dcdf; --cap-lo:#8e9499;
+  --accent-lamp:#78b943; --accent-dim:rgba(120,185,67,.2); --accent-glow:rgba(120,185,67,.32); --accent-ink:#0a1206;
   /* accent-text is the accent tuned for use AS text. On dark themes the lamp
      already passes; the light theme overrides it with a darker oxide. */
   --accent-text:var(--accent-lamp);
-  --lcd-ink:#f3f5f6;
+  --lcd-ink:#d6d9db;
   --text-primary:#f3f5f6; --text-secondary:#c3cad0; --text-muted:#a3abb2;
   --text-engraved-lo:rgba(0,0,0,.75); --text-engraved-hi:rgba(255,255,255,.06);
   --signal-mute:#d8d8d8; --signal-solo:#ffd166; --signal-rec:#ff4d4d; --signal-play:#4ade44;
-  --meter-low:#46d746; --meter-mid:#ffd166; --meter-high:#ff9d3d; --meter-peak:#ff4d4d;
+  --meter-low:#5da117; --meter-mid:#b99d40; --meter-high:#c97735; --meter-peak:#cc4943;
   --scope-glass:#070809; --scope-grid:rgba(255,255,255,.07);
-  --type-display:"Eurostile","Bahnschrift","DIN Alternate","Oswald",system-ui,sans-serif;
+  --type-display:"Bahnschrift","Eurostile","DIN Alternate","Arial Narrow",system-ui,sans-serif;
   --type-ui:ui-sans-serif,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --type-num:ui-monospace,"SF Mono","Roboto Mono","Consolas",monospace;
   --size-1:10px; --size-2:11px; --size-3:13px; --size-4:15px; --size-5:19px; --size-6:26px;
   --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
   --motion-fast:90ms; --motion-base:140ms; --motion-ease:cubic-bezier(.2,.7,.3,1);
-  --mod-bass:#7ddb4f; --mod-six:#f0932b; --mod-boom:#e8503c;
-  --mod-nine:#b06df0; --mod-sev:#4f8dff; --mod-five:#3fc9c1;
+  --mod-bass:#79b83f; --mod-six:#d88927; --mod-boom:#d84c3e;
+  --mod-nine:#9d5ed0; --mod-sev:#4b7fd2; --mod-five:#39b3ac;
   --mod-fx:#93999f;
   --mod-tint:4%;
 }
@@ -137,8 +143,8 @@ html[data-theme="rust"]{
   --mat-speckle:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='%23fff' opacity='.07'%3E%3Ccircle cx='5' cy='7' r='.45'/%3E%3Ccircle cx='31' cy='4' r='.35'/%3E%3Ccircle cx='18' cy='27' r='.4'/%3E%3Ccircle cx='43' cy='35' r='.45'/%3E%3Ccircle cx='9' cy='44' r='.3'/%3E%3C/g%3E%3Cg fill='%23000' opacity='.28'%3E%3Ccircle cx='22' cy='11' r='.5'/%3E%3Ccircle cx='39' cy='19' r='.4'/%3E%3Ccircle cx='3' cy='31' r='.45'/%3E%3Ccircle cx='28' cy='42' r='.35'/%3E%3C/g%3E%3C/svg%3E");
   /* fine vertical brushing for the metal faceplates */
   --mat-brush:
-    repeating-linear-gradient(90deg,rgba(255,255,255,.013) 0 1px,transparent 1px 4px),
-    repeating-linear-gradient(90deg,rgba(0,0,0,.025) 0 1px,transparent 1px 7px);
+    repeating-linear-gradient(90deg,rgba(255,255,255,.006) 0 1px,transparent 1px 5px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,.012) 0 1px,transparent 1px 9px);
   --mat-plate:
     var(--mat-speckle),
     var(--mat-brush),
@@ -159,10 +165,10 @@ body{
   color:var(--text-primary);
   font-family:var(--type-ui);font-size:var(--size-3);
   min-width:1280px;overflow:hidden;height:100vh;
-  display:grid;grid-template-rows:56px minmax(0,1.12fr) minmax(240px,.88fr) 38px;
+  display:grid;grid-template-rows:58px minmax(0,1fr) clamp(230px,30.11vh,302px) 52px;
   -webkit-font-smoothing:antialiased;
 }
-body.workspace-collapsed{grid-template-rows:56px minmax(0,1fr) 0 38px;}
+body.workspace-collapsed{grid-template-rows:58px minmax(0,1fr) 0 52px;}
 body.workspace-collapsed .botrow{display:none;}
 .num{font-family:var(--type-num);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
 button,input,select{font:inherit;color:inherit;}
@@ -192,15 +198,27 @@ button{background:none;border:0;cursor:pointer;}
 
 /* ==================== TOP BAR ==================== */
 .topbar{
-  min-width:0;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) 168px minmax(0,1fr);
-  align-items:center;gap:var(--space-2);padding:0 var(--space-2);
+  grid-row:1;min-width:0;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) 168px minmax(0,1fr);
+  align-items:center;gap:var(--space-2);padding:0 12px 0 10px;
   background:var(--mat-plate);border-bottom:1px solid var(--edge-hairline);
   box-shadow:inset 0 1px 0 var(--edge-highlight),0 4px 8px rgba(0,0,0,.6);z-index:40;
 }
-.header-left,.header-right{min-width:0;display:flex;align-items:center;gap:var(--space-2);}
+html[data-theme="rack"] .topbar{
+  background-image:var(--mat-speckle),linear-gradient(180deg,#1d1e1f,#18191a);
+}
+.theme-popover{
+  position:fixed;z-index:70;top:58px;right:10px;width:210px;padding:10px;border-radius:var(--edge-radius-panel);
+  background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
+  border:1px solid var(--edge-hairline);box-shadow:inset 0 1px var(--edge-highlight),0 10px 28px rgba(0,0,0,.72);
+}
+.theme-popover h2{margin:0 0 8px;font-family:var(--type-display);font-size:var(--size-2);letter-spacing:.12em;text-transform:uppercase;color:var(--text-primary);}
+.theme-options{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.theme-options button{height:28px;border-radius:var(--edge-radius-ctl);font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
+.theme-options button[aria-pressed="true"]{color:var(--accent-text);box-shadow:var(--lift-1),inset 0 -2px var(--accent-lamp);}
+.header-left,.header-right{min-width:0;display:flex;align-items:center;gap:7px;transform:translateY(1.5px);}
 .header-right{justify-content:flex-end;}
 .iconbtn{
-  width:40px;height:38px;flex:none;border-radius:7px;display:grid;place-items:center;
+  width:42px;height:40px;flex:none;border-radius:7px;display:grid;place-items:center;
   color:var(--text-secondary);
   background:
     radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.06),transparent 62%),
@@ -211,22 +229,23 @@ button{background:none;border:0;cursor:pointer;}
 }
 .iconbtn:hover{color:var(--text-primary);}
 .iconbtn:active{box-shadow:inset 0 3px 6px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.6);}
-.iconbtn.on{color:var(--signal-play);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 0 1px color-mix(in srgb,var(--signal-play) 55%,transparent),
-    0 0 12px color-mix(in srgb,var(--signal-play) 45%,transparent),0 2px 4px rgba(0,0,0,.55);}
+.iconbtn.on{color:#71b23e;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -2px 3px rgba(0,0,0,.45),
+    0 2px 4px rgba(0,0,0,.55),0 0 0 1px rgba(0,0,0,.55);}
+.iconbtn.on svg{filter:drop-shadow(0 0 4px rgba(113,178,62,.45));}
 .iconbtn svg{width:17px;height:17px;fill:currentColor;}
 .iconbtn.ghost{background:none;box-shadow:none;width:26px;}
 /* Project picker, as in the mock: a raised plate wide enough for the whole
    name, a dropdown chevron, and the favourite heart on the same plate. */
 .projbox{
-  height:42px;flex:none;min-width:0;display:flex;align-items:center;gap:2px;padding:0 4px 0 2px;
+  width:176px;height:40px;flex:none;min-width:0;display:flex;align-items:center;gap:2px;padding:0 2px;
   border-radius:8px;
   background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
   box-shadow:inset 0 1px 0 var(--edge-highlight),0 0 0 1px rgba(0,0,0,.55),0 2px 4px rgba(0,0,0,.45);
 }
 .projsel{
-  height:34px;min-width:0;display:flex;align-items:center;gap:8px;padding:0 6px 0 10px;
-  border-radius:6px;color:var(--text-primary);font-size:var(--size-4);
+  height:34px;min-width:0;flex:1;display:flex;align-items:center;gap:8px;padding:0 4px 0 8px;
+  border-radius:6px;color:#d0d3d5;font-size:var(--size-3);
 }
 .projsel:hover{background:rgba(255,255,255,.04);}
 .projsel .pname{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
@@ -236,11 +255,12 @@ button{background:none;border:0;cursor:pointer;}
 /* Grouped control clusters: a recessed channel that the keys sit inside, which
    is what gives the mock's bar its substance. */
 .transport,.tempogroup{
-  height:42px;flex:none;display:flex;align-items:center;gap:3px;padding:3px;
+  height:40px;flex:none;display:flex;align-items:center;gap:1px;padding:2px;
   border-radius:8px;background:var(--surface-well);
   box-shadow:var(--sink-1),0 1px 0 var(--edge-highlight);
 }
-.tempogroup{padding:0;overflow:hidden;align-items:stretch;
+.transport{width:131px;margin-left:10px;}
+.tempogroup{width:116px;padding:0;overflow:hidden;align-items:stretch;
   background:linear-gradient(180deg,color-mix(in srgb,var(--scope-glass) 88%,#000),var(--scope-glass));
   box-shadow:var(--sink-2),0 1px 0 var(--edge-highlight);}
 .tempogroup .lcd.tempo{height:100%;box-shadow:none;background:none;border-radius:0;}
@@ -249,7 +269,7 @@ button{background:none;border:0;cursor:pointer;}
 /* Transport keys: generous square keys seated together in the recessed
    transport channel, the glyph carrying its signal colour. */
 .tbtn{
-  width:46px;height:36px;flex:none;border-radius:6px;display:grid;place-items:center;
+  width:auto;height:36px;flex:1 1 0;border-radius:6px;display:grid;place-items:center;
   color:var(--text-secondary);
   background:
     radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.06),transparent 62%),
@@ -258,7 +278,7 @@ button{background:none;border:0;cursor:pointer;}
     0 1px 2px rgba(0,0,0,.55);
   transition:box-shadow var(--motion-fast) var(--motion-ease),color var(--motion-fast) var(--motion-ease);
 }
-.tbtn svg{width:19px;height:19px;fill:currentColor;}
+.tbtn svg{width:21px;height:21px;fill:currentColor;}
 .tbtn:active{box-shadow:inset 0 3px 6px rgba(0,0,0,.7);}
 .tbtn:hover{color:var(--text-primary);}
 /* idle transport glyphs keep their signal colors, as in the reference image */
@@ -280,23 +300,22 @@ button{background:none;border:0;cursor:pointer;}
 }
 .lcd::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(160deg,rgba(255,255,255,.035) 0 40%,transparent 40%);}
-.lcd .lcdval{font-family:var(--type-num);font-variant-numeric:tabular-nums;font-size:var(--size-4);
-  color:var(--lcd-ink,var(--accent-lamp));
-  text-shadow:0 0 9px color-mix(in srgb,var(--lcd-ink,var(--accent-lamp)) 32%,transparent);line-height:1.1;}
+.lcd .lcdval{font-family:var(--type-num);font-variant-numeric:tabular-nums;font-size:var(--size-4);font-weight:400;
+  color:var(--lcd-ink,var(--accent-lamp));line-height:1.1;}
 .lcd .lcdlbl{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.16em;text-transform:uppercase;
   color:var(--text-secondary);}
-.lcd.tempo{width:82px;cursor:ns-resize;padding-inline:8px;}
-.lcd.tempo input{background:none;border:0;width:66px;min-height:24px;font:inherit;font-family:var(--type-num);
-  font-size:var(--size-4);color:var(--lcd-ink,var(--accent-lamp));
-  text-shadow:0 0 9px color-mix(in srgb,var(--lcd-ink,var(--accent-lamp)) 32%,transparent);}
-.lcd.clock{width:142px;}
+.lcd.tempo{width:70px;cursor:ns-resize;padding-inline:8px;}
+.lcd.tempo input{background:none;border:0;width:58px;min-height:24px;font:inherit;font-family:var(--type-num);
+  font-size:var(--size-4);color:var(--lcd-ink,var(--accent-lamp));}
+.lcd.clock{width:116px;}
 /* the mock sets the wordmark as plain type on the bar, no recessed plate */
 .wordmark{
-  margin:0;height:34px;display:grid;place-items:center;font-family:var(--type-display);font-size:22px;font-weight:700;
-  text-transform:uppercase;letter-spacing:.18em;
+  margin:0;height:34px;display:grid;place-items:center;font-family:var(--type-display);font-size:24px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.17em;
   color:var(--text-primary);text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 14px rgba(255,255,255,.07);
-  width:168px;text-align:center;overflow:hidden;white-space:nowrap;
+  width:168px;text-align:center;overflow:hidden;white-space:nowrap;transform:translate(36px,3px);
 }
+html[data-theme="rack"] .wordmark{color:#d4d6d7;}
 .tapbtn{
   width:44px;height:42px;flex:none;border-radius:7px;
   font-family:var(--type-display);font-size:var(--size-3);letter-spacing:.1em;text-transform:uppercase;
@@ -309,39 +328,41 @@ button{background:none;border:0;cursor:pointer;}
 }
 .tapbtn:hover{color:var(--text-primary);}
 .tapbtn:active{box-shadow:inset 0 3px 6px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.6);}
-.mode-toggle{display:flex;flex:none;align-items:center;gap:2px;height:42px;padding:3px;
+.mode-toggle{width:120px;display:flex;flex:none;align-items:center;gap:2px;height:40px;margin-left:1px;padding:3px;
   border-radius:8px;background:var(--surface-well);
   box-shadow:var(--sink-1),0 1px 0 var(--edge-highlight);}
-.mode-toggle button{height:36px;padding:0 12px;border-radius:6px;
+.mode-toggle button{height:34px;flex:1;padding:0 6px;border-radius:6px;
   font-family:var(--type-display);font-size:var(--size-1);
   letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
 .mode-toggle button:hover{color:var(--text-secondary);}
 .mode-toggle button.on{color:var(--accent-text);
   background:linear-gradient(180deg,var(--surface-raised),var(--surface-plate-bot));
   box-shadow:inset 0 -2px 0 var(--accent-lamp),inset 0 1px 0 var(--edge-highlight),0 1px 2px rgba(0,0,0,.5);}
-.meter-mode{width:42px;height:34px;flex:none;border-radius:var(--edge-radius-ctl);
-  font-family:var(--type-display);font-size:var(--size-2);color:var(--text-primary);
-  background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
-.mastermeter{flex:none;display:grid;grid-template-columns:180px 58px;align-items:center;gap:var(--space-2);}
+.meter-mode{width:41px;height:40px;flex:none;border-radius:var(--edge-radius-ctl);
+  font-family:var(--type-display);font-size:var(--size-2);color:#c3c9ce;background:none;box-shadow:none;}
+.mastermeter{flex:none;display:grid;grid-template-columns:180px 30px;align-items:center;gap:var(--space-2);margin-left:4px;}
 .meterpair{width:180px;display:grid;grid-template-columns:10px 1fr;grid-template-rows:1fr 1fr;gap:2px 4px;}
-.meterpair span{font-family:var(--type-num);font-size:8px;line-height:7px;color:var(--text-muted);}
-.meterpair canvas{width:166px;height:7px;background:var(--surface-well);border-radius:var(--edge-radius-chip);box-shadow:var(--sink-1);}
-.mastermeter .mdb{width:58px;text-align:left;font-family:var(--type-num);font-size:var(--size-2);color:var(--text-secondary);}
+.meterpair span{font-family:var(--type-num);font-size:8px;line-height:5px;color:var(--text-muted);}
+.meterpair canvas{width:166px;height:5px;background:var(--surface-well);border-radius:var(--edge-radius-chip);box-shadow:var(--sink-1);}
+.mastermeter .mdb{width:30px;overflow:hidden;text-align:left;font-family:var(--type-num);font-size:var(--size-2);color:var(--text-secondary);}
+.header-right #btnMetro{width:37px;}
+.header-right #btnPower{width:41px;margin-left:-2px;}
+.header-right #meterMode{margin-left:-1px;}
+.header-right > .iconbtn:last-child{width:46px;margin-left:23px;color:var(--text-primary);}
 
 /* ==================== KNOBS ==================== */
 /* mock knobs: large dark domes with a knurled skirt, a bright pointer, a
    thick glowing value arc, tick marks outside the arc, label above */
-.knob{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
-  cursor:ns-resize;user-select:none;--k:var(--mod-accent,var(--accent-lamp));width:48px;}
-.kdial{position:relative;width:44px;height:44px;}
+.knob{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
+  cursor:ns-resize;user-select:none;--k:var(--mod-accent,var(--accent-lamp));width:42px;}
+.kdial{position:relative;width:38px;height:38px;}
 .kdial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
 .kdial .arc-track{stroke:#0a0c0d;stroke-width:2.2;}
 /* the mock's arcs are thin, tight rings hugging the cap, lit but not fat */
-.kdial .arc-fill{stroke:var(--k);stroke-width:2.2;
-  filter:drop-shadow(0 0 4px color-mix(in srgb,var(--k) 75%,transparent))
-         drop-shadow(0 0 1.5px color-mix(in srgb,var(--k) 60%,#fff));}
-.kdial .ktick{stroke:rgba(255,255,255,.18);stroke-width:1.1;}
-.kbody{position:absolute;left:50%;top:50%;width:32px;height:32px;transform:translate(-50%,-50%);border-radius:50%;
+.kdial .arc-fill{stroke:var(--k);stroke-width:3.2;
+  filter:drop-shadow(0 0 3.5px color-mix(in srgb,var(--k) 60%,transparent));}
+.kdial .ktick{stroke:rgba(255,255,255,.26);stroke-width:1.1;}
+.kbody{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%);border-radius:50%;
   background:
     radial-gradient(circle at 50% 32%,var(--metal-cap-top) 0 40%,transparent 41%),
     repeating-conic-gradient(from 0deg,var(--metal-skirt-a) 0deg 4deg,var(--metal-skirt-b) 4deg 8deg),
@@ -350,7 +371,7 @@ button{background:none;border:0;cursor:pointer;}
   transition:transform var(--motion-fast) var(--motion-ease);}
 .kbody::before{content:"";position:absolute;inset:4px;border-radius:50%;
   background:
-    radial-gradient(circle at 34% 26%,rgba(255,255,255,.14) 0 12%,transparent 48%),
+    radial-gradient(circle at 34% 26%,rgba(255,255,255,.12) 0 12%,transparent 48%),
     linear-gradient(155deg,var(--metal-cap-top),var(--metal-cap-bot));
   box-shadow:inset 0 1px 1px var(--edge-highlight),inset 0 -1px 2px rgba(0,0,0,.55);}
 .kbody::after{content:"";position:absolute;inset:-2px;border-radius:50%;z-index:-1;
@@ -358,11 +379,11 @@ button{background:none;border:0;cursor:pointer;}
     var(--metal-skirt-a) 215deg,var(--metal-cap-bot) 295deg,var(--metal-skirt-a) 360deg);
   box-shadow:0 2px 4px rgba(0,0,0,.55);}
 /* a fine machined indicator line running from the cap centre to its edge */
-.kbody .kptr{position:absolute;left:50%;top:3px;width:2px;height:14px;margin-left:-1px;border-radius:1px;
+.kbody .kptr{position:absolute;left:50%;top:3px;width:2px;height:12px;margin-left:-1px;border-radius:1px;
   background:linear-gradient(180deg,#ffffff,#e6ebef 45%,rgba(230,235,239,.35));
   box-shadow:0 0 6px rgba(255,255,255,.5),0 0 3px color-mix(in srgb,var(--k) 60%,transparent),
     0 1px 1px rgba(0,0,0,.7);
-  transform-origin:50% 13px;}
+  transform-origin:50% 11px;}
 .knob.dragging .kbody{transform:translate(-50%,-50%) scale(1.06);}
 .klabel{
   /* sits above the dial, as in the mock; two lines at 10px rather than one
@@ -393,79 +414,78 @@ button{background:none;border:0;cursor:pointer;}
 .knob.xl .kbody .kptr{height:18px;top:3px;width:2.4px;margin-left:-1.2px;transform-origin:50% 18px;}
 
 /* ==================== MID ROW ==================== */
-.midrow{min-width:0;min-height:0;display:grid;
-  grid-template-columns:182px 116px minmax(0,1fr) 336px;gap:5px;padding:5px 5px 2px;}
+.midrow{grid-row:2;min-width:0;min-height:0;display:grid;
+  grid-template-columns:182px 116px minmax(0,1fr) 386px;gap:5px;padding:8px 5px 2px;}
 
 /* ---------- module browser ---------- */
 .browser .bfilter{
-  flex:none;margin:var(--space-1);height:24px;display:flex;align-items:center;gap:5px;
+  flex:none;margin:2px 2px 3px 4px;height:28px;display:flex;align-items:center;gap:5px;
   padding:0 var(--space-2);border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);
   font-size:var(--size-1);color:var(--text-secondary);}
 .browser .bfilter i{width:5px;height:5px;border-radius:50%;background:var(--accent-lamp);
   box-shadow:0 0 5px var(--accent-glow);flex:none;}
-.blist{flex:1;min-height:0;overflow-y:auto;padding:0 var(--space-1) var(--space-1);display:flex;flex-direction:column;gap:3px;}
+.blist{flex:1;min-height:0;overflow-y:auto;padding:0 1px var(--space-1) 2px;display:flex;flex-direction:column;gap:3px;}
 .bitem{
-  --k:var(--mod-accent);display:flex;align-items:center;gap:6px;padding:5px;border-radius:var(--edge-radius-ctl);cursor:grab;
+  --k:var(--mod-accent);display:flex;align-items:center;gap:15px;min-height:74px;padding:7px 5px 7px 9px;border-radius:var(--edge-radius-ctl);cursor:grab;
   background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
   box-shadow:var(--lift-1);border-left:2px solid var(--k);
   transition:box-shadow var(--motion-fast) var(--motion-ease);
 }
+html[data-theme="rack"] .browser{background-color:#131517;}
+html[data-theme="rack"] .browser .bfilter{background:#0c0e10;}
+html[data-theme="rack"] .browser .bitem{background:linear-gradient(180deg,#25292c,#1c1f21);}
 .bitem:hover{box-shadow:var(--lift-1),0 0 0 1px color-mix(in srgb,var(--k) 45%,transparent);}
 /* thumbnail reads as a miniature faceplate: tinted plate, accent top edge,
    tiny knob studs */
 .bthumb{
-  width:46px;height:28px;flex:none;border-radius:3px;position:relative;overflow:hidden;
+  width:62px;height:38px;flex:none;border-radius:3px;position:relative;overflow:hidden;
   background:
     var(--mat-brush),
+    linear-gradient(180deg,color-mix(in srgb,var(--k) 85%,#000) 0 5px,transparent 5px),
     linear-gradient(180deg,color-mix(in srgb,var(--k) 10%,#1f2226),#0a0c0e);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.09),inset 0 -4px 8px rgba(0,0,0,.5),
-    inset 0 2px 0 color-mix(in srgb,var(--k) 55%,transparent),0 1px 2px rgba(0,0,0,.6);
+    0 1px 2px rgba(0,0,0,.6);
 }
 /* stud knobs with a faint accent pip, echoing the real faceplate's knob row */
-.bthumb i{position:absolute;width:5px;height:5px;border-radius:50%;opacity:1;
+.bthumb i{position:absolute;width:7px;height:7px;border-radius:50%;opacity:1;
   background:radial-gradient(circle at 38% 28%,#565c62,#101315 74%);
   box-shadow:inset 0 0 0 .5px rgba(255,255,255,.16),0 0 3px color-mix(in srgb,var(--k) 30%,transparent),
     0 1px 1px rgba(0,0,0,.7);}
+.bthumb i.led{width:3px;height:2px;border-radius:1px;background:var(--k);opacity:.68;
+  box-shadow:0 0 3px color-mix(in srgb,var(--k) 45%,transparent);}
 .bmeta{min-width:0;}
-.bmeta .bn{font-family:var(--type-display);font-size:var(--size-2);font-weight:700;letter-spacing:.09em;
+.bmeta .bn{font-family:var(--type-display);font-size:var(--size-3);font-weight:700;letter-spacing:.09em;
   color:color-mix(in srgb,var(--k) 62%,var(--text-primary));
-  text-shadow:0 1px 0 var(--text-engraved-lo);}
-.bmeta .bfull{display:block;font-size:var(--size-1);color:var(--text-primary);
+  text-shadow:0 1px 0 var(--text-engraved-lo);filter:brightness(.8);}
+.bmeta .bfull{display:block;font-family:"Segoe UI",sans-serif;font-size:var(--size-2);color:var(--text-primary);
+  filter:brightness(.8);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.bmeta .bs{display:block;font-size:var(--size-1);color:var(--text-secondary);line-height:12px;
-  max-height:24px;overflow:hidden;}
+.bmeta .bs{display:block;font-family:"Segoe UI",sans-serif;font-size:var(--size-2);color:var(--text-secondary);line-height:13px;
+  filter:brightness(.7);transform:scaleX(.96);transform-origin:left center;
+  max-height:26px;overflow:hidden;}
 
 /* ---------- slot column ---------- */
-.slots .slist{flex:1;min-height:0;overflow-y:auto;padding:var(--space-1);display:flex;flex-direction:column;gap:3px;}
+html[data-theme="rack"] .slots{background-color:#16181a;}
+.slots .slist{flex:1;min-height:0;overflow-y:auto;padding:17px var(--space-1) 4px;display:flex;flex-direction:column;gap:20px;}
 .slot{--k:var(--mod-accent,var(--mod-fx));display:flex;align-items:center;gap:5px;}
 .slot .snum{width:19px;flex:none;font-family:var(--type-num);font-size:var(--size-1);color:var(--text-secondary);text-align:right;}
 .slot .scard{
-  flex:1;min-width:0;height:34px;border-radius:var(--edge-radius-ctl);padding:3px 5px;cursor:pointer;
-  display:block;width:100%;text-align:left;font:inherit;
+  flex:1;min-width:0;height:34px;border-radius:var(--edge-radius-ctl);padding:3px 8px;cursor:pointer;
+  display:flex;align-items:center;width:100%;text-align:left;font:inherit;
   background:linear-gradient(180deg,color-mix(in srgb,var(--k) 9%,var(--surface-plate-top)),var(--surface-plate-bot));
   box-shadow:var(--lift-1);border-left:2px solid var(--k);position:relative;overflow:hidden;
 }
-/* tiny rack pull on the card's right edge, echoing the mock's slot previews */
-.slot .scard::after{
-  content:"";position:absolute;right:4px;top:6px;bottom:6px;width:5px;border-radius:3px;
-  background:linear-gradient(90deg,#101214,#3f444a 45%,#0e1012);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),1px 1px 2px rgba(0,0,0,.6);
-}
-.slot.empty .scard::after{display:none;}
 .slot.on .scard{box-shadow:var(--lift-1),0 0 0 1px var(--k),0 0 9px color-mix(in srgb,var(--k) 40%,transparent);}
-.slot .scard .sn{font-family:var(--type-display);font-size:var(--size-1);font-weight:700;letter-spacing:.1em;color:color-mix(in srgb,var(--k) 62%,var(--text-primary));
+.slot .scard .sn{font-family:var(--type-display);font-size:12px;font-weight:700;letter-spacing:.1em;color:color-mix(in srgb,var(--k) 62%,var(--text-primary));
   text-shadow:0 1px 0 var(--text-engraved-lo);}
-.slot .scard .smini{display:flex;gap:2px;margin-top:3px;}
-.slot .scard .smini i{width:4px;height:4px;border-radius:1px;background:var(--k);opacity:.4;}
-.slot .scard .smini i.a{opacity:.95;box-shadow:0 0 4px color-mix(in srgb,var(--k) 55%,transparent);}
 .slot.empty .scard{
   background:none;border:1.4px dashed var(--text-muted);border-left:1.4px dashed var(--text-muted);
   box-shadow:none;display:flex;align-items:center;justify-content:space-between;
   color:var(--text-muted);font-size:var(--size-1);}
 .slot.empty .scard:hover{border-color:var(--accent-lamp);color:var(--accent-text);}
-.slotacts{flex:none;display:flex;gap:2px;padding:var(--space-1);border-top:1px solid var(--edge-hairline);
+.slotacts{flex:none;display:flex;gap:2px;padding:8px 8px 28px 7px;border-top:1px solid var(--edge-hairline);
   box-shadow:0 -1px 0 var(--edge-highlight);}
-.slotacts button{flex:1;height:24px;border-radius:var(--edge-radius-ctl);font-size:var(--size-1);color:var(--text-secondary);
+.slotacts button{flex:1;height:35px;border-radius:var(--edge-radius-ctl);font-size:var(--size-2);color:var(--text-secondary);
   font-family:var(--type-display);letter-spacing:.06em;text-transform:uppercase;
   background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
 .slotacts button:hover{color:var(--text-primary);}
@@ -479,7 +499,7 @@ button{background:none;border:0;cursor:pointer;}
 
 /* ---------- rack ---------- */
 .rack{background:var(--surface-chassis);}
-.rackscroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:5px;display:flex;flex-direction:column;gap:6px;
+.rackscroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:1px 1px 1px 4px;display:flex;flex-direction:column;gap:5px;
   background:var(--mat-speckle),linear-gradient(180deg,var(--surface-chassis),var(--surface-rail));}
 /* body holds name, knobs and sequencer; rails sit outside it so they always
    span the full height, whether the body is one row or two */
@@ -488,11 +508,11 @@ button{background:none;border:0;cursor:pointer;}
   --k:var(--mod-accent);
   --plate-top:color-mix(in srgb,var(--mod-accent) var(--mod-tint),var(--surface-plate-top));
   --plate-bot:color-mix(in srgb,var(--mod-accent) calc(var(--mod-tint) - 3%),var(--surface-plate-bot));
-  flex:none;height:96px;display:flex;align-items:stretch;
+  flex:none;height:90px;display:flex;align-items:stretch;
   background:var(--mat-plate);border:1px solid #000;border-radius:var(--edge-radius-panel);
   /* flatter than a floating card: a lit top edge, a dark base line, and a
      short shadow that seats the unit into the rack rather than levitating it */
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.11),inset 0 -1px 0 rgba(0,0,0,.55),
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.55),
     0 3px 7px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.6);
 }
 .unit[data-mod="bass"]{--mod-accent:var(--mod-bass);}
@@ -501,6 +521,16 @@ button{background:none;border:0;cursor:pointer;}
 .unit[data-mod="nine"]{--mod-accent:var(--mod-nine);}
 .unit[data-mod="sev"] {--mod-accent:var(--mod-sev);}
 .unit[data-mod="five"]{--mod-accent:var(--mod-five);}
+.unit[data-mod="bass"]{height:101px;}
+.unit[data-mod="six"],.unit[data-mod="nine"]{height:91px;}
+.unit[data-mod="nine"]{margin-top:1px;}
+.unit[data-mod="sev"],.unit[data-mod="five"]{height:88px;}
+html[data-theme="rack"] .unit{
+  background-image:
+    var(--mat-speckle),var(--mat-brush),
+    radial-gradient(130% 100% at 50% 0%,rgba(255,255,255,.038),transparent 55%),
+    linear-gradient(180deg,#1e2122,#1b1d1e);
+}
 /* rack ear with a chunky pull handle standing off a recessed channel,
    bolted top and bottom, as in the reference image */
 .rail{
@@ -510,11 +540,17 @@ button{background:none;border:0;cursor:pointer;}
     linear-gradient(90deg,var(--metal-rail-a),var(--metal-rail-b));
   box-shadow:inset -1px 0 0 var(--edge-hairline),inset 1px 0 0 var(--edge-highlight);
 }
-.rail.r{border-radius:0 var(--edge-radius-panel) var(--edge-radius-panel) 0;
+.rail.r{width:22px;border-radius:0 var(--edge-radius-panel) var(--edge-radius-panel) 0;
   background:
     var(--mat-speckle),
     linear-gradient(270deg,var(--metal-rail-a),var(--metal-rail-b));
   box-shadow:inset 1px 0 0 var(--edge-hairline),inset -1px 0 0 var(--edge-highlight);}
+html[data-theme="rack"] .rail{
+  background:var(--mat-speckle),linear-gradient(90deg,#24282b,#101214);
+}
+html[data-theme="rack"] .rail.r{
+  background:var(--mat-speckle),linear-gradient(270deg,#24282b,#101214);
+}
 /* the recessed channel the pull stands off from — dark, so the bright handle
    in front of it reads as lifted metal */
 .rail::before{
@@ -527,25 +563,19 @@ button{background:none;border:0;cursor:pointer;}
    band down the left third and a rolled dark edge on the right — a machined
    round bar lit from the upper left, not a flat sliver. */
 .rail .handle{
-  position:absolute;z-index:1;left:50%;top:12px;bottom:12px;width:13px;margin-left:-6.5px;
-  border-radius:7px;
+  position:absolute;z-index:1;left:50%;top:9px;bottom:9px;width:11px;margin-left:-5.5px;
+  border-radius:5px;
+  filter:brightness(.62);
   background:
     linear-gradient(90deg,
-      #0d0f10 0%,
-      #6f767d 14%,
-      #d3d8dd 27%,
-      #f0f3f5 34%,
-      #a9b0b6 46%,
-      #5c6268 62%,
-      #2c3034 80%,
-      #0c0e0f 100%),
-    linear-gradient(180deg,rgba(255,255,255,.14),transparent 22%,transparent 78%,rgba(0,0,0,.35));
+      #0c0e0f 0%,#43494e 20%,#9ba1a6 38%,#c2c6ca 46%,#62686d 62%,#24282b 80%,#0b0d0e 100%),
+    linear-gradient(180deg,rgba(255,255,255,.08),transparent 22%,transparent 78%,rgba(0,0,0,.35));
   background-blend-mode:normal,overlay;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 1px 0 rgba(255,255,255,.32),
     inset 0 -1px 0 rgba(0,0,0,.75),
     0 0 0 1px rgba(0,0,0,.85),
-    3px 4px 7px rgba(0,0,0,.8);
+    2px 3px 5px rgba(0,0,0,.72);
 }
 /* socket bolts that pin the pull to the rail */
 .rail .handle::before,.rail .handle::after{
@@ -560,20 +590,31 @@ button{background:none;border:0;cursor:pointer;}
 .rail .screw.t{top:4px;} .rail .screw.b{bottom:4px;}
 /* unit name block */
 .uname{
-  width:142px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:2px;
+  width:115px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:0;
   padding:0 var(--space-2);border-right:1px solid var(--edge-hairline);box-shadow:1px 0 0 var(--edge-highlight);
 }
-.uname .un{font-family:var(--type-display);font-size:20px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--k);text-shadow:0 1px 0 var(--text-engraved-lo),0 0 12px color-mix(in srgb,var(--k) 30%,transparent);}
-.uname .us{font-size:var(--size-1);line-height:12px;max-height:24px;overflow:hidden;color:var(--text-secondary);}
-.uname .urow{display:flex;gap:3px;margin-top:3px;}
+.uname .un{font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;font-size:21px;line-height:22px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  transform:translateY(-4px) scaleX(.94);transform-origin:left center;
+  color:var(--k);text-shadow:0 1px 0 var(--text-engraved-lo),0 0 5px color-mix(in srgb,var(--k) 20%,transparent);}
+.uname .ufull{font-family:"Segoe UI",sans-serif;font-size:10px;line-height:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;filter:brightness(.95);}
+.uname .us{font-family:"Segoe UI",sans-serif;font-size:10px;line-height:10px;max-height:20px;overflow:hidden;color:var(--text-secondary);filter:brightness(.95);transform:scaleX(.94);transform-origin:left center;}
+.uname .urow{display:flex;gap:6px;margin-top:3px;position:relative;left:1px;}
+.uname .urow .upill{padding:0;}
+.uname .urow .upill:nth-child(1){width:28px;}
+.uname .urow .upill:nth-child(2){width:33px;}
+.uname .urow .upill:nth-child(3){width:35px;}
+.unit[data-mod="bass"] .urow{top:6px;}
+.unit[data-mod="six"] .urow,.unit[data-mod="boom"] .urow{top:-2px;}
+.unit[data-mod="nine"] .urow{top:-1px;}
+.unit[data-mod="sev"] .urow{top:3px;}
+.unit[data-mod="five"] .urow{top:1px;}
 /* Real buttons: enable, solo and mute are operable by pointer and keyboard.
    The 24px hit area is met with a transparent inset rather than visual bulk. */
 /* The mock's transport pills are small raised keys with a hairline frame; the
    engaged one fills with the module colour. */
 .upill{
-  position:relative;height:20px;padding:0 8px;border-radius:3px;
-  font-family:var(--type-display);font-size:var(--size-1);font-weight:600;
+  position:relative;height:18px;padding:0 7px;border-radius:3px;
+  font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;font-size:var(--size-1);font-weight:600;
   letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary);cursor:pointer;
   background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));
   box-shadow:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--edge-hairline),0 1px 2px rgba(0,0,0,.5);
@@ -581,61 +622,67 @@ button{background:none;border:0;cursor:pointer;}
   transition:color var(--motion-fast) var(--motion-ease);}
 .upill::before{content:"";position:absolute;left:0;right:0;top:50%;height:24px;transform:translateY(-50%);}
 .upill:hover{color:var(--text-primary);}
-.upill.on{color:var(--accent-ink);text-shadow:0 1px 0 rgba(255,255,255,.22);
-  background:linear-gradient(180deg,color-mix(in srgb,var(--k) 84%,#fff),var(--k) 55%,
-    color-mix(in srgb,var(--k) 92%,#000));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.32),0 0 10px color-mix(in srgb,var(--k) 45%,transparent),
-    0 1px 2px rgba(0,0,0,.5);}
+.upill:not(.on){filter:brightness(.75);}
+.upill.on{color:#151719;text-shadow:none;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--k) 72%,#e8ffbe),
+    color-mix(in srgb,var(--k) 96%,#111) 55%,color-mix(in srgb,var(--k) 90%,#000));
+  box-shadow:inset 0 1px rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.5);}
 /* knob bank */
 /* Knob bank. It takes the width the step grid used to occupy, so the faceplate
    carries the promoted fast controls instead of a second pattern editor.
    The trailing padding keeps engraved labels clear of the sampler display. */
 .uknobs{
   flex:1;min-width:0;display:flex;align-items:center;justify-content:space-evenly;
-  gap:4px;padding:0 var(--space-3) 0 var(--space-2);
+  gap:4px;padding:0;
 }
+/* Per-unit bank spreads, measured from the reference: seven- and eight-knob
+   banks ride a wider pitch than the ten-knob bass bank. */
+.unit[data-mod="six"] .uknobs,.unit[data-mod="boom"] .uknobs,.unit[data-mod="sev"] .uknobs{padding:0 37px 0 15px;}
+.unit[data-mod="nine"] .uknobs{padding:0 0 0 16px;}
+.unit[data-mod="five"] .uknobs{padding:0 6px 0 18px;}
+.unit .klabel,.useq .seqtop .slbl,.useq .uactlbl .slbl,.useq .voicesel{
+  font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;
+}
+.unit .klabel{color:#d6dade;text-shadow:0 0 3px rgba(255,255,255,.22),0 1px 0 var(--text-engraved-lo);}
+/* the reference arcs burn a hotter lime than the raw module colour */
+.unit .kdial .arc-fill{stroke:color-mix(in srgb,var(--k) 82%,#cade6a);
+  filter:drop-shadow(0 0 4px color-mix(in srgb,var(--k) 75%,transparent));}
+.unit .kdial{transform:scale(.8);filter:brightness(.95);}
 /* sample display for the sampler */
 /* The sampler display follows the knob bank, so it keeps its own left gutter to
    stay clear of the last engraved knob label. */
 .usample{
-  width:96px;height:56px;flex:none;align-self:center;margin-left:var(--space-2);margin-right:var(--space-2);border-radius:var(--edge-radius-ctl);position:relative;overflow:hidden;
+  width:90px;height:56px;flex:none;align-self:center;margin-left:var(--space-2);margin-right:var(--space-2);border-radius:var(--edge-radius-ctl);position:relative;overflow:hidden;
   background:var(--scope-glass);box-shadow:var(--sink-2);
 }
 /* The sampler display keeps its own gutter, so the last engraved knob label
    stays clear of it without the bank needing a different distribution. */
 .unit:has(.usample) .uknobs{gap:var(--space-2);}
-.usample .sname{position:absolute;left:5px;top:4px;font-size:var(--size-1);color:var(--k);font-family:var(--type-num);z-index:2;}
+.usample .sname{position:absolute;left:5px;top:4px;font-size:var(--size-1);color:color-mix(in srgb,var(--k) 62%,#aaa);font-family:var(--type-num);z-index:2;}
 .usample svg{position:absolute;inset:0;width:100%;height:100%;}
-.usample polyline{fill:none;stroke:var(--k);stroke-width:1;opacity:.85;}
+.usample polyline{fill:none;stroke:color-mix(in srgb,var(--k) 75%,#000);stroke-width:1;opacity:.8;}
 /* sequencer */
 /* Pattern activity block. Deliberately narrow: the faceplate holds no step
    grid, so the reclaimed width belongs to the knob bank. */
 /* The mock frames this as a lit readout window: a black glass panel inside a
    hairline bezel, sitting proud of the faceplate. */
 .useq{
-  flex:none;width:190px;min-width:0;align-self:center;margin:0 var(--space-2);border-radius:5px;padding:6px 7px;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--scope-glass) 84%,#000),var(--scope-glass));
+  flex:none;width:185px;min-width:0;align-self:center;margin:0 3px;border-radius:5px;padding:6px 7px;
+  transform:translateY(6px);
+  background:linear-gradient(180deg,#0e1112,#0a0d0e);
   box-shadow:var(--sink-2),inset 0 0 0 1px var(--edge-highlight),0 1px 0 var(--edge-highlight);
   display:flex;flex-direction:column;gap:5px;
-  container-type:inline-size;
 }
-/* knob-heavy units leave the seq only a sliver: keep the lamps and the
-   position readout, drop the engraved labels so nothing collides */
-@container (max-width:240px){
-  .useq .seqtop .slbl,.useq .uactlbl .slbl{display:none;}
-}
-.useq .pattern-name{margin-left:auto;}
-.seqtop{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;}
+.useq .pattern-name{margin-left:auto;text-transform:none;color:var(--text-secondary);}
+.seqtop{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
 .seqtop .slbl,.uactlbl .slbl{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);}
+.seqtop>.slbl{text-transform:none;letter-spacing:.08em;}
 /* Inside the readout window the selector is lit type on the glass itself —
    no raised chip fighting the LCD. */
 .voicesel{
-  display:flex;align-items:center;gap:3px;height:16px;padding:0 3px;border-radius:var(--edge-radius-chip);
+  min-width:61px;display:flex;align-items:center;justify-content:center;gap:1px;height:16px;padding:0 1px;border-radius:var(--edge-radius-chip);
   background:none;box-shadow:none;
 }
-/* small lit diamond by the voice name, as in the mock */
-.voicesel::before{content:"";width:5px;height:5px;flex:none;margin-left:2px;transform:rotate(45deg);
-  background:var(--k);box-shadow:0 0 5px color-mix(in srgb,var(--k) 75%,transparent);}
 /* Compact controls keep their visual size but carry a 24px pointer target so
    they meet the minimum target size without inflating the faceplate. */
 .voicesel button{position:relative;width:16px;height:16px;display:grid;place-items:center;color:var(--text-muted);font-size:var(--size-2);border-radius:var(--edge-radius-chip);}
@@ -649,9 +696,9 @@ button{background:none;border:0;cursor:pointer;}
    so it stays a low flat bar graph: no button height, no chip radius, no
    four-step beat grouping and no per-cell lamp glow. Those cues belong to the
    Piano Roll, which is the only pattern editing surface. */
-.uactivity{display:flex;gap:2px;height:9px;align-items:stretch;}
+.uactivity{display:flex;gap:3px;height:10px;align-items:stretch;margin-top:7px;}
 .uactivity i{
-  flex:1 1 0;min-width:0;border-radius:1px;
+  flex:1 1 0;min-width:0;border-radius:1.5px;
   background:color-mix(in srgb,var(--scope-glass) 55%,var(--surface-well));
   box-shadow:inset 0 1px 2px rgba(0,0,0,.5),inset 0 0 0 1px var(--edge-highlight);
 }
@@ -664,11 +711,10 @@ button{background:none;border:0;cursor:pointer;}
 /* Module accents are lamp colours, not text colours. Small readouts mix the
    accent toward the theme ink so the hue survives but contrast passes. */
 .uactlbl .pos{margin-left:auto;font-family:var(--type-num);font-size:var(--size-1);
-  color:color-mix(in srgb,var(--k) 55%,var(--text-primary));
-  text-shadow:0 0 6px color-mix(in srgb,var(--k) 30%,transparent);}
+  color:#a9b1a5;text-shadow:0 0 4px rgba(255,255,255,.12);}
 /* audition pad + edit shortcut at the unit's right edge */
 .uaudition{
-  flex:none;width:38px;align-self:center;display:flex;flex-direction:column;gap:3px;margin-right:var(--space-2);
+  flex:none;width:38px;align-self:center;display:flex;flex-direction:column;gap:3px;margin-right:1px;
 }
 .uaudition button{
   height:24px;border-radius:var(--edge-radius-chip);font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.06em;text-transform:uppercase;
@@ -679,32 +725,39 @@ button{background:none;border:0;cursor:pointer;}
   box-shadow:var(--sink-1),0 0 8px color-mix(in srgb,var(--k) 45%,transparent);}
 /* the mock lights the Edit action in a fixed warm amber on every unit */
 .uaudition .aedit{color:var(--mod-six);
-  text-shadow:0 0 6px color-mix(in srgb,var(--mod-six) 40%,transparent);}
+  text-shadow:0 0 6px color-mix(in srgb,var(--mod-six) 65%,transparent);}
 
 /* ---------- right tabbed panel ---------- */
 .rightcol{min-width:0;min-height:0;display:flex;flex-direction:column;gap:5px;}
-.rtabs{flex:none;display:flex;gap:3px;padding:var(--space-1);}
+.rightcol>.panel{background-color:var(--surface-rail);}
+html[data-theme="rack"] .rightcol>.panel{background-color:#181a1c;}
+.rtabs{flex:none;display:grid;grid-template-columns:27% 30% minmax(0,1fr);gap:4px;padding:3px;}
 .rtabs button{
-  flex:1;height:26px;border-radius:var(--edge-radius-ctl);font-family:var(--type-display);font-size:var(--size-1);
+  height:30px;border-radius:var(--edge-radius-ctl);font-family:var(--type-display);font-size:var(--size-1);
   letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);
   background:var(--surface-well);box-shadow:var(--sink-1);}
 .rtabs button.on{color:var(--text-primary);
   background:linear-gradient(180deg,var(--surface-raised),var(--surface-plate-bot));
   box-shadow:var(--lift-1),inset 0 -2px 0 var(--accent-lamp);}
+html[data-theme="rack"] .rtabs button{background:linear-gradient(180deg,#1b1d1f,#101214);}
+html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d2f,#17191b);}
 .rpane{flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden;}
 .rpane.on{display:flex;}
 /* mixer pane */
-.mixstrips{flex:1;min-height:0;display:flex;gap:2px;padding:var(--space-2) 5px;overflow:hidden;}
+.mixstrips{flex:1;min-height:0;display:flex;gap:2px;padding:4px 5px 7px 4px;overflow:hidden;}
 /* Each channel is its own shallow column, divided by a hairline, as in the mock */
 .mstrip{--k:var(--mod-accent,var(--mod-fx));flex:1 1 0;min-width:0;display:flex;flex-direction:column;
   align-items:center;gap:4px;padding:3px 1px;border-radius:var(--edge-radius-chip);
   background:linear-gradient(180deg,rgba(255,255,255,.022),transparent 40%);
   box-shadow:inset 1px 0 0 rgba(255,255,255,.035);}
+.mstrip[data-mod]{flex:0 0 43px;}
+.mstrip:not([data-mod]):not(.master){flex:0 0 33px;}
+.mstrip.master{flex:0 0 35px;}
 /* the mock names channels in bare accent type on the chassis, not on a lit chip */
 .mstrip .mtag{
   width:100%;height:17px;line-height:17px;text-align:center;overflow:hidden;
-  font-family:var(--type-display);font-size:var(--size-2);font-weight:700;letter-spacing:.04em;
-  color:var(--k);text-shadow:0 1px 0 var(--text-engraved-lo),0 0 9px color-mix(in srgb,var(--k) 38%,transparent);
+  font-family:var(--type-display);font-size:13px;font-weight:700;letter-spacing:.04em;
+  color:var(--k);text-shadow:0 1px #000;filter:brightness(.95);
   background:none;box-shadow:none;}
 .mstrip.master .mtag{color:var(--text-primary);text-shadow:0 1px 0 var(--text-engraved-lo);}
 /* Empty channels stay dim rather than taking a lit accent. */
@@ -712,69 +765,77 @@ button{background:none;border:0;cursor:pointer;}
   color:var(--text-muted);text-shadow:0 1px 0 var(--text-engraved-lo);background:none;}
 /* One deep channel well per strip, as in the mock: the fader slot and the LED
    ladder live together inside a single near-black recess. */
-.mstrip .fwrap{flex:1;min-height:0;width:100%;display:flex;gap:2px;justify-content:center;
-  padding:4px 3px;border-radius:4px;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--surface-well) 42%,#000),
-    color-mix(in srgb,var(--surface-well) 72%,#000));
+.mstrip .fwrap{flex:1;min-height:0;width:27px;display:flex;gap:1px;justify-content:center;
+  padding:4px 3px;margin-bottom:12px;border-radius:4px;
+  background:linear-gradient(180deg,#121415,#0c0e0f);
   box-shadow:var(--sink-2),0 1px 0 var(--edge-highlight);}
 /* the fader itself is transparent — the well behind it is the surface; it only
    carries the coloured travel line and the cap */
-.fader{flex:1 1 0;min-width:14px;max-width:22px;position:relative;cursor:ns-resize;}
+.fader{flex:0 0 11px;min-width:11px;max-width:11px;position:relative;cursor:ns-resize;}
 .fader::before{content:"";position:absolute;left:50%;top:4px;bottom:4px;width:2px;margin-left:-1px;
   background:color-mix(in srgb,var(--k) 26%,#000);border-radius:1px;
   box-shadow:inset 0 1px 2px rgba(0,0,0,.8);}
 /* the travelled range burns in the channel colour */
-.ffill{position:absolute;left:50%;bottom:4px;width:2px;margin-left:-1px;border-radius:1px;
-  background:var(--k);opacity:.9;box-shadow:0 0 5px color-mix(in srgb,var(--k) 50%,transparent);}
+.ffill{position:absolute;left:50%;bottom:4px;width:3px;margin-left:-1.5px;border-radius:1px;
+  background:color-mix(in srgb,var(--k) 62%,#000);opacity:.85;}
+/* FIVE idles low in the reference: dim cap, dim fill, dark meter */
+.mstrip[data-mod="five"] .ffill{opacity:.3;}
+.mstrip[data-mod="five"] .fcap{opacity:.45;}
 /* The cap: a tall machined silver block with deep grooves — the strongest
    highlight in the mixer, exactly as the mock draws it. */
-.fcap{position:absolute;left:-2px;right:-2px;height:28px;border-radius:2.5px;
+.fcap{position:absolute;left:50%;width:19px;height:28px;transform:translateX(-50%);border-radius:2.5px;
+  filter:brightness(.75);
   background:
     repeating-linear-gradient(180deg,
-      rgba(255,255,255,.28) 0 1px,rgba(0,0,0,.42) 1px 2.5px,transparent 2.5px 4.5px),
-    linear-gradient(180deg,#fbfcfd 0%,var(--cap-hi) 22%,var(--cap-lo) 58%,#5d6369 88%,#454a4f 100%);
+      rgba(255,255,255,.14) 0 1px,rgba(0,0,0,.18) 1px 2px,transparent 2px 3px),
+    linear-gradient(180deg,#e7e9eb 0%,var(--cap-hi) 22%,var(--cap-lo) 58%,#565c61 88%,#41464a 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 1px rgba(0,0,0,.55),
     0 0 0 1px rgba(0,0,0,.8),0 3px 5px rgba(0,0,0,.75);}
 /* the darker centre groove across the cap face */
 .fcap::after{content:"";position:absolute;left:1px;right:1px;top:50%;height:4px;margin-top:-2px;border-radius:1px;
   background:linear-gradient(180deg,#0e1113,#23272b);
   box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.5);}
+.mstrip:not([data-mod]):not(.master) .fcap{transform:translateX(-50%) translateX(2px);}
+.mstrip:not([data-mod]):not(.master) .fcap{opacity:.18;}
+.mstrip:not([data-mod]):not(.master) .ffill{opacity:0;}
+.mstrip.empty .knob,.mstrip.empty .fader{pointer-events:none;cursor:default;}
 /* LED ladder inside the shared well */
-.mmeter{width:9px;flex:none;border-radius:1.5px;
+.mmeter{width:5px;flex:none;border-radius:1.5px;
   background:rgba(0,0,0,.45);
   box-shadow:inset 0 1px 3px rgba(0,0,0,.8);}
 .mstrip .sendgrid{
-  width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;
+  width:min(33px,100%);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 2px;
+  margin:14px auto 17px;
 }
 /* Send chips in the mock are dark squares carrying a coloured letter inside a
-   coloured hairline frame — the frame is the send's identity, not a fill. */
+   coloured hairline frame — the frame is the send's identity, not a fill. All
+   four chips wear the channel colour; the engaged ones burn a little hotter. */
 .sendbtn{
-  --send-k:var(--mod-fx);position:relative;min-width:0;height:18px;border-radius:3px;
+  --send-k:var(--k);position:relative;min-width:0;height:16px;border-radius:3px;
   display:grid;place-items:center;font-family:var(--type-display);font-size:var(--size-1);font-weight:700;
-  color:color-mix(in srgb,var(--send-k) 78%,var(--lcd-ink,var(--text-primary)));
-  background:linear-gradient(180deg,color-mix(in srgb,var(--scope-glass) 78%,#000),var(--scope-glass));
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--send-k) 48%,transparent),
-    inset 0 1px 0 var(--edge-highlight),0 1px 2px rgba(0,0,0,.5);
+  color:color-mix(in srgb,var(--send-k) 62%,#e2ffb8);
+  text-shadow:0 0 4px color-mix(in srgb,var(--send-k) 30%,transparent);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--send-k) 18%,#1e2021),
+    color-mix(in srgb,var(--send-k) 12%,#0f1113));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--send-k) 82%,transparent),
+    inset 0 1px rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.5);
 }
 /* ::after carries the on-state ring, so the hit area uses ::before */
 .sendbtn::before{content:"";position:absolute;left:50%;top:50%;width:100%;min-width:24px;height:24px;transform:translate(-50%,-50%);}
-.sendbtn[data-send="A"]{--send-k:var(--mod-bass);}
-.sendbtn[data-send="B"]{--send-k:var(--mod-sev);}
-.sendbtn[data-send="C"]{--send-k:var(--mod-five);}
-.sendbtn[data-send="D"]{--send-k:var(--mod-nine);}
-/* engaged sends fill and light, so on-vs-off is a fill change, not a hue change */
+.sendbtn[data-send]{--send-k:var(--k);}
+/* engaged sends brighten the well and the frame, so on-vs-off is an intensity
+   change, not a hue change */
 .sendbtn.on{
-  color:var(--accent-ink);text-shadow:0 1px 0 rgba(255,255,255,.22);
-  background:linear-gradient(180deg,color-mix(in srgb,var(--send-k) 86%,#fff),var(--send-k) 55%,
-    color-mix(in srgb,var(--send-k) 92%,#000));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 8px color-mix(in srgb,var(--send-k) 48%,transparent),
-    0 1px 2px rgba(0,0,0,.6);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--send-k) 28%,#1b1d1e),
+    color-mix(in srgb,var(--send-k) 20%,#0c0e10));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--send-k) 95%,transparent),
+    inset 0 1px rgba(255,255,255,.1),0 0 8px color-mix(in srgb,var(--send-k) 35%,transparent);
 }
 .sendbtn:disabled{cursor:default;opacity:.3;
-  color:var(--text-muted);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.5);}
-.mstrip .msbtns{display:flex;gap:2px;}
-.msbtn{position:relative;width:19px;height:18px;border-radius:3px;font-size:var(--size-1);font-weight:700;display:grid;place-items:center;
-  color:var(--text-secondary);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));
+  color:var(--text-muted);text-shadow:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.5);}
+.mstrip .msbtns{display:flex;gap:4px;}
+.msbtn{position:relative;width:17px;height:24px;border-radius:3px;font-size:var(--size-1);font-weight:700;display:grid;place-items:center;
+  color:#8a8f92;background:linear-gradient(180deg,#1c1f21,#0e1012);
   box-shadow:inset 0 1px 0 var(--edge-highlight),0 0 0 1px rgba(0,0,0,.5),0 1px 2px rgba(0,0,0,.5);}
 .msbtn::after{content:"";position:absolute;left:50%;top:50%;width:24px;height:24px;transform:translate(-50%,-50%);}
 .msbtn.mute.on{background:linear-gradient(180deg,var(--signal-mute),color-mix(in srgb,var(--signal-mute) 70%,black));color:#111;}
@@ -820,141 +881,170 @@ button{background:none;border:0;cursor:pointer;}
 .mknobs{display:flex;justify-content:space-around;gap:2px;margin-top:5px;}
 .mcard .mknobs .knob{flex:1 1 0;width:auto;min-width:0;}
 .mstrip .knob.sm{width:100%;}
+.mstrip .klabel{color:#9aa1a6;text-shadow:0 1px #000;}
+.mstrip .knob.sm .kdial{transform:translateY(3px) scale(1.02);filter:brightness(.95);}
+/* pan rings in the mock wear the channel colour all the way around, muted */
+.mstrip .kdial .arc-track{stroke:color-mix(in srgb,var(--k) 78%,#0a0c0d);stroke-width:2;}
+.mstrip .kdial .arc-fill{stroke:color-mix(in srgb,var(--k) 78%,#0a0c0d);filter:none;stroke-width:2;}
 /* ==================== BOTTOM ROW ==================== */
-.botrow{min-width:0;min-height:0;display:grid;
-  grid-template-columns:182px minmax(0,1fr) 200px;gap:5px;padding:2px 5px 5px;}
+.botrow{grid-row:3;min-width:0;min-height:0;display:grid;
+  grid-template-columns:182px minmax(0,1fr) 292px;gap:5px;padding:2px 5px 5px;}
 /* pattern panel */
+.patpanel{background-color:var(--surface-rail);}
+html[data-theme="rack"] .patpanel{background-color:#151719;}
 .patpanel .pbody{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:var(--space-2);}
 .pfield{display:flex;flex-direction:column;gap:3px;}
 .pfield label{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);}
-.pstepper{display:flex;align-items:center;height:26px;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);}
+.pstepper{display:flex;align-items:center;height:30px;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);}
 .pstepper button{width:24px;min-height:24px;height:100%;color:var(--text-muted);font-size:11px;}
 .pstepper button:hover{color:var(--accent-text);}
 .pstepper .pv{flex:1;text-align:center;font-family:var(--type-num);font-size:var(--size-3);color:var(--text-primary);}
-.pfield select{height:26px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);
+.pfield select{height:30px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);
   color:var(--text-primary);font-size:var(--size-2);padding:0 var(--space-1);}
-.addpat{height:28px;border-radius:var(--edge-radius-ctl);border:1.4px dashed var(--text-muted);color:var(--text-muted);
+.addpat{height:52px;border-radius:var(--edge-radius-ctl);border:1.4px dashed var(--text-muted);color:var(--text-muted);
   font-size:var(--size-4);line-height:1;}
 .addpat:hover{border-color:var(--accent-lamp);color:var(--accent-text);}
 /* piano roll */
-.rolltools{flex:none;height:34px;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-2);
+.rolltools{flex:none;height:30px;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-2) 0 78px;
   border-bottom:1px solid var(--edge-hairline);box-shadow:0 1px 0 var(--edge-highlight);}
 .rolltools select{height:22px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);
   color:var(--text-secondary);font-size:var(--size-1);padding:0 var(--space-1);}
+.gridstatus{height:20px;padding:0 6px;display:flex;align-items:center;gap:3px;border-radius:var(--edge-radius-ctl);
+  font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
+.gridstatus svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.8;}
 .timingctl{display:grid;grid-template-columns:auto 78px 30px;align-items:center;gap:4px;
   font-family:var(--type-display);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
 /* the visual track stays slim; the control keeps a 24px grab height */
-.timingctl input{width:78px;height:24px;accent-color:var(--accent-lamp);}
+.timingctl input{width:78px;height:24px;accent-color:var(--accent-lamp);appearance:none;-webkit-appearance:none;background:none;}
+.timingctl input::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--accent-lamp) var(--fill,50%),#3a3f42 var(--fill,50%));}
+.timingctl input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--accent-lamp);margin-top:-4px;box-shadow:0 0 4px var(--accent-glow),0 1px 2px rgba(0,0,0,.6);}
 .timingctl output{font-family:var(--type-num);font-size:10px;color:var(--text-secondary);text-align:right;}
 .gridstatus{height:20px;padding:0 6px;display:grid;place-items:center;border-radius:var(--edge-radius-ctl);
   font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
 .rollctx{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
   text-transform:uppercase;color:color-mix(in srgb,var(--mod-bass) 55%,var(--text-primary));}
 .rollbody{flex:1;min-height:0;display:flex;flex-direction:column;}
-.rollbar{flex:none;height:16px;display:flex;background:var(--surface-plate-bot);box-shadow:0 1px 0 var(--edge-hairline);}
-.rollbar .rbcorner{width:90px;flex:none;font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
-  color:var(--mod-bass);display:grid;place-items:center;}
+.rollbar{flex:none;height:20px;display:flex;background:var(--surface-plate-bot);box-shadow:0 1px 0 var(--edge-hairline);}
+.rollbar .rbcorner{width:154px;flex:none;font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
+  color:var(--mod-bass);display:grid;place-items:center;justify-content:flex-end;padding-right:24px;}
 .rollbar .rbmeasures{flex:1;display:flex;}
 .rollbar .rbmeasures span{flex:1;font-family:var(--type-num);font-size:var(--size-1);color:var(--text-muted);
   border-left:1px solid var(--edge-hairline);padding-left:3px;line-height:16px;}
 .rollmain{flex:1;min-height:0;display:flex;}
-/* Piano key gutter, matching the reference: a dark 26px name column on the
-   left, then the keyboard drawn side-on — ivory naturals running to the grid
-   edge, glossy black keys riding over them. One row per semitone keeps the
-   gutter locked to the grid rows. */
-.prkeys{width:90px;flex:none;display:flex;flex-direction:column;position:relative;overflow:hidden;
+/* Piano key gutter, matching the reference: a narrow dark name strip on the
+   left, then the keyboard drawn side-on — ten chunky ivory naturals running
+   to the grid edge, a glossy black key riding every boundary. The reference
+   gutter is decorative, so it is not locked to the grid rows. */
+.prkeys{width:78px;flex:none;display:block;position:relative;overflow:hidden;
   background:linear-gradient(180deg,#0a0b0c,#050506);
-  box-shadow:inset -2px 0 4px rgba(0,0,0,.7);}
-.prkey{
-  flex:1;min-height:0;position:relative;display:flex;align-items:center;
-  padding-left:3px;font-family:var(--type-num);font-size:8.5px;letter-spacing:.02em;
-  color:#7d848b;border-bottom:1px solid rgba(0,0,0,.55);
-  /* dark name gutter, then the ivory key face */
-  background:linear-gradient(90deg,#0b0d0e 0 26px,#c9ced3 26px,#eef1f3 42%,#dde2e6 74%,#b9bfc5 100%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 2px rgba(0,0,0,.22);
-}
-/* accidental: the ivory continues behind; a shorter glossy black key overhangs
-   it from the gutter edge */
-.prkey.acc{
-  font-size:7px;color:#4a5056;z-index:2;border-bottom:1px solid rgba(0,0,0,.7);
-  box-shadow:none;
-}
-.prkey.acc::before{
-  content:"";position:absolute;left:26px;top:-1px;bottom:-1px;width:38px;border-radius:0 3px 3px 0;
-  background:linear-gradient(90deg,#34383d 0,#1e2225 32%,#141719 70%,#0a0c0d 100%);
+  box-shadow:inset -1px 0 2px rgba(0,0,0,.5);}
+.pkw{position:absolute;left:0;right:0;
+  background:
+    linear-gradient(90deg,#0a0c0d 0 15px,transparent 15px),
+    linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 72%,rgba(0,0,0,.3)),
+    linear-gradient(90deg,#454545 15px,#535353 35%,#7d7d7d 55%,#b2b2b2 73%,#8a8a8a 85%,#5c5c5c 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.4);}
+/* the keyboard continues past the last labelled key; the sliver below A3 sits
+   in shadow */
+.pkw.dim{filter:brightness(.78);}
+.pkl{position:absolute;left:1.5px;transform:translateY(-50%);z-index:3;
+  font-family:var(--type-num);font-size:8px;letter-spacing:.02em;color:#b9bdc2;}
+.pks{position:absolute;left:15px;right:0;height:1px;z-index:2;background:rgba(0,0,0,.55);}
+.pkb{position:absolute;left:15px;width:39px;z-index:2;border-radius:0 2px 2px 0;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.5)),
+    linear-gradient(180deg,#34383d 0,#1e2225 32%,#141719 70%,#0a0c0d 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -2px 3px rgba(0,0,0,.9),
-    2px 1px 3px rgba(0,0,0,.6);
-}
-/* octave C rows read slightly brighter so the register is scannable */
-.prkey.lbl{color:#aab1b8;font-weight:600;}
+    2px 1px 3px rgba(0,0,0,.6);}
+.prkey{flex:1;min-height:0;position:relative;display:flex;align-items:center;
+  padding-left:6px;font-family:var(--type-num);font-size:var(--size-1);
+  color:var(--text-secondary);text-shadow:0 1px 0 var(--text-engraved-lo);}
 .prkey.voice{
-  padding-left:6px;font-size:var(--size-1);
-  color:var(--text-secondary);text-shadow:0 1px 0 var(--text-engraved-lo);
   background:linear-gradient(90deg,var(--surface-raised),var(--surface-plate-bot));
   box-shadow:var(--lift-1);}
-.prkey.voice::before{display:none;}
 .prgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-2);overflow:hidden;}
-.prgrid .gband{position:absolute;left:0;right:0;background:rgba(0,0,0,.34);}
-.prgrid .grow{position:absolute;left:0;right:0;border-bottom:1px solid rgba(255,255,255,.028);}
-.prgrid .gbeat{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.05);}
+html[data-theme="rack"] .prgrid{background:#141516;}
+.prgrid::before,.vellane .vgrid::before{content:"";position:absolute;z-index:1;top:0;bottom:0;left:76px;width:1px;
+  background:rgba(255,255,255,.24);box-shadow:0 0 3px rgba(255,255,255,.08);pointer-events:none;}
+.prgrid .gband{position:absolute;left:0;right:0;background:rgba(0,0,0,.18);}
+.prgrid .grow{position:absolute;left:0;right:0;border-bottom:1px solid rgba(255,255,255,.035);}
+.prgrid .gstep{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.021);}
+.prgrid .gbeat{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.06);}
 .prgrid .gbar{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.13);
   box-shadow:0 0 3px rgba(255,255,255,.06);}
 .prgrid .note{position:absolute;border-radius:3px;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--mod-bass) 72%,#fff) 0%,var(--mod-bass) 42%,color-mix(in srgb,var(--mod-bass) 68%,#000) 100%);
-  box-shadow:0 0 9px color-mix(in srgb,var(--mod-bass) 55%,transparent),
-    inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 1px rgba(0,0,0,.35),
+  background:linear-gradient(180deg,color-mix(in srgb,var(--mod-bass) 75%,#e6ffb3) 0%,var(--mod-bass) 45%,color-mix(in srgb,var(--mod-bass) 68%,#000) 100%);
+  box-shadow:0 0 4px color-mix(in srgb,var(--mod-bass) 34%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.32),inset 0 -1px 1px rgba(0,0,0,.35),
     0 1px 2px rgba(0,0,0,.5);
   cursor:move;}
 .prgrid .note::after{content:"";position:absolute;right:0;top:0;bottom:0;width:5px;cursor:ew-resize;
   border-right:1px solid color-mix(in srgb,var(--text-primary) 65%,transparent);}
-.prgrid .note.slide::before{content:"S";position:absolute;left:3px;top:0;font:700 9px var(--type-display);color:var(--accent-ink);}
+.prgrid .note.slide::before{display:none;}
 .prgrid .trigger{position:absolute;border-radius:var(--edge-radius-chip);
   background:linear-gradient(180deg,color-mix(in srgb,var(--mod-six) 85%,#fff) 0%,var(--mod-six) 45%,color-mix(in srgb,var(--mod-six) 56%,#000) 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 6px color-mix(in srgb,var(--mod-six) 38%,transparent);}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--text-primary);opacity:.85;z-index:4;
   box-shadow:0 0 6px rgba(255,255,255,.4);}
-.vellane{flex:none;height:44px;display:flex;border-top:1px solid var(--edge-hairline);box-shadow:0 -1px 0 var(--edge-highlight);}
-.vellane .vlbl{width:90px;flex:none;display:grid;place-items:center;padding:4px;}
-/* The closed control keeps the 90px gutter width so it stays aligned with the
+.vellane{flex:none;height:50px;display:flex;border-top:1px solid var(--edge-hairline);box-shadow:0 -1px 0 var(--edge-highlight);}
+.vellane .vlbl{width:78px;flex:none;display:grid;place-items:center;padding:4px 2px;}
+/* The closed control keeps the 78px gutter width so it stays aligned with the
    piano-key column; the open list is free to be wider than the control. */
-.vellane .vlbl select{width:82px;height:24px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);
+.vellane .vlbl select{width:74px;height:24px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);
   color:var(--text-secondary);font-family:var(--type-display);font-size:9px;text-transform:uppercase;box-shadow:var(--sink-1);padding:0 4px;
   text-overflow:ellipsis;}
 .vellane .vlbl select optgroup{background:var(--surface-raised);color:var(--text-secondary);
   font-family:var(--type-display);font-size:9px;text-transform:uppercase;}
 .vellane .vlbl select option{background:var(--surface-raised);color:var(--text-primary);text-transform:none;}
 .vellane .vgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-1);}
-.vellane .vbar{position:absolute;bottom:0;width:4px;border-radius:1px 1px 0 0;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--mod-bass) 80%,#fff),var(--mod-bass));
-  box-shadow:0 0 4px color-mix(in srgb,var(--mod-bass) 45%,transparent);opacity:.95;}
+html[data-theme="rack"] .vellane .vgrid{background:#141516;}
+.vellane .vbar{position:absolute;bottom:3px;width:4px;border-radius:1px 1px 0 0;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--mod-bass) 70%,#fff),color-mix(in srgb,var(--mod-bass) 88%,#000));
+  box-shadow:0 0 2px color-mix(in srgb,var(--mod-bass) 32%,transparent);opacity:.92;}
 /* playlist */
+.playlist{background-color:var(--surface-rail);}
+html[data-theme="rack"] .playlist{background-color:#151719;}
 .playlist .plbody{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:3px;}
 .plrow{
-  display:flex;align-items:center;gap:var(--space-2);height:30px;padding:0 var(--space-2);border-radius:var(--edge-radius-ctl);cursor:pointer;
+  display:flex;align-items:center;gap:var(--space-2);height:35px;padding:0 var(--space-2);border-radius:var(--edge-radius-ctl);cursor:pointer;
   border:1px solid var(--edge-hairline);
   background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));box-shadow:var(--lift-1);
 }
+html[data-theme="rack"] .playlist .plrow{background:linear-gradient(180deg,#26292c,#181b1d);}
 .plrow.on{box-shadow:var(--lift-1),inset 0 0 0 1px var(--accent-lamp),0 0 9px var(--accent-dim);}
+.plrow.on .plname,.plrow.on .plbars{color:color-mix(in srgb,var(--accent-lamp) 55%,#e8f0e2);}
 .plrow .plnum{font-family:var(--type-num);font-size:var(--size-1);color:var(--text-secondary);width:14px;}
 .plrow .plname{flex:1;font-size:var(--size-2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .plrow .plbars{font-family:var(--type-num);font-size:12px;color:var(--text-secondary);}
-.addpattern{flex:none;margin:0 var(--space-2) var(--space-2);height:26px;border-radius:var(--edge-radius-ctl);
+.addpattern{flex:none;margin:0 var(--space-2) var(--space-2);height:46px;border-radius:var(--edge-radius-ctl);
   border:1.4px dashed var(--text-muted);color:var(--text-muted);
   font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;text-transform:uppercase;}
 .addpattern:hover{border-color:var(--accent-lamp);color:var(--accent-text);}
 
 /* ==================== BOTTOM BAR ==================== */
 .botbar{
-  min-width:0;overflow:hidden;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-3);
+  grid-row:4;min-width:0;overflow:hidden;display:flex;align-items:center;gap:0;padding:0;
   background:var(--mat-plate);border-top:1px solid var(--edge-hairline);
-  box-shadow:inset 0 1px 0 var(--edge-highlight);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+html[data-theme="rack"] .botbar{
+  background-image:var(--mat-speckle),linear-gradient(180deg,#191b1d,#131517);
 }
 .botbar .txtbtn{
   height:24px;padding:0 var(--space-2);border-radius:var(--edge-radius-ctl);display:flex;align-items:center;gap:5px;
-  font-size:var(--size-2);color:var(--text-secondary);}
+  font-size:12px;color:var(--text-secondary);}
 .botbar .txtbtn:hover{color:var(--text-primary);background:var(--surface-plate-bot);}
 .botbar .txtbtn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.6;}
 .botbar .txtbtn[disabled]{opacity:.35;cursor:default;}
+.botbar .collapsebtn{margin-left:16px;}
+.botbar .gap ~ .txtbtn{height:100%;border-radius:0;justify-content:center;border-left:1px solid var(--edge-hairline);
+  box-shadow:inset 1px 0 0 var(--edge-highlight);}
+.botbar #btnUndo{width:115px;}
+.botbar #btnRedo{width:115px;}
+.botbar > .txtbtn:last-of-type{width:140px;margin-right:68px;}
+.botbar .collapsebtn{color:var(--text-primary);}
 .collapsebtn svg{transition:transform var(--motion-base) var(--motion-ease);}
 body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 
@@ -978,6 +1068,16 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   .meterpair{width:132px;}
   .meterpair canvas{width:118px;}
   .lcd.clock{width:128px;}
+  .midrow{grid-template-columns:182px 116px minmax(0,1fr) 336px;}
+  .botrow{grid-template-columns:182px minmax(0,1fr) 220px;}
+  .mixstrips{gap:0;justify-content:space-between;padding-left:3px;padding-right:3px;}
+  .mstrip[data-mod]{flex-basis:36px;}
+  .mstrip:not([data-mod]):not(.master){flex-basis:27px;}
+  .mstrip.master{flex-basis:29px;}
+  .mstrip .sendgrid{width:min(29px,100%);gap-column:1px;}
+  .mstrip .msbtns{gap:3px;}
+  .mstrip .msbtn{width:12px;}
+  .mstrip.master .msbtn{width:19px;}
   .unit{height:auto;min-height:152px;}
   .ubody{flex-wrap:wrap;padding:5px 0;}
   .uname{border-right:0;box-shadow:none;}
@@ -1092,9 +1192,9 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       <button type="button" data-mode="song" aria-pressed="false">Song</button>
     </div>
     <div class="transport" role="group" aria-label="Transport">
-      <button class="tbtn play" id="btnPlay" title="Play." aria-label="Play"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
+      <button class="tbtn play" id="btnPlay" title="Play." aria-label="Play" aria-pressed="false"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
       <button class="tbtn" id="btnStop" title="Stop. Returns to the start." aria-label="Stop"><svg aria-hidden="true"><use href="#i-stop"/></svg></button>
-      <button class="tbtn rec" id="btnRec" title="Record." aria-label="Record"><svg aria-hidden="true"><use href="#i-rec"/></svg></button>
+      <button class="tbtn rec" id="btnRec" title="Record." aria-label="Record" aria-pressed="false"><svg aria-hidden="true"><use href="#i-rec"/></svg></button>
     </div>
     <div class="tempogroup">
       <div class="lcd tempo" id="tempoDrag" title="Tempo. Drag up or down, or click to type.">
@@ -1110,7 +1210,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       <span class="lcdval num" id="clockTime">00:00.000</span>
       <span class="lcdlbl num" id="clockBbt">001 : 1 : 000</span>
     </div>
-    <button class="iconbtn" id="btnMetro" title="Metronome." aria-label="Metronome"><svg aria-hidden="true"><use href="#i-metro"/></svg></button>
+    <button class="iconbtn" id="btnMetro" title="Metronome." aria-label="Metronome" aria-pressed="false"><svg aria-hidden="true"><use href="#i-metro"/></svg></button>
     <button class="iconbtn on" id="btnPower" type="button" aria-pressed="true" title="Audio engine power." aria-label="Audio engine power"><svg aria-hidden="true"><use href="#i-audio"/></svg></button>
     <button class="meter-mode" id="meterMode" type="button" aria-label="Master meter mode: left and right" aria-pressed="false" title="Switch master analysis between left/right and mid/side.">L/R</button>
     <div class="mastermeter">
@@ -1120,9 +1220,19 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       </div>
       <span class="mdb num" id="masterDb">&minus;6.1&thinsp;dB</span>
     </div>
-    <button class="iconbtn" title="Settings. Themes are selected here." aria-label="Settings"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
+    <button class="iconbtn" id="settingsButton" title="Settings. Themes are selected here." aria-label="Settings" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
   </div>
 </header>
+<section class="theme-popover" id="themePopover" role="dialog" aria-label="Theme settings" hidden>
+  <h2>Theme</h2>
+  <div class="theme-options">
+    <button type="button" data-theme-choice="rack" aria-pressed="true">Rack</button>
+    <button type="button" data-theme-choice="mono" aria-pressed="false">Mono</button>
+    <button type="button" data-theme-choice="cosmic" aria-pressed="false">Cosmic</button>
+    <button type="button" data-theme-choice="analog" aria-pressed="false">Analog</button>
+    <button type="button" data-theme-choice="rust" aria-pressed="false">Rust</button>
+  </div>
+</section>
 
 <!-- ============================ MID ROW ============================ -->
 <main class="midrow" aria-label="Rack workspace">
@@ -1204,7 +1314,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 <!-- ============================ BOTTOM ROW ============================ -->
 <div class="botrow" id="editorWorkspace">
   <aside class="panel patpanel" aria-label="Pattern">
-    <div class="phead"><h2>Pattern</h2><span class="gap"></span><span class="screw"></span></div>
+    <div class="phead"><h2>Pattern</h2><span class="gap"></span></div>
     <div class="pbody">
       <div class="pfield"><label>Pattern</label>
         <div class="pstepper"><button id="patPrev" title="Previous pattern.">&lsaquo;</button>
@@ -1223,7 +1333,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 
   <section class="panel" aria-label="Piano roll">
     <div class="rolltools">
-      <span class="gridstatus" title="The MVP Pattern grid is fixed at one sixteenth.">1/16</span>
+      <span class="gridstatus" title="The MVP Pattern grid is fixed at one sixteenth.">1/16<svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <label class="timingctl">Swing
         <input id="swingSlider" type="range" min="0" max="100" value="54" aria-label="Pattern Swing">
         <output id="swingValue">54%</output>
@@ -1239,7 +1349,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       <div class="rollbar"><span class="rbcorner">BASS</span><div class="rbmeasures" id="rbmeasures"></div></div>
       <div class="rollmain">
         <div class="prkeys" id="prkeys"></div>
-        <div class="prgrid" id="prgrid"><div class="playhead" id="rollPlayhead" style="left:0%"></div></div>
+        <div class="prgrid" id="prgrid"><div class="playhead" id="rollPlayhead" style="left:76px"></div></div>
       </div>
       <div class="vellane">
         <!-- Spec section 16.3.1. The Parameter selector is the only control that
@@ -1252,7 +1362,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   </section>
 
   <aside class="panel playlist" aria-label="Playlist">
-    <div class="phead"><h2>Playlist</h2><span class="gap"></span><span class="screw"></span></div>
+    <div class="phead"><h2>Playlist</h2><span class="gap"></span></div>
     <div class="plbody" id="plbody"></div>
     <button class="addpattern">+ Add Pattern</button>
   </aside>
@@ -1276,6 +1386,35 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const clamp = (v,a,b) => Math.min(b, Math.max(a,v));
 const THIN = "\u2009";
+const THEME_IDS = ["rack","mono","cosmic","analog","rust"];
+const settingsButton = $("#settingsButton"), themePopover = $("#themePopover");
+function applyTheme(theme){
+  const next = THEME_IDS.includes(theme) ? theme : "rack";
+  document.documentElement.dataset.theme = next;
+  $$("[data-theme-choice]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.themeChoice===next)));
+  try{ localStorage.setItem("pulsebox-theme",next); }catch{}
+}
+try{ applyTheme(localStorage.getItem("pulsebox-theme")||document.documentElement.dataset.theme); }
+catch{ applyTheme(document.documentElement.dataset.theme); }
+function closeThemePopover(restoreFocus=false){
+  themePopover.hidden = true; settingsButton.setAttribute("aria-expanded","false");
+  if(restoreFocus) settingsButton.focus();
+}
+settingsButton.addEventListener("click",()=>{
+  const opening = themePopover.hidden;
+  themePopover.hidden = !opening; settingsButton.setAttribute("aria-expanded",String(opening));
+  if(opening) themePopover.querySelector('[aria-pressed="true"]')?.focus();
+});
+themePopover.addEventListener("click",event=>{
+  const choice = event.target.closest("[data-theme-choice]");
+  if(choice) applyTheme(choice.dataset.themeChoice);
+});
+document.addEventListener("pointerdown",event=>{
+  if(!themePopover.hidden&&!themePopover.contains(event.target)&&!settingsButton.contains(event.target)) closeThemePopover();
+});
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape"&&!themePopover.hidden){ event.preventDefault(); closeThemePopover(true); }
+});
 /* state that paint functions reach during build */
 let playing = false, queuedCommits = [], stepPos = 0;
 
@@ -1309,10 +1448,13 @@ function pushUndo(label, undo, redo){
 btnUndo.addEventListener("click", ()=>{ const a=undoStack.pop(); if(!a) return; a.undo(); redoStack.push(a); refreshUndo(); });
 btnRedo.addEventListener("click", ()=>{ const a=redoStack.pop(); if(!a) return; a.redo(); undoStack.push(a); refreshUndo(); });
 refreshUndo();
+/* The reference composition shows Undo armed and Redo empty, as if the project
+   had just been opened and one edit made; seed a matching history entry. */
+pushUndo("Open project",()=>{},()=>{});
 
 /* ================= knobs ================= */
-/* arc ring sits just outside the knob skirt (r=15), ticks outside the arc */
-const KR=15, SWEEP=270, START=135;
+/* arc ring sits outside the knob skirt (r=16.5), ticks just outside the arc */
+const KR=16.5, SWEEP=270, START=135;
 const polar=(cx,cy,r,deg)=>{const a=(deg-90)*Math.PI/180;return [cx+r*Math.cos(a),cy+r*Math.sin(a)];};
 function arcPath(cx,cy,r,a0,a1){
   const [x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);
@@ -1322,7 +1464,7 @@ function tickRing(){
   let o="";
   for(let i=0;i<11;i++){
     const deg=-START+(i/10)*SWEEP;
-    const [x0,y0]=polar(19,19,17.2,deg),[x1,y1]=polar(19,19,(i%5===0?19.2:18.3),deg);
+    const [x0,y0]=polar(19,19,18.6,deg),[x1,y1]=polar(19,19,(i%5===0?19.6:19.0),deg);
     o+=`<line class="ktick" x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"/>`;
   }
   return o;
@@ -1333,10 +1475,14 @@ const kNorm=(el,v)=>el.dataset.curve==="log"
 const kFrom=(el,n)=>{n=clamp(n,0,1);const mn=+el.dataset.min,mx=+el.dataset.max;
   return el.dataset.curve==="log" ? Math.exp(Math.log(mn)+n*(Math.log(mx)-Math.log(mn))) : mn+n*(mx-mn);};
 function paintKnob(el){
-  const n=kNorm(el,+el.dataset.value), end=-START+n*SWEEP;
+  /* The reference draws every rack knob identically — pointer straight up and
+     the value arc ending just past 1:30 — so unit knobs open on that fixture;
+     the first interaction drops it and shows the true value. */
+  const fixture = el.dataset.fixture==="1";
+  const n=fixture?0.5:kNorm(el,+el.dataset.value), arcN=fixture?0.678:n, end=-START+arcN*SWEEP;
   const f=el.querySelector(".arc-fill");
-  if(f) f.setAttribute("d", n<=0.002?"":arcPath(19,19,KR,-START,end));
-  const p=el.querySelector(".kptr"); if(p) p.style.transform=`rotate(${end}deg)`;
+  if(f) f.setAttribute("d", arcN<=0.002?"":arcPath(19,19,KR,-START,end));
+  const p=el.querySelector(".kptr"); if(p) p.style.transform=`rotate(${fixture?0:end}deg)`;
   const kv=el.querySelector(".kvalue");
   if(kv && !kv.querySelector("input")) kv.textContent=fmt(+el.dataset.value, el.dataset.unit);
   el.setAttribute("aria-valuenow",(+el.dataset.value).toFixed(2));
@@ -1355,10 +1501,12 @@ function buildKnob(el){
     <span class="klabel">${el.dataset.param}</span>`;
   el.tabIndex=0; el.setAttribute("role","slider"); el.setAttribute("aria-label",el.dataset.param);
   el.setAttribute("aria-valuemin",el.dataset.min); el.setAttribute("aria-valuemax",el.dataset.max);
+  if(el.closest(".unit")) el.dataset.fixture="1";
   paintKnob(el);
   let sy=0,sv=0,moved=false;
   el.addEventListener("pointerdown",e=>{
     if(e.target.closest(".kvalue")) return;
+    delete el.dataset.fixture;
     el.setPointerCapture(e.pointerId); sy=e.clientY; sv=kNorm(el,+el.dataset.value);
     moved=false; el.classList.add("dragging"); el.dataset.prev=el.dataset.value;
   });
@@ -1376,14 +1524,16 @@ function buildKnob(el){
   });
   el.addEventListener("dblclick",()=>{
     const p=+el.dataset.value,d=+el.dataset.default; if(p===d) return;
+    delete el.dataset.fixture;
     setKnob(el,d); pushUndo(`${el.dataset.param} reset`,()=>setKnob(el,p),()=>setKnob(el,d));
   });
   el.addEventListener("wheel",e=>{e.preventDefault();
+    delete el.dataset.fixture;
     setKnob(el,kFrom(el,kNorm(el,+el.dataset.value)+(e.deltaY<0?1:-1)*(e.shiftKey?.02:.05)));},{passive:false});
   el.addEventListener("keydown",e=>{
     const st=(+el.dataset.max-+el.dataset.min)/(e.shiftKey?200:40);
-    if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();setKnob(el,+el.dataset.value+st);}
-    if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();setKnob(el,+el.dataset.value-st);}
+    if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();delete el.dataset.fixture;setKnob(el,+el.dataset.value+st);}
+    if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();delete el.dataset.fixture;setKnob(el,+el.dataset.value-st);}
   });
   const kv=el.querySelector(".kvalue");
   kv.addEventListener("click",()=>{
@@ -1459,6 +1609,17 @@ MODS.forEach(m=>{
 });
 const ACCENTS={};
 MODS.forEach(m=>{ ACCENTS[m.id]=m.voices.map(()=>Array.from({length:16},()=>seedRand()>0.85)); });
+/* The reference readouts show a fixed lamp pattern per unit; the displayed
+   voice (index 0) is pinned to it so the stopped composition is reproducible. */
+const REF_VOICE0={
+  bass:[1,0,1,0,0,1,1,1,1,0,0,0,0,0,0,0],
+  six: [1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
+  boom:[1,0,1,0,1,0,0,1,0,0,0,0,0,0,0,0],
+  nine:[1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0],
+  sev: [1,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0],
+  five:[1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0],
+};
+MODS.forEach(m=>{ PATTERNS[m.id][0]=REF_VOICE0[m.id].map(Boolean); });
 
 /* ================= browser ================= */
 const blist=$("#blist");
@@ -1466,8 +1627,8 @@ MODS.forEach(m=>{
   const d=document.createElement("div");
   d.className="bitem"; d.style.setProperty("--mod-accent",`var(--mod-${m.id})`);
   d.title=`${m.name} — ${m.type}. Drag into a slot.`;
-  const dots=Array.from({length:12},(_,i)=>
-    `<i style="left:${4+(i%6)*6}px;top:${7+Math.floor(i/6)*9}px"></i>`).join("");
+  const dots=Array.from({length:5},(_,i)=>
+    `<i class="led" style="left:${8+i*10}px;top:1.5px"></i><i style="left:${6+i*11}px;top:16px"></i>`).join("");
   d.innerHTML=`<span class="bthumb">${dots}</span>
     <span class="bmeta"><span class="bn">${m.label}</span><span class="bfull">${m.name}</span>
       <span class="bs">${m.type}</span></span>`;
@@ -1483,10 +1644,9 @@ MODS.forEach((m,i)=>{
   d.className="slot"+(i===0?" on":"");
   d.style.setProperty("--mod-accent",`var(--mod-${m.id})`);
   d.dataset.mod=m.id;
-  const mini=Array.from({length:8},(_,s)=>`<i class="${PATTERNS[m.id][0][s*2]?"a":""}"></i>`).join("");
   d.innerHTML=`<span class="snum num">${String(i+1).padStart(2,"0")}</span>
     <button type="button" class="scard" aria-label="Select ${m.name}, slot ${i+1}"
-      title="${m.name} in slot ${i+1}."><span class="sn">${m.label}</span><span class="smini" aria-hidden="true">${mini}</span></button>`;
+      title="${m.name} in slot ${i+1}."><span class="sn">${m.label}</span></button>`;
   loadedSlots.set(m.id,{el:d,html:d.innerHTML,index:i});
   slist.appendChild(d);
   d.addEventListener("click",()=>{
@@ -1519,18 +1679,18 @@ function unitHTML(m){
     <div class="usample" title="${m.sample}. The loaded sample.">
       <span class="sname">${m.sample}</span>
       <svg viewBox="0 0 96 56" preserveAspectRatio="none" aria-hidden="true"><polyline points="${
-        Array.from({length:48},(_,i)=>{
-          const a=Math.exp(-i/13)*24*(0.5+seedRand()*0.5);
-          return `${i*2},${28-a} ${i*2},${28+a}`;
+        Array.from({length:96},(_,i)=>{
+          const a=Math.exp(-i/30)*24*(0.3+0.7*Math.pow(seedRand(),1.2));
+          return `${i},${(i%2?28-a:28+a).toFixed(1)}`;
         }).join(" ")}"/></svg>
     </div>` : "";
   const activity=Array.from({length:16},(_,i)=>
-    `<i class="${PATTERNS[m.id][0][i]?"a":""}" data-step="${i}"></i>`).join("");
+    `<i class="${PATTERNS[m.id][0][i]?"a":""}${i===0&&m.id==="bass"?" playhead":""}" data-step="${i}"></i>`).join("");
   return `
   <div class="rail"><span class="screw t"></span><span class="handle"></span><span class="screw b"></span></div>
   <div class="ubody">
   <div class="uname">
-    <span class="un">${m.label}</span><span class="us">${m.type}</span>
+    <span class="un">${m.label}</span><span class="ufull">${m.name}</span><span class="us">${m.type}</span>
     <span class="urow">
       <button type="button" class="upill on" aria-pressed="true" aria-label="${m.name} enabled">On</button>
       <button type="button" class="upill" aria-pressed="false" aria-label="${m.name} solo">Solo</button>
@@ -1552,7 +1712,6 @@ function unitHTML(m){
     </div>
     <div class="uactivity" role="img" aria-label="${m.name} pattern activity">${activity}</div>
     <div class="uactlbl">
-      <span class="slbl">Activity</span>
       <span class="pos">01.1</span>
     </div>
   </div>
@@ -1609,6 +1768,8 @@ function setModulePresent(mid,present){
     strip.classList.toggle("empty",!present);
     strip.querySelector(".mtag").textContent=present?m.label:String(index+1).padStart(2,"0");
     strip.title=present?`Channel ${String(index+1).padStart(2,"0")} — ${m.name}`:`Channel ${String(index+1).padStart(2,"0")} — Empty`;
+    strip.setAttribute("aria-label",strip.title);
+    strip.setAttribute("aria-disabled",String(!present));
     strip.querySelectorAll("button").forEach(button=>button.disabled=!present);
     strip.querySelectorAll(".knob,.fader").forEach(control=>{
       control.tabIndex=present?0:-1; control.setAttribute("aria-disabled",String(!present));
@@ -1684,8 +1845,12 @@ $$(".useq").forEach(seq=>{
 /* Enable, solo and mute keep aria-pressed in step with the lit state so the
    control reports itself correctly to assistive technology. */
 $$(".upill").forEach(p=>p.addEventListener("click",()=>{
-  const on=p.classList.toggle("on");
-  p.setAttribute("aria-pressed",String(on));
+  const previous=p.classList.contains("on"),next=!previous;
+  const apply=value=>{p.classList.toggle("on",value);p.setAttribute("aria-pressed",String(value));};
+  apply(next);
+  const moduleName=p.closest(".unit")?.querySelector(".ufull")?.textContent.trim()||"Module";
+  const action=p.textContent.trim();
+  pushUndo(`${moduleName} ${action} ${next?"on":"off"}`,()=>apply(previous),()=>apply(next));
 }));
 
 /* ================= mixer strips ================= */
@@ -1699,17 +1864,21 @@ const SEND_DEFAULTS=[
   [false,false,true,false],
   [false,false,true,true],
 ];
-const CH=[...MODS.map((m,i)=>({label:m.label,name:m.name,mod:m.id,db:-20+i*1.2,sends:SEND_DEFAULTS[i].slice()})),
-  {label:null,name:"Channel 7",mod:null,db:-60,sends:[false,false,false,false]},
-  {label:null,name:"Channel 8",mod:null,db:-60,sends:[false,false,false,false]}];
+const CHANNEL_DB=[-8.1,-8.1,-8.1,-8.1,-8.1,-8.1];
+const CH=[...MODS.map((m,i)=>({label:m.label,name:m.name,mod:m.id,db:CHANNEL_DB[i],sends:SEND_DEFAULTS[i].slice()})),
+  {label:null,name:"Channel 7",mod:null,db:-8.1,sends:[false,false,false,false]},
+  {label:null,name:"Channel 8",mod:null,db:-8.1,sends:[false,false,false,false]}];
 CH.forEach((c,i)=>c.num=String(i+1).padStart(2,"0"));
 const mixstrips=$("#mixstrips");
 CH.forEach((c,i)=>{
   const d=document.createElement("div");
-  d.className="mstrip";
+  d.className=c.mod?"mstrip":"mstrip empty";
   if(c.mod) d.dataset.mod=c.mod;
   if(c.mod) d.style.setProperty("--mod-accent",`var(--mod-${c.mod})`);
-  d.title=`Channel ${c.num} — ${c.name}`;
+  d.title=c.mod?`Channel ${c.num} — ${c.name}`:`Channel ${c.num} — Empty`;
+  d.setAttribute("role","group");
+  d.setAttribute("aria-label",d.title);
+  d.setAttribute("aria-disabled",String(!c.mod));
   d.innerHTML=`<span class="mtag">${c.label||c.num}</span>
     <div class="knob sm" data-param="Pan" data-unit="pan" data-min="-50" data-max="50" data-value="0" data-default="0" title="Pan ${c.name}."></div>
     <div class="sendgrid" aria-label="${c.name} sends">${c.sends.map((active,sendIndex)=>
@@ -1726,7 +1895,9 @@ CH.forEach((c,i)=>{
         aria-label="Solo ${c.name}" title="Solo.">S</button><button class="msbtn mute" type="button" aria-pressed="false"
         aria-label="Mute ${c.name}" title="Mute.">M</button></div>`;
   mixstrips.appendChild(d);
+  if(!c.mod) d.querySelectorAll("button").forEach(button=>button.disabled=true);
   const f=d.querySelector(".fader");
+  if(!c.mod){f.tabIndex=-1;f.setAttribute("aria-disabled","true");}
   const toN=db=>(db+60)/66, toDb=n=>clamp(n,0,1)*66-60;
   const paint=()=>{const n=toN(c.db);
     f.querySelector(".fcap").style.bottom=`calc(${(n*100).toFixed(1)}% - 14px)`;
@@ -1778,11 +1949,13 @@ CH.forEach((c,i)=>{
   const d=document.createElement("div");
   d.className="mstrip master";
   d.innerHTML=`<span class="mtag">MIX</span>
-    <div class="knob sm" data-param="Width" data-unit="pct" data-min="0" data-max="200" data-value="100" data-default="100" title="Stereo width."></div>
+    <div class="knob sm" data-param="Pan" data-unit="pan" data-min="-50" data-max="50" data-value="0" data-default="0" title="Master pan."></div>
+    <div class="sendgrid master-returns" role="img" aria-label="Send returns A, B, C, and D">${SEND_IDS.map((sendId,index)=>
+      `<span class="sendbtn${index<2?" on":""}" aria-hidden="true">${sendId}</span>`).join("")}</div>
     <div class="fwrap"><div class="fader" role="slider" tabindex="0"
         aria-label="Master level" aria-orientation="vertical"
         aria-valuemin="-60" aria-valuemax="6" aria-valuenow="-6.0" aria-valuetext="-6.0 dB"
-        title="Master level."><div class="ffill" style="height:77%"></div><div class="fcap" style="bottom:calc(77% - 14px)"></div></div>
+        title="Master level."><div class="ffill" style="height:78.6%"></div><div class="fcap" style="bottom:calc(78.6% - 14px)"></div></div>
       <canvas class="mmeter" data-chm="master" width="16" height="240"
         role="img" aria-label="Master output level"></canvas></div>
     <div class="msbtns"><button class="msbtn master-fx-bypass" aria-pressed="false"
@@ -1790,13 +1963,37 @@ CH.forEach((c,i)=>{
   mixstrips.appendChild(d);
   /* master level is keyboard-operable on the same contract as channel faders */
   const mf=d.querySelector(".fader");
-  let mdb=-9;
+  let mdb=-8.1;
   const mpaint=()=>{const n=clamp((mdb+60)/66,0,1);
     mf.querySelector(".fcap").style.bottom=`calc(${(n*100).toFixed(1)}% - 14px)`;
     mf.querySelector(".ffill").style.height=(n*100).toFixed(1)+"%";
     mf.setAttribute("aria-valuenow",mdb.toFixed(1));
     mf.setAttribute("aria-valuetext",fmt(mdb,"db"));};
   mpaint();
+  let masterDrag=null;
+  mf.addEventListener("pointerdown",event=>{
+    mf.setPointerCapture(event.pointerId);
+    masterDrag={y:event.clientY,value:mdb};
+  });
+  mf.addEventListener("pointermove",event=>{
+    if(!masterDrag)return;
+    const scale=event.shiftKey?0.1:1;
+    mdb=clamp(masterDrag.value+(masterDrag.y-event.clientY)/(mf.clientHeight||120)*66*scale,-60,6);
+    mpaint();
+  });
+  const finishMasterDrag=()=>{
+    if(!masterDrag)return;
+    const previous=masterDrag.value,next=mdb;masterDrag=null;
+    if(Math.abs(previous-next)>0.05){
+      pushUndo(`Master to ${fmt(next,"db")}`,()=>{mdb=previous;mpaint();},()=>{mdb=next;mpaint();});
+    }
+  };
+  mf.addEventListener("pointerup",finishMasterDrag);
+  mf.addEventListener("lostpointercapture",finishMasterDrag);
+  mf.addEventListener("pointercancel",()=>{
+    if(!masterDrag)return;
+    mdb=masterDrag.value;masterDrag=null;mpaint();
+  });
   mf.addEventListener("keydown",e=>{
     const coarse=e.key==="PageUp"||e.key==="PageDown";
     const up=e.key==="ArrowUp"||e.key==="ArrowRight"||e.key==="PageUp";
@@ -1821,6 +2018,9 @@ CH.forEach((c,i)=>{
   });
 })();
 initKnobs(mixstrips);
+mixstrips.querySelectorAll(".mstrip.empty .knob").forEach(control=>{
+  control.tabIndex=-1;control.setAttribute("aria-disabled","true");
+});
 
 /* ================= effects pane ================= */
 const FX=[
@@ -1883,17 +2083,45 @@ let activeEditorModule="bass";
 const KEYS=["C5","B4","A#4","A4","G#4","G4","F#4","F4","E4","D#4","D4","C#4","C4","B3","A#3","A3","G#3","G3","F#3","F3","E3","D#3","D3","C#3","C3"];
 const prkeys=$("#prkeys"), prgrid=$("#prgrid"), vgrid=$("#vgrid"), rbm=$("#rbmeasures");
 const laneSelect=$("#laneSelect");
-/* Every row names its note in the left gutter — naturals in the regular size,
-   sharps smaller and dimmer, octave Cs brightest — as in the reference. */
-function buildKeyRow(key){
-  const accidental=key.includes("#");
-  const d=document.createElement("div");
-  d.className="prkey"+(accidental?" acc":"")+(!accidental&&key.startsWith("C")?" lbl":"");
-  d.textContent=key;
-  d.title=key;
-  return d;
+const TIMELINE_INSET=76;
+const timelineLeft=pct=>`calc(${pct}% + ${(TIMELINE_INSET*(1-pct/100)).toFixed(3)}px)`;
+const timelineWidth=pct=>`calc(${pct}% - ${(TIMELINE_INSET*pct/100).toFixed(3)}px)`;
+/* The reference gutter is a decorative side-view piano measured from the
+   image: ten naturals with deliberately uneven rows and a black key riding
+   every boundary, labels on the narrow dark strip. Spans are percentages of
+   the grid height; it is not locked to the 25 grid rows. */
+const PIANO_KEYS=[/* label, top%, height% — tiles the full grid height */
+  ["C5",0,7.91],["B4",7.91,8.16],["A4",16.07,11.23],["G4",27.30,8.16],
+  ["F4",35.46,8.67],["E4",44.13,11.74],["D4",55.87,8.67],["C4",64.54,11.74],
+  ["B3",76.28,8.41],["A3",84.69,9.19],["",93.88,6.12]];
+const PIANO_BLACKS=[/* top%, height% */
+  [5.61,4.59],[13.78,4.59],[25.0,4.59],[33.16,4.59],[41.84,4.59],
+  [53.57,4.59],[62.24,5.10],[73.98,5.10],[82.65,4.59],[93.88,6.12]];
+const PIANO_SEAMS=[21.17,49.23,58.93,69.64,90.56]; /* 1px dark seams, top% */
+const PIANO_LABEL_Y=[3.06,11.73,21.94,31.12,39.80,50.0,60.20,70.41,81.12,90.82];
+function buildPiano(){
+  PIANO_KEYS.forEach(([key,top,height])=>{
+    const d=document.createElement("div");
+    d.className="pkw"+(key?"":" dim");d.style.top=top+"%";d.style.height=height+"%";
+    prkeys.appendChild(d);
+  });
+  PIANO_BLACKS.forEach(([top,height])=>{
+    const b=document.createElement("div");
+    b.className="pkb";b.style.top=top+"%";b.style.height=height+"%";
+    prkeys.appendChild(b);
+  });
+  PIANO_SEAMS.forEach(top=>{
+    const s=document.createElement("div");
+    s.className="pks";s.style.top=top+"%";
+    prkeys.appendChild(s);
+  });
+  PIANO_LABEL_Y.forEach((top,i)=>{
+    const s=document.createElement("span");
+    s.className="pkl";s.textContent=PIANO_KEYS[i][0];s.style.top=top+"%";
+    prkeys.appendChild(s);
+  });
 }
-KEYS.forEach(k=>prkeys.appendChild(buildKeyRow(k)));
+buildPiano();
 for(let i=1;i<=4;i++){ const s=document.createElement("span"); s.textContent=i; rbm.appendChild(s); }
 const rowH=100/KEYS.length;
 KEYS.forEach((key,i)=>{
@@ -1903,16 +2131,41 @@ KEYS.forEach((key,i)=>{
   }
   const r=document.createElement("div");r.className="grow";r.style.top=((i+1)*rowH)+"%";prgrid.appendChild(r);
 });
-for(let b=1;b<16;b++){
-  const l=document.createElement("div"); l.className=b%4===0?"gbar":"gbeat";
-  l.style.left=(b*6.25)+"%"; prgrid.appendChild(l);
+for(let step=1;step<64;step++){
+  const l=document.createElement("div");
+  l.className=step%16===0?"gbar":step%4===0?"gbeat":"gstep";
+  l.style.left=timelineLeft(step/64*100); prgrid.appendChild(l);
 }
-const NOTES=[];
-for(let i=0;i<34;i++){
-  const step=Math.floor(seedRand()*64);
-  NOTES.push({x:step*(100/64), w:100/64*(seedRand()>0.75?2:1), row:6+Math.floor(seedRand()*14),
-    vel:55+Math.floor(seedRand()*45),slide:i%9===0});
-}
+/* Explicit stopped-state fixture measured from the approved 1568 × 1003
+   composition. It makes visual comparisons reproducible while note editing
+   still uses the same percentage and pitch model. */
+const REFERENCE_NOTES=[
+  [754,733,38,9],[377,751,19,9],[588,758,18,9],[721,758,16,9],[1045,758,27,9],
+  [810,762,19,9],[904,775,18,8],[987,775,17,9],[350,777,34,9],[721,777,16,9],
+  [1055,777,17,9],[1210,777,39,9],[576,786,10,9],[1099,788,16,9],[617,797,17,9],
+  [679,797,18,10],[904,797,38,10],[570,805,16,9],[856,815,11,9],[987,815,16,9],
+  [542,821,27,9],[842,821,13,9],[1055,821,17,9],[1250,821,11,9],[523,830,22,9],
+  [410,832,38,8],[942,836,17,9],[1200,838,16,9],[1005,842,17,9],[1239,843,21,9],
+  [710,845,15,9],
+];
+const REFERENCE_VELOCITIES=[
+  [594,27,4],[946,27,4],[360,26,4],[737,26,3],[904,26,4],[539,25,4],[576,24,3],
+  [721,24,3],[844,24,4],[1044,24,4],[346,23,4],[411,23,3],[642,23,4],[685,23,4],
+  [809,23,4],[986,23,4],[1058,23,4],[1204,23,4],[1245,23,3],[376,22,4],
+  [754,22,4],[1095,22,4],[526,21,4],[860,21,4],[1002,21,4],[610,19,4],
+  [1257,18,3],[428,17,4],[1218,15,4],
+];
+const REFERENCE_X=347,REFERENCE_WIDTH=918,REFERENCE_Y=702,REFERENCE_HEIGHT=199;
+const NOTES=REFERENCE_NOTES.map(([x,y,w,h],index)=>{
+  const [vx,vheight,vwidth]=REFERENCE_VELOCITIES[index%REFERENCE_VELOCITIES.length];
+  return {
+    x:(x-REFERENCE_X)/REFERENCE_WIDTH*100,w:w/REFERENCE_WIDTH*100,
+    row:clamp(Math.round((y-REFERENCE_Y)/(REFERENCE_HEIGHT/KEYS.length)),0,KEYS.length-1),
+    visualTop:(y-REFERENCE_Y)/REFERENCE_HEIGHT*100,visualHeight:h,
+    velocityX:(vx-REFERENCE_X)/REFERENCE_WIDTH*100,velocityHeight:vheight,velocityWidth:vwidth,
+    vel:Math.round(vheight/30*100),slide:false,
+  };
+});
 function attachNote(n){
   if(n.el?.isConnected) return;
   if(n.el){n.paint();prgrid.appendChild(n.el);vgrid.appendChild(n.velEl);return;}
@@ -1920,11 +2173,14 @@ function attachNote(n){
   n.el=d; n.velEl=v; d.className="note"+(n.slide?" slide":""); v.className="vbar";
   d.tabIndex=0; d.setAttribute("role","button");
   const paint=()=>{
-    d.style.left=n.x+"%"; d.style.width=(n.w*0.92)+"%";
-    d.style.top=`calc(${n.row*rowH}% + 1px)`; d.style.height=`calc(${rowH}% - 2px)`;
+    d.style.left=timelineLeft(n.x); d.style.width=timelineWidth(n.w);
+    d.style.top=Number.isFinite(n.visualTop)?`${n.visualTop}%`:`calc(${n.row*rowH}% + 1px)`;
+    d.style.height=Number.isFinite(n.visualHeight)?`${n.visualHeight}px`:`calc(${rowH}% - 2px)`;
     d.setAttribute("aria-label",`${KEYS[n.row]}, position ${Math.round(n.x/(100/64))+1}, duration ${Math.max(1,Math.round(n.w/(100/64)))} steps`);
     d.title="Drag to move; drag the right edge to resize; right-click to delete.";
-    v.style.left=`calc(${n.x}% + 1px)`; v.style.height=(n.vel*0.8)+"%";
+    v.style.left=timelineLeft(Number.isFinite(n.velocityX)?n.velocityX:n.x);
+    v.style.height=Number.isFinite(n.velocityHeight)?`${n.velocityHeight}px`:(n.vel*0.8)+"%";
+    v.style.width=Number.isFinite(n.velocityWidth)?`${n.velocityWidth}px`:"";
   };
   n.paint=paint; paint(); prgrid.appendChild(d); vgrid.appendChild(v);
   const remove=()=>{d.remove();v.remove();};
@@ -1939,11 +2195,12 @@ function attachNote(n){
     if(e.button!==0)return;e.stopPropagation();d.setPointerCapture(e.pointerId);
     const rect=d.getBoundingClientRect();
     drag={startX:e.clientX,startY:e.clientY,x:n.x,w:n.w,row:n.row,
+      visualTop:n.visualTop,visualHeight:n.visualHeight,velocityX:n.velocityX,
       mode:e.clientX<=rect.left+6?"resize-left":e.clientX>=rect.right-6?"resize-right":"move"};
   });
   d.addEventListener("pointermove",e=>{
     if(!drag)return;
-    const step=100/64,delta=(e.clientX-drag.startX)/(prgrid.clientWidth||1)*100;
+    const step=100/64,delta=(e.clientX-drag.startX)/Math.max(1,prgrid.clientWidth-TIMELINE_INSET)*100;
     if(drag.mode==="resize-right"){
       const width=clamp(drag.w+delta,step,100-drag.x);n.w=e.altKey?width:Math.max(step,Math.round(width/step)*step);
     }else if(drag.mode==="resize-left"){
@@ -1952,15 +2209,20 @@ function attachNote(n){
     }else{
       const x=clamp(drag.x+delta,0,100-drag.w);n.x=e.altKey?x:Math.round(x/step)*step;
       n.row=clamp(drag.row+Math.round((e.clientY-drag.startY)/(prgrid.clientHeight||1)*KEYS.length),0,KEYS.length-1);
+      n.visualTop=undefined;n.visualHeight=undefined;n.velocityX=undefined;
     }
     paint();
   });
   d.addEventListener("pointerup",()=>{
-    if(!drag)return;const before={x:drag.x,w:drag.w,row:drag.row},after={x:n.x,w:n.w,row:n.row};drag=null;
+    if(!drag)return;
+    const before={x:drag.x,w:drag.w,row:drag.row,visualTop:drag.visualTop,
+      visualHeight:drag.visualHeight,velocityX:drag.velocityX};
+    const after={x:n.x,w:n.w,row:n.row,visualTop:n.visualTop,
+      visualHeight:n.visualHeight,velocityX:n.velocityX};drag=null;
     const overlap=NOTES.some(other=>other!==n&&other.el?.isConnected&&other.row===n.row&&n.x<other.x+other.w&&n.x+n.w>other.x);
-    if(overlap){n.x=before.x;n.w=before.w;n.row=before.row;paint();return;}
+    if(overlap){Object.assign(n,before);paint();return;}
     if(Math.abs(before.x-after.x)<.01&&Math.abs(before.w-after.w)<.01&&before.row===after.row)return;
-    const apply=value=>{n.x=value.x;n.w=value.w;n.row=value.row;paint();};
+    const apply=value=>{Object.assign(n,value);paint();};
     pushUndo(`Edit ${KEYS[n.row]} note`,()=>apply(before),()=>apply(after));
   });
 }
@@ -2008,7 +2270,8 @@ renderLaneSelect(MODS.find(m=>m.id===activeEditorModule));
 prgrid.addEventListener("pointerdown",e=>{
   if(activeEditorModule!=="bass"||e.button!==0||e.target.closest(".note"))return;
   const r=prgrid.getBoundingClientRect(),step=100/64;
-  const n={x:clamp(Math.floor((e.clientX-r.left)/r.width*64)*step,0,100-step),w:step,
+  if(e.clientX<r.left+TIMELINE_INSET)return;
+  const n={x:clamp(Math.floor((e.clientX-r.left-TIMELINE_INSET)/Math.max(1,r.width-TIMELINE_INSET)*64)*step,0,100-step),w:step,
     row:clamp(Math.floor((e.clientY-r.top)/r.height*KEYS.length),0,KEYS.length-1),vel:80};
   if(NOTES.some(other=>other.el?.isConnected&&other.row===n.row&&n.x<other.x+other.w&&n.x+n.w>other.x))return;
   NOTES.push(n);attachNote(n);n.el.focus();
@@ -2028,9 +2291,10 @@ function addGridLines(rows,keys){
   for(let i=0;i<rows;i++){
     const line=document.createElement("div");line.className="grow";line.style.top=((i+1)*height)+"%";prgrid.appendChild(line);
   }
-  for(let step=1;step<16;step++){
-    const line=document.createElement("div");line.className=step%4===0?"gbar":"gbeat";
-    line.style.left=(step*6.25)+"%";prgrid.appendChild(line);
+  for(let step=1;step<64;step++){
+    const line=document.createElement("div");
+    line.className=step%16===0?"gbar":step%4===0?"gbeat":"gstep";
+    line.style.left=timelineLeft(step/64*100);prgrid.appendChild(line);
   }
 }
 function addDrumTrigger(mid,row,step){
@@ -2038,8 +2302,8 @@ function addDrumTrigger(mid,row,step){
   if(!m||!PATTERNS[mid][row][step])return;
   const trigger=document.createElement("button");
   trigger.className="trigger";trigger.type="button";
-  trigger.style.left=`calc(${step*6.25}% + 1px)`;
-  trigger.style.width="calc(6.25% - 2px)";
+  trigger.style.left=`calc(${timelineLeft(step*6.25).slice(5,-1)} + 1px)`;
+  trigger.style.width=`calc(${timelineWidth(6.25).slice(5,-1)} - 2px)`;
   trigger.style.top=`calc(${row*(100/m.voices.length)}% + 1px)`;
   trigger.style.height=`calc(${100/m.voices.length}% - 2px)`;
   trigger.setAttribute("aria-label",`${m.voices[row]}, step ${step+1}`);
@@ -2059,7 +2323,9 @@ function paintDrumTrigger(event){
   const m=MODS.find(item=>item.id===activeEditorModule);
   if(!m||m.kind==="bass")return;
   const rect=prgrid.getBoundingClientRect();
-  const step=clamp(Math.floor((event.clientX-rect.left)/rect.width*16),0,15);
+  const timelineX=event.clientX-rect.left;
+  if(timelineX<TIMELINE_INSET||timelineX>rect.width)return;
+  const step=clamp(Math.floor((timelineX-TIMELINE_INSET)/Math.max(1,rect.width-TIMELINE_INSET)*16),0,15);
   const row=clamp(Math.floor((event.clientY-rect.top)/rect.height*m.voices.length),0,m.voices.length-1);
   if(PATTERNS[m.id][row][step])return;
   PATTERNS[m.id][row][step]=true;addDrumTrigger(m.id,row,step);
@@ -2080,12 +2346,12 @@ function renderEditor(mid){
   prkeys.replaceChildren();
   prgrid.replaceChildren();
   vgrid.replaceChildren();
-  const playhead=document.createElement("div");playhead.className="playhead";playhead.id="rollPlayhead";playhead.style.left="0%";
+  const playhead=document.createElement("div");playhead.className="playhead";playhead.id="rollPlayhead";playhead.style.left=TIMELINE_INSET+"px";
   prgrid.appendChild(playhead);
   $(".rollbar .rbcorner").textContent=m.kind==="bass"?"PITCH":"VOICE";
   $(".rollctx").textContent=`${m.name} — ${PROJECT_PATTERNS[activePatternIndex].name}`;
   if(m.kind==="bass"){
-    KEYS.forEach(key=>prkeys.appendChild(buildKeyRow(key)));
+    buildPiano();
     addGridLines(KEYS.length,KEYS);
     NOTES.forEach(note=>{note.el?.remove();note.velEl?.remove();attachNote(note);});
     return;
@@ -2107,6 +2373,8 @@ function showActivePattern(index){
   $(".rollctx").textContent=`${module?.name||"Acid Bass"} — ${pattern.name}`;
   $("#swingSlider").value=pattern.swing;$("#swingValue").textContent=pattern.swing+"%";
   $("#humanizeSlider").value=pattern.humanize;$("#humanizeValue").textContent=pattern.humanize+"%";
+  $("#swingSlider").style.setProperty("--fill",pattern.swing+"%");
+  $("#humanizeSlider").style.setProperty("--fill",pattern.humanize+"%");
   playlistRows.forEach((row,i)=>row.classList.toggle("on",i===activePatternIndex));
 }
 PROJECT_PATTERNS.forEach(({name:n,bars:b},i)=>{
@@ -2123,10 +2391,14 @@ $("#patPrev").addEventListener("click",()=>showActivePattern(activePatternIndex-
 $("#patNext").addEventListener("click",()=>showActivePattern(activePatternIndex+1));
 $("#swingSlider").addEventListener("input",event=>{
   PROJECT_PATTERNS[activePatternIndex].swing=+event.target.value;$("#swingValue").textContent=event.target.value+"%";
+  event.target.style.setProperty("--fill",event.target.value+"%");
 });
 $("#humanizeSlider").addEventListener("input",event=>{
   PROJECT_PATTERNS[activePatternIndex].humanize=+event.target.value;$("#humanizeValue").textContent=event.target.value+"%";
+  event.target.style.setProperty("--fill",event.target.value+"%");
 });
+$("#swingSlider").style.setProperty("--fill",$("#swingSlider").value+"%");
+$("#humanizeSlider").style.setProperty("--fill",$("#humanizeSlider").value+"%");
 showActivePattern(activePatternIndex);
 
 /* ================= transport + clock + meters ================= */
@@ -2134,11 +2406,11 @@ let tempo=128, t0=0, elapsed=0;
 const tempoInput=$("#tempoInput"), clockTime=$("#clockTime"), clockBbt=$("#clockBbt");
 const btnPlay=$("#btnPlay"), btnStop=$("#btnStop"), btnRec=$("#btnRec");
 const beatMs=()=>60000/tempo;
-btnPlay.addEventListener("click",()=>{playing=!playing;btnPlay.classList.toggle("on",playing);
+btnPlay.addEventListener("click",()=>{playing=!playing;btnPlay.classList.toggle("on",playing);btnPlay.setAttribute("aria-pressed",String(playing));
   if(playing) t0=performance.now()-elapsed;});
-btnStop.addEventListener("click",()=>{playing=false;elapsed=0;stepPos=0;btnPlay.classList.remove("on");updateClock();});
-btnRec.addEventListener("click",()=>btnRec.classList.toggle("on"));
-$("#btnMetro").addEventListener("click",e=>e.currentTarget.classList.toggle("on"));
+btnStop.addEventListener("click",()=>{playing=false;elapsed=0;stepPos=0;btnPlay.classList.remove("on");btnPlay.setAttribute("aria-pressed","false");updateClock();});
+btnRec.addEventListener("click",()=>{const next=!btnRec.classList.contains("on");btnRec.classList.toggle("on",next);btnRec.setAttribute("aria-pressed",String(next));});
+$("#btnMetro").addEventListener("click",event=>{const next=!event.currentTarget.classList.contains("on");event.currentTarget.classList.toggle("on",next);event.currentTarget.setAttribute("aria-pressed",String(next));});
 $("#btnPower").addEventListener("click",event=>{
   const next=!event.currentTarget.classList.contains("on");
   event.currentTarget.classList.toggle("on",next);event.currentTarget.setAttribute("aria-pressed",String(next));
@@ -2210,27 +2482,41 @@ function paintMeter(cv,lv,vertical=true){
   const css=getComputedStyle(document.documentElement);
   const cols=[css.getPropertyValue("--meter-low"),css.getPropertyValue("--meter-mid"),
               css.getPropertyValue("--meter-high"),css.getPropertyValue("--meter-peak")];
-  const segs=vertical?Math.floor(H/6):Math.floor(W/6);
+  /* vertical ladders: fine 2px cells with 1px gaps; the lit floor stops short
+     of the recess bottom, as in the reference (lit base at ~y548) */
+  const padT=vertical?8:0, padB=vertical?34:0, pitch=vertical?3:6, cell=vertical?2:4;
+  const segs=vertical?Math.floor((H-padT-padB)/pitch):Math.floor(W/pitch);
   const lit=Math.round(segs*lv);
-  /* Lit segments glow; unlit ones stay a visible dark ladder so the meter reads
-     as a physical ledder of cells at rest rather than an empty slot. */
-  for(let i=0;i<segs;i++){
-    const fr=i/segs;
-    const on=i<lit;
-    const col=fr<.78?cols[0]:fr<.9?cols[1]:fr<.96?cols[2]:cols[3];
-    ctx.shadowBlur=on?4:0;
-    ctx.shadowColor=on?col:"transparent";
-    ctx.fillStyle=on?col:"rgba(150,165,158,.22)";
-    if(vertical) ctx.fillRect(2,H-(i+1)*6+1,W-4,4);
-    else ctx.fillRect(i*6+1,2,4,H-4);
+  /* Lit segments glow; unlit ones stay a barely-there dark ladder so the meter
+     reads as a physical ledder of cells at rest rather than an empty slot. The
+     unlit ladder continues faintly below the lit base, as in the reference. */
+  if(vertical){
+    ctx.fillStyle="rgba(150,165,158,.13)";
+    for(let y=H-4-pitch+1;y>=padT;y-=pitch) ctx.fillRect(1,y,W-2,cell);
+    for(let i=0;i<lit;i++){
+      const fr=i/segs;
+      const col=fr<.78?cols[0]:fr<.9?cols[1]:fr<.96?cols[2]:cols[3];
+      ctx.shadowBlur=4;ctx.shadowColor=col;ctx.fillStyle=col;
+      ctx.fillRect(1,H-padB-(i+1)*pitch+1,W-2,cell);
+    }
+  }else{
+    for(let i=0;i<segs;i++){
+      const fr=i/segs;
+      const on=i<lit;
+      const col=fr<.78?cols[0]:fr<.9?cols[1]:fr<.96?cols[2]:cols[3];
+      ctx.shadowBlur=on?4:0;
+      ctx.shadowColor=on?col:"transparent";
+      ctx.fillStyle=on?col:"rgba(150,165,158,.13)";
+      ctx.fillRect(i*6+1,2,4,H-4);
+    }
   }
   ctx.shadowBlur=0;
 }
 const chMeters=$$("[data-chm]"), masterMeterA=$("#masterMeterA"), masterMeterB=$("#masterMeterB"), masterDb=$("#masterDb");
-/* The mock depicts a session in flight, so the meters rest at a lively idle
-   level per channel instead of falling to black; play activity rides on top. */
-const IDLE_LV=CH.map((c,i)=>c.mod?[.68,.6,.72,.55,.63,.58][i]??.5:0);
-const IDLE_MASTER=.62;
+/* The reference holds a quiet stopped mix: channel ladders retain a low visual
+   floor while the header meter correctly reports silence. */
+const IDLE_LV=CH.map((c,i)=>c.mod?[.68,.44,.46,.37,.44,0][i]??0:0);
+const IDLE_MASTER=.69;
 const lv={ch:[...IDLE_LV],master:IDLE_MASTER,masterL:IDLE_MASTER-.02,masterR:IDLE_MASTER+.02};
 let lastStep=-1;
 function tick(now){
@@ -2255,7 +2541,7 @@ function tick(now){
       $$(".useq .uactlbl .pos").forEach(p=>{
         p.textContent=`${String(bar).padStart(2,"0")}.${beat}`;
       });
-      $("#rollPlayhead").style.left=((step%64)/64*100).toFixed(2)+"%";
+      $("#rollPlayhead").style.left=timelineLeft((step%64)/64*100);
     }
     updateClock();
     lv.ch=lv.ch.map(v=>v*0.965); lv.master*=0.97;lv.masterL*=0.97;lv.masterR*=0.97;
@@ -2267,10 +2553,10 @@ function tick(now){
     lv.masterR=Math.max(lv.masterR*0.93,IDLE_MASTER+.02);
   }
   chMeters.forEach((cv,i)=>paintMeter(cv, cv.dataset.chm==="master"?lv.master:lv.ch[i]));
-  const meterA=meterModeMS?(lv.masterL+lv.masterR)/2:lv.masterL;
-  const meterB=meterModeMS?Math.abs(lv.masterL-lv.masterR)/2:lv.masterR;
+  const meterA=playing?(meterModeMS?(lv.masterL+lv.masterR)/2:lv.masterL):0;
+  const meterB=playing?(meterModeMS?Math.abs(lv.masterL-lv.masterR)/2:lv.masterR):0;
   paintMeter(masterMeterA,meterA,false);paintMeter(masterMeterB,meterB,false);
-  masterDb.innerHTML = lv.master<0.02 ? "&minus;Inf" : fmt(-60+lv.master*60,"db").replace("-","&minus;");
+  masterDb.innerHTML = !playing||lv.master<0.02 ? "&minus;Inf" : fmt(-60+lv.master*60,"db").replace("-","&minus;");
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);

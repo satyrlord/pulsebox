@@ -68,6 +68,18 @@ function primaryAcceptanceIds(markdown: string): readonly number[] {
     .flatMap((match) => range(Number(match[1]), Number(match[2] ?? match[1])));
 }
 
+function acceptanceCriterion(markdown: string, id: number): string {
+  const lines = markdown.split(/\r?\n/u);
+  const marker = `${id.toString()}. **AC-${id.toString().padStart(3, "0")}.**`;
+  const start = lines.findIndex((line) => line.startsWith(marker));
+  if (start < 0) {
+    throw new Error(`Missing acceptance criterion ${marker}`);
+  }
+  const next = lines.findIndex((line, index) => index > start
+    && /^[0-9]+\. \*\*AC-[0-9]{3}\.\*\*/u.test(line));
+  return lines.slice(start, next < 0 ? undefined : next).join("\n");
+}
+
 describe("product specification structure", () => {
   it("keeps one indexed file set in normative build order", () => {
     const expectedPaths = [INDEX_PATH, ...BUILD_ORDER.map(({ path }) => path),
@@ -143,8 +155,15 @@ describe("product specification structure", () => {
       .matchAll(/^[0-9]+\. \*\*AC-([0-9]{3})\.\*\*/gmu)]
       .map((match) => Number(match[1]));
 
-    expect(decisionIds).toEqual(range(1, 66));
+    expect(decisionIds).toEqual(range(1, 67));
     expect(acceptanceIds).toEqual(range(1, 86));
+
+    const release = read(SUPPORTING_SPECS[1].path);
+    const emptyMixer = acceptanceCriterion(release, 18);
+    const compactMixer = acceptanceCriterion(release, 68);
+    expect(emptyMixer).toContain("two-digit slot numbers");
+    expect(emptyMixer).not.toContain("labeled `Empty`");
+    expect(compactMixer).toContain("noninteractive A–D return labels");
   });
 
   it("assigns every release criterion one primary build-order owner", () => {

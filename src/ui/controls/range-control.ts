@@ -30,17 +30,21 @@ const RANGE_STYLE = String.raw`
     position: relative;
     display: grid;
     place-items: center;
-    width: 48px;
-    min-height: 48px;
+    width: 44px;
+    min-height: 44px;
     cursor: ns-resize;
     touch-action: none;
     user-select: none;
   }
 
+  /*
+   * The ring is the value track. Its lit arc uses the module accent, and the
+   * cap sits inside it as a separate raised surface, so the value reading and
+   * the tactile cap never share a colour.
+   */
   .dial {
-    width: 40px;
-    height: 40px;
-    border: var(--pulse-border-thin, 1px) solid var(--pulse-color-border-default, #6d7881);
+    width: 38px;
+    height: 38px;
     border-radius: var(--pulse-radius-round, 999px);
     background:
       conic-gradient(
@@ -49,19 +53,33 @@ const RANGE_STYLE = String.raw`
         var(--pulse-color-control-track, #6f7b84) var(--angle) 270deg,
         transparent 270deg
       );
-    box-shadow: inset 0 0 0 7px var(--pulse-color-surface-control, #242a30), var(--pulse-shadow-control, 0 1px 3px #0008);
+  }
+
+  /* The raised cap, drawn over the ring with a recessed dark face. */
+  .dial::after {
+    position: absolute;
+    inset: 8px;
+    border: var(--pulse-border-thin, 1px) solid var(--pulse-color-border-default, #6d7881);
+    border-radius: var(--pulse-radius-round, 999px);
+    background: var(--pulse-color-surface-control, #242a30);
+    box-shadow:
+      inset 0 1px 0 0 #ffffff1a,
+      inset 0 -2px 3px 0 #00000066,
+      var(--pulse-shadow-control, 0 1px 3px #0008);
+    content: "";
   }
 
   .marker {
     position: absolute;
-    inset-block-start: 7px;
+    z-index: 1;
+    inset-block-start: 10px;
     inset-inline-start: calc(50% - 1px);
     width: 2px;
-    height: 13px;
+    height: 10px;
     border-radius: 1px;
     background: var(--pulse-color-control-thumb, #e1e6e9);
-    transform: rotate(var(--rotation)) translateY(3px);
-    transform-origin: 1px 17px;
+    transform: rotate(var(--rotation)) translateY(2px);
+    transform-origin: 1px 12px;
   }
 
   input[type="range"] {
@@ -74,11 +92,14 @@ const RANGE_STYLE = String.raw`
     opacity: 0;
   }
 
+  /* Short technical control labels use uppercase, per specification 11.3. */
   .label {
     max-width: 76px;
     overflow: hidden;
     color: var(--pulse-color-text-secondary, #bac2c8);
+    letter-spacing: 0.06em;
     text-overflow: ellipsis;
+    text-transform: uppercase;
     white-space: nowrap;
   }
 

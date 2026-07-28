@@ -14,10 +14,10 @@ are arranged in normative build order.
 
 - Eight rack slots, eight visible instrument mixer strips, and one master strip
   in the MVP.
-- Native DOM, Custom Elements, Shadow DOM, Web Audio, AudioWorklet, IndexedDB,
-  strict TypeScript, Vite, Vitest, and Playwright.
-- No UI framework, virtual DOM, server product component, native wrapper, PWA,
-  service worker, accounts, cloud sync, collaboration, or MIDI.
+- Web Audio, AudioWorklet, IndexedDB, strict TypeScript, Vite, Vitest, and
+  Playwright.
+- No server product component, native wrapper, PWA, service worker, accounts,
+  cloud sync, collaboration, or MIDI.
 - The canonical local origin is `http://127.0.0.1:4173`. Development and
   production-build launch must fail rather than move to another port.
 
@@ -68,7 +68,7 @@ product API. Run `npm run build` before `npm run start`.
 
 Pulsebox has strict engine, state, and UI layers. The engine owns audio and has
 no DOM dependency. State owns serializable data and reversible commands and has
-no DOM or live audio objects. UI owns Web Components and dispatches typed
+no DOM or live audio objects. UI owns the components and dispatches typed
 commands without editing the audio graph.
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the normative contracts.

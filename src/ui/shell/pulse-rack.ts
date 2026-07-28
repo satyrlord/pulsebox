@@ -41,8 +41,14 @@ export class PulseRack extends HTMLElement {
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
+        /*
+         * The rack interior is recessed so that raised module faceplates read
+         * against it. This is the enclosure, not a card surface.
+         */
         .modules {
           min-height: 0;
+          background: var(--pulse-color-app, #0b0d0f);
+          box-shadow: inset 0 2px 4px 0 #00000073;
           overflow: auto;
           padding: var(--pulse-space-2, 8px);
         }

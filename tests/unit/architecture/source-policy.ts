@@ -393,6 +393,18 @@ export function findForbiddenTechnologyViolations(
       if (ts.isPropertyAccessExpression(node) && node.name.text === "serviceWorker") {
         messages.add("Service-worker registration is prohibited.");
       }
+      // Spec-001 section 3: destructive edits happen immediately and are
+      // recovered through Undo. A blocking confirmation is never the mechanism.
+      if (
+        ts.isCallExpression(node) &&
+        ((ts.isIdentifier(node.expression) && node.expression.text === "confirm") ||
+          (ts.isPropertyAccessExpression(node.expression) &&
+            node.expression.name.text === "confirm" &&
+            ts.isIdentifier(node.expression.expression) &&
+            node.expression.expression.text === "window"))
+      ) {
+        messages.add("Destructive confirmation dialogs are prohibited.");
+      }
       if (ts.isStringLiteralLike(node)) {
         if (/midi/i.test(node.text)) messages.add(`MIDI string ${node.text} is prohibited.`);
         if (/ScriptProcessorNode|createScriptProcessor/.test(node.text)) {

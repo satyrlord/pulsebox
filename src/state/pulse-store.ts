@@ -144,6 +144,75 @@ export class PulseStore {
     return accepted(true, project.revision);
   }
 
+  saveProject(): ProjectState {
+    return this.#cloneProject(this.#state.project);
+  }
+
+  loadProject(project: ProjectState): CommandResult {
+    const previous = this.#state;
+    const nextProject = this.#cloneProject(project);
+    const revision = incrementRevision(previous.project.revision, this.#idFactory);
+    const candidate = { ...nextProject, revision };
+    if (sameProjectContent(previous.project, candidate)) {
+      return accepted(false, previous.project.revision);
+    }
+    this.#undo.length = 0;
+    this.#redo.length = 0;
+    this.#state = {
+      ...previous,
+      project: candidate,
+      ui: reconcileUiReferences(candidate, previous.ui),
+      history: { canUndo: false, canRedo: false },
+    };
+    this.#notify(previous);
+    this.#onEngineDelta({
+      kind: "project-replace",
+      projectRevision: candidate.revision,
+      targetIds: [],
+      payload: { source: "loadProject" },
+    });
+    return accepted(true, candidate.revision);
+  }
+
+  exportProject(): string {
+    return JSON.stringify(this.saveProject());
+  }
+
+  importProject(serializedProject: string): CommandResult {
+    try {
+      const parsed = JSON.parse(serializedProject) as Partial<ProjectState>;
+      if (typeof parsed !== "object" || Array.isArray(parsed)) {
+        return rejected("serializedProject", "Project export was unreadable.", "Provide a valid Pulsebox project export.");
+      }
+      const project = parsed as ProjectState;
+      const previous = this.#state;
+      const nextProject = this.#cloneProject(project);
+      const revision = incrementRevision(previous.project.revision, this.#idFactory);
+      const candidate = { ...nextProject, revision };
+      if (sameProjectContent(previous.project, candidate)) {
+        return accepted(false, previous.project.revision);
+      }
+      this.#undo.length = 0;
+      this.#redo.length = 0;
+      this.#state = {
+        ...previous,
+        project: candidate,
+        ui: reconcileUiReferences(candidate, previous.ui),
+        history: { canUndo: false, canRedo: false },
+      };
+      this.#notify(previous);
+      this.#onEngineDelta({
+        kind: "project-replace",
+        projectRevision: candidate.revision,
+        targetIds: [],
+        payload: { source: "importProject" },
+      });
+      return accepted(true, candidate.revision);
+    } catch {
+      return rejected("serializedProject", "Project export was unreadable.", "Provide a valid Pulsebox project export.");
+    }
+  }
+
   createCommand<T extends PulseCommand["type"]>(
     type: T,
     payload: Extract<PulseCommand, { readonly type: T }>["payload"],
@@ -431,6 +500,10 @@ export class PulseStore {
       subscription.listener(selected, oldSelected);
     }
     void previous;
+  }
+
+  #cloneProject(project: ProjectState): ProjectState {
+    return JSON.parse(JSON.stringify(project)) as ProjectState;
   }
 }
 

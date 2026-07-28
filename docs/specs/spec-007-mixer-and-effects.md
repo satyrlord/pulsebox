@@ -21,7 +21,8 @@ The MVP has eight rack-slot mixer channels and one master channel.
 Each of the eight rack slots has one matching instrument channel. Loading,
 removing, swapping, or reordering a module updates that slot channel without
 creating mixer banks or channels beyond eight. Empty rack slots retain disabled
-visible strips labeled `Empty`.
+visible strips identified by their two-digit slot number. Their accessible name
+and state report that the slot is empty.
 
 The active audio-path identity follows the module ID. Slot identity controls
 placement and the corresponding strip position.
@@ -30,10 +31,11 @@ placement and the corresponding strip position.
 
 The established visible mixer contains:
 
-- Exactly eight visible instrument channel strips, including disabled `Empty`
-  strips.
+- Exactly eight visible instrument channel strips, including disabled empty
+  strips identified by two-digit slot number.
 - One fixed compact strip geometry for every instrument channel.
-- One master strip.
+- One master strip with compact, noninteractive A–D return labels in A, B / C,
+  D reading order. These identify return buses and are not sends or controls.
 - Four A–D send buttons per instrument channel in a visible 2 × 2 grid.
 - Meter.
 - Vertical fader.
@@ -74,9 +76,10 @@ selection is transient session state and is not serialized, restored, included
 in portable project files, or rendered into audio exports.
 
 The master strip and all eight instrument strips remain visible whenever the
-Mixer studio tab is active at a supported layout. Empty strips are disabled and
-labeled `Empty`. There are no hidden mixer banks in the MVP. Effects and Master
-replace the Mixer view inside the same compact studio column.
+Mixer studio tab is active at a supported layout. Empty strips are disabled,
+show their two-digit slot number, and expose the Empty state accessibly. There
+are no hidden mixer banks in the MVP. Effects and Master replace the Mixer view
+inside the same compact studio column.
 
 ### 19.3 Internal drum-voice mixer
 
@@ -266,6 +269,9 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
   compact button itself shows disabled, zero, and non-zero states without
   relying on color alone.
 - Effect chains receive sends and return to master.
+- The master strip exposes one compact, noninteractive label for each A–D
+  return. These identify the return buses without changing project state or
+  routing master signal to a send bus.
 - Routing prevents feedback loops.
 - Send return level is automatable.
 

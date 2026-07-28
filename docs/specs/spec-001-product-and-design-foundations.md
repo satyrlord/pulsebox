@@ -79,8 +79,10 @@ Rules:
 
 - Short labels are always uppercase.
 - Short labels are no longer than four characters.
-- Use short labels on faceplates, compact rack cards, rack-overview markers,
-  mixer strips, and dense selectors.
+- Use short labels as the primary identity on faceplates, compact rack cards,
+  rack-overview markers, mixer strips, and dense selectors. A rack faceplate may
+  pair its short label with the approved full name and type as subordinate text;
+  the short label remains the dominant compact identifier.
 - Use full names in the module browser, help text, accessible names, detailed editors,
   and documentation.
 - Do not invent additional visible names for the six instruments.
@@ -203,7 +205,13 @@ Use each accent for:
 - Mixer header.
 - Overview marker.
 
-Never rely on color alone.
+Never rely on color alone. Every accent is paired with the module short label,
+and selection, status, and disabled state each carry a non-color cue that
+survives the high-contrast overlay.
+
+`THEMING.md` section 3.4 owns the normative token values for these six accents.
+A plugin declares its own accent in its manifest `moduleAccent`, which must match
+that table.
 
 ### 11.3 Typography and icons
 

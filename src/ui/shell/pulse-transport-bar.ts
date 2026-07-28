@@ -27,7 +27,9 @@ export class PulseTransportBar extends HTMLElement {
           border-block-end: var(--pulse-border-thin, 1px) solid var(--pulse-color-border-default, #6d7881);
           padding-inline: var(--pulse-space-3, 12px);
           background: var(--pulse-color-surface-panel, #15191d);
-          box-shadow: var(--pulse-shadow-panel, 0 4px 12px #0009);
+          box-shadow:
+            inset 0 1px 0 0 #ffffff14,
+            var(--pulse-shadow-panel, 0 4px 12px #0009);
         }
         .side {
           display: flex;

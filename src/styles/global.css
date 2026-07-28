@@ -83,6 +83,19 @@ body {
   gap: var(--pulse-space-1);
 }
 
+/*
+ * Grouped transport controls sit in a recessed bay, the way hardware groups
+ * related switches. Depth is one inset boundary plus a modest inner shadow.
+ */
+.transport-controls,
+.history-controls {
+  border: var(--pulse-border-thin) solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-panel);
+  padding: var(--pulse-space-1);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  box-shadow: inset 0 1px 3px 0 #00000073;
+}
+
 .compact-controls {
   min-width: 0;
   overflow-x: auto;
@@ -110,10 +123,10 @@ body {
   gap: var(--pulse-space-2);
   max-width: min(360px, calc(100vw - var(--pulse-space-6)));
   padding: var(--pulse-space-2) var(--pulse-space-3);
-  border: var(--pulse-border-thin) solid var(--pulse-color-border-strong);
+  border: var(--pulse-border-thin) solid var(--pulse-color-border-strong, #aab4bc);
   border-radius: var(--pulse-radius-panel);
-  color: var(--pulse-color-text-primary);
-  background: var(--pulse-color-surface-raised);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-overlay, #101317);
   box-shadow: var(--pulse-shadow-panel);
 }
 
@@ -121,26 +134,66 @@ body {
   display: none;
 }
 
+/* The Settings page overlays the workspace. Playback continues underneath, so
+   the panel never unmounts the shell or interrupts the audio graph. */
+.settings-panel {
+  position: fixed;
+  z-index: 20;
+  inset-block: var(--pulse-space-6) calc(var(--pulse-space-10) + var(--pulse-space-3));
+  inset-inline: 50%;
+  width: min(560px, calc(100vw - var(--pulse-space-8)));
+  translate: -50% 0;
+  overflow: auto;
+}
+
+.settings-panel[hidden] {
+  display: none;
+}
+
 button,
 select,
 input {
   min-height: var(--pulse-target-min);
-  border: var(--pulse-border-thin) solid var(--pulse-color-border-default);
+  border: var(--pulse-border-thin) solid var(--pulse-color-border-default, #6d7881);
   border-radius: var(--pulse-radius-control);
-  color: var(--pulse-color-text-primary);
-  background: var(--pulse-color-surface-control);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-control, #242a30);
   outline: var(--pulse-operational-outline);
   outline-offset: -2px;
 }
 
+/* Raised switch cap: a one-pixel top highlight over a modest drop shadow. */
 button {
+  padding-inline: var(--pulse-space-2);
+  box-shadow:
+    inset 0 1px 0 0 #ffffff1a,
+    var(--pulse-shadow-control, 0 1px 3px #0008);
   cursor: pointer;
+  transition: background var(--pulse-duration-fast) linear;
 }
 
+button:hover:not(:disabled) {
+  border-color: var(--pulse-color-border-strong, #aab4bc);
+}
+
+/* Pressed caps read as depressed: the highlight moves to an inner shadow. */
+button:active:not(:disabled) {
+  box-shadow: inset 0 1px 3px 0 #00000080;
+}
+
+button:disabled {
+  color: var(--pulse-color-disabled, #7b858d);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* A lit switch. The accent fill is paired with the strong boundary so the
+   state never depends on colour alone. */
 button[aria-pressed="true"] {
-  color: var(--pulse-color-on-accent);
-  border-color: var(--pulse-color-accent);
-  background: var(--pulse-color-accent);
+  color: var(--pulse-color-on-accent, #07110b);
+  border-color: var(--pulse-color-border-strong, #aab4bc);
+  background: var(--pulse-color-accent, #7ed9a3);
+  font-weight: var(--pulse-weight-strong);
 }
 
 .tempo-label,
@@ -149,13 +202,21 @@ button[aria-pressed="true"] {
 .mode-label,
 .audio-status,
 .position {
-  color: var(--pulse-color-text-secondary);
+  color: var(--pulse-color-text-secondary, #bac2c8);
   white-space: nowrap;
 }
 
+/* Recessed value display, matching the transport readouts in the rack. */
 .position {
-  min-width: 56px;
+  min-width: 76px;
+  border: var(--pulse-border-thin) solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-control);
+  padding: var(--pulse-space-1) var(--pulse-space-2);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  box-shadow: inset 0 1px 3px 0 #00000073;
   font-family: var(--pulse-font-mono);
+  letter-spacing: 0.06em;
   text-align: end;
 }
 
@@ -165,7 +226,7 @@ button[aria-pressed="true"] {
 
 .editor-copy {
   margin: 0;
-  color: var(--pulse-color-text-secondary);
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 body {

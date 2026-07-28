@@ -96,8 +96,8 @@ this table is the traceability record.
 - **D37.** WAV export does not normalize, uses deterministic TPDF dither, and
   resamples offline to 44.1 kHz at high quality.
 - **D38.** Whenever the Mixer studio view is active, all eight instrument strips
-  remain simultaneously visible; empty slots use disabled strips labeled
-  `Empty`.
+  remain simultaneously visible; empty slots use disabled strips identified by
+  two-digit slot number and expose their Empty state accessibly.
 - **D39.** The minimum supported viewport is 1280 × 720. Below it, autosave
   continues and Save, portable Export, and a read-only project summary remain
   accessible behind a clear notice.
@@ -214,4 +214,15 @@ this table is the traceability record.
   and adds stack-order, height, and persistence state for a comparison that
   ghost lanes already serve. `AC-079` gates the selector and its lane
   lifecycle, `AC-086` gates ghost behavior.
+- **D67.** At 1568 × 1003,
+  `docs/design/image-gen-mock.png` is the approved raster reference for the
+  shell's proportion, placement, density, materials, typography scale, and
+  control sizing; `docs/design/claude-mock-up.html` remains the semantic and
+  interactive composition target. The rack faceplate pairs its dominant short
+  label with subordinate full-name and type text, the bottom workspace bar uses
+  the reference's approximately 50-to-52-pixel height, empty mixer strips show
+  their two-digit slot numbers, and the master strip's A–D grid identifies the
+  return buses with noninteractive labels rather than adding master sends or
+  return-state controls. Responsive and accessible behavior continues to be
+  owned by the product specifications rather than by raster artifacts.
 

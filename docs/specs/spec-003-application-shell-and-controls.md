@@ -4,7 +4,7 @@
 **Spec ID:** `spec-003`  
 **Build order:** 3 of 10  
 **Depends on:** [Technical foundations](spec-002-technical-foundations.md)  
-**Owns:** Application composition, Web Components, navigation, responsive
+**Owns:** Application composition, UI components, navigation, responsive
 behavior, and shared control primitives.  
 **Acceptance IDs:** `AC-004` through `AC-005`, `AC-042`, `AC-059`, and `AC-064`
 through `AC-066` in [release acceptance](spec-012-release-acceptance.md).
@@ -26,7 +26,7 @@ manage their own overflow.
    taller displays and approximately 210 to 230 pixels at the supported
    720-pixel height. Use internal scrolling rather than shrinking controls
    below their minimum sizes.
-4. Bottom workspace bar: approximately 40 to 46 pixels.
+4. Bottom workspace bar: approximately 50 to 52 pixels.
 
 At 1280 × 720, the complete row stack, inter-region gaps, and borders must fit
 without page-level scrolling or overlap. The rack and editor manage their own
@@ -59,11 +59,15 @@ priority from the rack.
 
 For the shell surfaces covered by this specification,
 [`docs/design/claude-mock-up.html`](../design/claude-mock-up.html) is the
-approved visual composition target, including the 2 × 2 A–D send grid added to
-each instrument channel. It owns visual proportion, placement, density, and the
-single-column tabbed studio composition. The product specifications continue to
-own behavior, state, accessibility, audio routing, and responsive acceptance.
-Other files under `docs/design/` remain non-normative visual evidence.
+approved semantic and interactive composition target.
+[`docs/design/image-gen-mock.png`](../design/image-gen-mock.png) is its approved
+1568 × 1003 raster reference for visual proportion, placement, density,
+materials, typography scale, and control sizing. The HTML target follows that
+raster at the reference viewport while preserving semantic controls,
+accessibility, interaction, and the responsive rules in this specification.
+The product specifications continue to own behavior, state, accessibility,
+audio routing, and responsive acceptance. Other files under `docs/design/`
+remain non-normative visual evidence.
 
 ### 8.3 Pattern and Song transport modes
 
@@ -87,8 +91,12 @@ timelines are post-MVP work.
 The studio mixer uses:
 
 - Eight simultaneously visible instrument channel strips whenever Mixer is the
-  active studio view. Empty rack slots retain disabled strips labeled `Empty`.
-- One master strip.
+  active studio view. Empty rack slots retain disabled strips identified by
+  their two-digit slot numbers, such as `07` and `08`, and expose their Empty
+  state in accessible text.
+- One master strip with compact, noninteractive A–D return labels in the same 2
+  × 2 reading order. They identify the four return buses and are not master
+  sends or return-state controls.
 - Four A–D send buttons per instrument channel, arranged as a visible 2 × 2
   grid inside the strip. Empty-channel send buttons remain visible but disabled.
 - A vertical fader.
@@ -117,9 +125,10 @@ The studio region provides:
 At every supported width:
 
 - Mixer is selected by default.
-- Mixer presents all eight instrument strips, including disabled `Empty`
-  strips, and one master strip. Each instrument strip keeps its 2 × 2 A–D send
-  grid visible.
+- Mixer presents all eight instrument strips, including disabled empty strips
+  identified by two-digit slot number, and one master strip. Each instrument
+  strip keeps its 2 × 2 A–D send grid visible, and the master keeps its 2 × 2
+  A–D return labels visible.
 - Effects replaces the Mixer view and presents the four modular send-chain
   summaries plus detailed-chain entry points.
 - Master opens master routing, master-chain, and output metering.
@@ -175,7 +184,7 @@ Behavior:
 
 ---
 
-## 10. Web Component structure
+## 10. Component structure
 
 Use the `pulse-` prefix without exceptions.
 
@@ -214,14 +223,13 @@ Recommended hierarchy:
     - `pulse-dialog`
     - `pulse-curve-editor`
 
-Do not create a custom element for every static wrapper.
+Do not create a component for every static wrapper.
 
 Rules:
 
-- Custom elements extend `HTMLElement`.
-- Reusable controls and isolated leaves use Shadow DOM.
-- The application shell may use light DOM.
-- Use templates, fragments, native elements, and `textContent`.
+- Reusable controls and isolated leaves encapsulate their styles.
+- The application shell may use unencapsulated styles.
+- Use native elements and text nodes rather than markup strings.
 - Never insert project data through unsanitized `innerHTML`.
 - Cache element references.
 - Clean up listeners, observers, timers, worklet ports, and animation frames.

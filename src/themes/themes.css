@@ -1,3 +1,11 @@
+/*
+ * Built-in theme palettes. Values are normative product design data owned by
+ * docs/THEMING.md section 4 and mirrored by src/themes/tokens.ts, which the
+ * theme service, the user-theme validator, and the contrast checks all read.
+ * Keep this file and that module in step; tests/unit/themes/token-discipline
+ * fails when they drift.
+ */
+
 :root,
 [data-theme="rack"] {
   --pulse-color-app: #0b0d0f;
@@ -6,7 +14,6 @@
   --pulse-color-surface-inset: #080a0c;
   --pulse-color-text-primary: #f3f5f6;
   --pulse-color-text-secondary: #bac2c8;
-  --pulse-color-text-muted: #919ba3;
   --pulse-color-border-default: #6d7881;
   --pulse-color-border-strong: #aab4bc;
   --pulse-color-accent: #7ed9a3;
@@ -15,22 +22,23 @@
   --pulse-color-focus-outer: #000000;
   --pulse-color-control-track: #6f7b84;
   --pulse-color-control-fill: #b0f2ca;
-  --pulse-color-control-thumb: #e1e6e9;
-  --pulse-color-meter-track: #20262b;
   --pulse-color-meter-low: #62d28a;
   --pulse-color-meter-mid: #f2c14e;
   --pulse-color-meter-high: #ff7667;
   --pulse-color-status-danger: #ff8178;
   --pulse-color-status-warning: #f2c14e;
   --pulse-color-status-success: #62d28a;
+  --pulse-color-overlay: #101317;
+  --pulse-color-text-muted: #919ba3;
+  --pulse-color-selection: #244d38;
+  --pulse-color-control-thumb: #e1e6e9;
+  --pulse-color-meter-track: #20262b;
   --pulse-color-status-info: #6bb8ff;
   --pulse-color-disabled: #7b858d;
-  --pulse-color-selection: #244d38;
-  --pulse-color-overlay: #101317;
   --pulse-color-scrollbar-track: #111519;
   --pulse-color-scrollbar-thumb: #6d7881;
-  --pulse-shadow-control: 0 1px 3px 0 #00000080;
-  --pulse-shadow-panel: 0 4px 12px 0 #00000099;
+  --pulse-shadow-control: 0px 1px 3px 0px #00000080;
+  --pulse-shadow-panel: 0px 4px 12px 0px #00000099;
 }
 
 [data-theme="mono"] {
@@ -40,25 +48,27 @@
   --pulse-color-surface-inset: #000000;
   --pulse-color-text-primary: #ffffff;
   --pulse-color-text-secondary: #c8c8c8;
-  --pulse-color-text-muted: #999999;
   --pulse-color-border-default: #777777;
   --pulse-color-border-strong: #b8b8b8;
   --pulse-color-accent: #e6e6e6;
   --pulse-color-on-accent: #080808;
+  --pulse-color-focus-inner: #ffffff;
+  --pulse-color-focus-outer: #000000;
   --pulse-color-control-track: #6a6a6a;
   --pulse-color-control-fill: #ffffff;
-  --pulse-color-control-thumb: #f2f2f2;
-  --pulse-color-meter-track: #292929;
   --pulse-color-meter-low: #d4d4d4;
   --pulse-color-meter-mid: #ffffff;
   --pulse-color-meter-high: #ffffff;
   --pulse-color-status-danger: #ffffff;
   --pulse-color-status-warning: #e8e8e8;
   --pulse-color-status-success: #d4d4d4;
+  --pulse-color-overlay: #0b0b0b;
+  --pulse-color-text-muted: #999999;
+  --pulse-color-selection: #393939;
+  --pulse-color-control-thumb: #f2f2f2;
+  --pulse-color-meter-track: #292929;
   --pulse-color-status-info: #d6d6d6;
   --pulse-color-disabled: #858585;
-  --pulse-color-selection: #393939;
-  --pulse-color-overlay: #0b0b0b;
   --pulse-color-scrollbar-track: #0c0c0c;
   --pulse-color-scrollbar-thumb: #777777;
   --pulse-shadow-control: none;
@@ -72,29 +82,31 @@
   --pulse-color-surface-inset: #050817;
   --pulse-color-text-primary: #f3f5ff;
   --pulse-color-text-secondary: #bcc6e8;
-  --pulse-color-text-muted: #929ec2;
   --pulse-color-border-default: #64729d;
   --pulse-color-border-strong: #98a9d8;
   --pulse-color-accent: #66c7ff;
   --pulse-color-on-accent: #03101a;
+  --pulse-color-focus-inner: #ffffff;
+  --pulse-color-focus-outer: #000000;
   --pulse-color-control-track: #6a799f;
   --pulse-color-control-fill: #a8e9ff;
-  --pulse-color-control-thumb: #dde5ff;
-  --pulse-color-meter-track: #202945;
   --pulse-color-meter-low: #61d8b0;
   --pulse-color-meter-mid: #f2c85e;
   --pulse-color-meter-high: #ff7183;
   --pulse-color-status-danger: #ff8292;
   --pulse-color-status-warning: #f2c85e;
   --pulse-color-status-success: #61d8b0;
+  --pulse-color-overlay: #0c1124;
+  --pulse-color-text-muted: #929ec2;
+  --pulse-color-selection: #173f61;
+  --pulse-color-control-thumb: #dde5ff;
+  --pulse-color-meter-track: #202945;
   --pulse-color-status-info: #73b8ff;
   --pulse-color-disabled: #7f8caf;
-  --pulse-color-selection: #173f61;
-  --pulse-color-overlay: #0c1124;
   --pulse-color-scrollbar-track: #0d1327;
   --pulse-color-scrollbar-thumb: #64729d;
-  --pulse-shadow-control: 0 1px 4px 0 #00000099;
-  --pulse-shadow-panel: 0 4px 14px 0 #000000a6;
+  --pulse-shadow-control: 0px 1px 4px 0px #00000099;
+  --pulse-shadow-panel: 0px 4px 14px 0px #000000a6;
 }
 
 [data-theme="analog"] {
@@ -104,29 +116,31 @@
   --pulse-color-surface-inset: #100f0d;
   --pulse-color-text-primary: #fff9ed;
   --pulse-color-text-secondary: #d0c5b6;
-  --pulse-color-text-muted: #aaa095;
   --pulse-color-border-default: #867c70;
   --pulse-color-border-strong: #b8ab9b;
   --pulse-color-accent: #f0b65b;
   --pulse-color-on-accent: #1a1003;
+  --pulse-color-focus-inner: #ffffff;
+  --pulse-color-focus-outer: #000000;
   --pulse-color-control-track: #867c70;
   --pulse-color-control-fill: #ffe0a3;
-  --pulse-color-control-thumb: #e8ded2;
-  --pulse-color-meter-track: #40392f;
   --pulse-color-meter-low: #86c878;
   --pulse-color-meter-mid: #edbc58;
   --pulse-color-meter-high: #f47762;
   --pulse-color-status-danger: #f48170;
   --pulse-color-status-warning: #edbc58;
   --pulse-color-status-success: #86c878;
+  --pulse-color-overlay: #201d19;
+  --pulse-color-text-muted: #aaa095;
+  --pulse-color-selection: #5b431d;
+  --pulse-color-control-thumb: #e8ded2;
+  --pulse-color-meter-track: #40392f;
   --pulse-color-status-info: #81bde8;
   --pulse-color-disabled: #92887c;
-  --pulse-color-selection: #5b431d;
-  --pulse-color-overlay: #201d19;
   --pulse-color-scrollbar-track: #211e1a;
   --pulse-color-scrollbar-thumb: #867c70;
-  --pulse-shadow-control: 0 1px 3px 0 #00000080;
-  --pulse-shadow-panel: 0 4px 12px 0 #0000008c;
+  --pulse-shadow-control: 0px 1px 3px 0px #00000080;
+  --pulse-shadow-panel: 0px 4px 12px 0px #0000008c;
 }
 
 [data-theme="rust"] {
@@ -136,37 +150,31 @@
   --pulse-color-surface-inset: #0d0907;
   --pulse-color-text-primary: #fff4e8;
   --pulse-color-text-secondary: #d8bfaf;
-  --pulse-color-text-muted: #a98e7e;
   --pulse-color-border-default: #8d6b58;
   --pulse-color-border-strong: #c49378;
   --pulse-color-accent: #e58a55;
   --pulse-color-on-accent: #190a03;
+  --pulse-color-focus-inner: #ffffff;
+  --pulse-color-focus-outer: #000000;
   --pulse-color-control-track: #8d6b58;
   --pulse-color-control-fill: #ffc8a5;
-  --pulse-color-control-thumb: #e6c9b9;
-  --pulse-color-meter-track: #40291f;
   --pulse-color-meter-low: #8dce75;
   --pulse-color-meter-mid: #f0b956;
   --pulse-color-meter-high: #ff755b;
   --pulse-color-status-danger: #ff826b;
   --pulse-color-status-warning: #f0b956;
   --pulse-color-status-success: #8dce75;
+  --pulse-color-overlay: #1c120e;
+  --pulse-color-text-muted: #a98e7e;
+  --pulse-color-selection: #62331e;
+  --pulse-color-control-thumb: #e6c9b9;
+  --pulse-color-meter-track: #40291f;
   --pulse-color-status-info: #78bce7;
   --pulse-color-disabled: #9b7a68;
-  --pulse-color-selection: #62331e;
-  --pulse-color-overlay: #1c120e;
   --pulse-color-scrollbar-track: #1d120e;
   --pulse-color-scrollbar-thumb: #8d6b58;
-  --pulse-shadow-control: 0 1px 3px 0 #00000099;
-  --pulse-shadow-panel: 0 4px 12px 0 #000000a6;
-}
-
-[data-theme="mono"],
-[data-theme="cosmic"],
-[data-theme="analog"],
-[data-theme="rust"] {
-  --pulse-color-focus-inner: #ffffff;
-  --pulse-color-focus-outer: #000000;
+  --pulse-shadow-control: 0px 1px 3px 0px #00000099;
+  --pulse-shadow-panel: 0px 4px 12px 0px #000000a6;
 }
 
 [data-high-contrast="true"] {
@@ -175,11 +183,8 @@
   --pulse-color-surface-panel: #000000;
   --pulse-color-surface-control: #111111;
   --pulse-color-surface-inset: #000000;
-  --pulse-color-overlay: #000000;
   --pulse-color-text-primary: #ffffff;
   --pulse-color-text-secondary: #ffffff;
-  --pulse-color-text-muted: #d6d6d6;
-  --pulse-color-selection: #005a66;
   --pulse-color-border-default: #ffffff;
   --pulse-color-border-strong: #ffffff;
   --pulse-color-accent: #00e5ff;
@@ -188,14 +193,17 @@
   --pulse-color-focus-outer: #000000;
   --pulse-color-control-track: #6a6a6a;
   --pulse-color-control-fill: #00e5ff;
-  --pulse-color-control-thumb: #ffffff;
-  --pulse-color-meter-track: #262626;
   --pulse-color-meter-low: #00ff80;
   --pulse-color-meter-mid: #ffff00;
   --pulse-color-meter-high: #ff5c5c;
   --pulse-color-status-danger: #ff6b6b;
   --pulse-color-status-warning: #ffff00;
   --pulse-color-status-success: #00ff80;
+  --pulse-color-overlay: #000000;
+  --pulse-color-text-muted: #d6d6d6;
+  --pulse-color-selection: #005a66;
+  --pulse-color-control-thumb: #ffffff;
+  --pulse-color-meter-track: #262626;
   --pulse-color-status-info: #66ccff;
   --pulse-color-disabled: #b8b8b8;
   --pulse-color-scrollbar-track: #000000;

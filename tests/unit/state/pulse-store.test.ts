@@ -34,6 +34,29 @@ function deterministicIds(): IdFactory {
 }
 
 describe("PulseStore", () => {
+  it("supports project load, save, export, and import lifecycle operations", () => {
+    const ids = deterministicIds();
+    const store = createStore(ids);
+    const originalProject = store.saveProject();
+
+    const reloaded = store.loadProject({
+      ...originalProject,
+      name: "Imported project",
+      revision: { ...originalProject.revision, counter: originalProject.revision.counter + 1 },
+    });
+    expect(reloaded).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.name).toBe("Imported project");
+
+    const exported = store.exportProject();
+    expect(JSON.parse(exported)).toMatchObject({ name: "Imported project" });
+
+    const importedSnapshot = JSON.parse(exported) as { name: string };
+    importedSnapshot.name = "Imported from export";
+    const imported = store.importProject(JSON.stringify(importedSnapshot));
+    expect(imported).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.name).toBe("Imported from export");
+  });
+
   it("applies one atomic parameter command and supports undo and redo", () => {
     const ids = deterministicIds();
     const deltas = vi.fn();

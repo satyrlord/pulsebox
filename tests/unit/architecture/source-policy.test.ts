@@ -65,6 +65,7 @@ describe("architecture source policy", () => {
       { path: "src/state/project.ts", source: "interface Project { readonly node: AudioNode }" },
       { path: "src/engine/preview.ts", source: 'import { AcidBassDsp } from "./modules/bass-mono/dsp-core";' },
       { path: "scripts/server.mjs", source: 'const endpoint = "/api/projects";' },
+      { path: "src/ui/rack-delete.ts", source: 'if (window.confirm("Delete module?")) remove();' },
     ];
 
     const violations = findForbiddenTechnologyViolations(fixture);
@@ -77,6 +78,7 @@ describe("architecture source policy", () => {
     expect(violations.some((violation) => violation.message.includes("State must not hold"))).toBe(true);
     expect(violations.some((violation) => violation.message.includes("DSP cores"))).toBe(true);
     expect(violations.some((violation) => violation.message.includes("endpoint"))).toBe(true);
+    expect(violations.some((violation) => violation.message.includes("confirmation dialogs"))).toBe(true);
   });
 
   it("contains no prohibited framework, JSX, MIDI, ScriptProcessor, or service-worker code", () => {

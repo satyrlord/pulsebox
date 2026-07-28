@@ -1,8 +1,9 @@
 # Naming, dependency, and originality audit
 
-**Date:** 2026-07-27
+**Date:** 2026-07-28
 
-**Repository state:** Phase 1 runnable foundation
+**Repository state:** Phase 1 runnable foundation with the theme, appearance,
+and user-theme import implementation
 
 **Result:** pass for the current source, shipping text, build, and dependency
 scope
@@ -22,8 +23,8 @@ assets exist yet.
 - Reviewed visible product naming and capitalization.
 - Reviewed file and configuration paths for remnants from earlier products or
   prohibited native-wrapper architecture.
-- Inspected the complete dependency tree for prohibited UI frameworks and the
-  direct decoder chain for pinned versions and licenses.
+- Inspected the complete dependency tree and the direct decoder chain for pinned
+  versions and licenses.
 - Built the production artifact and inspected its file list to confirm that
   `design/` and `research/` are excluded.
 - Confirmed that policy documents may name prohibited technologies only to state
@@ -51,7 +52,6 @@ assets exist yet.
 
 - No prohibited historical product or manufacturer name occurs in the current
   source, package metadata, public documents, or built artifact.
-- The prohibited framework dependency query is empty.
 - `npm audit` reports zero vulnerabilities across 174 installed dependencies.
 - Bundled decoder packages are pinned to `@audio/decode-wav` 1.4.3,
   `@audio/decode-aiff` 1.2.3, and `@audio/decode-flac` 1.2.3. Their package
@@ -61,8 +61,13 @@ assets exist yet.
   documentation uses `Pulsebox`.
 - The six approved instrument names and IDs remain those in the
   [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
-- The current build contains only `index.html`, CSS, the application module, and
-  the Acid Bass worklet asset.
+- The current build contains only `index.html`, CSS, the application module, the
+  Acid Bass worklet asset, and the sample decoder worker.
+- The five built-in theme palettes and the high-contrast overlay are original
+  token values authored for Pulsebox. They carry no copied color scheme, no
+  hardware artwork, and no community theme data.
+- Theme identifiers and visible labels are the approved `rack`, `mono`,
+  `cosmic`, `analog`, and `rust` set. No theme name refers to a real product.
 
 ## Required future audit
 

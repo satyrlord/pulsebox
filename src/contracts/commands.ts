@@ -63,6 +63,16 @@ export type Listener<Selected> = (
 ) => void;
 export type Unsubscribe = () => void;
 
+export interface ProjectStateLike {
+  readonly id: string;
+  readonly lineageId: string;
+  readonly revision: StateRevision;
+  readonly name: string;
+  readonly tempo: number;
+  readonly rackSlots: readonly unknown[];
+  readonly modules: Readonly<Record<string, unknown>>;
+}
+
 export interface PulseStore<State, Command> {
   getState(): Readonly<State>;
   dispatch(command: Command): CommandResult;
@@ -72,6 +82,10 @@ export interface PulseStore<State, Command> {
   ): Unsubscribe;
   undo(): CommandResult;
   redo(): CommandResult;
+  loadProject(project: ProjectStateLike): CommandResult;
+  saveProject(): ProjectStateLike;
+  exportProject(): string;
+  importProject(serializedProject: string): CommandResult;
 }
 
 export interface EngineProjectionPort<Delta> {

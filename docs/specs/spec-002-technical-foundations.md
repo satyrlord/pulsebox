@@ -17,9 +17,9 @@ Undo foundations.
 Use:
 
 - TypeScript with strict mode.
-- Native DOM APIs.
-- Native Custom Elements and Web Components.
-- Shadow DOM for reusable controls and isolated leaf components.
+- One UI framework or component model for the whole UI layer, applied
+  consistently.
+- Style encapsulation for reusable controls and isolated leaf components.
 - CSS Grid and Flexbox.
 - CSS custom properties.
 - Inline SVG.
@@ -37,24 +37,13 @@ Use:
 
 Do not use:
 
-- React.
-- Vue.
-- Angular.
-- Svelte.
-- Solid.
-- Preact.
-- Lit.
-- JSX.
-- A virtual DOM.
-- A UI component framework.
-- A CSS framework.
 - Third-party sequencer, mixer, piano-roll, knob, or fader components.
 - Raster control artwork.
 - `ScriptProcessorNode`.
 - Main-thread DSP.
 - MIDI APIs, MIDI file code, MIDI learn, or MIDI placeholders.
 
-Inspect the final dependency tree. No unused framework dependency may remain.
+Inspect the final dependency tree. No unused dependency may remain.
 
 ---
 
@@ -107,7 +96,7 @@ The state layer has no DOM and no live AudioNode objects.
 
 Responsibilities:
 
-- Web Components.
+- UI components.
 - Layout.
 - Input handling.
 - Accessibility.

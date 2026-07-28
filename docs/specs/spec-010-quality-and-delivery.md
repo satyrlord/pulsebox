@@ -253,7 +253,7 @@ global stylesheet.
 
 Support the current stable releases of Chrome, Edge, and Firefox. Safari is
 outside MVP support. Run every deterministic browser-specific audio, file,
-Canvas, persistence, and Web Component check in all three release channels. Use
+Canvas, persistence, and component check in all three release channels. Use
 documented manual checks only for physical audio behavior that browser
 automation cannot observe. Record exact browser versions in release evidence.
 

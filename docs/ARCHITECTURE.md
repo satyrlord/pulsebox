@@ -24,7 +24,7 @@ together if an accepted decision changes a boundary defined here.
 Pulsebox shall remain:
 
 - a fully client-side browser application;
-- a strict-TypeScript application built with native DOM APIs and Web Components;
+- a strict-TypeScript application with one consistent UI component model;
 - a three-layer system with engine, state, and UI ownership kept separate;
 - limited to eight enabled rack slots in the MVP while keeping internal
   contracts slot-count agnostic;
@@ -116,8 +116,8 @@ Allowed compile-time dependencies are:
 | Consumer    | May depend on                                                      | Must not depend on                                                              |
 | ----------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
 | UI          | UI code, data-only contracts, state read and command ports         | Engine implementations, `AudioNode`, worklet ports, persistence implementations |
-| State       | State code, data-only contracts, injected persistence ports        | DOM, Web Components, Canvas, `AudioNode`, worklet implementations               |
-| Engine      | Engine code, data-only contracts, injected clock and decoder ports | DOM, Web Components, project repositories, UI code                              |
+| State       | State code, data-only contracts, injected persistence ports        | DOM, UI components, Canvas, `AudioNode`, worklet implementations                |
+| Engine      | Engine code, data-only contracts, injected clock and decoder ports | DOM, UI components, project repositories, UI code                               |
 | Composition | Public ports from UI, state, engine, and persistence adapters      | Private internals of any layer                                                  |
 
 Cross-layer imports that bypass a public port shall fail an architecture test.
@@ -180,8 +180,8 @@ disagree, implementation shall stop until the two contracts are reconciled.
 
 The UI shall own:
 
-- native Custom Elements and Web Components;
-- Shadow DOM for reusable controls and isolated leaf components;
+- the UI components and their composition;
+- style encapsulation for reusable controls and isolated leaf components;
 - layout, keyboard and pointer input, focus, and accessibility;
 - theme application and visual state;
 - Canvas or SVG rendering for high-frequency or geometric views;

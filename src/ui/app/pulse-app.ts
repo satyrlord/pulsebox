@@ -8,9 +8,15 @@ import type {
   Unsubscribe,
 } from "../../contracts";
 import type { PulseCommand, PulseState, PulseStore } from "../../state/public";
+import {
+  APPEARANCE_STORAGE_KEY,
+  elementThemeHost,
+  PulseThemeService,
+} from "../../themes";
 import { PulseKnob } from "../controls/pulse-knob";
 import { requiredElement } from "../required-element";
 import { PulsePatternStrip } from "../shell/pulse-pattern-strip";
+import { PulseSettingsPage } from "../shell/pulse-settings-page";
 import { RackView } from "./rack-view";
 
 type CommandPayload<Type extends PulseCommand["type"]> = Extract<
@@ -49,6 +55,8 @@ export interface PulseboxAppHandle {
   readonly dispose: () => void;
   readonly markAudioUnavailable: () => void;
   readonly reportAudioStatus: (status: PulseAudioStatus, message?: string) => void;
+  /** Appearance ownership, for the Settings page once it exists. */
+  readonly themeService: PulseThemeService;
 }
 
 export function mountPulseboxApp(options: MountPulseboxAppOptions): PulseboxAppHandle {
@@ -62,6 +70,7 @@ class PulseboxApp implements PulseboxAppHandle {
   readonly #audio: PulseAudioControlPort;
   readonly #host: HTMLDivElement;
   readonly #store: PulseAppStorePort;
+  readonly #themeService: PulseThemeService;
   readonly #unsubscribers: Unsubscribe[] = [];
   readonly #visibleSlotCount: number;
   #audioStatus!: HTMLOutputElement;
@@ -71,8 +80,10 @@ class PulseboxApp implements PulseboxAppHandle {
   #rackView!: RackView;
   #recordButton!: HTMLButtonElement;
   #redoButton!: HTMLButtonElement;
+  #settingsButton!: HTMLButtonElement;
+  #settingsPanel!: HTMLElement;
   #tempo!: HTMLInputElement;
-  #undoNotice!: HTMLElement;
+  #undoNotice: HTMLElement | undefined;
   #undoNoticeMessage!: HTMLSpanElement;
   #undoNoticeTimer: number | undefined;
   #undoRemovalButton!: HTMLButtonElement;
@@ -87,9 +98,31 @@ class PulseboxApp implements PulseboxAppHandle {
     this.#manifestFor = options.manifestFor;
     this.#store = options.store;
     this.#visibleSlotCount = options.visibleSlotCount;
+    // Appearance is a global UI preference. It never reaches the store, so a
+    // theme change cannot mark a project dirty or enter undo history.
+    this.#themeService = new PulseThemeService({
+      host: elementThemeHost(document.documentElement),
+      storage: {
+        getItem: (key) => window.localStorage.getItem(key),
+        setItem: (key, value) => {
+          window.localStorage.setItem(key, value);
+        },
+      },
+      onCorruptPreference: () => {
+        this.#announce("Stored appearance settings were unreadable, so the Rack theme is active.");
+      },
+      onStorageFailure: (message) => {
+        this.#announce(message);
+      },
+    });
+  }
+
+  get themeService(): PulseThemeService {
+    return this.#themeService;
   }
 
   mount(): void {
+    this.#themeService.start();
     this.#host.innerHTML = `
       <div class="pulse-shell" data-pulse-editable-workspace>
         <pulse-transport-bar>
@@ -117,8 +150,13 @@ class PulseboxApp implements PulseboxAppHandle {
             <button type="button" data-action="undo">Undo</button>
             <button type="button" data-action="redo">Redo</button>
           </span>
-          <span slot="actions" class="phase-label">Three-slot Phase 1 rack</span>
+          <span slot="actions" class="phase-label">
+            <button type="button" data-action="settings" aria-expanded="false" aria-controls="settings-panel">Settings</button>
+          </span>
         </pulse-workspace-bar>
+        <div class="settings-panel" id="settings-panel" hidden>
+          <pulse-settings-page></pulse-settings-page>
+        </div>
         <aside class="undo-notice" role="status" aria-live="polite" aria-atomic="true" hidden>
           <span class="undo-notice-message"></span>
           <button type="button" data-action="undo-removal">Undo</button>
@@ -136,6 +174,12 @@ class PulseboxApp implements PulseboxAppHandle {
     this.#undoNotice = requiredElement(this.#host, ".undo-notice", HTMLElement);
     this.#undoNoticeMessage = requiredElement(this.#host, ".undo-notice-message", HTMLSpanElement);
     this.#undoRemovalButton = requiredElement(this.#host, "[data-action='undo-removal']", HTMLButtonElement);
+    this.#settingsButton = requiredElement(this.#host, "[data-action='settings']", HTMLButtonElement);
+    this.#settingsPanel = requiredElement(this.#host, ".settings-panel", HTMLElement);
+    // Appearance ownership stays with the theme service. The page reads and
+    // writes preferences through it and never touches the project store.
+    requiredElement(this.#host, "pulse-settings-page", PulseSettingsPage)
+      .connect(this.#themeService);
     const addProductName = this.#manifestFor(this.#addPluginId)?.productName ?? "module";
     this.#rackView = new RackView(rack, this.#visibleSlotCount, addProductName, this.#manifestFor, {
       onAction: (action, moduleId, slotId) => this.#onRackAction(action, moduleId, slotId),
@@ -162,6 +206,11 @@ class PulseboxApp implements PulseboxAppHandle {
     this.#host.addEventListener("change", (event) => this.#onChange(event), { signal });
     window.addEventListener("keydown", (event) => this.#onKeyDown(event), { signal });
     document.addEventListener("visibilitychange", () => this.#onVisibilityChange(), { signal });
+    // A valid appearance envelope written by another tab applies as a UI-only
+    // update. Invalid cross-tab data is ignored without changing appearance.
+    window.addEventListener("storage", (event) => {
+      if (event.key === APPEARANCE_STORAGE_KEY) this.#themeService.applyCrossTabValue(event.newValue);
+    }, { signal });
 
     this.#unsubscribers.push(
       this.#store.subscribe((state) => state.project, () => this.#patchRack()),
@@ -244,6 +293,24 @@ class PulseboxApp implements PulseboxAppHandle {
     } else if (action === "redo") {
       const result = this.#store.redo();
       if (result.status === "accepted" && result.changed) this.#hideUndoNotice();
+    } else if (action === "settings") {
+      this.#setSettingsOpen(this.#settingsPanel.hidden !== false);
+    }
+  }
+
+  /**
+   * Section 11.4 keeps appearance selection on this page alone. Closing returns
+   * focus to the button that opened it, so keyboard position is never lost.
+   */
+  #setSettingsOpen(open: boolean): void {
+    this.#settingsPanel.hidden = !open;
+    this.#settingsButton.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const page = this.#settingsPanel.querySelector("pulse-settings-page");
+      const first = page?.shadowRoot?.querySelector("input");
+      if (first instanceof HTMLInputElement) first.focus();
+    } else {
+      this.#settingsButton.focus();
     }
   }
 
@@ -267,6 +334,12 @@ class PulseboxApp implements PulseboxAppHandle {
       const redo = event.key.toLowerCase() === "y" || event.shiftKey;
       const result = redo ? this.#store.redo() : this.#store.undo();
       if (result.status === "accepted" && result.changed) this.#hideUndoNotice();
+      return;
+    }
+    // An open Settings page owns Escape: closing it must not also stop playback.
+    if (event.key === "Escape" && !this.#settingsPanel.hidden) {
+      event.preventDefault();
+      this.#setSettingsOpen(false);
       return;
     }
     if (path.some((target) =>
@@ -390,19 +463,37 @@ class PulseboxApp implements PulseboxAppHandle {
   }
 
   #showUndoNotice(message: string, canUndo: boolean): void {
+    const notice = this.#undoNotice;
+    if (notice === undefined) return;
     if (this.#undoNoticeTimer !== undefined) window.clearTimeout(this.#undoNoticeTimer);
     this.#undoNoticeMessage.textContent = message;
     this.#undoRemovalButton.hidden = !canUndo;
-    this.#undoNotice.hidden = false;
+    notice.hidden = false;
     if (!canUndo) {
       this.#undoNoticeTimer = window.setTimeout(() => this.#hideUndoNotice(), 2_500);
     }
   }
 
+  /**
+   * Non-blocking status message with an ARIA live announcement. Used for
+   * appearance failures, which must never block or change the active theme.
+   */
+  #announce(message: string): void {
+    // The theme service starts before the shell is rendered, so a startup
+    // report has no notice element to write into yet. Defer to the next task.
+    if (this.#undoNotice === undefined) {
+      queueMicrotask(() => {
+        if (this.#undoNotice !== undefined) this.#showUndoNotice(message, false);
+      });
+      return;
+    }
+    this.#showUndoNotice(message, false);
+  }
+
   #hideUndoNotice(): void {
     if (this.#undoNoticeTimer !== undefined) window.clearTimeout(this.#undoNoticeTimer);
     this.#undoNoticeTimer = undefined;
-    this.#undoNotice.hidden = true;
+    if (this.#undoNotice !== undefined) this.#undoNotice.hidden = true;
   }
 }
 

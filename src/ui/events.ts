@@ -24,6 +24,20 @@ declare global {
     "pulse-control-commit": CustomEvent<PulseControlEventDetail>;
     "pulse-control-input": CustomEvent<PulseControlEventDetail<number>>;
     "pulse-step-change": CustomEvent<PulseStepChangeDetail>;
+    "pulse-note-create": CustomEvent<unknown>;
+    "pulse-note-change": CustomEvent<unknown>;
+    "pulse-note-delete": CustomEvent<unknown>;
+    "pulse-module-add": CustomEvent<unknown>;
+    "pulse-module-move": CustomEvent<unknown>;
+    "pulse-module-remove": CustomEvent<unknown>;
+    "pulse-module-duplicate": CustomEvent<unknown>;
+    "pulse-channel-change": CustomEvent<unknown>;
+    "pulse-effect-change": CustomEvent<unknown>;
+    "pulse-pattern-change": CustomEvent<unknown>;
+    "pulse-pattern-select": CustomEvent<unknown>;
+    "pulse-pattern-reorder": CustomEvent<unknown>;
+    "pulse-automation-change": CustomEvent<unknown>;
+    "pulse-transport-command": CustomEvent<unknown>;
   }
 }
 

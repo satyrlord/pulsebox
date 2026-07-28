@@ -45,12 +45,12 @@ description: Use when the user wants Pulsebox interface work designed, built, au
 - Implement themes only through the documented CSS token contract. Do not add
   theme-specific TypeScript or markup.
 
-## Build native controls
+## Build original controls
 
-- Use native Custom Elements and the pulse- prefix.
-- Use Shadow DOM for reusable controls and isolated leaf components.
-- Do not introduce a UI framework, JSX, virtual DOM, CSS framework, or
-  third-party music control.
+- Use the project's UI component model and the pulse- prefix.
+- Encapsulate styles for reusable controls and isolated leaf components.
+- Do not introduce a third-party music control or a second component model
+  alongside the project's.
 - Render structure once and patch state. Keep high-frequency meters, playheads,
   and curves isolated from structural DOM work.
 - Make every visible operational control change state, audio, navigation, or a

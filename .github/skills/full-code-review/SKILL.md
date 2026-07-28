@@ -28,11 +28,11 @@ ownership boundary it should have respected. Check:
   message ordering, and offline parity;
 - versioned project data, migrations, validation, assets, and preference
   boundaries;
-- Custom Element registration, Shadow DOM behavior, cleanup, input, focus,
+- component registration, style encapsulation, cleanup, input, focus,
   accessibility, and supported-size layout;
 - the five-theme token contract and absence of theme-specific markup or logic;
-- prohibited frameworks, MIDI, main-thread DSP, ScriptProcessorNode, server,
-  native wrapper, PWA, and service-worker code;
+- MIDI, main-thread DSP, ScriptProcessorNode, server, native wrapper, PWA, and
+  service-worker code;
 - naming, originality, shipping boundaries, and research isolation;
 - direct code, cohesive modules, explicit invariants, and removal of duplicated
   policy or unnecessary concepts;

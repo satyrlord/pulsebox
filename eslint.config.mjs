@@ -14,7 +14,7 @@ const restricted = (patterns) => [
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "playwright-report/**", "test-results/**", "design/**", "eslint.config.mjs"],
+    ignores: ["dist/**", "node_modules/**", "playwright-report/**", "test-results/**", "design/**", "tmp/**", "tmp-*/**", "eslint.config.mjs"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

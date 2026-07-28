@@ -6,9 +6,8 @@ Use simple English. Prefer short sentences and a plain structure. Do not use
 emoji in code, comments, tests, specifications, documentation, or skills.
 
 Pulsebox is a fully client-side, desktop-first modular groove workstation for
-Chrome, Edge, and Firefox. It is built with strict TypeScript, native Web
-Components, Web Audio, and AudioWorklet. No UI framework, no server product
-component, no MIDI.
+Chrome, Edge, and Firefox. It is built with strict TypeScript, Web Audio, and
+AudioWorklet. No server product component, no MIDI.
 
 ## Source of truth
 
@@ -108,8 +107,9 @@ Owning contract documents:
 Use:
 
 - strict TypeScript;
-- native DOM APIs, Custom Elements, and Web Components;
-- Shadow DOM for reusable controls and isolated leaf components;
+- one UI framework or component model for the whole UI layer, applied
+  consistently;
+- style encapsulation for reusable controls and isolated leaf components;
 - CSS Grid, Flexbox, custom properties, and original inline SVG;
 - Canvas only where high-frequency rendering benefits from it;
 - Web Audio and AudioWorklet;
@@ -120,15 +120,12 @@ Use:
 
 Do not use:
 
-- React, Vue, Angular, Svelte, Solid, Preact, Lit, JSX, or a virtual DOM;
-- UI or CSS frameworks;
 - third-party sequencer, mixer, piano-roll, knob, or fader components;
 - raster control artwork;
 - ScriptProcessorNode or main-thread custom DSP;
 - MIDI APIs, MIDI files, MIDI learn, or MIDI placeholders.
 
-Inspect the dependency tree before close-out. Remove unused and prohibited
-framework dependencies.
+Inspect the dependency tree before close-out. Remove unused dependencies.
 
 ## Architecture
 
@@ -139,7 +136,7 @@ framework dependencies.
 - The state layer owns plain project data, commands, undo and redo,
   serialization, migrations, validation, selectors, editor state, automation,
   and persistence state. It has no DOM and stores no live AudioNode objects.
-- The UI owns Web Components, layout, input, accessibility, themes, and visual
+- The UI owns components, layout, input, accessibility, themes, and visual
   patching. It dispatches typed commands and never edits the audio graph.
 - Define the base plugin manifest, instrument and effect contracts, parameter
   descriptors, command model, message protocol, project schema, and theme tokens
@@ -159,7 +156,7 @@ The three domain layers and the wiring-only composition boundary live here:
 | `src/main.ts`     | composition | Object creation, port injection, command routing, startup and shutdown                     |
 | `src/engine/`     | engine      | AudioContext, AudioNodes, worklets, transport clock, scheduling, decoding, offline render  |
 | `src/state/`      | state       | Project data, typed commands, undo and redo, selectors, serialization, persistence ports   |
-| `src/ui/`         | UI          | Custom elements, layout, input, focus, accessibility, themes, DOM patching                 |
+| `src/ui/`         | UI          | Components, layout, input, focus, accessibility, themes, DOM patching                      |
 | `src/contracts/`  | contracts   | Data-only shared types with no singleton, browser handle, or algorithm                     |
 
 Cross-layer imports go through the owning layer's `public.ts`
@@ -168,9 +165,11 @@ enforce this:
 
 - `no-restricted-imports` per layer in `eslint.config.mjs`.
 - The AST policy in `tests/unit/architecture/source-policy.ts`, which also fails
-  on JSX and TSX, UI framework imports, `ScriptProcessorNode`, any identifier or
-  string matching `midi`, service-worker code, and product-specific plugin-ID
-  branching outside a plugin folder or the registry.
+  on `ScriptProcessorNode`, any identifier or string matching `midi`,
+  service-worker code, and product-specific plugin-ID branching outside a plugin
+  folder or the registry. Its JSX, TSX, and UI-framework-import checks and the
+  matching `eslint.config.mjs` rules still run and must be removed as part of
+  the framework migration.
 
 Read that policy file before adding a source directory or a shared branch.
 
@@ -224,7 +223,7 @@ evicting the oldest entries rather than rejecting a valid new action.
 
 ## UI and accessibility
 
-- Prefix custom elements with pulse-.
+- Prefix Pulsebox component names with pulse-.
 - Render component structure once and patch changed state. Avoid rebuilding
   large subtrees during high-frequency updates.
 - Never insert project data through unsanitized innerHTML.
