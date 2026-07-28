@@ -33,7 +33,12 @@ The merged MVP is complete only when:
     `Delete module` is in the loaded module context menu and works by right-click
     and the standard keyboard context-menu gesture; no persistent Add or minus
     buttons exist below the slot list.
-11. **AC-011.** Compact step editing works.
+11. **AC-011.** The Piano Roll is the only surface that edits Pattern event
+    data. No rack faceplate contains a step grid or any per-step editing.
+    Faceplate Pattern activity is output-only and not focusable. The faceplate
+    audition control sounds the module while held by pointer or by keyboard,
+    stops on release or on lost focus or capture, respects mute, solo, and
+    routing, and writes no Pattern event, no project state, and no Undo entry.
 12. **AC-012.** Piano-roll note creation, movement, resizing, deletion, velocity, selection,
     and quantization work.
 13. **AC-013.** Drum-grid painting, velocity, probability, micro-timing, flam, roll, voice
@@ -168,7 +173,7 @@ The merged MVP is complete only when:
 71. **AC-071.** The engine, state, and UI remain slot-count agnostic for the explicit
     sixteen-slot post-MVP target without enabling more than eight slots in the
     MVP.
-72. **AC-072.** The compact pattern strip handles lengths above sixteen steps through
+72. **AC-072.** The Piano Roll handles part lengths above sixteen steps through
     sixteen-step pages, playback follow, a page indicator, and viewed-page
     locking.
 73. **AC-073.** Pause preserves position; Stop returns to the last explicit start marker,
@@ -188,10 +193,18 @@ The merged MVP is complete only when:
 78. **AC-078.** Development and built-product launch use `http://127.0.0.1:4173`; a busy
     port fails visibly instead of selecting a different origin.
 79. **AC-079.** The Piano Roll header shows Pattern-owned horizontal Swing and
-    Humanize sliders and a Velocity lane selector in place of `Vel 100`. The
-    MVP uses fixed 1/16 timing, fixed 100% quantize strength, Alt-drag temporary
-    snap override, and no Straight, grid, triplet, or persistent snap-off
-    control.
+    Humanize sliders and a Parameter selector, defaulting to Velocity, in place
+    of `Vel 100`. The selector is the only control that chooses an edited lane;
+    it is scoped to the selected module, offering that module's supported note
+    properties and its manifest-declared automatable parameters, re-scoping on
+    module change, and marking entries that already hold data in the active
+    Pattern. Exactly one lane is visible at a time. Selecting a parameter with
+    no lane creates no project data and no undo entry; the first committed edit
+    creates the lane as one undoable command, and erasing every step removes the
+    lane record. A mixer, send, effect, or master parameter reaches the same
+    lane only through `Automate` on its own control. The MVP uses fixed 1/16
+    timing, fixed 100% quantize strength, Alt-drag temporary snap override, and
+    no Straight, grid, triplet, or persistent snap-off control.
 80. **AC-080.** Rack-module collapse persists only as a local UI preference keyed by
     project, project lineage, and module, does not travel in `.pulsebox` files,
     creates no undo entry, and never leaks across whole-project replacement
@@ -211,4 +224,11 @@ The merged MVP is complete only when:
 85. **AC-085.** Master-effects bypass is project-owned, undoable, playback-safe,
     and bypasses user master effects while leaving master gain and the protected
     limiter active. The limiter keeps its own detailed bypass.
+86. **AC-086.** Piano Roll ghost notes and ghost lane content are output-only:
+    they are not focusable, are never returned by marquee or select-all, and are
+    never moved, deleted, or transformed by an edit, a generator, or a transform
+    aimed at the active module. They carry a non-color cue in addition to color
+    in every supplied theme, and ghost display persists only as a local view
+    preference that creates no undo entry and does not travel in `.pulsebox`
+    files.
 

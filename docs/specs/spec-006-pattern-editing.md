@@ -4,10 +4,11 @@
 **Spec ID:** `spec-006`  
 **Build order:** 6 of 10  
 **Depends on:** [Rack and instruments](spec-005-rack-and-instruments.md)  
-**Owns:** Named project Patterns, the module-aware Piano Roll, live input,
-generators, and transforms.
-**Acceptance IDs:** `AC-011` through `AC-017`, `AC-069`, `AC-072`, and
-`AC-079` in
+**Owns:** Named project Patterns, the module-aware Piano Roll as the single
+pattern editing surface and the single automation-lane editing surface, live
+input, generators, and transforms.
+**Acceptance IDs:** `AC-011` through `AC-017`, `AC-069`, `AC-072`, `AC-079`, and
+`AC-086` in
 [release acceptance](spec-012-release-acceptance.md).
 
 ---
@@ -31,24 +32,32 @@ The Playlist is always the compact Song-building surface beside the inspector.
 It uses the same named Patterns and does not introduce Section or Scene
 entities. The inspector has no Pattern/Song tabs.
 
-### 16.1 Compact pattern strip
+### 16.1 One pattern editing surface
 
-- Sixteen visible steps by default.
-- Active, inactive, current, selected, accented, tied, slid, probabilistic, and
-  disabled states.
-- Current step is clear but restrained.
-- Click toggles.
-- Shift-click changes selection.
-- Pointer drag paints.
-- Vertical drag may change velocity for drum steps.
-- An alternate button, keyboard command, or inspector exposes advanced
-  properties.
-- Advanced editing never depends on right-click alone.
-- Step numbers or beat divisions remain readable.
+The Piano Roll is the only surface that edits Pattern event data. No other view
+creates, deletes, or modifies steps, notes, or triggers.
 
-Patterns longer than sixteen steps use sixteen-step pages with a visible page
-indicator. Playback follow is enabled by default and advances the displayed page
-with the playhead. The user may lock the viewed page while playback continues.
+Rack module faceplates carry no step grid and no per-step editing. A faceplate
+shows non-editing Pattern activity and provides the audition control defined in
+[rack and instruments](spec-005-rack-and-instruments.md) section 15. Pattern
+activity is an output-only indicator: it never accepts pointer or keyboard
+input, and it is not a paged or scrubbable view of step data.
+
+This rule exists so that a user learns exactly one place to edit a Pattern. A
+second editing grid on the faceplate cannot show accent, tie, slide,
+probability, micro-timing, page position, or parts longer than sixteen steps
+within the module height budget, so it would present an incomplete and
+misleading copy of the same data.
+
+Patterns longer than sixteen steps use sixteen-step pages in the Piano Roll with
+a visible page indicator. Playback follow is enabled by default and advances the
+displayed page with the playhead. The user may lock the viewed page while
+playback continues.
+
+The Phase 1 foundation still ships an editable sixteen-step faceplate component
+and a `pattern-step-toggle` command reached from the rack. Both predate this
+rule. Removing that editing path from the rack, and moving its command to the
+Piano Roll, is required before `AC-011` can pass.
 
 ### 16.2 Named project Patterns
 
@@ -109,16 +118,17 @@ Shared header:
 - Fixed 1/16 grid status.
 - Horizontal Swing slider.
 - Horizontal Humanize slider.
-- Lower-lane selector, default Velocity, in place of a static `Vel 100` label.
+- Parameter selector, default Velocity, in place of a static `Vel 100` label.
+  It is the single entry point to every lane the Piano Roll edits, as defined
+  in section 16.3.1.
 - Zoom controls.
 - Timeline.
 - Scrollable grid.
-- Velocity lane.
-- Automation lanes.
+- One active lower lane, as defined in section 16.3.1.
 - Horizontal and vertical zoom.
 - Current playhead.
 - Selection overlay.
-- Ghost note preview.
+- Ghost notes, as defined in section 16.3.2.
 
 Shared interactions:
 
@@ -178,6 +188,70 @@ Per-note or trigger properties where supported by the selected module:
 
 Canvas may render the static grid and playhead. Interactive notes must expose
 meaningful accessibility information.
+
+#### 16.3.1 Parameter selector and the active lane
+
+The Piano Roll owns every lane a Pattern can hold. The Parameter selector in the
+shared header is the only control that chooses which lane is edited. There is no
+second lane picker, no per-lane add button in the rack, and no automation editor
+outside the Piano Roll.
+
+The selector is scoped to the selected module. It offers exactly two groups:
+
+- Note properties supported by the selected module's declared event capability,
+  drawn from the per-note property list above.
+- Automatable parameters declared by the selected module's plugin manifest,
+  including its voice parameters, in manifest order.
+
+Changing the module selection re-scopes the selector. Mixer, send, effect, and
+master parameters are not module-owned and therefore never appear in it; those
+lanes are armed from their own surface, as required by
+[mixer and effects](spec-007-mixer-and-effects.md), and open in this same Piano
+Roll lane once armed. Whatever the source, the lane is edited only here.
+
+Exactly one lane is active and visible at a time. Choosing a parameter replaces
+the displayed lane; it never stacks a second lane and never resizes the grid.
+Lanes that hold data are not lost when hidden, and the selector marks which
+parameters already have data in the active Pattern so a user can find existing
+automation without opening each entry in turn.
+
+The selector lists a parameter whether or not a lane exists for it yet.
+Selecting a parameter with no lane shows an empty lane at the parameter's
+current value and creates no project data. A lane record is created by the first
+committed edit, which is one undoable command. A lane emptied by erasing every
+step is removed on commit rather than persisting as an empty record.
+
+The active lane obeys the automation rules in
+[song and automation](spec-008-song-and-automation.md) section 18.2: step-based
+values on the fixed 1/16 grid, with step draw, erase, select, move, and scale
+values. Note-property lanes edit the selected events rather than a separate
+automation record, so a note property has no lane record of its own and erasing
+its lane content resets the property to its default instead of deleting notes.
+
+The selector is keyboard reachable, announces the active parameter and its
+group, and reports when a listed parameter has existing data.
+
+#### 16.3.2 Ghost notes and ghost lanes
+
+Ghost notes show the events of non-selected modules in the same Pattern behind
+the active module's events, so a user can place events against the rest of the
+Pattern without switching modules.
+
+- Ghosts are output only. They never accept pointer or keyboard input, are not
+  focusable, are never selected by marquee or select-all, and are never moved,
+  deleted, or transformed by an edit aimed at the active module.
+- Ghosts are visually recessed and use a non-color cue in addition to color, so
+  the distinction survives the accessible themes required by
+  [product and design foundations](spec-001-product-and-design-foundations.md).
+- Ghosts follow the module's assigned color where color is available.
+- Ghost display is a local view preference. It is not project data, is not
+  included in portable files, and creates no undo entry.
+
+The same rule applies to the lower lane: the active lane may show the
+corresponding lane of non-selected modules as recessed ghost content under the
+same output-only constraints. This preserves the single-editing-surface rule of
+section 16.1, because a ghost is a reference image of data that is edited by
+selecting its owning module.
 
 Keyboard behavior:
 

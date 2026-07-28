@@ -35,7 +35,8 @@ this table is the traceability record.
   overlay.
 - **D09.** Compact faceplates expose the established fast controls; deeper
   synthesis, sample, voice, insert, and routing controls live in the expanded
-  editor.
+  editor. Faceplates carry no step grid and no per-step editing, as recorded in
+  `D65`.
 - **D10.** Browser projects use JSON manifests plus asset records; portable
   export is one `.pulsebox` package.
 - **D11.** Support current stable Chrome, Edge, and Firefox.
@@ -121,8 +122,8 @@ this table is the traceability record.
 - **D47.** Pause preserves position; Stop returns to the last explicit start
   marker, defaulting to Pattern step 1 or the first Playlist row; repeated Stop
   has no second action.
-- **D48.** Patterns longer than sixteen steps use sixteen-step pages, playback
-  follow by default, and an optional viewed-page lock.
+- **D48.** Patterns longer than sixteen steps use sixteen-step pages in the
+  Piano Roll, playback follow by default, and an optional viewed-page lock.
 - **D49.** Channel mute silences main and sends; global solo passes only soloed
   channels and their sends, and shared returns contain only surviving soloed
   sources.
@@ -179,4 +180,38 @@ this table is the traceability record.
   notes move and resize and support slides; drum triggers paint as fixed one-cell
   events. The master-effects bypass leaves master gain and the protected limiter
   active.
+- **D65.** The Piano Roll is the only Pattern editing surface. Rack faceplates
+  carry no step grid and no per-step editing. Each faceplate keeps an
+  output-only Pattern activity indicator and gains a hold-to-sound audition
+  control for sound design, and the reclaimed horizontal space carries fast
+  controls promoted from the expanded editor. Two editing grids over the same
+  Pattern part read to users as two pattern editors, and the faceplate copy is
+  the weaker of the two: within the 86-98 pixel module height it cannot show
+  accent, tie, slide, probability, micro-timing, page position, or parts longer
+  than sixteen steps, and for a drum machine it exposes only one voice at a
+  time. Rejected alternatives: keeping a read-only paged activity grid on the
+  faceplate, which preserves the visual language of an editor and still spends
+  the space; and making the audition control record into the active Pattern when
+  record-armed, which duplicates the live-input path in section 16.4 and
+  reintroduces a second write path into Pattern data. `AC-011` now gates the
+  single-surface rule and the audition control, and `AC-072` moves paging to the
+  Piano Roll, where parts of 17 to 64 steps still require it.
+- **D66.** The Piano Roll's Parameter selector is the single entry point to every
+  lane it edits, and exactly one lane is visible at a time. The selector is
+  scoped to the selected module and offers two groups: that module's supported
+  note properties, and its manifest-declared automatable parameters. This
+  extends `D65` from event data to automation: a user who has learned that the
+  Piano Roll edits the Pattern should not discover a second automation editor
+  elsewhere. Mixer, send, effect, and master parameters have no owning module,
+  so they are armed by an `Automate` action on their own control and then open
+  in the same Piano Roll lane; the arming path lives with the parameter, the
+  editing surface stays singular. Cross-module context is served by output-only
+  ghost notes and ghost lane content rather than by editing a non-selected
+  module in place. Rejected alternatives: listing every project parameter in one
+  global selector, which makes the common module case pay for a long list and
+  makes the visible lane's owner ambiguous; and stacking multiple lanes under
+  the grid, which spends vertical budget the 1280-by-720 target does not have
+  and adds stack-order, height, and persistence state for a comparison that
+  ghost lanes already serve. `AC-079` gates the selector and its lane
+  lifecycle, `AC-086` gates ghost behavior.
 

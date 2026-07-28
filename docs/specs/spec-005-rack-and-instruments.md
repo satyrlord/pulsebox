@@ -175,7 +175,8 @@ Each slot supports:
 - Module menu.
 - Selection.
 - Visible level.
-- Pattern activity.
+- Pattern activity, as the output-only indicator defined in section 15.0.
+- Audition, as defined in section 15.0.
 
 Rack-module collapse is a lightweight local UI preference keyed by project ID,
 project lineage ID, and stable module ID. It is not project data, is not
@@ -230,7 +231,8 @@ Each instrument has:
 - Expanded editor.
 - Stable parameter IDs.
 - Pattern selector.
-- Step or note activity.
+- Pattern activity indicator.
+- Audition control.
 - Per-module output level.
 - Mute and solo.
 - Insert-chain access.
@@ -243,6 +245,65 @@ Compact faceplates expose the established fast-control set defined for each
 instrument below. Additional synthesis, sample, voice, insert, and routing
 parameters live in the playback-safe expanded editor. Faceplate pages are not
 user-configurable in the MVP.
+
+Faceplates contain no step grid and no per-step editing. All Pattern event
+editing happens in the Piano Roll, as required by
+[pattern editing](spec-006-pattern-editing.md) section 16.1. The horizontal
+space that a faceplate would otherwise spend on a step grid carries the
+promoted fast controls listed for each instrument below.
+
+### 15.0 Pattern activity and audition
+
+Pattern activity indicator:
+
+- Output only. It never accepts pointer or keyboard input and is not focusable.
+- Shows that the module is producing events during playback, and shows the
+  current position within the module part.
+- Shows no per-step accent, tie, slide, probability, or micro-timing detail.
+- Carries no editing affordance and is not a paged view of step data.
+
+The indicator must not look like a row of pressable steps. A user must not have
+to click it to learn that it is not an editor, so the following visual
+constraints are normative:
+
+- It reads as a flat bar graph, not as controls. Cells use no button geometry:
+  no control-sized height, no control corner radius, no raised or lit cap
+  treatment, and no per-cell glow.
+- Cell height stays at or below one third of the faceplate control height.
+- Unlit cells are visually uniform. The indicator does not group cells into
+  beats or bars, because that grouping reads as an editable grid.
+- Only the current playback position may use an emphasized treatment.
+
+A visual restyle of the rack must preserve these constraints. Restoring step
+button styling to this indicator reintroduces the second apparent pattern
+editor that decision `D65` removed.
+
+Audition control:
+
+- One control per module faceplate.
+- Sounds the module while held and stops when released. Pointer press and
+  release, and keyboard Space or Enter press and release, drive the same
+  behavior.
+- Uses the module's current faceplate parameter values, so a parameter change
+  is audible on the next audition without touching the Pattern.
+- For a drum module, sounds the voice currently chosen in the voice selector.
+- For a pitched module, sounds the module's audition pitch, which defaults to
+  the Pattern's key or to a documented fixed pitch when no key applies.
+- Writes nothing. It never creates, deletes, or modifies Pattern events, never
+  mutates project state, and never creates an Undo entry.
+- Is not a recording path. Recording into a Pattern stays with live input in
+  [pattern editing](spec-006-pattern-editing.md) section 16.4.
+- Works while the transport is stopped, playing, or paused, and does not alter
+  transport state or position.
+- Respects module mute, solo, routing, inserts, and sends, so an auditioned
+  voice is heard exactly where the module is routed.
+- Releases its voice when the module is removed, when the project is replaced,
+  and when audio is interrupted. A held control that loses pointer capture or
+  keyboard focus stops the voice rather than leaving it sounding.
+- Remains visible and operable when audio is blocked, and reports the blocked
+  state instead of failing silently.
+- Is announced to assistive technology as an audition control, not as a step or
+  a toggle.
 
 ### 15.1 Acid Bass
 
@@ -257,15 +318,16 @@ Compact controls:
 - Waveform.
 - Glide.
 - Volume.
-- Current note or lane.
+- Sub-oscillator level.
+- Second-oscillator detune.
+- Clean or dirty filter model.
+- Pattern activity indicator.
+- Audition control.
 - Compact filter response.
 
 Expanded controls:
 
 - Second oscillator.
-- Second-oscillator detune.
-- Sub oscillator.
-- Clean or dirty filter model.
 - Detailed envelope.
 - Glide mode.
 - Accent response.
@@ -340,7 +402,10 @@ Compact controls:
 - Level.
 - Drive.
 - Voice selector.
-- Per-step trigger and velocity.
+- Selected-voice pan.
+- Selected-voice mute and solo.
+- Pattern activity indicator.
+- Audition control.
 
 Expanded editor:
 
@@ -364,7 +429,10 @@ Compact controls:
 - Level.
 - Compression.
 - Voice selector.
-- Per-step trigger and velocity.
+- Selected-voice pan.
+- Selected-voice mute and solo.
+- Pattern activity indicator.
+- Audition control.
 
 Expanded editor includes the shared drum capabilities and original large-machine
 voice design.
@@ -379,9 +447,14 @@ Compact controls:
 - Tune.
 - Decay.
 - Filter.
-- Module-send emphasis that scales sends A through D together while preserving
-  their relative levels.
-- Per-step trigger and velocity.
+- Attack.
+- Selected-voice level.
+- Pattern activity indicator.
+- Audition control.
+
+This module's waveform preview occupies the faceplate width that two further
+knobs would need, so its selected-voice pan and its module-send emphasis live in
+the expanded editor rather than on the plate.
 
 Expanded editor includes:
 
@@ -392,6 +465,9 @@ Expanded editor includes:
 - Pitch.
 - Decay.
 - Filtering.
+- Selected-voice pan.
+- Module-send emphasis that scales sends A through D together while preserving
+  their relative levels.
 - Voice mixer.
 - Per-step properties.
 - Voice inserts plus parent module send controls and routing.
@@ -407,7 +483,10 @@ Compact controls:
 - Sample-rate reduction.
 - Level.
 - Voice selector.
-- Per-step trigger and velocity.
+- Selected-voice pan.
+- Selected-voice mute and solo.
+- Pattern activity indicator.
+- Audition control.
 
 The built-in lo-fi stage starts enabled and can be disabled.
 
@@ -424,7 +503,9 @@ Compact controls:
 - Bit reduction.
 - Sample-rate reduction.
 - Voice selector.
-- Per-step trigger and velocity.
+- Selected-voice mute and solo.
+- Pattern activity indicator.
+- Audition control.
 
 The built-in lo-fi stage starts enabled and can be disabled.
 

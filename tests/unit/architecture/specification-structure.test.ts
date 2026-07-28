@@ -143,14 +143,14 @@ describe("product specification structure", () => {
       .matchAll(/^[0-9]+\. \*\*AC-([0-9]{3})\.\*\*/gmu)]
       .map((match) => Number(match[1]));
 
-    expect(decisionIds).toEqual(range(1, 64));
-    expect(acceptanceIds).toEqual(range(1, 85));
+    expect(decisionIds).toEqual(range(1, 66));
+    expect(acceptanceIds).toEqual(range(1, 86));
   });
 
   it("assigns every release criterion one primary build-order owner", () => {
     const ownedIds = BUILD_ORDER.flatMap(({ path }) => primaryAcceptanceIds(read(path)))
       .sort((left, right) => left - right);
 
-    expect(ownedIds).toEqual(range(1, 85));
+    expect(ownedIds).toEqual(range(1, 86));
   });
 });

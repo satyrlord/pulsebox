@@ -56,6 +56,14 @@ post-MVP work.
 
 Any automatable parameter may have a lane in a Pattern.
 
+Every automation lane is edited in the Piano Roll's active lower lane and
+nowhere else, as defined in
+[pattern editing](spec-006-pattern-editing.md) section 16.3.1. This section owns
+what a lane stores and how it records; that section owns how a lane is chosen
+and displayed. Module-owned parameters are chosen from the Piano Roll's
+module-scoped Parameter selector. Mixer, send, effect, and master parameters are
+armed from their own surface and then open in the same Piano Roll lane.
+
 Automation is step-based only. It stores discrete values on the fixed 1/16
 musical grid. It does not store line segments, curve segments, or dense
 freehand points.

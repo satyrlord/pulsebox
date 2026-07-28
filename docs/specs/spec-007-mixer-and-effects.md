@@ -112,6 +112,27 @@ Each compact A–D card summarizes one modular send-bus chain. It shows the
 primary effect, four macros, chain count, bypass state, activity, Edit control,
 and circular return Mix control.
 
+### 19.4.1 Automating a mixer, send, effect, or master parameter
+
+Mixer, send, effect, and master parameters are not owned by a rack module, so
+they do not appear in the Piano Roll's module-scoped Parameter selector defined
+in [pattern editing](spec-006-pattern-editing.md) section 16.3.1.
+
+Each such parameter exposes an `Automate` action on its own control, reached
+from the control's context menu and from the keyboard. The action arms the
+parameter and opens its lane as the Piano Roll's active lane in the active
+Pattern. Editing then follows the single-surface rule: the lane is drawn and
+edited only in the Piano Roll.
+
+Arming alone writes no project data and creates no undo entry. The lane record
+is created by the first committed edit or by a recorded pass, exactly as for a
+module parameter.
+
+While a non-module parameter is armed, the Parameter selector shows it as the
+active lane alongside its owning surface name, so the user can see that the
+visible lane belongs to the mixer rather than to the selected module. Selecting
+any entry from the module-scoped groups replaces it and disarms it.
+
 ### 19.5 Solo and mute
 
 - Channel mute silences the module main path and all four sends, regardless of
