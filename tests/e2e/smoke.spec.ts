@@ -22,23 +22,47 @@ async function startPlayback(page: Page): Promise<void> {
   await expect(page.locator(".audio-status")).toHaveText("Audio active");
 }
 
+/**
+ * Specification 005 section 9.1: eight slots, the six approved instruments in
+ * rack order, and the last two empty.
+ */
+const SEEDED_RACK = [
+  "Acid Bass",
+  "Drumline Six",
+  "Boom Eight",
+  "Hybrid Nine",
+  "Digit Seven",
+  "Digit Five",
+  "Empty",
+  "Empty",
+] as const;
+
+/** The first empty slot, which is where an Add control lives. */
+const FIRST_EMPTY_SLOT = SEEDED_RACK.indexOf("Empty");
+
 test("boots the production shell with the seeded rack", async ({ page }) => {
   await expect(page).toHaveTitle("PULSEBOX");
   await expect(page.locator('[data-component="transport-bar"]')).toBeVisible();
-  await expect(page.locator(RACK_MODULE)).toHaveCount(3);
-  await expect(page.locator(RACK_MODULE).nth(0)).toHaveAttribute("data-label", "Acid Bass");
-  await expect(page.locator(RACK_MODULE).nth(1)).toHaveAttribute("data-label", "Drumline Six");
-  await expect(page.locator(RACK_MODULE).nth(2)).toHaveAttribute("data-label", "Empty");
+  await expect(page.locator(RACK_MODULE)).toHaveCount(SEEDED_RACK.length);
+  for (const [index, label] of SEEDED_RACK.entries()) {
+    await expect(page.locator(RACK_MODULE).nth(index)).toHaveAttribute("data-label", label);
+  }
 });
 
 test("adds an instrument into an empty slot", async ({ page }) => {
-  await page.locator(RACK_MODULE).nth(2).getByRole("button", { name: "Add Acid Bass" }).click();
+  const loadedBefore = FIRST_EMPTY_SLOT;
+  await page
+    .locator(RACK_MODULE)
+    .nth(FIRST_EMPTY_SLOT)
+    .getByRole("button", { name: "Add Acid Bass" })
+    .click();
   await expect(page.locator(`${RACK_MODULE}[data-label='Acid Bass']`)).toHaveCount(2);
-  await expect(page.locator(ACTIVITY_INDICATOR)).toHaveCount(3);
+  // One indicator per loaded module, so filling a slot adds exactly one.
+  await expect(page.locator(ACTIVITY_INDICATOR)).toHaveCount(loadedBefore + 1);
 });
 
 test("adds the selected Drumline plugin", async ({ page }) => {
-  const empty = page.locator(RACK_MODULE).nth(2);
+  const empty = page.locator(RACK_MODULE).nth(FIRST_EMPTY_SLOT);
   await empty.getByRole("button", { name: "Add Drumline Six" }).click();
   await expect(page.locator(`${RACK_MODULE}[data-label='Drumline Six']`)).toHaveCount(2);
 });
@@ -95,21 +119,47 @@ test("audition sounds only while pointer or keyboard input is held", async ({ pa
           .__auditionProbe,
     );
   const audition = page.getByRole("button", { name: "Acid Bass audition" });
+
+  // Activating audio and building the seeded rack takes longer than the default
+  // expect timeout allows.
+  const auditionPoll = { timeout: 20_000 };
+
+  // Start the audio graph first and let the seeded rack finish allocating its
+  // own worklet nodes. Otherwise those startup nodes satisfy the "a node was
+  // created" poll below, the press is released while the context is still
+  // activating — which correctly allocates nothing — and the test measures
+  // rack startup rather than the audition.
+  await startPlayback(page);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect
+    .poll(async () => (await readProbe()).created, auditionPoll)
+    .toBeGreaterThanOrEqual(SEEDED_RACK.filter((label) => label !== "Empty").length);
+
+  const beforePress = (await readProbe()).created;
   await audition.hover();
   await page.mouse.down();
   await expect(audition).toHaveAttribute("data-active", "true");
-  await expect.poll(async () => (await readProbe()).created).toBeGreaterThanOrEqual(3);
+  await expect
+    .poll(async () => (await readProbe()).created, auditionPoll)
+    .toBeGreaterThan(beforePress);
   await page.mouse.up();
   await expect(audition).toHaveAttribute("data-active", "false");
-  await expect.poll(async () => (await readProbe()).disconnected).toBeGreaterThanOrEqual(1);
+  await expect
+    .poll(async () => (await readProbe()).disconnected, auditionPoll)
+    .toBeGreaterThanOrEqual(1);
 
+  const beforeKey = (await readProbe()).created;
   await audition.focus();
   await page.keyboard.down("Enter");
   await expect(audition).toHaveAttribute("data-active", "true");
-  await expect.poll(async () => (await readProbe()).created).toBeGreaterThanOrEqual(4);
+  await expect
+    .poll(async () => (await readProbe()).created, auditionPoll)
+    .toBeGreaterThan(beforeKey);
   await page.keyboard.up("Enter");
   await expect(audition).toHaveAttribute("data-active", "false");
-  await expect.poll(async () => (await readProbe()).disconnected).toBeGreaterThanOrEqual(2);
+  await expect
+    .poll(async () => (await readProbe()).disconnected, auditionPoll)
+    .toBeGreaterThanOrEqual(2);
 });
 
 test("the playhead advances from the audio clock", async ({ page }) => {

@@ -34,8 +34,8 @@ The established visible mixer contains:
 - Exactly eight visible instrument channel strips, including disabled empty
   strips identified by two-digit slot number.
 - One fixed compact strip geometry for every instrument channel.
-- One master strip with compact, noninteractive A–D return labels in A, B / C,
-  D reading order. These identify return buses and are not sends or controls.
+- One master strip carrying master level, metering, and master-effects bypass,
+  with no A–D grid.
 - Four A–D send buttons per instrument channel in a visible 2 × 2 grid.
 - Meter.
 - Vertical fader.
@@ -86,6 +86,23 @@ Mixer studio tab is active at a supported layout. Empty strips are disabled,
 show their two-digit slot number, and expose the Empty state accessibly. There
 are no hidden mixer banks in the MVP. Effects and Master replace the Mixer view
 inside the same compact studio column.
+
+Sends are an instrument-channel concept. The mix bus is the destination that
+send chains return into, never a send source, and its processing is the serial
+master chain in section 20.6 rather than four parallel send chains. The master
+strip therefore carries no A–D grid in any form, including a noninteractive
+label set. Return levels belong to the compact A–D cards in the Effects view,
+and master processing belongs to the Master view.
+
+The master strip is not an instrument channel and does not copy instrument-strip
+geometry. The fixed compact strip geometry above governs the eight instrument
+channels only. Because the master strip carries no pan control and no send grid,
+its fader occupies the reclaimed height: the master fader is taller than an
+instrument fader, starts below the master label, and ends on the same floor so
+the strips still share a baseline. The reclaimed space is never padded out to
+force the two fader lengths to match. A longer master fader is also the correct
+result on its own terms, since master level is the most frequently adjusted
+control in the mixer and benefits from the finest travel.
 
 ### 19.3 Internal drum-voice mixer
 
@@ -275,9 +292,8 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
   compact button itself shows disabled, zero, and non-zero states without
   relying on color alone.
 - Effect chains receive sends and return to master.
-- The master strip exposes one compact, noninteractive label for each A–D
-  return. These identify the return buses without changing project state or
-  routing master signal to a send bus.
+- The master strip exposes no send or return control. Each chain's return level
+  is the circular `Mix` control on its compact A–D card in the Effects view.
 - Routing prevents feedback loops.
 - Send return level is automatable.
 
@@ -325,6 +341,14 @@ Compressor:
 - Release.
 - Makeup.
 - Visible gain reduction.
+
+Limiter:
+
+- Compact controls are Ceiling, Gain, and Release.
+- Ceiling is the output level nothing passes.
+- Gain sets the level driven into the limiter.
+- Visible gain reduction.
+- Deeper limiter controls live in its detailed editor.
 
 Delay:
 

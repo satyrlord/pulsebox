@@ -162,15 +162,14 @@ The merged MVP is complete only when:
     interactive, and exposed to assistive technology.
 66. **AC-066.** Nonessential visual animation pauses when hidden.
 67. **AC-067.** CSS token, spacing, radius, scrollbar, and supported-viewport rules are
-    followed. At 1568 × 1003, the semantic composition follows the approved
-    raster reference's major row and column geometry, density, materials,
-    typography scale, and control sizing without replacing semantic controls
-    with raster artwork.
+    followed. The semantic composition follows the approved composition target's
+    major row and column geometry, density, materials, typography scale, and
+    control sizing without replacing semantic controls with raster artwork.
 68. **AC-068.** The visible mixer uses fixed compact strips. Every instrument
     strip keeps its A–D sends visible as a 2 × 2 button grid, and channel
     selection or detail editing does not resize the mixer. Empty strips remain
-    visible under their two-digit slot numbers, and the master strip keeps its
-    noninteractive A–D return labels visible without creating a feedback route.
+    visible under their two-digit slot numbers, and the master strip carries no
+    A–D send or return grid.
 69. **AC-069.** One module-aware Piano Roll switches between monophonic pitched
     rows and named drum-voice rows. Its header has no local Play, pen, or erase
     buttons. Monophonic notes create, delete, move, resize, and slide without

@@ -152,7 +152,7 @@ describe("product specification structure", () => {
       ...read(SUPPORTING_SPECS[1].path).matchAll(/^[0-9]+\. \*\*AC-([0-9]{3})\.\*\*/gmu),
     ].map((match) => Number(match[1]));
 
-    expect(decisionIds).toEqual(range(1, 69));
+    expect(decisionIds).toEqual(range(1, 77));
     expect(acceptanceIds).toEqual(range(1, 86));
 
     const release = read(SUPPORTING_SPECS[1].path);
@@ -160,7 +160,10 @@ describe("product specification structure", () => {
     const compactMixer = acceptanceCriterion(release, 68);
     expect(emptyMixer).toContain("two-digit slot numbers");
     expect(emptyMixer).not.toContain("labeled `Empty`");
-    expect(compactMixer).toContain("noninteractive A–D return labels");
+    // The mix bus is a send destination, never a send source. Decision D75.
+    expect(compactMixer.replaceAll(/\s+/gu, " ")).toContain(
+      "the master strip carries no A–D send or return grid",
+    );
   });
 
   it("assigns every release criterion one primary build-order owner", () => {

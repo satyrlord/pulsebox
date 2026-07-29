@@ -20,7 +20,8 @@ input, generators, and transforms.
 - Pattern name, default `Verse` in the supplied project.
 - Previous and next.
 - Duration in bars.
-- Scale, default Chromatic.
+- Scale, default Chromatic. The MVP offers Chromatic, Minor, Dorian, Phrygian,
+  and Pentatonic.
 - Add.
 - Duplicate.
 - Rename.

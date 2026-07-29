@@ -58,16 +58,17 @@ compact so mixer routing remains immediately available without taking visual
 priority from the rack.
 
 For the shell surfaces covered by this specification,
-[`docs/design/claude-mock-up.html`](../design/claude-mock-up.html) is the
-approved semantic and interactive composition target.
-[`docs/design/image-gen-mock.png`](../design/image-gen-mock.png) is its approved
-1568 × 1003 raster reference for visual proportion, placement, density,
-materials, typography scale, and control sizing. The HTML target follows that
-raster at the reference viewport while preserving semantic controls,
-accessibility, interaction, and the responsive rules in this specification.
-The product specifications continue to own behavior, state, accessibility,
-audio routing, and responsive acceptance. Other files under `docs/design/`
-remain non-normative visual evidence.
+[`docs/design/claude-mock-up.html`](../design/claude-mock-up.html) is the single
+approved composition target. It owns the semantic structure, the interactive
+behavior, and the visual proportion, placement, density, materials, typography
+scale, and control sizing that an earlier raster study previously carried. There
+is no separate image reference; a second target in another medium drifts from
+the first and leaves implementers with two conflicting sources.
+
+The product specifications continue to own behavior, state, accessibility, audio
+routing, and responsive acceptance. Where the composition target and a product
+specification disagree, the specification wins and the target is corrected.
+Other files under `docs/design/` remain non-normative visual evidence.
 
 ### 8.3 Pattern and Song transport modes
 
@@ -94,9 +95,10 @@ The studio mixer uses:
   active studio view. Empty rack slots retain disabled strips identified by
   their two-digit slot numbers, such as `07` and `08`, and expose their Empty
   state in accessible text.
-- One master strip with compact, noninteractive A–D return labels in the same 2
-  × 2 reading order. They identify the four return buses and are not master
-  sends or return-state controls.
+- One master strip carrying master level, metering, and master-effects bypass.
+  It has no A–D grid. The mix bus is not a send source, and its processing is a
+  master chain rather than four send chains, so send-bus content belongs to the
+  Effects and Master views instead.
 - Four A–D send buttons per instrument channel, arranged as a visible 2 × 2
   grid inside the strip. Empty-channel send buttons remain visible but disabled.
 - A vertical fader.
@@ -122,13 +124,16 @@ The studio region provides:
 - Effects.
 - Master.
 
+The three tabs are peers and share one tab strip of equal-width controls. No view
+takes a wider tab than the others at any supported width.
+
 At every supported width:
 
 - Mixer is selected by default.
 - Mixer presents all eight instrument strips, including disabled empty strips
   identified by two-digit slot number, and one master strip. Each instrument
-  strip keeps its 2 × 2 A–D send grid visible, and the master keeps its 2 × 2
-  A–D return labels visible.
+  strip keeps its 2 × 2 A–D send grid visible. The master strip carries no A–D
+  grid.
 - Effects replaces the Mixer view and presents the four modular send-chain
   summaries plus detailed-chain entry points.
 - Master opens master routing, master-chain, and output metering.

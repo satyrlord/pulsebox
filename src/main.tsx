@@ -7,12 +7,24 @@ import {
 import {
   ACID_BASS_DEFAULT_PARAMETERS,
   ACID_BASS_MANIFEST,
+  BOOM_EIGHT_DEFAULT_PARAMETERS,
+  BOOM_EIGHT_MANIFEST,
+  DIGIT_FIVE_DEFAULT_PARAMETERS,
+  DIGIT_FIVE_MANIFEST,
+  DIGIT_SEVEN_DEFAULT_PARAMETERS,
+  DIGIT_SEVEN_MANIFEST,
   DRUMLINE_SIX_DEFAULT_PARAMETERS,
   DRUMLINE_SIX_MANIFEST,
-  DRUM_VOICE_IDS,
+  HYBRID_NINE_DEFAULT_PARAMETERS,
+  HYBRID_NINE_MANIFEST,
   TransportRuntime,
+  auditionNoteFor,
   createBassVoiceAdapter,
+  createBoomVoiceAdapter,
+  createDigitFiveVoiceAdapter,
+  createDigitSevenVoiceAdapter,
   createDrumlineVoiceAdapter,
+  createHybridVoiceAdapter,
   createPluginRegistry,
   drumVoiceNote,
   type TransportModule,
@@ -41,7 +53,8 @@ import {
 import { createIndexedDbProjectRepository } from "./persistence/public";
 import { mountPulseboxApp, type PulseboxAppHandle } from "./ui/public";
 
-const visibleSlotCount = 3;
+// Section 9.1: the MVP rack is exactly eight slots, six loaded and two empty.
+const visibleSlotCount = 8;
 const initialSteps = Object.freeze(
   [36, 36, 43, 39, 36, 46, 43, 39, 36, 39, 48, 43, 36, 46, 39, 43].map((note, index) =>
     Object.freeze({
@@ -54,38 +67,85 @@ const initialSteps = Object.freeze(
   ),
 );
 
-// Drumline Six selects its voice by note number, so a drum pattern is an
-// ordinary note pattern in the shared model.
-const drumLane = drumVoiceNote;
-const drumSteps = Object.freeze(
-  Array.from({ length: 16 }, (_, index) =>
-    Object.freeze({
-      active: index % 4 === 0 || index % 8 === 6 || index % 2 === 1,
-      note:
-        index % 8 === 0
-          ? drumLane("kick")
-          : index % 8 === 4
-            ? drumLane("snare")
-            : index % 8 === 6
-              ? drumLane("open-hat")
-              : drumLane("closed-hat"),
-      velocity: index % 4 === 0 ? 0.95 : 0.6,
-      accent: index % 8 === 0,
-      slide: false,
-    }),
-  ),
-);
+// A drum module selects its voice by note number, so a drum pattern is an
+// ordinary note pattern in the shared model. Section 9.1 requires an original
+// coherent demo loop, so each machine below plays one distinct role rather than
+// every machine restating the same backbeat.
+interface DemoHit {
+  /** Voice index within the module's own roster, in rack order. */
+  readonly voice: number;
+  readonly steps: readonly number[];
+  readonly velocity?: number;
+}
 
-const moduleSeed: ModuleSeed = {
-  pluginId: ACID_BASS_MANIFEST.pluginId,
-  parameters: toParameterValues(ACID_BASS_DEFAULT_PARAMETERS),
-  steps: initialSteps,
-};
-const drumSeed: ModuleSeed = {
-  pluginId: DRUMLINE_SIX_MANIFEST.pluginId,
-  parameters: toParameterValues(DRUMLINE_SIX_DEFAULT_PARAMETERS),
-  steps: drumSteps,
-};
+function demoSteps(baseNote: number, hits: readonly DemoHit[]) {
+  const byStep = new Map<number, DemoHit>();
+  for (const hit of hits) {
+    for (const step of hit.steps) byStep.set(step, hit);
+  }
+  return Object.freeze(
+    Array.from({ length: 16 }, (_, index) => {
+      const hit = byStep.get(index);
+      return Object.freeze({
+        active: hit !== undefined,
+        note: baseNote + (hit?.voice ?? 0),
+        velocity: hit?.velocity ?? 0.7,
+        accent: index % 8 === 0 && hit !== undefined,
+        slide: false,
+      });
+    }),
+  );
+}
+
+const DRUM_BASE = drumVoiceNote("kick");
+
+/** Drumline Six keeps the backbeat: kick, snare, and a closed-hat pulse. */
+const drumlineSteps = demoSteps(DRUM_BASE, [
+  { voice: 0, steps: [0, 6, 10], velocity: 0.95 },
+  { voice: 1, steps: [4, 12], velocity: 0.85 },
+  { voice: 4, steps: [2, 14], velocity: 0.55 },
+]);
+
+/** Boom Eight adds weight on the downbeats and a tom fill at the turnaround. */
+const boomSteps = demoSteps(DRUM_BASE, [
+  { voice: 1, steps: [0, 8], velocity: 0.9 },
+  { voice: 4, steps: [13], velocity: 0.7 },
+  { voice: 5, steps: [15], velocity: 0.75 },
+]);
+
+/** Hybrid Nine carries the offbeat hat and a ride accent. */
+const hybridSteps = demoSteps(DRUM_BASE, [
+  { voice: 6, steps: [1, 3, 5, 7, 9, 11, 13, 15], velocity: 0.45 },
+  { voice: 8, steps: [4, 12], velocity: 0.5 },
+]);
+
+/** Digit Seven answers with a clap on the backbeat. */
+const digitSevenSteps = demoSteps(DRUM_BASE, [{ voice: 2, steps: [4, 12], velocity: 0.62 }]);
+
+/** Digit Five lays a shaker and clave pattern over the top. */
+const digitFiveSteps = demoSteps(DRUM_BASE, [
+  { voice: 6, steps: [2, 6, 10, 14], velocity: 0.4 },
+  { voice: 7, steps: [3, 11], velocity: 0.5 },
+]);
+
+const seedFor = (
+  manifest: { readonly pluginId: PluginId },
+  defaults: Readonly<Record<string, unknown>>,
+  steps: ReturnType<typeof demoSteps> | typeof initialSteps,
+): ModuleSeed => ({
+  pluginId: manifest.pluginId,
+  parameters: toParameterValues(defaults),
+  steps,
+});
+
+const defaultRack: readonly ModuleSeed[] = [
+  seedFor(ACID_BASS_MANIFEST, ACID_BASS_DEFAULT_PARAMETERS, initialSteps),
+  seedFor(DRUMLINE_SIX_MANIFEST, DRUMLINE_SIX_DEFAULT_PARAMETERS, drumlineSteps),
+  seedFor(BOOM_EIGHT_MANIFEST, BOOM_EIGHT_DEFAULT_PARAMETERS, boomSteps),
+  seedFor(HYBRID_NINE_MANIFEST, HYBRID_NINE_DEFAULT_PARAMETERS, hybridSteps),
+  seedFor(DIGIT_SEVEN_MANIFEST, DIGIT_SEVEN_DEFAULT_PARAMETERS, digitSevenSteps),
+  seedFor(DIGIT_FIVE_MANIFEST, DIGIT_FIVE_DEFAULT_PARAMETERS, digitFiveSteps),
+];
 
 interface RuntimePlugin {
   readonly voiceAdapterFactory: VoiceAdapterFactory;
@@ -94,33 +154,60 @@ interface RuntimePlugin {
 }
 
 const appReference: { current: PulseboxAppHandle | undefined } = { current: undefined };
-const registry = createPluginRegistry<RuntimePlugin>([
+
+/**
+ * The six approved MVP instruments. Registering a module is one entry here plus
+ * its own folder, as section 6.5 requires: nothing below this table branches on
+ * plugin ID, and the audition pitch comes from the shared voice roster.
+ */
+const INSTRUMENTS = [
   {
     manifest: ACID_BASS_MANIFEST,
-    factory: {
-      voiceAdapterFactory: createBassVoiceAdapter,
-      moduleSeed: {
-        pluginId: ACID_BASS_MANIFEST.pluginId,
-        parameters: toParameterValues(ACID_BASS_DEFAULT_PARAMETERS),
-        steps: createSilentSteps(),
-      },
-      auditionNoteForVoice: () => 36,
-    },
+    defaults: ACID_BASS_DEFAULT_PARAMETERS,
+    adapter: createBassVoiceAdapter,
   },
   {
     manifest: DRUMLINE_SIX_MANIFEST,
+    defaults: DRUMLINE_SIX_DEFAULT_PARAMETERS,
+    adapter: createDrumlineVoiceAdapter,
+  },
+  {
+    manifest: BOOM_EIGHT_MANIFEST,
+    defaults: BOOM_EIGHT_DEFAULT_PARAMETERS,
+    adapter: createBoomVoiceAdapter,
+  },
+  {
+    manifest: HYBRID_NINE_MANIFEST,
+    defaults: HYBRID_NINE_DEFAULT_PARAMETERS,
+    adapter: createHybridVoiceAdapter,
+  },
+  {
+    manifest: DIGIT_SEVEN_MANIFEST,
+    defaults: DIGIT_SEVEN_DEFAULT_PARAMETERS,
+    adapter: createDigitSevenVoiceAdapter,
+  },
+  {
+    manifest: DIGIT_FIVE_MANIFEST,
+    defaults: DIGIT_FIVE_DEFAULT_PARAMETERS,
+    adapter: createDigitFiveVoiceAdapter,
+  },
+] as const;
+
+const registry = createPluginRegistry<RuntimePlugin>(
+  INSTRUMENTS.map(({ manifest, defaults, adapter }) => ({
+    manifest,
     factory: {
-      voiceAdapterFactory: createDrumlineVoiceAdapter,
+      voiceAdapterFactory: adapter,
       moduleSeed: {
-        pluginId: DRUMLINE_SIX_MANIFEST.pluginId,
-        parameters: toParameterValues(DRUMLINE_SIX_DEFAULT_PARAMETERS),
+        pluginId: manifest.pluginId,
+        parameters: toParameterValues(defaults),
         steps: createSilentSteps(),
       },
-      auditionNoteForVoice: (voiceId) =>
-        drumVoiceNote(DRUM_VOICE_IDS.find((candidate) => candidate === voiceId) ?? "kick"),
+      auditionNoteForVoice: (voiceId: string | undefined) =>
+        auditionNoteFor(manifest.pluginId, voiceId),
     },
-  },
-]);
+  })),
+);
 // One transport owns the clock, the lookahead loop, and every voice. Registering
 // an instrument means adding a registry entry, not touching the transport.
 let audio: TransportRuntime;
@@ -144,7 +231,7 @@ audio = createAudioRuntime();
 let audioProjectionQueue = Promise.resolve();
 let suppressAudioProjection = false;
 const store = new PulseStore(
-  createDefaultState(browserIdFactory, [moduleSeed, drumSeed]),
+  createDefaultState(browserIdFactory, defaultRack),
   browserIdFactory,
   (pluginId) => registry.get(pluginId)?.factory.moduleSeed,
   (delta) => queueAudioDelta(delta),

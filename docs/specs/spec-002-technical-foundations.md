@@ -223,17 +223,33 @@ and UI code must not require product-specific branching beyond the registry.
 
 Implement a typed `PulseStore`, or an equivalently named central store.
 
-Required API:
+Required store API:
 
 - `getState()`
 - `dispatch(command)`
 - `subscribe(selector, callback)`
 - `undo()`
 - `redo()`
-- `loadProject()`
+- `loadProject(project)`
 - `saveProject()`
-- `exportProject()`
-- `importProject()`
+
+`loadProject` accepts an already validated in-memory project and `saveProject`
+returns one. Neither reads nor writes a serialized document.
+
+Serialization is a separate required capability that the store does not own.
+Project export and import are owned by the persistence layer and reach the user
+through the composition boundary:
+
+- Export serializes a validated project document to the portable `.pulsebox`
+  representation.
+- Import parses untrusted bytes, validates them, applies migrations, checks
+  plugin compatibility, and only then hands the result to `loadProject`.
+
+Untrusted project data has exactly one entry path, which is the validating
+import path. The store exposes no raw serialization entry point, so no caller
+can introduce unvalidated data by bypassing it. `ARCHITECTURE.md` section 7.1
+owns the store interface and `PROJECT-FORMAT.md` owns the serialized document,
+its migrations, and its portable archive.
 
 Use:
 
@@ -244,7 +260,7 @@ Use:
 - Command objects with reversible patches or explicit inverse commands.
 - Gesture coalescing.
 
-High-level state:
+High-level state for the complete MVP:
 
 - `project`
 - `transport`
@@ -260,6 +276,12 @@ High-level state:
 - `history`
 - `persistence`
 
+This is the state vocabulary, not a required literal top-level shape. Serialized
+musical data may be nested under `project` so that one document saves, loads,
+and undoes atomically. Each area arrives with the specification that owns its
+feature in build order, so a phase that has not reached that owner carries no
+placeholder slice for it.
+
 Do not persist:
 
 - Meter animation frames.
@@ -270,27 +292,29 @@ Do not persist:
 - Audio-context power state.
 - Playhead animation state.
 
-### 7.1 Typed UI events
+### 7.1 Typed UI edits
 
-Use typed composed events such as:
+A control never mutates project state directly and never reaches the engine
+directly. It reports the user's intent as a typed, statically checked edit that
+the store validates before any transition.
 
-- `pulse-control-input`
-- `pulse-control-commit`
-- `pulse-step-change`
-- `pulse-note-create`
-- `pulse-note-change`
-- `pulse-note-delete`
-- `pulse-module-add`
-- `pulse-module-move`
-- `pulse-module-remove`
-- `pulse-module-duplicate`
-- `pulse-channel-change`
-- `pulse-effect-change`
-- `pulse-pattern-change`
-- `pulse-pattern-select`
-- `pulse-pattern-reorder`
-- `pulse-automation-change`
-- `pulse-transport-command`
+The command union in the state layer is the single vocabulary for these edits.
+It is exhaustive over the MVP surface and covers at least:
+
+- continuous control input and its commit;
+- step, note, and automation editing;
+- module add, move, remove, and duplicate;
+- mixer channel and effect changes;
+- pattern selection, rename, and reorder;
+- transport commands.
+
+Each command carries a unique command ID, a stable command type, a typed
+payload, the expected project revision, an origin, and an optional gesture ID.
+An unknown or malformed edit fails to type-check rather than reaching the store.
+
+The transport mechanism is the component model's own typed dispatch. A DOM
+`CustomEvent` layer is not required and must not be added solely to re-express
+an edit the command union already carries.
 
 Transient drag input does not create one history entry per pointer event.
 Pointer release commits one command unless the user deliberately creates

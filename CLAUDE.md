@@ -9,6 +9,7 @@ to one agent tool.
 
 Claude Code specifics:
 
+- Answers should be in Simple English. Keep answers short, clear, unambiguous and concise.
 - Repository skills live in `.github/skills/` while `.claude/skills/` and `.agents\skills` are junctions pointing to the single source.
 Invoke one with the Skill tool by its directory name. Start with skills-router when the  right workflow is unclear.
 - `.github/copilot-instructions.md` points at the same AGENTS.md. Keep the three  entry documents consistent when agent instructions change.

@@ -5,11 +5,11 @@ import {
   type ParameterDescriptor,
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
-import { DEFAULT_DRUMLINE_PARAMETERS } from "./dsp-core";
-import { DRUM_VOICE_IDS, DRUM_VOICE_NAMES, type DrumVoiceId } from "./voices";
+import { DEFAULT_DIGIT_FIVE_PARAMETERS } from "./dsp-core";
+import { DIGIT_FIVE_VOICE_IDS, DIGIT_FIVE_VOICE_NAMES, type DigitFiveVoiceId } from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
-  if (!result.ok) throw new Error("Drumline Six contains an invalid stable identifier.");
+  if (!result.ok) throw new Error("Digit Five contains an invalid stable identifier.");
   return result.value;
 }
 
@@ -49,7 +49,7 @@ interface VoiceField {
   readonly step: number;
   readonly unit: ParameterDescriptor["unit"];
   readonly precision: number;
-  readonly defaultFor: (voiceId: DrumVoiceId) => number;
+  readonly defaultFor: (voiceId: DigitFiveVoiceId) => number;
 }
 
 const VOICE_FIELDS: readonly VoiceField[] = [
@@ -61,27 +61,27 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 1,
     unit: "semitones",
     precision: 0,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].tune,
-  },
-  {
-    field: "snap",
-    label: "Snap",
-    minimum: 0,
-    maximum: 1,
-    step: 0.01,
-    unit: "ratio",
-    precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].snap,
+    defaultFor: (voiceId) => DEFAULT_DIGIT_FIVE_PARAMETERS.voices[voiceId].tune,
   },
   {
     field: "decay",
     label: "Decay",
     minimum: 0.01,
-    maximum: 2,
+    maximum: 3,
     step: 0.01,
     unit: "seconds",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].decay,
+    defaultFor: (voiceId) => DEFAULT_DIGIT_FIVE_PARAMETERS.voices[voiceId].decay,
+  },
+  {
+    field: "noise",
+    label: "Noise",
+    minimum: 0,
+    maximum: 1,
+    step: 0.01,
+    unit: "ratio",
+    precision: 2,
+    defaultFor: (voiceId) => DEFAULT_DIGIT_FIVE_PARAMETERS.voices[voiceId].noise ?? 0,
   },
   {
     field: "level",
@@ -91,7 +91,7 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].level,
+    defaultFor: (voiceId) => DEFAULT_DIGIT_FIVE_PARAMETERS.voices[voiceId].level,
   },
   {
     field: "pan",
@@ -101,22 +101,40 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].pan,
+    defaultFor: (voiceId) => DEFAULT_DIGIT_FIVE_PARAMETERS.voices[voiceId].pan,
   },
 ];
 
+/** Section 15.7: the built-in lo-fi stage starts enabled and can be disabled. */
+const lofiEnabled: ParameterDescriptor = {
+  id: parameterId("lofi-enabled"),
+  name: "Lo-fi stage",
+  shortLabel: "Lo-fi",
+  valueType: "boolean",
+  defaultValue: DEFAULT_DIGIT_FIVE_PARAMETERS.lofiEnabled,
+  // A toggle carries no measured quantity, so it has no unit and no precision.
+  unit: "none",
+  displayPrecision: 0,
+  resetValue: DEFAULT_DIGIT_FIVE_PARAMETERS.lofiEnabled,
+  smoothing: { curve: "none", durationMilliseconds: 0 },
+  workletRate: "message",
+  automation: "step",
+  modulation: "none",
+};
+
 const moduleParameters: readonly ParameterDescriptor[] = [
-  moduleParameter("tone", "Tone", DEFAULT_DRUMLINE_PARAMETERS.tone, "ratio"),
-  moduleParameter("drive", "Drive", DEFAULT_DRUMLINE_PARAMETERS.drive, "ratio"),
-  moduleParameter("level", "Level", DEFAULT_DRUMLINE_PARAMETERS.level, "ratio"),
+  moduleParameter("filter", "Filter", DEFAULT_DIGIT_FIVE_PARAMETERS.filter, "ratio"),
+  moduleParameter("bits", "Bit reduction", DEFAULT_DIGIT_FIVE_PARAMETERS.bits, "ratio"),
+  moduleParameter("rate", "Sample-rate reduction", DEFAULT_DIGIT_FIVE_PARAMETERS.rate, "ratio"),
+  moduleParameter("level", "Level", DEFAULT_DIGIT_FIVE_PARAMETERS.level, "ratio"),
 ];
 
-const voiceParameters: readonly ParameterDescriptor[] = DRUM_VOICE_IDS.flatMap((voiceId) =>
+const voiceParameters: readonly ParameterDescriptor[] = DIGIT_FIVE_VOICE_IDS.flatMap((voiceId) =>
   VOICE_FIELDS.map((descriptor): ParameterDescriptor => {
     const defaultValue = descriptor.defaultFor(voiceId);
     return {
       id: parameterId(`${voiceId}-${descriptor.field}`),
-      name: `${DRUM_VOICE_NAMES[voiceId]} ${descriptor.label.toLowerCase()}`,
+      name: `${DIGIT_FIVE_VOICE_NAMES[voiceId]} ${descriptor.label.toLowerCase()}`,
       shortLabel: descriptor.label,
       valueType: "float",
       minimum: descriptor.minimum,
@@ -136,15 +154,16 @@ const voiceParameters: readonly ParameterDescriptor[] = DRUM_VOICE_IDS.flatMap((
 
 const parameters: readonly ParameterDescriptor[] = Object.freeze([
   ...moduleParameters,
+  lofiEnabled,
   ...voiceParameters,
 ]);
 
-export const DRUMLINE_SIX_MANIFEST = Object.freeze({
+export const DIGIT_FIVE_MANIFEST = Object.freeze({
   manifestSchemaVersion: 1,
-  pluginId: required(parsePluginId("drum-analog-small")),
+  pluginId: required(parsePluginId("drum-digital-b")),
   kind: "instrument",
-  productName: "Drumline Six",
-  shortLabel: "SIX",
+  productName: "Digit Five",
+  shortLabel: "FIVE",
   pluginVersion: "1.0.0",
   stateSchemaVersion: 1,
   apiVersion: 1,
@@ -155,13 +174,13 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
     parameters.map((parameter) => [parameter.id, parameter.defaultValue]),
   ),
   ui: {
-    // The normative section 3.4 accent row for `SIX`. Kept in step with
+    // The normative section 3.4 accent row for `FIVE`. Kept in step with
     // `MODULE_ACCENTS` by tests/unit/engine/manifest-identity.test.ts.
     moduleAccent: {
-      accent: "#FFB44A",
-      accentMuted: "#76552A",
-      led: "#FFD078",
-      controlRing: "#D98E2F",
+      accent: "#4ADFC7",
+      accentMuted: "#2B6D63",
+      led: "#7FF2DF",
+      controlRing: "#32B8A3",
     },
     // The faceplate carries the module controls; per-voice knobs address the
     // voice chosen in the selector, which the rack owns.
@@ -170,10 +189,14 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
       parameterId: parameter.id,
     })),
     detailedEditorSections: [
-      { id: "module", name: "Module", parameterIds: moduleParameters.map((one) => one.id) },
-      ...DRUM_VOICE_IDS.map((voiceId) => ({
+      {
+        id: "module",
+        name: "Module",
+        parameterIds: [...moduleParameters.map((one) => one.id), lofiEnabled.id],
+      },
+      ...DIGIT_FIVE_VOICE_IDS.map((voiceId) => ({
         id: voiceId,
-        name: DRUM_VOICE_NAMES[voiceId],
+        name: DIGIT_FIVE_VOICE_NAMES[voiceId],
         parameterIds: VOICE_FIELDS.map((descriptor) =>
           parameterId(`${voiceId}-${descriptor.field}`),
         ),
@@ -183,21 +206,23 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
   automation: "step",
   cpuClass: "light",
   compatibility: { acceptedStateSchemaVersions: [1], migrations: [] },
-  voices: DRUM_VOICE_IDS.map((voiceId) => ({
+  voices: DIGIT_FIVE_VOICE_IDS.map((voiceId) => ({
     id: voiceId,
-    name: DRUM_VOICE_NAMES[voiceId],
+    name: DIGIT_FIVE_VOICE_NAMES[voiceId],
     outputChannels: 2,
   })),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
-  voiceStealing: { maximumVoices: 6, priority: "oldest", releaseMilliseconds: 4 },
+  voiceStealing: { maximumVoices: 8, priority: "oldest", releaseMilliseconds: 4 },
   retriggerPolicy: "restart",
   chokePolicy: "group",
   inputChannels: 0,
   outputChannels: 2,
+  // Voices play tables generated at construction rather than decoded assets.
+  // User sample layers arrive with specification 009.
   supportsSampleLayers: false,
-  processorFactoryKey: "drumline-six-worklet",
+  processorFactoryKey: "digit-five-worklet",
   renderCapabilities: { live: true, offline: false },
 } satisfies InstrumentPluginManifest);
 
-export const DRUMLINE_SIX_DEFAULT_PARAMETERS = DRUMLINE_SIX_MANIFEST.defaultState;
+export const DIGIT_FIVE_DEFAULT_PARAMETERS = DIGIT_FIVE_MANIFEST.defaultState;

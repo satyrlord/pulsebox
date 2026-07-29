@@ -47,6 +47,7 @@ Position group:
 
 Master group:
 
+- Metronome toggle.
 - Audio-engine power.
 - One two-state analysis toggle labeled `L/R` or `M/S`.
 - Two master meter bars. In `L/R` they show left and right. In `M/S` they
@@ -81,6 +82,12 @@ Behavior:
 - Pattern and Song transport modes switch without stopping.
 - Pattern switching is quantized to a configurable boundary, default one bar.
 - Count-in and metronome are configurable for live recording.
+- The header metronome toggle is the single control that switches the metronome
+  on and off. It uses `aria-pressed`, is a global UI preference rather than
+  project data, creates no undo entry, and never changes project state,
+  automation, or export. Count-in length and metronome sound stay with the live
+  recording settings owned by
+  [pattern editing](spec-006-pattern-editing.md) section 16.4.
 - Pin project toggles whether the current project appears at the top of the
   project selector. It uses `aria-pressed` and persists as project metadata.
 

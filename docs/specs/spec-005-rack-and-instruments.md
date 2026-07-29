@@ -27,6 +27,8 @@ Transport and timing:
 - Humanize: 12%.
 - Quantize strength: 100%.
 - Transport: stopped.
+- Instrument channel level: approximately -8 dB on every occupied slot, so the
+  supplied six-module mix leaves master headroom.
 - Master level: approximately -6 dB.
 - New-installation UI theme: `rack`, stored as a global preference rather than
   project state.

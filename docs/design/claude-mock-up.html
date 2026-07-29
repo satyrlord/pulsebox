@@ -9,18 +9,21 @@
    topbar / browser + slots / rack units / right tabs + 2x2 A-D channel sends
    pattern + module-aware piano roll + playlist / collapsible bottom workspace
    Themes are tokens only. Geometry never moves.
-   Styling pass: aligned with design/image-gen-mock.png — neutral matte
+   Styling pass: neutral matte
    graphite, green lamp accent, rounder controls, rack pull handles.
    Pass 2: closer to the mock — softer lit faceplates with brushed texture,
    larger knobs with glowing value arcs and labels above, chunkier pull
    handles with socket bolts, blooming step lamps, silver fader caps,
    plain-text wordmark.
-   Pass 3: native 1568 x 1003 composition geometry, measured directly from
-   the approved reference image.
-   Pass 4: measurement-driven pixel parity pass — decorative measured piano
-   gutter, target-matched mixer levels, caps, sends and meter ladders,
-   voice-0 lamp fixtures, uniform rack-knob arc fixture, reference waveform,
-   and topbar/bottom-bar alignment tuned against per-pixel diffs.
+   Pass 3: native 1568 x 1003 composition geometry.
+   Pass 4: pixel parity pass — decorative piano gutter, mixer levels, caps,
+   sends and meter ladders, voice-0 lamp fixtures, uniform rack-knob arc
+   fixture, waveform, and topbar/bottom-bar alignment.
+   Passes 3 and 4 were measured against an early raster study that decision D77
+   has since withdrawn. This file is now the single approved composition target
+   (spec-003 section 8.2): it owns the geometry, and the product specifications
+   own behavior. Where the two disagree, the specification wins and this file is
+   corrected.
    ========================================================================== */
 :root, html[data-theme="rack"]{
   --surface-app:#08090a; --surface-rail:#101214; --surface-chassis:#141618;
@@ -206,15 +209,6 @@ button{background:none;border:0;cursor:pointer;}
 html[data-theme="rack"] .topbar{
   background-image:var(--mat-speckle),linear-gradient(180deg,#1d1e1f,#18191a);
 }
-.theme-popover{
-  position:fixed;z-index:70;top:58px;right:10px;width:210px;padding:10px;border-radius:var(--edge-radius-panel);
-  background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
-  border:1px solid var(--edge-hairline);box-shadow:inset 0 1px var(--edge-highlight),0 10px 28px rgba(0,0,0,.72);
-}
-.theme-popover h2{margin:0 0 8px;font-family:var(--type-display);font-size:var(--size-2);letter-spacing:.12em;text-transform:uppercase;color:var(--text-primary);}
-.theme-options{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
-.theme-options button{height:28px;border-radius:var(--edge-radius-ctl);font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary);background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
-.theme-options button[aria-pressed="true"]{color:var(--accent-text);box-shadow:var(--lift-1),inset 0 -2px var(--accent-lamp);}
 .header-left,.header-right{min-width:0;display:flex;align-items:center;gap:7px;transform:translateY(1.5px);}
 .header-right{justify-content:flex-end;}
 .iconbtn{
@@ -712,7 +706,7 @@ html[data-theme="rack"] .rail.r{
    accent toward the theme ink so the hue survives but contrast passes. */
 .uactlbl .pos{margin-left:auto;font-family:var(--type-num);font-size:var(--size-1);
   color:#a9b1a5;text-shadow:0 0 4px rgba(255,255,255,.12);}
-/* audition pad + edit shortcut at the unit's right edge */
+/* audition pad at the unit's right edge */
 .uaudition{
   flex:none;width:38px;align-self:center;display:flex;flex-direction:column;gap:3px;margin-right:1px;
 }
@@ -723,15 +717,14 @@ html[data-theme="rack"] .rail.r{
 .uaudition .apad[data-held="true"]{color:var(--accent-ink);
   background:linear-gradient(180deg,var(--k),color-mix(in srgb,var(--k) 68%,black));
   box-shadow:var(--sink-1),0 0 8px color-mix(in srgb,var(--k) 45%,transparent);}
-/* the mock lights the Edit action in a fixed warm amber on every unit */
-.uaudition .aedit{color:var(--mod-six);
-  text-shadow:0 0 6px color-mix(in srgb,var(--mod-six) 65%,transparent);}
 
 /* ---------- right tabbed panel ---------- */
 .rightcol{min-width:0;min-height:0;display:flex;flex-direction:column;gap:5px;}
 .rightcol>.panel{background-color:var(--surface-rail);}
 html[data-theme="rack"] .rightcol>.panel{background-color:#181a1c;}
-.rtabs{flex:none;display:grid;grid-template-columns:27% 30% minmax(0,1fr);gap:4px;padding:3px;}
+/* Three peer views, so three equal tabs. Nothing about Mixer, Effects or Master
+   makes one of them wider than the others. */
+.rtabs{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:3px;}
 .rtabs button{
   height:30px;border-radius:var(--edge-radius-ctl);font-family:var(--type-display);font-size:var(--size-1);
   letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);
@@ -760,6 +753,10 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
   color:var(--k);text-shadow:0 1px #000;filter:brightness(.95);
   background:none;box-shadow:none;}
 .mstrip.master .mtag{color:var(--text-primary);text-shadow:0 1px 0 var(--text-engraved-lo);}
+/* The master strip carries no pan knob and no send grid, so its well takes that
+   reclaimed height instead of padding it out: the master fader runs from just
+   below the MIX label down to the buttons, taller than the channel faders. */
+.mstrip.master .fwrap{margin-top:2px;}
 /* Empty channels stay dim rather than taking a lit accent. */
 .mstrip.empty .mtag,.mstrip:not([data-mod]) .mtag{
   color:var(--text-muted);text-shadow:0 1px 0 var(--text-engraved-lo);background:none;}
@@ -800,7 +797,9 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
 .mstrip:not([data-mod]):not(.master) .ffill{opacity:0;}
 .mstrip.empty .knob,.mstrip.empty .fader{pointer-events:none;cursor:default;}
 /* LED ladder inside the shared well */
-.mmeter{width:5px;flex:none;border-radius:1.5px;
+/* The ladder fills the whole well: it is a block so it stretches to the well's
+   height, and paintMeter resizes its backing bitmap to match. */
+.mmeter{width:5px;flex:none;align-self:stretch;display:block;height:100%;border-radius:1.5px;
   background:rgba(0,0,0,.45);
   box-shadow:inset 0 1px 3px rgba(0,0,0,.8);}
 .mstrip .sendgrid{
@@ -1185,7 +1184,9 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
         <span class="pname">Neon Basement</span>
         <svg aria-hidden="true"><use href="#i-chev"/></svg>
       </button>
-      <button class="iconbtn ghost" title="Add to favourites." aria-label="Favourite"><svg aria-hidden="true"><use href="#i-heart"/></svg></button>
+      <button class="iconbtn ghost" type="button" aria-pressed="false"
+        title="Pin project. Keeps this project at the top of the project selector."
+        aria-label="Pin project"><svg aria-hidden="true"><use href="#i-heart"/></svg></button>
     </div>
     <div class="mode-toggle" id="transportMode" aria-label="Transport mode">
       <button class="on" type="button" data-mode="pattern" aria-pressed="true">Pattern</button>
@@ -1220,19 +1221,9 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       </div>
       <span class="mdb num" id="masterDb">&minus;6.1&thinsp;dB</span>
     </div>
-    <button class="iconbtn" id="settingsButton" title="Settings. Themes are selected here." aria-label="Settings" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
+    <button class="iconbtn" id="settingsButton" title="Settings. Themes are selected here." aria-label="Settings"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
   </div>
 </header>
-<section class="theme-popover" id="themePopover" role="dialog" aria-label="Theme settings" hidden>
-  <h2>Theme</h2>
-  <div class="theme-options">
-    <button type="button" data-theme-choice="rack" aria-pressed="true">Rack</button>
-    <button type="button" data-theme-choice="mono" aria-pressed="false">Mono</button>
-    <button type="button" data-theme-choice="cosmic" aria-pressed="false">Cosmic</button>
-    <button type="button" data-theme-choice="analog" aria-pressed="false">Analog</button>
-    <button type="button" data-theme-choice="rust" aria-pressed="false">Rust</button>
-  </div>
-</section>
 
 <!-- ============================ MID ROW ============================ -->
 <main class="midrow" aria-label="Rack workspace">
@@ -1246,7 +1237,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <aside class="panel slots" aria-label="Slots">
     <div class="slist" id="slist"></div>
     <div class="slotacts">
-      <button title="Duplicate the selected module.">Copy</button>
+      <button title="Duplicate the selected module.">Dupe</button>
     </div>
   </aside>
 
@@ -1334,8 +1325,8 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <section class="panel" aria-label="Piano roll">
     <div class="rolltools">
       <span class="gridstatus" title="The MVP Pattern grid is fixed at one sixteenth.">1/16<svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <label class="timingctl">Swing
-        <input id="swingSlider" type="range" min="0" max="100" value="54" aria-label="Pattern Swing">
+      <label class="timingctl" title="Swing. One global project value in the MVP: it applies to every Pattern.">Swing
+        <input id="swingSlider" type="range" min="0" max="100" value="54" aria-label="Project Swing">
         <output id="swingValue">54%</output>
       </label>
       <label class="timingctl">Humanize
@@ -1386,35 +1377,15 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const clamp = (v,a,b) => Math.min(b, Math.max(a,v));
 const THIN = "\u2009";
+/* Spec section 11.4. The header carries no theme selector; theme and contrast
+   are chosen on the Settings page. The stored global preference is still applied
+   here so this composition can be captured in any of the five themes. */
 const THEME_IDS = ["rack","mono","cosmic","analog","rust"];
-const settingsButton = $("#settingsButton"), themePopover = $("#themePopover");
 function applyTheme(theme){
-  const next = THEME_IDS.includes(theme) ? theme : "rack";
-  document.documentElement.dataset.theme = next;
-  $$("[data-theme-choice]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.themeChoice===next)));
-  try{ localStorage.setItem("pulsebox-theme",next); }catch{}
+  document.documentElement.dataset.theme = THEME_IDS.includes(theme) ? theme : "rack";
 }
 try{ applyTheme(localStorage.getItem("pulsebox-theme")||document.documentElement.dataset.theme); }
 catch{ applyTheme(document.documentElement.dataset.theme); }
-function closeThemePopover(restoreFocus=false){
-  themePopover.hidden = true; settingsButton.setAttribute("aria-expanded","false");
-  if(restoreFocus) settingsButton.focus();
-}
-settingsButton.addEventListener("click",()=>{
-  const opening = themePopover.hidden;
-  themePopover.hidden = !opening; settingsButton.setAttribute("aria-expanded",String(opening));
-  if(opening) themePopover.querySelector('[aria-pressed="true"]')?.focus();
-});
-themePopover.addEventListener("click",event=>{
-  const choice = event.target.closest("[data-theme-choice]");
-  if(choice) applyTheme(choice.dataset.themeChoice);
-});
-document.addEventListener("pointerdown",event=>{
-  if(!themePopover.hidden&&!themePopover.contains(event.target)&&!settingsButton.contains(event.target)) closeThemePopover();
-});
-document.addEventListener("keydown",event=>{
-  if(event.key==="Escape"&&!themePopover.hidden){ event.preventDefault(); closeThemePopover(true); }
-});
 /* state that paint functions reach during build */
 let playing = false, queuedCommits = [], stepPos = 0;
 
@@ -1442,7 +1413,9 @@ function refreshUndo(){
 }
 function pushUndo(label, undo, redo){
   undoStack.push({label,undo,redo}); redoStack.length = 0;
-  if(undoStack.length>200) undoStack.shift();
+  /* Spec section 24.2 and decision D60: at most 100 active entries, oldest
+     first out. The product also enforces byte budgets this mock does not model. */
+  if(undoStack.length>100) undoStack.shift();
   refreshUndo();
 }
 btnUndo.addEventListener("click", ()=>{ const a=undoStack.pop(); if(!a) return; a.undo(); redoStack.push(a); refreshUndo(); });
@@ -1559,7 +1532,7 @@ const MODS=[
           ["Volume","db",-60,6,-4,0]],
    voices:["Note"]},
   {id:"six",label:"SIX",name:"Drumline Six",type:"Small analog drum machine",kind:"drum",
-   knobs:[["Tune","st",-12,12,0,0],["Snappy","pct",0,100,58,50],["Decay","pct",0,100,50,50],
+   knobs:[["Tune","st",-12,12,0,0],["Snap","pct",0,100,58,50],["Decay","pct",0,100,50,50],
           ["Tone","pct",0,100,48,50],["Level","db",-60,6,-3,0],["Drive","pct",0,100,18,0],
           ["Pan","pct",-100,100,0,0]],
    voices:["Kick","Snare","Low Tom","High Tom","Closed Hat","Open Hat","Crash","Ride"]},
@@ -1587,12 +1560,16 @@ const MODS=[
           ["Bit Crush","pct",0,100,22,0],["Rate","pct",0,100,18,0]],
    voices:["Shaker","Bongo","Conga","Tambourine","Cowbell","Claves","Click","Noise"]},
 ];
+/* Spec section 17 and decision D69. Swing is one global project property in the
+   MVP, so it lives beside tempo rather than on a Pattern and the header slider
+   reads the same on every Pattern. Humanize stays Pattern-owned. */
+let projectSwing=54;
 const PROJECT_PATTERNS=[
-  {name:"Intro",bars:8,swing:52,humanize:8},
-  {name:"Verse",bars:16,swing:54,humanize:12},
-  {name:"Break",bars:8,swing:50,humanize:18},
-  {name:"Drop",bars:16,swing:57,humanize:10},
-  {name:"Outro",bars:8,swing:51,humanize:6},
+  {name:"Intro",bars:8,humanize:8},
+  {name:"Verse",bars:16,humanize:12},
+  {name:"Break",bars:8,humanize:18},
+  {name:"Drop",bars:16,humanize:10},
+  {name:"Outro",bars:8,humanize:6},
 ];
 let activePatternIndex=1;
 /* seeded patterns so the mockup shows musical content, not noise */
@@ -1718,7 +1695,6 @@ function unitHTML(m){
   <div class="uaudition">
     <button class="apad" title="Hold to sound this voice. Does not change the pattern."
       aria-label="Audition ${m.name}. Hold to sound.">Aud</button>
-    <button class="aedit" title="Edit this module's part in the Piano Roll.">Edit</button>
   </div>
   </div>
   <div class="rail r"><span class="screw t"></span><span class="handle"></span><span class="screw b"></span></div>`;
@@ -1836,9 +1812,6 @@ $$(".useq").forEach(seq=>{
   pad.addEventListener("keyup",e=>{
     if(e.key===" "||e.key==="Enter"){e.preventDefault();release();}
   });
-  seq.parentElement.querySelector(".uaudition .aedit")?.addEventListener("click",()=>{
-    renderEditor(mid);
-  });
   repaint();
 });
 /* pill toggles */
@@ -1883,8 +1856,8 @@ CH.forEach((c,i)=>{
     <div class="knob sm" data-param="Pan" data-unit="pan" data-min="-50" data-max="50" data-value="0" data-default="0" title="Pan ${c.name}."></div>
     <div class="sendgrid" aria-label="${c.name} sends">${c.sends.map((active,sendIndex)=>
       `<button class="sendbtn${active?" on":""}" type="button" data-send="${SEND_IDS[sendIndex]}"
-        aria-label="${c.name} send ${SEND_IDS[sendIndex]} to ${SEND_NAMES[sendIndex]}"
-        aria-pressed="${active}" title="Send ${SEND_IDS[sendIndex]} — ${SEND_NAMES[sendIndex]}. Click to preview its active state."
+        aria-label="${c.name} send ${SEND_IDS[sendIndex]} to ${SEND_NAMES[sendIndex]}, ${active?"active":"off"}"
+        aria-haspopup="dialog" title="Send ${SEND_IDS[sendIndex]} — ${SEND_NAMES[sendIndex]}. Opens its amount and pre or post fader setting."
         ${c.mod?"":"disabled"}>${SEND_IDS[sendIndex]}</button>`).join("")}</div>
     <div class="fwrap"><div class="fader" role="slider" tabindex="0"
         aria-label="${c.name} level" aria-orientation="vertical"
@@ -1932,26 +1905,18 @@ CH.forEach((c,i)=>{
     const on=b.classList.toggle("on");
     b.setAttribute("aria-pressed",String(on));
   }));
-  d.querySelectorAll(".sendbtn").forEach((b,sendIndex)=>b.addEventListener("click",()=>{
-    const previous=c.sends[sendIndex], next=!previous;
-    const paintSend=value=>{
-      c.sends[sendIndex]=value;
-      b.classList.toggle("on",value);
-      b.setAttribute("aria-pressed",String(value));
-    };
-    paintSend(next);
-    pushUndo(`${c.name} send ${SEND_IDS[sendIndex]} ${next?"on":"off"}`,
-      ()=>paintSend(previous),()=>paintSend(next));
-  }));
+  /* Spec sections 19.2 and 20.5. A send button opens the send's amount and
+     pre/post value surface. Its lit state is derived from a non-zero amount
+     rather than being a toggle, so there is no click-to-toggle path here. */
 });
 /* master strip */
 (()=>{
   const d=document.createElement("div");
   d.className="mstrip master";
+  /* Spec section 19.2 and decision D75. The mix bus is where send chains return,
+     never a send source, so the master strip carries no A-D grid. Return levels
+     live on the Effects tab's A-D cards; master processing lives on Master. */
   d.innerHTML=`<span class="mtag">MIX</span>
-    <div class="knob sm" data-param="Pan" data-unit="pan" data-min="-50" data-max="50" data-value="0" data-default="0" title="Master pan."></div>
-    <div class="sendgrid master-returns" role="img" aria-label="Send returns A, B, C, and D">${SEND_IDS.map((sendId,index)=>
-      `<span class="sendbtn${index<2?" on":""}" aria-hidden="true">${sendId}</span>`).join("")}</div>
     <div class="fwrap"><div class="fader" role="slider" tabindex="0"
         aria-label="Master level" aria-orientation="vertical"
         aria-valuemin="-60" aria-valuemax="6" aria-valuenow="-6.0" aria-valuetext="-6.0 dB"
@@ -2371,9 +2336,8 @@ function showActivePattern(index){
   $$(".pattern-name").forEach(el=>el.textContent=pattern.name);
   const module=MODS.find(item=>item.id===activeEditorModule);
   $(".rollctx").textContent=`${module?.name||"Acid Bass"} — ${pattern.name}`;
-  $("#swingSlider").value=pattern.swing;$("#swingValue").textContent=pattern.swing+"%";
+  /* Swing is global, so switching Patterns never moves it. */
   $("#humanizeSlider").value=pattern.humanize;$("#humanizeValue").textContent=pattern.humanize+"%";
-  $("#swingSlider").style.setProperty("--fill",pattern.swing+"%");
   $("#humanizeSlider").style.setProperty("--fill",pattern.humanize+"%");
   playlistRows.forEach((row,i)=>row.classList.toggle("on",i===activePatternIndex));
 }
@@ -2390,7 +2354,7 @@ PROJECT_PATTERNS.forEach(({name:n,bars:b},i)=>{
 $("#patPrev").addEventListener("click",()=>showActivePattern(activePatternIndex-1));
 $("#patNext").addEventListener("click",()=>showActivePattern(activePatternIndex+1));
 $("#swingSlider").addEventListener("input",event=>{
-  PROJECT_PATTERNS[activePatternIndex].swing=+event.target.value;$("#swingValue").textContent=event.target.value+"%";
+  projectSwing=+event.target.value;$("#swingValue").textContent=event.target.value+"%";
   event.target.style.setProperty("--fill",event.target.value+"%");
 });
 $("#humanizeSlider").addEventListener("input",event=>{
@@ -2442,12 +2406,12 @@ addEventListener("keydown",e=>{
   if(e.code==="Space"&&!e.target.closest("input,select")){e.preventDefault();btnPlay.click();}
 });
 tempoInput.addEventListener("change",()=>{const v=parseFloat(tempoInput.value);
-  if(!Number.isNaN(v)) tempo=clamp(v,40,300); tempoInput.value=tempo.toFixed(1);});
+  if(!Number.isNaN(v)) tempo=clamp(v,40,240); tempoInput.value=tempo.toFixed(1);});
 (()=>{ let dg=null; const el=$("#tempoDrag");
   el.addEventListener("pointerdown",e=>{if(e.target===tempoInput)return;
     el.setPointerCapture(e.pointerId);dg={y:e.clientY,v:tempo};});
   el.addEventListener("pointermove",e=>{if(!dg)return;
-    tempo=clamp(dg.v+(dg.y-e.clientY)*0.25,40,300);tempoInput.value=tempo.toFixed(1);});
+    tempo=clamp(dg.v+(dg.y-e.clientY)*0.25,40,240);tempoInput.value=tempo.toFixed(1);});
   el.addEventListener("pointerup",()=>dg=null);
 })();
 /* tap tempo */
@@ -2457,7 +2421,7 @@ tempoInput.addEventListener("change",()=>{const v=parseFloat(tempoInput.value);
     taps=taps.filter(t=>now-t<2400); taps.push(now);
     if(taps.length>=3){
       const gaps=taps.slice(1).map((t,i)=>t-taps[i]);
-      tempo=clamp(60000/(gaps.reduce((a,b)=>a+b,0)/gaps.length),40,300);
+      tempo=clamp(60000/(gaps.reduce((a,b)=>a+b,0)/gaps.length),40,240);
       tempoInput.value=tempo.toFixed(1);
     }
   });
@@ -2477,27 +2441,35 @@ function updateClock(){
 updateClock();
 
 function paintMeter(cv,lv,vertical=true){
+  /* Vertical ladders stretch to their well, so the backing bitmap follows the
+     element's real box instead of a fixed height that CSS would rescale. */
+  if(vertical){
+    const px=Math.round(cv.clientHeight);
+    if(px>0&&cv.height!==px) cv.height=px;
+  }
   const ctx=cv.getContext("2d"), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
   const css=getComputedStyle(document.documentElement);
   const cols=[css.getPropertyValue("--meter-low"),css.getPropertyValue("--meter-mid"),
               css.getPropertyValue("--meter-high"),css.getPropertyValue("--meter-peak")];
-  /* vertical ladders: fine 2px cells with 1px gaps; the lit floor stops short
-     of the recess bottom, as in the reference (lit base at ~y548) */
-  const padT=vertical?8:0, padB=vertical?34:0, pitch=vertical?3:6, cell=vertical?2:4;
+  /* Vertical ladders use fine 2px cells on a 3px pitch. A level meter fills from
+     its floor upward, so the lit column and the unlit ladder behind it share one
+     baseline at the bottom of the well. Segment zero sits on that floor; there
+     is no dead gap beneath the lit base. */
+  const padT=vertical?2:0, padB=vertical?2:0, pitch=vertical?3:6, cell=vertical?2:4;
   const segs=vertical?Math.floor((H-padT-padB)/pitch):Math.floor(W/pitch);
   const lit=Math.round(segs*lv);
+  const segY=i=>H-padB-(i+1)*pitch+1;
   /* Lit segments glow; unlit ones stay a barely-there dark ladder so the meter
-     reads as a physical ledder of cells at rest rather than an empty slot. The
-     unlit ladder continues faintly below the lit base, as in the reference. */
+     reads as a physical ladder of cells at rest rather than an empty slot. */
   if(vertical){
     ctx.fillStyle="rgba(150,165,158,.13)";
-    for(let y=H-4-pitch+1;y>=padT;y-=pitch) ctx.fillRect(1,y,W-2,cell);
+    for(let i=lit;i<segs;i++) ctx.fillRect(1,segY(i),W-2,cell);
     for(let i=0;i<lit;i++){
       const fr=i/segs;
       const col=fr<.78?cols[0]:fr<.9?cols[1]:fr<.96?cols[2]:cols[3];
       ctx.shadowBlur=4;ctx.shadowColor=col;ctx.fillStyle=col;
-      ctx.fillRect(1,H-padB-(i+1)*pitch+1,W-2,cell);
+      ctx.fillRect(1,segY(i),W-2,cell);
     }
   }else{
     for(let i=0;i<segs;i++){
@@ -2513,8 +2485,12 @@ function paintMeter(cv,lv,vertical=true){
   ctx.shadowBlur=0;
 }
 const chMeters=$$("[data-chm]"), masterMeterA=$("#masterMeterA"), masterMeterB=$("#masterMeterB"), masterDb=$("#masterDb");
-/* The reference holds a quiet stopped mix: channel ladders retain a low visual
-   floor while the header meter correctly reports silence. */
+/* Static-picture fixture only, per decision D74. These idle levels came from an
+   early raster study that has since been withdrawn (D77); they survive here so
+   this composition shows a plausible mix at rest. The product must not do this:
+   spec section 21.7 forbids fake meters while stopped, and the header meter
+   below already reports true silence. Do not carry this floor into product
+   code. */
 const IDLE_LV=CH.map((c,i)=>c.mod?[.68,.44,.46,.37,.44,0][i]??0:0);
 const IDLE_MASTER=.69;
 const lv={ch:[...IDLE_LV],master:IDLE_MASTER,masterL:IDLE_MASTER-.02,masterR:IDLE_MASTER+.02};

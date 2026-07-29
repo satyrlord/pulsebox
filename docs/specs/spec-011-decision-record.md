@@ -214,17 +214,14 @@ this table is the traceability record.
   and adds stack-order, height, and persistence state for a comparison that
   ghost lanes already serve. `AC-079` gates the selector and its lane
   lifecycle, `AC-086` gates ghost behavior.
-- **D67.** At 1568 × 1003,
-  `docs/design/image-gen-mock.png` is the approved raster reference for the
-  shell's proportion, placement, density, materials, typography scale, and
-  control sizing; `docs/design/claude-mock-up.html` remains the semantic and
-  interactive composition target. The rack faceplate pairs its dominant short
-  label with subordinate full-name and type text, the bottom workspace bar uses
-  the reference's approximately 50-to-52-pixel height, empty mixer strips show
-  their two-digit slot numbers, and the master strip's A–D grid identifies the
-  return buses with noninteractive labels rather than adding master sends or
-  return-state controls. Responsive and accessible behavior continues to be
-  owned by the product specifications rather than by raster artifacts.
+- **D67.** The rack faceplate pairs its dominant short label with subordinate
+  full-name and type text, the bottom workspace bar is approximately 50 to 52
+  pixels high, and empty mixer strips show their two-digit slot numbers.
+  Responsive and accessible behavior is owned by the product specifications
+  rather than by design artifacts. Two parts of this decision are superseded:
+  the master strip's A–D grid by `D75`, which removes it, and the separate
+  1568 × 1003 raster reference by `D77`, which withdraws it and leaves
+  `docs/design/claude-mock-up.html` as the single composition target.
 - **D68.** Numbered phases remain the dependency and completion order, while a
   narrow vertical foundation from a later phase may land after its owner and
   all earlier dependencies are applied. A foundation slice never marks its
@@ -241,3 +238,118 @@ this table is the traceability record.
   Playlist to contrast Patterns in; and omitting Swing until it can be
   Pattern-owned, which removes the single most identity-defining timing control
   from the MVP groove.
+- **D70.** `PulseStore` owns in-memory project state only. Its project API is
+  `loadProject` and `saveProject`, which exchange already validated in-memory
+  projects. Serialization, portable export, and untrusted import belong to the
+  persistence layer and reach the user through the composition boundary, so
+  untrusted bytes have exactly one entry path, which validates, migrates, and
+  checks plugin compatibility before calling `loadProject`. This keeps the
+  state layer free of a dependency on persistence and matches the store
+  interface in `ARCHITECTURE.md` section 7.1. Rejected alternatives: adding
+  `exportProject` and `importProject` to the store, which would invert the
+  state-to-persistence dependency direction and give unvalidated data a second
+  entry path that bypasses import validation; and moving serialization
+  ownership onto the store, which would additionally place document schema and
+  migration knowledge in the layer that must stay format-agnostic. `AC-033` and
+  `AC-084` continue to gate Undo behavior, and the `AC-034` through `AC-038`
+  and `AC-081` through `AC-083` persistence criteria gate export and import at
+  their owning layer.
+- **D71.** A typed edit is expressed as a command in the state layer's command
+  union and delivered by the UI component model's own typed dispatch. A DOM
+  `CustomEvent` layer is not required, and one must not be added solely to
+  re-express an edit the command union already carries. The union stays the
+  single edit vocabulary, so an unknown or malformed edit fails to type-check
+  rather than reaching the store at run time. This supersedes the earlier named
+  `pulse-` composed-event list, which assumed a Web Components UI; the repository
+  uses one React component model instead, as `AC-002` requires. Gesture
+  coalescing is unchanged and remains normative: a continuous drag carries one
+  gesture identifier and collapses into one history entry, and a typed numeric
+  field commits on Enter or blur. Rejected alternative: rebuilding the composed
+  event layer over React to preserve the literal event names, which adds an
+  indirection with no behavior change and weakens static checking.
+- **D72.** The rack faceplate has no Edit button and the master strip has no pan
+  control. Both appeared only in `docs/design/claude-mock-up.html` and were
+  removed from it rather than adopted. A faceplate Edit button duplicates the
+  existing path to a module's part, which is selecting the module in the rack
+  overview or in the Piano Roll's own module selector, and `D65` already fixed
+  the faceplate's contents as the output-only activity indicator plus the
+  hold-to-sound audition control. A master pan control would become a fully
+  automatable, serialized, exported master parameter under section 6.2 for a
+  control that master balance rarely needs. Rejected alternatives: pointing the
+  faceplate Edit button at the 760 x 680 expanded editor instead, which gives
+  that editor a visible home but no longer matches the approved composition; and
+  drawing the master pan knob permanently disabled to preserve raster parity,
+  which `AC-059` forbids because no visible control may be dead. `AC-011` and
+  `AC-059` continue to gate this.
+- **D73.** The metronome on and off switch lives in the transport header's master
+  group. Section 12 already required a configurable metronome for live recording
+  but named no surface for it, so recording could not be started and stopped
+  against a click without opening a settings surface that the MVP does not yet
+  have. The toggle is a global UI preference: it uses `aria-pressed`, creates no
+  undo entry, and changes no project state, automation, or export. Count-in
+  length and metronome sound remain with live recording in section 16.4.
+  Rejected alternatives: placing the switch only in a future recording settings
+  surface, which leaves the MVP with a required feature and no reachable
+  control; and exposing it in both places, which duplicates the displayed state
+  for no added capability.
+- **D74.** Four values the approved composition target already showed are now
+  contract: the MVP Pattern scale choices are Chromatic, Minor, Dorian,
+  Phrygian, and Pentatonic (section 16.0); the limiter's compact controls are
+  Ceiling, Gain, and Release (section 20.7); and the default project sets every
+  occupied instrument channel near -8 dB while the master stays near -6 dB
+  (section 9.1). The mock's remaining unspecified numbers stay unspecified: its
+  960-ticks-per-beat clock resolution is deferred to the section 12 transport
+  work, which chooses and records a resolution in the same change. Separately,
+  the mock holds its channel and master meters at a lit idle floor while stopped
+  so it matches the raster reference frame; that is a static-picture fixture
+  only. Section 21.7 governs the product, where meters read silence while the
+  transport is stopped.
+- **D75.** The master strip carries no A–D grid, in any form. This supersedes the
+  noninteractive return labels recorded in `D67`. Sends are an instrument-channel
+  concept: a channel taps a portion of its signal to one of four parallel send
+  chains, which return into the mix bus. The mix bus is that destination, so it
+  is never a send source, and giving it the same four-letter grid states a
+  routing relationship that does not exist. Mix-bus processing is also a
+  different kind of work from instrument effects: it is the serial master chain
+  in section 20.6, with its own compressor, EQ, and protected limiter, which is
+  why section 8.5 gives it a dedicated Master studio view rather than a corner of
+  a mixer strip. Return levels stay on the compact A–D cards in the Effects view,
+  where each chain already owns its circular `Mix` return control. Rejected
+  alternatives: keeping the letters as a static legend, which spends master-strip
+  height on something that controls nothing and reads as a dead control under
+  `AC-059`; and adding four dedicated return strips to the mixer, which makes
+  returns mixable in one place but widens the compact studio column that section
+  8.4 deliberately keeps narrow so the rack stays dominant. `AC-068` gates the
+  master strip's contents.
+- **D76.** The master strip is not an instrument channel, so it does not copy
+  instrument-strip geometry. The fixed compact strip geometry applies to the
+  eight instrument channels; the master is a different object with a different
+  job, and `D75` already removed the pan control and the A–D grid from it. The
+  height those controls vacate goes to the master fader rather than to padding,
+  so the master fader is deliberately taller than an instrument fader. It starts
+  below the master label and ends on the same floor, so the strips still share a
+  baseline while the travel differs. This is also correct on its own terms:
+  master level is the most frequently adjusted control in the mixer and benefits
+  from the finest travel. Rejected alternative: inserting a spacer to force the
+  master fader to the instrument-fader length, which buys a visual alignment
+  nobody needs by converting reclaimed height into dead space. Separately, the
+  Mixer, Effects, and Master tabs are peers and share one strip of equal-width
+  controls; the earlier unequal widths encoded no meaning. Section 19.2 owns the
+  master strip's geometry and section 8.5 owns the tab strip.
+- **D77.** The 1568 × 1003 raster reference is withdrawn, and
+  `docs/design/claude-mock-up.html` is the single approved composition target.
+  This supersedes that part of `D67`. Two approved targets in different media
+  cannot stay identical: the HTML target is corrected whenever a product
+  decision changes the composition, while a raster image cannot be edited in the
+  same change, so it drifts. Once drifted it is actively harmful, because an
+  implementer measuring against it reproduces decisions the specifications have
+  already reversed. The HTML target therefore owns proportion, placement,
+  density, materials, typography scale, and control sizing in addition to
+  semantics and interaction, and the raster file is removed from the repository.
+  The durable rules the raster established survive in `D67` and in their owning
+  specifications rather than in an image. Rejected alternatives: keeping the
+  image as non-normative historical evidence, which leaves the drifted artifact
+  on disk where an agent instructed to match the design will still find and
+  follow it; and regenerating the raster to match the current HTML, which
+  restores the same drift the moment the next composition decision lands.
+  `AC-067` now gates against the composition target rather than a raster.

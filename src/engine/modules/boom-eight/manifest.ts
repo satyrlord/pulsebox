@@ -5,11 +5,11 @@ import {
   type ParameterDescriptor,
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
-import { DEFAULT_DRUMLINE_PARAMETERS } from "./dsp-core";
-import { DRUM_VOICE_IDS, DRUM_VOICE_NAMES, type DrumVoiceId } from "./voices";
+import { DEFAULT_BOOM_PARAMETERS } from "./dsp-core";
+import { BOOM_VOICE_IDS, BOOM_VOICE_NAMES, type BoomVoiceId } from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
-  if (!result.ok) throw new Error("Drumline Six contains an invalid stable identifier.");
+  if (!result.ok) throw new Error("Boom Eight contains an invalid stable identifier.");
   return result.value;
 }
 
@@ -49,7 +49,7 @@ interface VoiceField {
   readonly step: number;
   readonly unit: ParameterDescriptor["unit"];
   readonly precision: number;
-  readonly defaultFor: (voiceId: DrumVoiceId) => number;
+  readonly defaultFor: (voiceId: BoomVoiceId) => number;
 }
 
 const VOICE_FIELDS: readonly VoiceField[] = [
@@ -61,27 +61,27 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 1,
     unit: "semitones",
     precision: 0,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].tune,
+    defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].tune,
   },
   {
-    field: "snap",
-    label: "Snap",
+    field: "punch",
+    label: "Punch",
     minimum: 0,
     maximum: 1,
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].snap,
+    defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].punch,
   },
   {
     field: "decay",
     label: "Decay",
     minimum: 0.01,
-    maximum: 2,
+    maximum: 3,
     step: 0.01,
     unit: "seconds",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].decay,
+    defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].decay,
   },
   {
     field: "level",
@@ -91,7 +91,7 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].level,
+    defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].level,
   },
   {
     field: "pan",
@@ -101,22 +101,22 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    defaultFor: (voiceId) => DEFAULT_DRUMLINE_PARAMETERS.voices[voiceId].pan,
+    defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].pan,
   },
 ];
 
 const moduleParameters: readonly ParameterDescriptor[] = [
-  moduleParameter("tone", "Tone", DEFAULT_DRUMLINE_PARAMETERS.tone, "ratio"),
-  moduleParameter("drive", "Drive", DEFAULT_DRUMLINE_PARAMETERS.drive, "ratio"),
-  moduleParameter("level", "Level", DEFAULT_DRUMLINE_PARAMETERS.level, "ratio"),
+  moduleParameter("tone", "Tone", DEFAULT_BOOM_PARAMETERS.tone, "ratio"),
+  moduleParameter("compression", "Compression", DEFAULT_BOOM_PARAMETERS.compression, "ratio"),
+  moduleParameter("level", "Level", DEFAULT_BOOM_PARAMETERS.level, "ratio"),
 ];
 
-const voiceParameters: readonly ParameterDescriptor[] = DRUM_VOICE_IDS.flatMap((voiceId) =>
+const voiceParameters: readonly ParameterDescriptor[] = BOOM_VOICE_IDS.flatMap((voiceId) =>
   VOICE_FIELDS.map((descriptor): ParameterDescriptor => {
     const defaultValue = descriptor.defaultFor(voiceId);
     return {
       id: parameterId(`${voiceId}-${descriptor.field}`),
-      name: `${DRUM_VOICE_NAMES[voiceId]} ${descriptor.label.toLowerCase()}`,
+      name: `${BOOM_VOICE_NAMES[voiceId]} ${descriptor.label.toLowerCase()}`,
       shortLabel: descriptor.label,
       valueType: "float",
       minimum: descriptor.minimum,
@@ -139,12 +139,12 @@ const parameters: readonly ParameterDescriptor[] = Object.freeze([
   ...voiceParameters,
 ]);
 
-export const DRUMLINE_SIX_MANIFEST = Object.freeze({
+export const BOOM_EIGHT_MANIFEST = Object.freeze({
   manifestSchemaVersion: 1,
-  pluginId: required(parsePluginId("drum-analog-small")),
+  pluginId: required(parsePluginId("drum-analog-large")),
   kind: "instrument",
-  productName: "Drumline Six",
-  shortLabel: "SIX",
+  productName: "Boom Eight",
+  shortLabel: "BOOM",
   pluginVersion: "1.0.0",
   stateSchemaVersion: 1,
   apiVersion: 1,
@@ -155,13 +155,13 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
     parameters.map((parameter) => [parameter.id, parameter.defaultValue]),
   ),
   ui: {
-    // The normative section 3.4 accent row for `SIX`. Kept in step with
+    // The normative section 3.4 accent row for `BOOM`. Kept in step with
     // `MODULE_ACCENTS` by tests/unit/engine/manifest-identity.test.ts.
     moduleAccent: {
-      accent: "#FFB44A",
-      accentMuted: "#76552A",
-      led: "#FFD078",
-      controlRing: "#D98E2F",
+      accent: "#FF6B5F",
+      accentMuted: "#763B37",
+      led: "#FF9188",
+      controlRing: "#D84E45",
     },
     // The faceplate carries the module controls; per-voice knobs address the
     // voice chosen in the selector, which the rack owns.
@@ -171,9 +171,9 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
     })),
     detailedEditorSections: [
       { id: "module", name: "Module", parameterIds: moduleParameters.map((one) => one.id) },
-      ...DRUM_VOICE_IDS.map((voiceId) => ({
+      ...BOOM_VOICE_IDS.map((voiceId) => ({
         id: voiceId,
-        name: DRUM_VOICE_NAMES[voiceId],
+        name: BOOM_VOICE_NAMES[voiceId],
         parameterIds: VOICE_FIELDS.map((descriptor) =>
           parameterId(`${voiceId}-${descriptor.field}`),
         ),
@@ -183,21 +183,21 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
   automation: "step",
   cpuClass: "light",
   compatibility: { acceptedStateSchemaVersions: [1], migrations: [] },
-  voices: DRUM_VOICE_IDS.map((voiceId) => ({
+  voices: BOOM_VOICE_IDS.map((voiceId) => ({
     id: voiceId,
-    name: DRUM_VOICE_NAMES[voiceId],
+    name: BOOM_VOICE_NAMES[voiceId],
     outputChannels: 2,
   })),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
-  voiceStealing: { maximumVoices: 6, priority: "oldest", releaseMilliseconds: 4 },
+  voiceStealing: { maximumVoices: 8, priority: "oldest", releaseMilliseconds: 5 },
   retriggerPolicy: "restart",
   chokePolicy: "group",
   inputChannels: 0,
   outputChannels: 2,
   supportsSampleLayers: false,
-  processorFactoryKey: "drumline-six-worklet",
+  processorFactoryKey: "boom-eight-worklet",
   renderCapabilities: { live: true, offline: false },
 } satisfies InstrumentPluginManifest);
 
-export const DRUMLINE_SIX_DEFAULT_PARAMETERS = DRUMLINE_SIX_MANIFEST.defaultState;
+export const BOOM_EIGHT_DEFAULT_PARAMETERS = BOOM_EIGHT_MANIFEST.defaultState;

@@ -11,6 +11,18 @@
  * the same samples. Nothing here reads a clock or a global.
  */
 
+import {
+  clamp,
+  DeterministicNoise,
+  mergeVoiceParameters,
+  type VoiceParameterUpdate,
+  OnePoleLowpass,
+  panGains,
+  ParameterGlide,
+  semitoneRatio,
+  softClip,
+  StateVariableFilter,
+} from "../../dsp/primitives";
 import { DRUM_VOICE_IDS, type DrumVoiceId } from "./voices";
 
 export { DRUM_VOICE_IDS, type DrumVoiceId };
@@ -84,94 +96,6 @@ export const DEFAULT_DRUMLINE_PARAMETERS: DrumlineSixParameters = Object.freeze(
 const CHOKE_GROUPS: readonly (readonly DrumVoiceId[])[] = [["closed-hat", "open-hat"]];
 
 const CHOKE_RELEASE_SECONDS = 0.004;
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
-}
-
-function semitoneRatio(semitones: number): number {
-  return 2 ** (clamp(semitones, -24, 24) / 12);
-}
-
-/** xorshift32. Deterministic, cheap, and re-seedable per trigger. */
-class DeterministicNoise {
-  readonly #seed: number;
-  #state: number;
-
-  constructor(seed: number) {
-    this.#seed = seed >>> 0 || 1;
-    this.#state = this.#seed;
-  }
-
-  reset(): void {
-    this.#state = this.#seed;
-  }
-
-  next(): number {
-    let x = this.#state;
-    x ^= (x << 13) >>> 0;
-    x >>>= 0;
-    x ^= x >>> 17;
-    x ^= (x << 5) >>> 0;
-    x >>>= 0;
-    this.#state = x;
-    return (x / 0x7fffffff - 1) * 0.999;
-  }
-}
-
-/**
- * The Chamberlin topology is only conditionally stable: its frequency
- * coefficient must stay below `2 - damping`, and the sine mapping itself is only
- * meaningful up to a sixth of the sample rate. Above either bound the state
- * diverges to a non-finite value within milliseconds and never returns, so both
- * bounds are enforced here rather than trusted to callers.
- */
-const SVF_MAXIMUM_CUTOFF_RATIO = 1 / 6;
-
-function svfCoefficient(cutoff: number, damping: number, sampleRate: number): number {
-  const ceiling = sampleRate * SVF_MAXIMUM_CUTOFF_RATIO;
-  const bounded = Math.min(Math.max(cutoff, 0), ceiling);
-  const coefficient = 2 * Math.sin((Math.PI * bounded) / sampleRate);
-  // Leaves a small margin below the analytical limit so rounding cannot sit
-  // exactly on the boundary.
-  return Math.min(coefficient, Math.max(0, 2 - damping) * 0.98);
-}
-
-/** Two-pole state-variable filter. Shared by every voice's noise shaping. */
-class StateVariableFilter {
-  #low = 0;
-  #band = 0;
-  #high = 0;
-
-  reset(): void {
-    this.#low = 0;
-    this.#band = 0;
-    this.#high = 0;
-  }
-
-  process(input: number, cutoff: number, damping: number, sampleRate: number): void {
-    const coefficient = svfCoefficient(cutoff, damping, sampleRate);
-    this.#low += coefficient * this.#band;
-    this.#high = input - this.#low - damping * this.#band;
-    this.#band += coefficient * this.#high;
-    // A denormal or an out-of-range input can still push the state somewhere it
-    // cannot come back from. Clearing it costs one branch and keeps a single bad
-    // sample from silencing the instrument for the rest of the session.
-    if (!Number.isFinite(this.#low + this.#band + this.#high)) this.reset();
-  }
-
-  get low(): number {
-    return this.#low;
-  }
-
-  get band(): number {
-    return this.#band;
-  }
-
-  get high(): number {
-    return this.#high;
-  }
-}
 
 class DrumVoice {
   readonly id: DrumVoiceId;
@@ -324,51 +248,27 @@ class DrumVoice {
   }
 }
 
-/**
- * One-pole lowpass. The mix bus wants a gentle tilt rather than a resonant
- * corner, and this topology is stable for every cutoff up to Nyquist, so the
- * Tone control keeps its full range instead of going inert where a resonant
- * filter would have to be clamped.
- */
-class OnePoleLowpass {
-  #value = 0;
-
-  reset(): void {
-    this.#value = 0;
-  }
-
-  process(input: number, cutoff: number, sampleRate: number): number {
-    const bounded = Math.min(Math.max(cutoff, 0), sampleRate * 0.49);
-    const coefficient = 1 - Math.exp((-2 * Math.PI * bounded) / sampleRate);
-    this.#value += coefficient * (input - this.#value);
-    if (!Number.isFinite(this.#value)) this.#value = 0;
-    return this.#value;
-  }
-}
-
 export type DrumlineParameterUpdateMode = "immediate" | "smooth";
-
-/** Ramp length for an audible mix-bus move. Long enough to remove a step. */
-const PARAMETER_SMOOTHING_SECONDS = 0.02;
 
 export class DrumlineSixDsp {
   readonly #sampleRate: number;
   readonly #voices: ReadonlyMap<DrumVoiceId, DrumVoice>;
   readonly #toneLeft = new OnePoleLowpass();
   readonly #toneRight = new OnePoleLowpass();
-  readonly #smoothingFrames: number;
-  #parameters: DrumlineSixParameters = DEFAULT_DRUMLINE_PARAMETERS;
   /** Values the mix bus is currently rendering, which chase `#parameters`. */
-  #renderedLevel = DEFAULT_DRUMLINE_PARAMETERS.level;
-  #renderedDrive = DEFAULT_DRUMLINE_PARAMETERS.drive;
-  #renderedTone = DEFAULT_DRUMLINE_PARAMETERS.tone;
+  readonly #level: ParameterGlide;
+  readonly #drive: ParameterGlide;
+  readonly #tone: ParameterGlide;
+  #parameters: DrumlineSixParameters = DEFAULT_DRUMLINE_PARAMETERS;
 
   constructor(sampleRate: number) {
     if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
       throw new RangeError("sampleRate must be a positive finite number");
     }
     this.#sampleRate = sampleRate;
-    this.#smoothingFrames = Math.max(1, Math.round(sampleRate * PARAMETER_SMOOTHING_SECONDS));
+    this.#level = new ParameterGlide(DEFAULT_DRUMLINE_PARAMETERS.level, sampleRate);
+    this.#drive = new ParameterGlide(DEFAULT_DRUMLINE_PARAMETERS.drive, sampleRate);
+    this.#tone = new ParameterGlide(DEFAULT_DRUMLINE_PARAMETERS.tone, sampleRate);
     this.#voices = new Map(
       DRUM_VOICE_IDS.map((id) => [
         id,
@@ -378,10 +278,10 @@ export class DrumlineSixDsp {
   }
 
   setParameters(
-    update: Partial<DrumlineSixParameters>,
+    update: VoiceParameterUpdate<DrumlineSixParameters>,
     mode: DrumlineParameterUpdateMode = "smooth",
   ): void {
-    const voices = { ...this.#parameters.voices, ...update.voices };
+    const voices = mergeVoiceParameters(this.#parameters.voices, update.voices);
     this.#parameters = Object.freeze({
       level: clamp(update.level ?? this.#parameters.level, 0, 1),
       drive: clamp(update.drive ?? this.#parameters.drive, 0, 1),
@@ -391,19 +291,11 @@ export class DrumlineSixDsp {
     // A snapshot is a state replacement, so it lands without a ramp. An
     // incremental change is a user moving a control, so it glides.
     if (mode === "immediate") {
-      this.#renderedLevel = this.#parameters.level;
-      this.#renderedDrive = this.#parameters.drive;
-      this.#renderedTone = this.#parameters.tone;
+      this.#level.set(this.#parameters.level);
+      this.#drive.set(this.#parameters.drive);
+      this.#tone.set(this.#parameters.tone);
     }
     for (const id of DRUM_VOICE_IDS) this.#voices.get(id)?.setParameters(voices[id]);
-  }
-
-  /** Advances one mix-bus value toward its target by at most one frame's step. */
-  #glide(rendered: number, target: number): number {
-    const difference = target - rendered;
-    if (difference === 0) return target;
-    const step = 1 / this.#smoothingFrames;
-    return Math.abs(difference) <= step ? target : rendered + Math.sign(difference) * step;
   }
 
   getParameterSnapshot(): DrumlineSixParameters {
@@ -434,12 +326,11 @@ export class DrumlineSixDsp {
 
     for (let index = Math.max(0, start); index < frameEnd; index += 1) {
       // Per frame, so a knob drag ramps rather than stepping between blocks.
-      this.#renderedLevel = this.#glide(this.#renderedLevel, target.level);
-      this.#renderedDrive = this.#glide(this.#renderedDrive, target.drive);
-      this.#renderedTone = this.#glide(this.#renderedTone, target.tone);
-      const level = this.#renderedLevel;
-      const toneCutoff = 480 * (16_000 / 480) ** clamp(this.#renderedTone, 0, 1);
-      const driveAmount = 1 + this.#renderedDrive * 7;
+      const level = this.#level.advance(target.level);
+      const drive = this.#drive.advance(target.drive);
+      const tone = this.#tone.advance(target.tone);
+      const toneCutoff = 480 * (16_000 / 480) ** clamp(tone, 0, 1);
+      const driveAmount = 1 + drive * 7;
 
       let mixLeft = 0;
       let mixRight = 0;
@@ -448,11 +339,9 @@ export class DrumlineSixDsp {
         if (!voice.active) continue;
         const sample = voice.render();
         if (sample === 0) continue;
-        const pan = clamp(this.#parameters.voices[voice.id].pan, -1, 1);
-        // Equal power, so a centred voice does not jump in level when panned.
-        const angle = ((pan + 1) * Math.PI) / 4;
-        mixLeft += sample * Math.cos(angle);
-        mixRight += sample * Math.sin(angle);
+        const [leftGain, rightGain] = panGains(this.#parameters.voices[voice.id].pan);
+        mixLeft += sample * leftGain;
+        mixRight += sample * rightGain;
       }
 
       const tonedLeft = this.#toneLeft.process(
@@ -474,9 +363,4 @@ export class DrumlineSixDsp {
       }
     }
   }
-}
-
-/** Smooth saturation. Bounded for any input, so drive can never blow up. */
-function softClip(value: number): number {
-  return value / (1 + Math.abs(value));
 }

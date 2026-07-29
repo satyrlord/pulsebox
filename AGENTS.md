@@ -25,7 +25,9 @@ AudioWorklet. No server product component, no MIDI.
   resolve it.
 - Files under docs/design/ are prototypes and visual evidence. They are not
   normative unless the specification or user explicitly makes them so. This
-  includes `docs/design/image-gen-mock.png` and `docs/design/claude-mock-up.html`.
+  includes `docs/design/claude-mock-up.html`, which spec-003 section 8.2 makes
+  the single approved composition target. Do not reintroduce a second design
+  target in another medium; it drifts from the HTML and contradicts it.
 
 Owning contract documents:
 
@@ -225,7 +227,9 @@ evicting the oldest entries rather than rejecting a valid new action.
 
 ## UI and accessibility
 
-- Prefix Pulsebox component names with pulse-.
+- Name UI components in PascalCase and give each rendered root a kebab-case
+  data-component hook for tests. The pulse- prefix stays reserved for CSS custom
+  properties and storage keys, not component names.
 - Render component structure once and patch changed state. Avoid rebuilding
   large subtrees during high-frequency updates.
 - Never insert project data through unsanitized innerHTML.

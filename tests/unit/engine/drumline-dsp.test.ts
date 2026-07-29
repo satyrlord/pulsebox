@@ -177,6 +177,27 @@ describe("DrumlineSixDsp", () => {
     expect(peak(left.left)).toBeGreaterThan(peak(left.right) * 4);
   });
 
+  /**
+   * A partial voice update must merge into that voice rather than replace it.
+   * A shallow table spread would drop every field the caller omitted, so a
+   * voice retuned by one field would silently lose its level and fall silent.
+   */
+  it("keeps the other fields of a voice when one field is updated", () => {
+    const dsp = new DrumlineSixDsp(SAMPLE_RATE);
+    dsp.setParameters({ voices: { kick: { pan: -1 } } }, "immediate");
+
+    const kick = dsp.getParameterSnapshot().voices.kick;
+    expect(kick.pan).toBe(-1);
+    expect(kick.level).toBe(DEFAULT_DRUMLINE_PARAMETERS.voices.kick.level);
+    expect(kick.decay).toBe(DEFAULT_DRUMLINE_PARAMETERS.voices.kick.decay);
+
+    const left = new Float32Array(4_096);
+    const right = new Float32Array(4_096);
+    dsp.trigger("kick");
+    dsp.process(left, right, 0, left.length);
+    expect(peak(left)).toBeGreaterThan(0.01);
+  });
+
   it("keeps output bounded at maximum drive and level", () => {
     const { left, right } = render((dsp) => {
       dsp.setParameters({ drive: 1, level: 1, tone: 1 });

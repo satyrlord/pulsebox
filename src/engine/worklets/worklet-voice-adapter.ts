@@ -296,6 +296,15 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
         );
       }
     });
+    // `dispose` can land while `addModule` or the constructor is still in
+    // flight. It has no node to release at that point, so the disposal is
+    // honoured here instead; otherwise this node would stay connected for the
+    // life of the context with nothing holding a reference to stop it.
+    if (this.#state === "disposed" || this.#state === "disposing") {
+      node.port.onmessage = null;
+      node.disconnect();
+      return;
+    }
     this.#node = node;
 
     const ready = new Promise<void>((resolve, reject) => {

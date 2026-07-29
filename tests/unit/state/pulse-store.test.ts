@@ -37,7 +37,7 @@ describe("PulseStore", () => {
   it("adds the selected registered plugin and duplicates its complete state", () => {
     const ids = deterministicIds();
     const drumSeed = {
-      pluginId: "drumline-six" as PluginId,
+      pluginId: "drum-analog-small" as PluginId,
       parameters: { tone: 0.45, drive: 0.2 },
       steps: seed.steps.map((step, index) => ({ ...step, note: 36 + (index % 6) })),
     };
@@ -74,7 +74,7 @@ describe("PulseStore", () => {
     expect(duplicate.parts).toEqual(drum.parts);
   });
 
-  it("supports project load, save, export, and import lifecycle operations", () => {
+  it("exchanges validated in-memory projects and owns no serialization entry point", () => {
     const ids = deterministicIds();
     const store = createStore(ids);
     const originalProject = store.saveProject();
@@ -87,9 +87,10 @@ describe("PulseStore", () => {
     expect(reloaded).toMatchObject({ status: "accepted", changed: true });
     expect(store.getState().project.name).toBe("Imported project");
 
-    // Serialization belongs to `src/state/persistence`, which validates a
-    // document before any of it reaches the store. The store deliberately has no
-    // raw-JSON import of its own for untrusted data to arrive through.
+    // Decision `D70`: serialization belongs to `src/state/persistence`, which
+    // validates, migrates, and checks plugin compatibility before anything
+    // reaches `loadProject`. The store owns no serialization entry point, so
+    // untrusted bytes cannot arrive by bypassing that one validating path.
     expect("importProject" in store).toBe(false);
     expect("exportProject" in store).toBe(false);
   });
