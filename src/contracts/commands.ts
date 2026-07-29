@@ -40,12 +40,7 @@ export type CommandResult =
     };
 
 export type EngineTargetId =
-  | ModuleInstanceId
-  | EffectInstanceId
-  | RackSlotId
-  | VoiceId
-  | PatternId
-  | SendBusId;
+  ModuleInstanceId | EffectInstanceId | RackSlotId | VoiceId | PatternId | SendBusId;
 
 export interface EngineDelta<TKind extends string, TPayload> {
   readonly kind: TKind;
@@ -54,13 +49,8 @@ export interface EngineDelta<TKind extends string, TPayload> {
   readonly payload: TPayload;
 }
 
-export type Selector<State, Selected> = (
-  state: Readonly<State>,
-) => Selected;
-export type Listener<Selected> = (
-  selected: Selected,
-  previous: Selected,
-) => void;
+export type Selector<State, Selected> = (state: Readonly<State>) => Selected;
+export type Listener<Selected> = (selected: Selected, previous: Selected) => void;
 export type Unsubscribe = () => void;
 
 export interface ProjectStateLike {
@@ -84,8 +74,6 @@ export interface PulseStore<State, Command> {
   redo(): CommandResult;
   loadProject(project: ProjectStateLike): CommandResult;
   saveProject(): ProjectStateLike;
-  exportProject(): string;
-  importProject(serializedProject: string): CommandResult;
 }
 
 export interface EngineProjectionPort<Delta> {

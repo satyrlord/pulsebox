@@ -8,8 +8,9 @@
 remains the product and acceptance source. This document owns the durable
 architecture details that implement that specification set.
 **Implementation state:** The Phase 1 contracts, layer guards, state spine,
-AudioWorklet spine, transport, bundled decoder adapter, and native UI foundation
-exist. Later roadmap layers remain contract-only where noted.
+AudioWorklet spine, transport, bundled decoder adapter, and React UI foundation
+exist. Narrow later-phase foundations are listed in README.md; their parent
+phases remain incomplete until their full owned scope and acceptance gates pass.
 
 ## 1. Purpose and interpretation
 
@@ -493,9 +494,19 @@ project state shall remain authoritative. The controller shall report the
 mismatch, suspend affected audio safely, and attempt one bounded full engine
 projection. It shall not mutate project state to match a failed graph.
 
+A voice fault is scoped to its own module. The transport shall release the
+faulted adapter and report the fault against that module, while every other
+voice continues to play and the transport remains able to start. Only a failure
+to create or resume the audio context shall make the runtime unavailable.
+
 Meter frames, meter-analysis mode, playheads, hover, focus, drag previews, audio
 power, monitor selection, and decoder progress are transient. They shall not enter project
 history or portable serialization.
+
+A processor shall report a final zero meter frame when it is suspended, stopped,
+or silenced. Rendering stops while suspended, so without that frame the last
+peak would remain the controller's most recent reading and a meter would stay
+lit for a voice that is no longer sounding.
 
 Rack-module collapse shall be a lightweight local UI preference keyed by
 `ProjectId`, `ProjectLineageId`, and `ModuleInstanceId`. It shall use the
@@ -1004,7 +1015,7 @@ covered with an offline context at that rate rather than reported as a pass.
 
 The following gates shall apply:
 
-<!-- markdownlint-disable MD013 -->
+<!-- markdownlint-disable MD013 MD060 -->
 
 | Contract                     | Fixture and comparison                                                       | Pass limit                                                                                                              |
 | ---------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -1020,7 +1031,7 @@ The following gates shall apply:
 | Export resampling            | Deterministic 48 kHz to 44.1 kHz impulse, sweep, and test-tone fixtures      | Passband error within 0.1 dB from 20 Hz through 20 kHz; aliased or imaged test-tone energy at or below -90 dBFS         |
 | Monitor exclusivity          | Orthogonal deterministic signals on program and selected PFL paths           | Rejected path below -120 dBFS; selected path matches fixed gain and limiter tolerances; no source overlap during switch |
 
-<!-- markdownlint-enable MD013 -->
+<!-- markdownlint-enable MD013 MD060 -->
 
 An adapter whose documented algorithm cannot meet a generic native-node limit
 shall define a stricter feature-specific measurement before implementation and
@@ -1075,7 +1086,7 @@ action. No recovery path shall require a destructive confirmation dialog.
 
 ## 16. Accepted and rejected alternatives
 
-<!-- markdownlint-disable MD013 -->
+<!-- markdownlint-disable MD013 MD060 -->
 
 | Decision            | Accepted                                                                    | Rejected                                                                         | Verification consequence                                                              |
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -1091,7 +1102,7 @@ action. No recovery path shall require a destructive confirmation dialog.
 | DSP placement       | AudioWorklet for custom DSP and engine adapters for suitable native nodes   | Main-thread custom DSP or `ScriptProcessorNode`                                  | Dependency, source, and production-browser audits are required                        |
 | Persistence         | State-owned ports backed by browser storage                                 | Engine or UI access to storage, remote storage, or path-based durable references | Repository contract and canonical-origin integration tests are required               |
 
-<!-- markdownlint-enable MD013 -->
+<!-- markdownlint-enable MD013 MD060 -->
 
 ## 17. Phase 0 exit gate
 

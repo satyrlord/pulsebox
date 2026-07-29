@@ -107,11 +107,7 @@ export interface InstrumentPluginManifest extends BasePluginManifest {
   readonly renderCapabilities: PluginRenderCapabilities;
 }
 
-export type EffectPlacement =
-  | "voice-insert"
-  | "module-pedalboard"
-  | "send-chain"
-  | "master-chain";
+export type EffectPlacement = "voice-insert" | "module-pedalboard" | "send-chain" | "master-chain";
 
 export interface EffectLatencyDescriptor {
   readonly mode: "zero" | "fixed-frames";
@@ -144,11 +140,7 @@ const SEMVER_PATTERN =
 const CONTRACT_KEY_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 export function isSupportedSemanticVersion(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.length <= 64 &&
-    SEMVER_PATTERN.test(value)
-  );
+  return typeof value === "string" && value.length <= 64 && SEMVER_PATTERN.test(value);
 }
 
 function arrayPath(name: string, index: number, suffix = ""): string {
@@ -179,11 +171,7 @@ function validateUniqueStrings(
 }
 
 function isJsonData(value: unknown, stack = new Set<object>()): boolean {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
-  ) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
     return true;
   }
   if (typeof value === "number") return Number.isFinite(value);
@@ -201,16 +189,11 @@ function isJsonData(value: unknown, stack = new Set<object>()): boolean {
   return valid;
 }
 
-function validateCompatibility(
-  manifest: PluginManifest,
-  issues: ValidationIssue[],
-): void {
+function validateCompatibility(manifest: PluginManifest, issues: ValidationIssue[]): void {
   const accepted = manifest.compatibility.acceptedStateSchemaVersions;
   if (
     accepted.length === 0 ||
-    accepted.some(
-      (version) => !Number.isSafeInteger(version) || version <= 0,
-    ) ||
+    accepted.some((version) => !Number.isSafeInteger(version) || version <= 0) ||
     accepted.some((version) => version > manifest.stateSchemaVersion) ||
     new Set(accepted).size !== accepted.length ||
     !accepted.includes(manifest.stateSchemaVersion)
@@ -231,8 +214,7 @@ function validateCompatibility(
     if (
       !Number.isSafeInteger(migration.fromStateSchemaVersion) ||
       migration.fromStateSchemaVersion <= 0 ||
-      migration.toStateSchemaVersion !==
-        migration.fromStateSchemaVersion + 1 ||
+      migration.toStateSchemaVersion !== migration.fromStateSchemaVersion + 1 ||
       migration.toStateSchemaVersion > manifest.stateSchemaVersion
     ) {
       issues.push({
@@ -255,11 +237,7 @@ function validateCompatibility(
 
   for (const version of accepted) {
     for (let current = version; current < manifest.stateSchemaVersion; current += 1) {
-      if (
-        !migrationKeys.has(
-          `${current.toString()}:${(current + 1).toString()}`,
-        )
-      ) {
+      if (!migrationKeys.has(`${current.toString()}:${(current + 1).toString()}`)) {
         issues.push({
           path: "compatibility.migrations",
           message: `Missing migration from state schema ${current.toString()} to ${(current + 1).toString()}.`,
@@ -326,9 +304,7 @@ function validateUi(
   }
 }
 
-export function validatePluginManifest(
-  value: unknown,
-): ValidationResult<PluginManifest> {
+export function validatePluginManifest(value: unknown): ValidationResult<PluginManifest> {
   if (!isPlainRecord(value)) {
     return {
       ok: false,
@@ -348,9 +324,7 @@ export function validatePluginManifest(
     !Array.isArray(raw.meters) ||
     raw.meters.some(
       (meter) =>
-        !isPlainRecord(meter) ||
-        typeof meter.id !== "string" ||
-        typeof meter.name !== "string",
+        !isPlainRecord(meter) || typeof meter.id !== "string" || typeof meter.name !== "string",
     ) ||
     !isPlainRecord(raw.defaultState) ||
     !isPlainRecord(raw.ui) ||
@@ -373,16 +347,12 @@ export function validatePluginManifest(
         typeof section.id !== "string" ||
         typeof section.name !== "string" ||
         !Array.isArray(section.parameterIds) ||
-        section.parameterIds.some(
-          (parameterId) => typeof parameterId !== "string",
-        ),
+        section.parameterIds.some((parameterId) => typeof parameterId !== "string"),
     ) ||
     !isPlainRecord(raw.compatibility) ||
     !Array.isArray(raw.compatibility.acceptedStateSchemaVersions) ||
     !Array.isArray(raw.compatibility.migrations) ||
-    raw.compatibility.migrations.some(
-      (migration) => !isPlainRecord(migration),
-    ) ||
+    raw.compatibility.migrations.some((migration) => !isPlainRecord(migration)) ||
     !isPlainRecord(raw.renderCapabilities) ||
     typeof raw.renderCapabilities.live !== "boolean" ||
     typeof raw.renderCapabilities.offline !== "boolean" ||
@@ -406,9 +376,7 @@ export function validatePluginManifest(
       !isPlainRecord(raw.voiceStealing) ||
       raw.voices.some(
         (voice) =>
-          !isPlainRecord(voice) ||
-          typeof voice.id !== "string" ||
-          typeof voice.name !== "string",
+          !isPlainRecord(voice) || typeof voice.id !== "string" || typeof voice.name !== "string",
       ) ||
       raw.acceptedEvents.some(
         (event) =>
@@ -468,8 +436,7 @@ export function validatePluginManifest(
   }
   if (
     manifest.shortLabel !== undefined &&
-    (!/^[A-Z0-9]{1,4}$/.test(manifest.shortLabel) ||
-      manifest.shortLabel.length > 4)
+    (!/^[A-Z0-9]{1,4}$/.test(manifest.shortLabel) || manifest.shortLabel.length > 4)
   ) {
     issues.push({
       path: "shortLabel",
@@ -508,10 +475,7 @@ export function validatePluginManifest(
 
   const parameterIds = new Set<string>();
   for (const [index, parameter] of manifest.parameters.entries()) {
-    const result = validateParameterDescriptor(
-      parameter,
-      arrayPath("parameters", index),
-    );
+    const result = validateParameterDescriptor(parameter, arrayPath("parameters", index));
     if (!result.ok) issues.push(...result.issues);
     if (parameterIds.has(parameter.id)) {
       issues.push({
@@ -524,10 +488,7 @@ export function validatePluginManifest(
 
   const meterIds = new Set<string>();
   for (const [index, meter] of manifest.meters.entries()) {
-    const result = parseMeterId(
-      meter.id,
-      arrayPath("meters", index, ".id"),
-    );
+    const result = parseMeterId(meter.id, arrayPath("meters", index, ".id"));
     if (!result.ok) issues.push(...result.issues);
     if (meter.name.trim().length === 0) {
       issues.push({
@@ -573,26 +534,14 @@ export function validatePluginManifest(
       });
     }
     if (
-      !isOneOf(manifest.voiceStealing.priority, [
-        "oldest",
-        "quietest",
-        "released-first",
-      ]) ||
-      !isOneOf(manifest.retriggerPolicy, [
-        "restart",
-        "legato",
-        "retrigger-envelope",
-      ]) ||
+      !isOneOf(manifest.voiceStealing.priority, ["oldest", "quietest", "released-first"]) ||
+      !isOneOf(manifest.retriggerPolicy, ["restart", "legato", "retrigger-envelope"]) ||
       !isOneOf(manifest.chokePolicy, ["none", "group"]) ||
       !isChannelCount(manifest.inputChannels, true) ||
       !isChannelCount(manifest.outputChannels, false) ||
       !isBoolean(manifest.supportsSampleLayers) ||
-      manifest.patternCompatibility.some(
-        (kind) => !isOneOf(kind, ["notes", "triggers"]),
-      ) ||
-      manifest.voices.some(
-        (voice) => !isChannelCount(voice.outputChannels, false),
-      )
+      manifest.patternCompatibility.some((kind) => !isOneOf(kind, ["notes", "triggers"])) ||
+      manifest.voices.some((voice) => !isChannelCount(voice.outputChannels, false))
     ) {
       issues.push({
         path: "instrument",
@@ -613,8 +562,7 @@ export function validatePluginManifest(
     );
     if (
       manifest.voices.some(
-        (voice) =>
-          !CONTRACT_KEY_PATTERN.test(voice.id) || voice.name.trim().length === 0,
+        (voice) => !CONTRACT_KEY_PATTERN.test(voice.id) || voice.name.trim().length === 0,
       ) ||
       manifest.acceptedEvents.some((event) => !CONTRACT_KEY_PATTERN.test(event.id))
     ) {
@@ -625,22 +573,14 @@ export function validatePluginManifest(
     }
   } else {
     if (
-      manifest.placements.some((placement) =>
-        !isOneOf(placement, [
-          "voice-insert",
-          "module-pedalboard",
-          "send-chain",
-          "master-chain",
-        ]),
+      manifest.placements.some(
+        (placement) =>
+          !isOneOf(placement, ["voice-insert", "module-pedalboard", "send-chain", "master-chain"]),
       ) ||
       manifest.inputChannels.length === 0 ||
-      manifest.inputChannels.some(
-        (channels) => !isChannelCount(channels, false),
-      ) ||
+      manifest.inputChannels.some((channels) => !isChannelCount(channels, false)) ||
       manifest.outputChannels.length === 0 ||
-      manifest.outputChannels.some(
-        (channels) => !isChannelCount(channels, false),
-      ) ||
+      manifest.outputChannels.some((channels) => !isChannelCount(channels, false)) ||
       !isOneOf(manifest.latency.mode, ["zero", "fixed-frames"]) ||
       !isOneOf(manifest.tail.mode, ["none", "finite", "bounded-generated"]) ||
       !isOneOf(manifest.wetDryLaw, ["linear", "equal-power"])
@@ -688,11 +628,7 @@ export function validatePluginManifest(
         message: "Bypass transition must be finite and non-negative.",
       });
     }
-    if (
-      manifest.safetyClampParameterIds.some(
-        (parameterId) => !parameterIds.has(parameterId),
-      )
-    ) {
+    if (manifest.safetyClampParameterIds.some((parameterId) => !parameterIds.has(parameterId))) {
       issues.push({
         path: "safetyClampParameterIds",
         message: "Safety clamps must reference declared parameters.",
@@ -700,7 +636,5 @@ export function validatePluginManifest(
     }
   }
 
-  return issues.length === 0
-    ? validationSuccess(manifest)
-    : { ok: false, issues };
+  return issues.length === 0 ? validationSuccess(manifest) : { ok: false, issues };
 }

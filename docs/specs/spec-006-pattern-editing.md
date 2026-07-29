@@ -54,11 +54,6 @@ a visible page indicator. Playback follow is enabled by default and advances the
 displayed page with the playhead. The user may lock the viewed page while
 playback continues.
 
-The Phase 1 foundation still ships an editable sixteen-step faceplate component
-and a `pattern-step-toggle` command reached from the rack. Both predate this
-rule. Removing that editing path from the rack, and moving its command to the
-Piano Roll, is required before `AC-011` can pass.
-
 ### 16.2 Named project Patterns
 
 A project owns between 1 and 32 named Patterns. A Pattern is the complete
@@ -116,8 +111,9 @@ Shared header:
 - Module or lane selector.
 - Four-bar timeline header by default.
 - Fixed 1/16 grid status.
-- Horizontal Swing slider.
-- Horizontal Humanize slider.
+- Horizontal Swing slider. It edits the one global project Swing value, so its
+  position is the same on every Pattern.
+- Horizontal Humanize slider, owned by the selected Pattern.
 - Parameter selector, default Velocity, in place of a static `Vel 100` label.
   It is the single entry point to every lane the Piano Roll edits, as defined
   in section 16.3.1.
@@ -311,4 +307,3 @@ Requirements:
 - “Apply” is not a destructive confirmation dialog.
 
 ---
-

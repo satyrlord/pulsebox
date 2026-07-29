@@ -1,0 +1,9 @@
+dist/
+node_modules/
+playwright-report/
+test-results/
+package-lock.json
+docs/design/claude-mock-up.html
+
+# Markdown is owned by markdownlint-cli2, not Prettier.
+*.md

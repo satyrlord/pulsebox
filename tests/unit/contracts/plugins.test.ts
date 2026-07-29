@@ -46,12 +46,8 @@ describe("plugin manifest validation", () => {
     const result = validatePluginManifest(manifest);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.some((issue) => issue.message.includes('duplicated'))).toBe(
-        true,
-      );
-      expect(result.issues.some((issue) => issue.message.includes('positions'))).toBe(
-        true,
-      );
+      expect(result.issues.some((issue) => issue.message.includes("duplicated"))).toBe(true);
+      expect(result.issues.some((issue) => issue.message.includes("positions"))).toBe(true);
     }
   });
 
@@ -74,11 +70,9 @@ describe("plugin manifest validation", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(
-        result.issues.some((issue) =>
-          issue.message.includes("state schema 2 to 3"),
-        ),
-      ).toBe(true);
+      expect(result.issues.some((issue) => issue.message.includes("state schema 2 to 3"))).toBe(
+        true,
+      );
     }
   });
 
@@ -135,8 +129,6 @@ describe("plugin manifest validation", () => {
 
     const defaultState: Record<string, unknown> = {};
     defaultState.self = defaultState;
-    expect(
-      validatePluginManifest({ ...createInstrumentManifest(), defaultState }).ok,
-    ).toBe(false);
+    expect(validatePluginManifest({ ...createInstrumentManifest(), defaultState }).ok).toBe(false);
   });
 });

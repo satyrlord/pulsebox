@@ -11,8 +11,12 @@ describe("Phase 0 project-format fixture definitions", () => {
     expect(new Set(ids).size).toBe(ids.length);
 
     const counts = Object.fromEntries(
-      (["valid", "rejection", "repair", "storage"] satisfies readonly ProjectFormatFixtureGroup[])
-        .map((group) => [group, PROJECT_FORMAT_FIXTURE_DEFINITIONS.filter((fixture) => fixture.group === group).length]),
+      (
+        ["valid", "rejection", "repair", "storage"] satisfies readonly ProjectFormatFixtureGroup[]
+      ).map((group) => [
+        group,
+        PROJECT_FORMAT_FIXTURE_DEFINITIONS.filter((fixture) => fixture.group === group).length,
+      ]),
     );
     expect(counts).toEqual({ valid: 7, rejection: 12, repair: 5, storage: 11 });
   });

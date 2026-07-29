@@ -26,18 +26,14 @@ function envelope(kind: string, payload: Readonly<Record<string, unknown>>) {
 describe("worklet protocol envelope validation", () => {
   it("accepts a versioned ready envelope", () => {
     expect(
-      validateEngineMessageEnvelope(
-        envelope("ready", { acceptedProtocolVersion: 1 }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("ready", { acceptedProtocolVersion: 1 })).ok,
     ).toBe(true);
   });
 
   it("validates ordinary payload sizes without TextEncoder", () => {
     vi.stubGlobal("TextEncoder", undefined);
     expect(
-      validateEngineMessageEnvelope(
-        envelope("configure", { label: "Acid bass \u{1F3B5}" }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("configure", { label: "Acid bass \u{1F3B5}" })).ok,
     ).toBe(true);
   });
 
@@ -49,9 +45,9 @@ describe("worklet protocol envelope validation", () => {
       }).ok,
     ).toBe(false);
     expect(validateEngineMessageEnvelope(envelope("custom", {})).ok).toBe(false);
-    expect(
-      validateEngineMessageEnvelope({ ...envelope("ready", {}), sequence: -1 }).ok,
-    ).toBe(false);
+    expect(validateEngineMessageEnvelope({ ...envelope("ready", {}), sequence: -1 }).ok).toBe(
+      false,
+    );
   });
 
   it("enforces parameter and event batch bounds", () => {
@@ -70,8 +66,7 @@ describe("worklet protocol envelope validation", () => {
         envelope("parameter-batch", {
           changes: Array.from(
             {
-              length:
-                ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch + 1,
+              length: ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch + 1,
             },
             () => ({}),
           ),
@@ -97,14 +92,10 @@ describe("worklet protocol envelope validation", () => {
 
   it("rejects oversized and non-finite ordinary payloads", () => {
     expect(
-      validateEngineMessageEnvelope(
-        envelope("configure", { text: "x".repeat(64 * 1024) }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("configure", { text: "x".repeat(64 * 1024) })).ok,
     ).toBe(false);
     expect(
-      validateEngineMessageEnvelope(
-        envelope("configure", { value: Number.POSITIVE_INFINITY }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("configure", { value: Number.POSITIVE_INFINITY })).ok,
     ).toBe(false);
   });
 
@@ -121,9 +112,7 @@ describe("worklet protocol envelope validation", () => {
     expect(
       validateEngineMessageEnvelope(
         envelope("sample-attach", {
-          chunk: new ArrayBuffer(
-            ENGINE_PROTOCOL_LIMITS.maximumSampleChunkBytes + 1,
-          ),
+          chunk: new ArrayBuffer(ENGINE_PROTOCOL_LIMITS.maximumSampleChunkBytes + 1),
           chunkIndex: 0,
           chunkCount: 1,
         }),

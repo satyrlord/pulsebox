@@ -1,22 +1,23 @@
+import { stubMixerNodes } from "./stub-audio-graph";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
 import { ENGINE_PROTOCOL_LIMITS } from "../../../src/contracts/worklet-protocol";
-import {
-  AcidBassAdapter,
-  type AcidBassAdapterStatus,
-  type ScheduledBassEvent,
-} from "../../../src/engine/modules/bass-mono/adapter";
+import { AcidBassAdapter } from "../../../src/engine/modules/bass-mono/adapter";
 import {
   ACID_BASS_DEFAULT_PARAMETERS,
   ACID_BASS_MANIFEST,
 } from "../../../src/engine/modules/bass-mono/manifest";
+import type { ScheduledVoiceEvent } from "../../../src/engine/transport/scheduled-event";
 import {
-  AcidBassRuntime,
-  type AcidBassRuntimeAdapterPort,
-  type AcidBassRuntimeStatus,
-} from "../../../src/engine/modules/bass-mono/runtime";
+  TransportRuntime,
+  type TransportRuntimeStatus,
+} from "../../../src/engine/transport/transport-runtime";
+import type {
+  VoiceAdapterPort,
+  VoiceAdapterStatus,
+} from "../../../src/engine/transport/voice-adapter";
 import { TEST_UUID } from "../contracts/fixtures";
 
 const PROJECT_REVISION = {
@@ -192,10 +193,7 @@ describe("Acid Bass plugin", () => {
     });
     await adapter.prepare();
     adapter.activate(destination);
-    adapter.setParameters(
-      { cutoff: 1_200, resonance: 0.5 },
-      NEXT_PROJECT_REVISION,
-    );
+    adapter.setParameters({ cutoff: 1_200, resonance: 0.5 }, NEXT_PROJECT_REVISION);
 
     nodes[0]?.dispatchEvent(new Event("processorerror"));
     await vi.waitFor(() => {
@@ -205,8 +203,7 @@ describe("Acid Bass plugin", () => {
 
     expect(nodes[1]?.connect).toHaveBeenCalledWith(destination);
     const recoverySnapshots = nodes[1]?.port.sent.filter(
-      (value) =>
-        (value as { readonly kind?: unknown }).kind === "state-snapshot",
+      (value) => (value as { readonly kind?: unknown }).kind === "state-snapshot",
     ) as
       | {
           readonly projectRevision?: StateRevision;
@@ -214,15 +211,12 @@ describe("Acid Bass plugin", () => {
         }[]
       | undefined;
     const recoveryHello = nodes[1]?.port.sent[0] as
-      | { readonly projectRevision?: StateRevision }
-      | undefined;
+      { readonly projectRevision?: StateRevision } | undefined;
     expect(recoveryHello?.projectRevision).toEqual(PROJECT_REVISION);
     expect(recoverySnapshots).toHaveLength(2);
     expect(recoverySnapshots?.[0]?.projectRevision).toEqual(PROJECT_REVISION);
     expect(recoverySnapshots?.[0]?.payload?.parameters).toEqual({});
-    expect(recoverySnapshots?.[1]?.projectRevision).toEqual(
-      NEXT_PROJECT_REVISION,
-    );
+    expect(recoverySnapshots?.[1]?.projectRevision).toEqual(NEXT_PROJECT_REVISION);
     expect(recoverySnapshots?.[1]?.payload?.parameters).toEqual({
       cutoff: 1_200,
       resonance: 0.5,
@@ -231,7 +225,7 @@ describe("Acid Bass plugin", () => {
 
   it("reports a terminal fault when automatic processor recovery cannot handshake", async () => {
     vi.useFakeTimers();
-    const statuses: AcidBassAdapterStatus[] = [];
+    const statuses: VoiceAdapterStatus[] = [];
     const nodes: RecoveryNode[] = [];
     let nodeCount = 0;
 
@@ -329,14 +323,16 @@ describe("Acid Bass plugin", () => {
       close: vi.fn().mockResolvedValue(undefined),
       currentTime: 0,
       destination: {},
+      ...stubMixerNodes(),
       resume: vi.fn().mockResolvedValue(undefined),
       sampleRate: 48_000,
     };
-    const scheduleBatches: (readonly ScheduledBassEvent[])[] = [];
+    const scheduleBatches: (readonly ScheduledVoiceEvent[])[] = [];
     const clearScheduledEvents = vi.fn();
-    const statuses: AcidBassRuntimeStatus[] = [];
-    let publishAdapterStatus: ((status: AcidBassAdapterStatus) => void) | undefined;
-    const adapter: AcidBassRuntimeAdapterPort = {
+    const disposeAdapter = vi.fn();
+    const statuses: TransportRuntimeStatus[] = [];
+    let publishAdapterStatus: ((status: VoiceAdapterStatus) => void) | undefined;
+    const adapter: VoiceAdapterPort = {
       prepare: vi.fn().mockResolvedValue(undefined),
       activate: vi.fn(),
       replaceState: vi.fn(),
@@ -347,29 +343,33 @@ describe("Acid Bass plugin", () => {
       clearScheduledEvents,
       resume: vi.fn(),
       suspend: vi.fn(),
-      dispose: vi.fn(),
+      dispose: disposeAdapter,
     };
     const moduleId = "10000000-0000-4000-8000-000000000001" as ModuleInstanceId;
-    const runtime = new AcidBassRuntime(
-      () => context as unknown as AudioContext,
-      (status) => statuses.push(status),
-      (_audioContext, options) => {
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      onStatus: (status) => statuses.push(status),
+      adapterFactoryFor: () => (_audioContext, options) => {
         publishAdapterStatus = options.onStatus;
         return adapter;
       },
-    );
+    });
     await runtime.replaceFromCurrentState(
       [
         {
           id: moduleId,
+          pluginId: ACID_BASS_MANIFEST.pluginId,
           parameters: ACID_BASS_DEFAULT_PARAMETERS,
-          steps: Array.from({ length: 16 }, () => ({
-            active: true,
-            note: 36,
-            velocity: 0.8,
-            accent: false,
-            slide: false,
-          })),
+          parts: [
+            Array.from({ length: 16 }, () => ({
+              active: true,
+              note: 36,
+              velocity: 0.8,
+              accent: false,
+              slide: false,
+            })),
+          ],
+          mix: { level: 0.8, pan: 0, muted: false, solo: false },
         },
       ],
       PROJECT_REVISION,
@@ -407,8 +407,13 @@ describe("Acid Bass plugin", () => {
       state: "faulted",
       fault: { code: "handshake-timeout" },
     });
-    expect(runtime.state).toBe("unavailable");
-    await expect(runtime.play(120)).rejects.toThrow("Audio is unavailable");
+
+    // The fault belongs to one voice. Its adapter is released so it stops
+    // receiving control data, but the runtime stays usable: the recovery text
+    // promises a silent instrument, not a silent application.
+    expect(disposeAdapter).toHaveBeenCalled();
+    expect(runtime.state).not.toBe("unavailable");
+    await expect(runtime.play(120)).resolves.toBeUndefined();
     runtime.dispose();
   });
 
@@ -417,10 +422,14 @@ describe("Acid Bass plugin", () => {
       close: vi.fn().mockResolvedValue(undefined),
       currentTime: 0,
       destination: {},
+      ...stubMixerNodes(),
       resume: vi.fn().mockResolvedValue(undefined),
       sampleRate: 48_000,
     };
-    const runtime = new AcidBassRuntime(() => context as unknown as AudioContext);
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => undefined,
+    });
     await runtime.play(120);
     context.currentTime = 0.5;
     runtime.setTempo(240);

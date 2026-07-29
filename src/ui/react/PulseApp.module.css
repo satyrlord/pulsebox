@@ -1,0 +1,42 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--pulse-color-surface, #101013);
+  color: var(--pulse-color-text, #e6e6ea);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.notice {
+  position: fixed;
+  inset-block-end: 1rem;
+  inset-inline-start: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  background: var(--pulse-color-panel, #1a1a1e);
+  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  border-radius: 0.125rem;
+}
+
+.notice button {
+  min-height: 1.5rem;
+  padding: 0.1875rem 0.625rem;
+  font: inherit;
+  font-size: 0.6875rem;
+  color: var(--pulse-color-text, #e6e6ea);
+  background: var(--pulse-color-control-cap, #24242a);
+  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  border-radius: 0.125rem;
+  cursor: pointer;
+}

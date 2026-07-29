@@ -1,7 +1,4 @@
-import {
-  validateStateRevision,
-  type StateRevision,
-} from "./ids";
+import { validateStateRevision, type StateRevision } from "./ids";
 import {
   isPlainRecord,
   validationFailure,
@@ -50,13 +47,9 @@ export const PROCESSOR_TO_CONTROLLER_KINDS = Object.freeze([
   "disposed",
 ] as const);
 
-export type ControllerToProcessorKind =
-  (typeof CONTROLLER_TO_PROCESSOR_KINDS)[number];
-export type ProcessorToControllerKind =
-  (typeof PROCESSOR_TO_CONTROLLER_KINDS)[number];
-export type EngineMessageKind =
-  | ControllerToProcessorKind
-  | ProcessorToControllerKind;
+export type ControllerToProcessorKind = (typeof CONTROLLER_TO_PROCESSOR_KINDS)[number];
+export type ProcessorToControllerKind = (typeof PROCESSOR_TO_CONTROLLER_KINDS)[number];
+export type EngineMessageKind = ControllerToProcessorKind | ProcessorToControllerKind;
 
 export interface EngineMessageEnvelope<
   TKind extends EngineMessageKind = EngineMessageKind,
@@ -115,29 +108,19 @@ const ALL_KINDS: ReadonlySet<string> = new Set([
   ...PROCESSOR_TO_CONTROLLER_KINDS,
 ]);
 
-const CONTROLLER_KIND_SET: ReadonlySet<string> = new Set(
-  CONTROLLER_TO_PROCESSOR_KINDS,
-);
-const PROCESSOR_KIND_SET: ReadonlySet<string> = new Set(
-  PROCESSOR_TO_CONTROLLER_KINDS,
-);
+const CONTROLLER_KIND_SET: ReadonlySet<string> = new Set(CONTROLLER_TO_PROCESSOR_KINDS);
+const PROCESSOR_KIND_SET: ReadonlySet<string> = new Set(PROCESSOR_TO_CONTROLLER_KINDS);
 
-export function isControllerToProcessorKind(
-  value: unknown,
-): value is ControllerToProcessorKind {
+export function isControllerToProcessorKind(value: unknown): value is ControllerToProcessorKind {
   return typeof value === "string" && CONTROLLER_KIND_SET.has(value);
 }
 
-export function isProcessorToControllerKind(
-  value: unknown,
-): value is ProcessorToControllerKind {
+export function isProcessorToControllerKind(value: unknown): value is ProcessorToControllerKind {
   return typeof value === "string" && PROCESSOR_KIND_SET.has(value);
 }
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
-  return (
-    typeof value === "number" && Number.isSafeInteger(value) && value >= 0
-  );
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function ordinaryPayloadByteLength(value: unknown): number | undefined {
@@ -173,11 +156,7 @@ function ordinaryPayloadByteLength(value: unknown): number | undefined {
 }
 
 function isJsonCompatible(value: unknown, seen = new Set<object>()): boolean {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
-  ) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
     return true;
   }
   if (typeof value === "number") return Number.isFinite(value);
@@ -189,9 +168,7 @@ function isJsonCompatible(value: unknown, seen = new Set<object>()): boolean {
   } else if (!isPlainRecord(value)) {
     compatible = false;
   } else {
-    compatible = Object.values(value).every((entry) =>
-      isJsonCompatible(entry, seen),
-    );
+    compatible = Object.values(value).every((entry) => isJsonCompatible(entry, seen));
   }
   seen.delete(value);
   return compatible;
@@ -208,10 +185,7 @@ function validateParameterBatch(
     });
     return;
   }
-  if (
-    payload.changes.length >
-    ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch
-  ) {
+  if (payload.changes.length > ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch) {
     issues.push({
       path: "payload.changes",
       message: "Parameter batch exceeds 128 changes.",
@@ -247,8 +221,7 @@ function validateEventBatch(
     ) {
       issues.push({
         path: `payload.events[${index.toString()}]`,
-        message:
-          "Scheduled events require an ID, absolute audio frame, priority, and data object.",
+        message: "Scheduled events require an ID, absolute audio frame, priority, and data object.",
       });
     }
   }
@@ -313,10 +286,7 @@ function validateAcknowledgement(
       message: "Acknowledgement sequence must be a non-negative safe integer.",
     });
   }
-  const revision = validateStateRevision(
-    payload.projectRevision,
-    "payload.projectRevision",
-  );
+  const revision = validateStateRevision(payload.projectRevision, "payload.projectRevision");
   if (!revision.ok) issues.push(...revision.issues);
   if (
     payload.disposition !== "applied" &&

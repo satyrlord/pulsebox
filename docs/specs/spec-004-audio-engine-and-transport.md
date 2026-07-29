@@ -98,10 +98,14 @@ WAV export, and stem export.
 
 ## 17. Timing
 
-Pattern properties shown as horizontal sliders in the Piano Roll header:
+Swing is one global project property in the MVP. It applies to every Pattern and
+to every module. Per-Pattern Swing is post-MVP work.
 
-- Swing, default 54%.
-- Humanize, default 12%.
+Timing properties shown as horizontal sliders in the Piano Roll header:
+
+- Swing, default 54%. Project-wide in the MVP: moving it on any Pattern changes
+  playback of every Pattern.
+- Humanize, default 12%. Pattern-owned.
 - Quantize strength is fixed at 100% in the MVP and is not a visible control.
 - The Pattern grid is fixed at 1/16. There is no Straight selector, grid
   selector, triplet selector, or persistent snap-off control in the MVP.
@@ -116,8 +120,9 @@ Behavior:
 - Timing is audible.
 - Visual playheads reflect timing where practical.
 - Tempo changes during playback are supported.
-- Selectable grids, triplets, persistent snap-off, per-voice grid resolution,
-  tempo automation, and time-signature timelines are post-MVP work.
+- Per-Pattern Swing, selectable grids, triplets, persistent snap-off, per-voice
+  grid resolution, tempo automation, and time-signature timelines are post-MVP
+  work.
 
 ---
 
@@ -154,7 +159,7 @@ Behavior:
 - Supports tempo change during playback without changing the current musical
   position. The engine discards only queued future events and rebuilds them on
   the new tempo grid.
-- Supports swing.
+- Supports one global Swing value.
 - Supports deterministic humanization.
 - Supports pattern and song modes.
 - Supports quantized named Pattern launches.
@@ -269,4 +274,3 @@ criterion, and its output belongs in the run report to the user rather than in
 the repository tree.
 
 ---
-

@@ -64,9 +64,7 @@ function parseStableId<T extends string>(
   path: string,
   label: string,
 ): ValidationResult<T> {
-  return typeof value === "string" &&
-    value.length <= 64 &&
-    STABLE_ID_PATTERN.test(value)
+  return typeof value === "string" && value.length <= 64 && STABLE_ID_PATTERN.test(value)
     ? validationSuccess(value as T)
     : validationFailure(
         path,
@@ -74,10 +72,7 @@ function parseStableId<T extends string>(
       );
 }
 
-export function parsePluginId(
-  value: unknown,
-  path = "pluginId",
-): ValidationResult<PluginId> {
+export function parsePluginId(value: unknown, path = "pluginId"): ValidationResult<PluginId> {
   return parseStableId<PluginId>(value, path, "Plugin ID");
 }
 
@@ -88,10 +83,7 @@ export function parseParameterId(
   return parseStableId<ParameterId>(value, path, "Parameter ID");
 }
 
-export function parseMeterId(
-  value: unknown,
-  path = "meterId",
-): ValidationResult<MeterId> {
+export function parseMeterId(value: unknown, path = "meterId"): ValidationResult<MeterId> {
   return parseStableId<MeterId>(value, path, "Meter ID");
 }
 
@@ -104,10 +96,7 @@ function isValueInRange(
   minimum: number | undefined,
   maximum: number | undefined,
 ): boolean {
-  return (
-    (minimum === undefined || value >= minimum) &&
-    (maximum === undefined || value <= maximum)
-  );
+  return (minimum === undefined || value >= minimum) && (maximum === undefined || value <= maximum);
 }
 
 export function validateParameterDescriptor(
@@ -148,10 +137,7 @@ export function validateParameterDescriptor(
     (value.automation !== "step" && value.automation !== "none") ||
     (value.modulation !== "none" && value.modulation !== "internal")
   ) {
-    return validationFailure(
-      path,
-      "Parameter descriptor has a missing or invalid contract field.",
-    );
+    return validationFailure(path, "Parameter descriptor has a missing or invalid contract field.");
   }
   const descriptor = value as unknown as ParameterDescriptor;
   const issues: ValidationIssue[] = [];
@@ -166,10 +152,7 @@ export function validateParameterDescriptor(
       message: "Short label must not be empty when present.",
     });
   }
-  if (
-    !Number.isSafeInteger(descriptor.displayPrecision) ||
-    descriptor.displayPrecision < 0
-  ) {
+  if (!Number.isSafeInteger(descriptor.displayPrecision) || descriptor.displayPrecision < 0) {
     issues.push({
       path: `${path}.displayPrecision`,
       message: "Display precision must be a non-negative safe integer.",
@@ -207,13 +190,7 @@ export function validateParameterDescriptor(
         path: `${path}.defaultValue`,
         message: "Numeric parameters require a finite numeric default.",
       });
-    } else if (
-      !isValueInRange(
-        descriptor.defaultValue,
-        descriptor.minimum,
-        descriptor.maximum,
-      )
-    ) {
+    } else if (!isValueInRange(descriptor.defaultValue, descriptor.minimum, descriptor.maximum)) {
       issues.push({
         path: `${path}.defaultValue`,
         message: "Default must be inside the parameter range.",
@@ -224,13 +201,7 @@ export function validateParameterDescriptor(
         path: `${path}.resetValue`,
         message: "Numeric parameters require a finite numeric reset value.",
       });
-    } else if (
-      !isValueInRange(
-        descriptor.resetValue,
-        descriptor.minimum,
-        descriptor.maximum,
-      )
-    ) {
+    } else if (!isValueInRange(descriptor.resetValue, descriptor.minimum, descriptor.maximum)) {
       issues.push({
         path: `${path}.resetValue`,
         message: "Reset value must be inside the parameter range.",
@@ -244,14 +215,10 @@ export function validateParameterDescriptor(
     }
     if (
       descriptor.valueType === "integer" &&
-      ((isFiniteNumber(descriptor.minimum) &&
-        !Number.isInteger(descriptor.minimum)) ||
-        (isFiniteNumber(descriptor.maximum) &&
-          !Number.isInteger(descriptor.maximum)) ||
-        (isFiniteNumber(descriptor.defaultValue) &&
-          !Number.isInteger(descriptor.defaultValue)) ||
-        (isFiniteNumber(descriptor.resetValue) &&
-          !Number.isInteger(descriptor.resetValue)) ||
+      ((isFiniteNumber(descriptor.minimum) && !Number.isInteger(descriptor.minimum)) ||
+        (isFiniteNumber(descriptor.maximum) && !Number.isInteger(descriptor.maximum)) ||
+        (isFiniteNumber(descriptor.defaultValue) && !Number.isInteger(descriptor.defaultValue)) ||
+        (isFiniteNumber(descriptor.resetValue) && !Number.isInteger(descriptor.resetValue)) ||
         (isFiniteNumber(descriptor.step) && !Number.isInteger(descriptor.step)))
     ) {
       issues.push({
@@ -302,11 +269,7 @@ export function validateParameterDescriptor(
       minimum === 0 ||
       maximum === 0 ||
       (minimum < 0 && maximum > 0);
-    if (
-      crossesZero ||
-      descriptor.defaultValue === 0 ||
-      descriptor.resetValue === 0
-    ) {
+    if (crossesZero || descriptor.defaultValue === 0 || descriptor.resetValue === 0) {
       issues.push({
         path: `${path}.smoothing`,
         message: "Exponential smoothing must not cross or target zero.",
@@ -314,7 +277,5 @@ export function validateParameterDescriptor(
     }
   }
 
-  return issues.length === 0
-    ? validationSuccess(descriptor)
-    : { ok: false, issues };
+  return issues.length === 0 ? validationSuccess(descriptor) : { ok: false, issues };
 }

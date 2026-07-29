@@ -62,10 +62,9 @@ function range(start: number, end: number): readonly number[] {
 
 function primaryAcceptanceIds(markdown: string): readonly number[] {
   const metadata = markdown.split(/\r?\n---\r?\n/u, 1)[0] ?? markdown;
-  return [...metadata.matchAll(
-    /`AC-([0-9]{3})`(?:(?:\s+through\s+|\s*-\s*)`AC-([0-9]{3})`)?/gu,
-  )]
-    .flatMap((match) => range(Number(match[1]), Number(match[2] ?? match[1])));
+  return [
+    ...metadata.matchAll(/`AC-([0-9]{3})`(?:(?:\s+through\s+|\s*-\s*)`AC-([0-9]{3})`)?/gu),
+  ].flatMap((match) => range(Number(match[1]), Number(match[2] ?? match[1])));
 }
 
 function acceptanceCriterion(markdown: string, id: number): string {
@@ -75,15 +74,19 @@ function acceptanceCriterion(markdown: string, id: number): string {
   if (start < 0) {
     throw new Error(`Missing acceptance criterion ${marker}`);
   }
-  const next = lines.findIndex((line, index) => index > start
-    && /^[0-9]+\. \*\*AC-[0-9]{3}\.\*\*/u.test(line));
+  const next = lines.findIndex(
+    (line, index) => index > start && /^[0-9]+\. \*\*AC-[0-9]{3}\.\*\*/u.test(line),
+  );
   return lines.slice(start, next < 0 ? undefined : next).join("\n");
 }
 
 describe("product specification structure", () => {
   it("keeps one indexed file set in normative build order", () => {
-    const expectedPaths = [INDEX_PATH, ...BUILD_ORDER.map(({ path }) => path),
-      ...SUPPORTING_SPECS.map(({ path }) => path)];
+    const expectedPaths = [
+      INDEX_PATH,
+      ...BUILD_ORDER.map(({ path }) => path),
+      ...SUPPORTING_SPECS.map(({ path }) => path),
+    ];
     const actualNames = readdirSync(SPECS_ROOT)
       .filter((name) => name.endsWith(".md"))
       .sort();
@@ -96,28 +99,23 @@ describe("product specification structure", () => {
     expect(linkPositions).toEqual([...linkPositions].sort((left, right) => left - right));
 
     for (const { path } of BUILD_ORDER) {
-      const indexRow = index.split(/\r?\n/u)
-        .find((line) => line.includes(`(${basename(path)})`));
-      expect(primaryAcceptanceIds(indexRow ?? ""), path)
-        .toEqual(primaryAcceptanceIds(read(path)));
+      const indexRow = index.split(/\r?\n/u).find((line) => line.includes(`(${basename(path)})`));
+      expect(primaryAcceptanceIds(indexRow ?? ""), path).toEqual(primaryAcceptanceIds(read(path)));
     }
 
     BUILD_ORDER.forEach(({ path }, indexPosition) => {
       const order = indexPosition + 1;
-      const previousPath = indexPosition === 0
-        ? INDEX_PATH
-        : BUILD_ORDER[indexPosition - 1]?.path;
+      const previousPath = indexPosition === 0 ? INDEX_PATH : BUILD_ORDER[indexPosition - 1]?.path;
       if (previousPath === undefined) {
         throw new TypeError(`Specification ${path} has no previous build stage.`);
       }
 
       const source = read(path);
       const header = source.split(/\r?\n---\r?\n/u, 1)[0] ?? source;
-      const indexRow = index.split(/\r?\n/u)
-        .find((line) => line.includes(`(${basename(path)})`)) ?? "";
-      const expectedIndexDependency = indexPosition === 0
-        ? "This index"
-        : `\`${specId(previousPath)}\``;
+      const indexRow =
+        index.split(/\r?\n/u).find((line) => line.includes(`(${basename(path)})`)) ?? "";
+      const expectedIndexDependency =
+        indexPosition === 0 ? "This index" : `\`${specId(previousPath)}\``;
 
       expect(header, path).toContain(`**Spec ID:** \`${specId(path)}\``);
       expect(header, path).toContain(
@@ -130,8 +128,7 @@ describe("product specification structure", () => {
 
   it("assigns every stable numbered section to exactly one file", () => {
     const sectionOwners = new Map<number, string>();
-    const expected = [{ path: INDEX_PATH, sections: [0] }, ...BUILD_ORDER,
-      ...SUPPORTING_SPECS];
+    const expected = [{ path: INDEX_PATH, sections: [0] }, ...BUILD_ORDER, ...SUPPORTING_SPECS];
 
     for (const { path, sections } of expected) {
       expect(numberedSections(read(path)), path).toEqual(sections);
@@ -148,14 +145,14 @@ describe("product specification structure", () => {
   });
 
   it("keeps all decisions and release criteria stable and complete", () => {
-    const decisionIds = [...read(SUPPORTING_SPECS[0].path)
-      .matchAll(/^- \*\*D([0-9]{2})\.\*\*/gmu)]
-      .map((match) => Number(match[1]));
-    const acceptanceIds = [...read(SUPPORTING_SPECS[1].path)
-      .matchAll(/^[0-9]+\. \*\*AC-([0-9]{3})\.\*\*/gmu)]
-      .map((match) => Number(match[1]));
+    const decisionIds = [
+      ...read(SUPPORTING_SPECS[0].path).matchAll(/^- \*\*D([0-9]{2})\.\*\*/gmu),
+    ].map((match) => Number(match[1]));
+    const acceptanceIds = [
+      ...read(SUPPORTING_SPECS[1].path).matchAll(/^[0-9]+\. \*\*AC-([0-9]{3})\.\*\*/gmu),
+    ].map((match) => Number(match[1]));
 
-    expect(decisionIds).toEqual(range(1, 67));
+    expect(decisionIds).toEqual(range(1, 69));
     expect(acceptanceIds).toEqual(range(1, 86));
 
     const release = read(SUPPORTING_SPECS[1].path);
@@ -167,8 +164,9 @@ describe("product specification structure", () => {
   });
 
   it("assigns every release criterion one primary build-order owner", () => {
-    const ownedIds = BUILD_ORDER.flatMap(({ path }) => primaryAcceptanceIds(read(path)))
-      .sort((left, right) => left - right);
+    const ownedIds = BUILD_ORDER.flatMap(({ path }) => primaryAcceptanceIds(read(path))).sort(
+      (left, right) => left - right,
+    );
 
     expect(ownedIds).toEqual(range(1, 86));
   });

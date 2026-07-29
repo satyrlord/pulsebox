@@ -200,8 +200,9 @@ The merged MVP is complete only when:
     without assistance within one minute under the procedure in section 24.4.
 78. **AC-078.** Development and built-product launch use `http://127.0.0.1:4173`; a busy
     port fails visibly instead of selecting a different origin.
-79. **AC-079.** The Piano Roll header shows Pattern-owned horizontal Swing and
-    Humanize sliders and a Parameter selector, defaulting to Velocity, in place
+79. **AC-079.** The Piano Roll header shows a horizontal Swing slider bound to the
+    one global project Swing value, a Pattern-owned horizontal Humanize slider,
+    and a Parameter selector, defaulting to Velocity, in place
     of `Vel 100`. The selector is the only control that chooses an edited lane;
     it is scoped to the selected module, offering that module's supported note
     properties and its manifest-declared automatable parameters, re-scoping on
@@ -239,4 +240,3 @@ The merged MVP is complete only when:
     in every supplied theme, and ghost display persists only as a local view
     preference that creates no undo entry and does not travel in `.pulsebox`
     files.
-

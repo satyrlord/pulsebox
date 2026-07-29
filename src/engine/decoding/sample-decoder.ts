@@ -26,7 +26,9 @@ export class SampleDecoder {
   #nextRequest = 0;
   #disposed = false;
 
-  constructor(worker = new Worker(new URL("./decoder-worker.ts", import.meta.url), { type: "module" })) {
+  constructor(
+    worker = new Worker(new URL("./decoder-worker.ts", import.meta.url), { type: "module" }),
+  ) {
     this.#worker = worker;
     worker.addEventListener("message", this.#onMessage);
     worker.addEventListener("error", this.#onError);
@@ -48,7 +50,8 @@ export class SampleDecoder {
     this.#worker.removeEventListener("message", this.#onMessage);
     this.#worker.removeEventListener("error", this.#onError);
     this.#worker.terminate();
-    for (const request of this.#pending.values()) request.reject(new Error("Sample decoder was disposed."));
+    for (const request of this.#pending.values())
+      request.reject(new Error("Sample decoder was disposed."));
     this.#pending.clear();
   }
 
@@ -72,7 +75,8 @@ export class SampleDecoder {
   };
 
   readonly #onError = (): void => {
-    for (const request of this.#pending.values()) request.reject(new Error("The audio decoder worker failed."));
+    for (const request of this.#pending.values())
+      request.reject(new Error("The audio decoder worker failed."));
     this.#pending.clear();
   };
 }

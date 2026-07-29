@@ -1,12 +1,14 @@
+import { stubMixerNodes } from "./stub-audio-graph";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { IdFactory } from "../../../src/contracts/ids";
 import type { EngineMessageEnvelope } from "../../../src/contracts/worklet-protocol";
 import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
+import { createBassVoiceAdapter } from "../../../src/engine/modules/bass-mono/adapter";
 import {
-  AcidBassRuntime,
-  type BassRuntimeModule,
-} from "../../../src/engine/modules/bass-mono/runtime";
+  TransportRuntime,
+  type TransportModule,
+} from "../../../src/engine/transport/transport-runtime";
 import { createDefaultState } from "../../../src/state/default-state";
 import { PulseStore } from "../../../src/state/pulse-store";
 
@@ -89,22 +91,20 @@ describe("store to Acid Bass worklet projection", () => {
       close: vi.fn().mockResolvedValue(undefined),
       currentTime: 0,
       destination: {},
+      ...stubMixerNodes(),
       resume: vi.fn().mockResolvedValue(undefined),
       sampleRate: 48_000,
     } as unknown as AudioContext;
-    const runtime = new AcidBassRuntime(() => context);
-    await runtime.replaceFromCurrentState(
-      initialModules,
-      initialState.project.revision,
-    );
+    const runtime = new TransportRuntime({
+      createContext: () => context,
+      adapterFactoryFor: () => createBassVoiceAdapter,
+    });
+    await runtime.replaceFromCurrentState(initialModules, initialState.project.revision);
     await runtime.activate();
 
     const projections: Promise<void>[] = [];
-    const store = new PulseStore(
-      initialState,
-      ids,
-      seed,
-      (delta) => projections.push(runtime.project(delta)),
+    const store = new PulseStore(initialState, ids, seed, (delta) =>
+      projections.push(runtime.project(delta)),
     );
     const moduleId = store.getState().ui.selectedModuleId;
     if (moduleId === undefined) throw new Error("Expected a selected module.");
@@ -138,9 +138,7 @@ describe("store to Acid Bass worklet projection", () => {
       "state-snapshot",
       "resume",
     ]);
-    const recoverySnapshot = recoveryMessages?.find(
-      (message) => message.kind === "state-snapshot",
-    );
+    const recoverySnapshot = recoveryMessages?.find((message) => message.kind === "state-snapshot");
     expect(recoverySnapshot).toMatchObject({
       kind: "state-snapshot",
       projectRevision: result.projectRevision,
@@ -150,20 +148,19 @@ describe("store to Acid Bass worklet projection", () => {
   });
 });
 
-function toRuntimeModules(
-  state: ReturnType<typeof createDefaultState>,
-): BassRuntimeModule[] {
+function toRuntimeModules(state: ReturnType<typeof createDefaultState>): TransportModule[] {
   return Object.values(state.project.modules).map((module) => ({
     id: module.id,
+    pluginId: module.pluginId,
     parameters: module.parameters,
-    steps: module.pattern.steps,
+    parts: module.parts,
+    mix: { level: module.level, pan: module.pan, muted: module.muted, solo: module.solo },
   }));
 }
 
 function deterministicIds(): IdFactory {
   let value = 1;
   return {
-    createUuid: () =>
-      `00000000-0000-4000-8000-${String(value++).padStart(12, "0")}`,
+    createUuid: () => `00000000-0000-4000-8000-${String(value++).padStart(12, "0")}`,
   };
 }

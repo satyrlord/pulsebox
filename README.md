@@ -2,9 +2,11 @@
 
 Pulsebox is a desktop-first modular groove workstation for current Chrome,
 Edge, and Firefox. It is a fully client-side browser application. The Phase 1
-foundation is runnable: it includes the strict TypeScript toolchain, native Web
-Components, typed state and plugin contracts, an AudioWorklet Acid Bass path,
-transport, and three exposed rack slots.
+foundation is runnable with narrow, tested foundations from later phases: a
+React interface, AudioWorklet Acid Bass and Drumline Six paths, transport, a
+four-Pattern bank, basic Playlist transport and channel mixing, appearance
+Settings, and browser project persistence. These slices do not mark their
+parent phases complete. Three rack slots are currently exposed.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications
@@ -14,8 +16,8 @@ are arranged in normative build order.
 
 - Eight rack slots, eight visible instrument mixer strips, and one master strip
   in the MVP.
-- Web Audio, AudioWorklet, IndexedDB, strict TypeScript, Vite, Vitest, and
-  Playwright.
+- React, Zustand, CSS Modules, Web Audio, AudioWorklet, IndexedDB, strict
+  TypeScript, Vite, Vitest, React Testing Library, and Playwright.
 - No server product component, native wrapper, PWA, service worker, accounts,
   cloud sync, collaboration, or MIDI.
 - The canonical local origin is `http://127.0.0.1:4173`. Development and
@@ -23,10 +25,11 @@ are arranged in normative build order.
 
 ## Current status
 
-Phase 0 contracts are complete. Phase 1 foundation work is implemented. Run
-`npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e` for
-current check results. The final MVP features in later roadmap phases are not
-implemented yet.
+Phase 0 contracts and the Phase 1 foundation are complete. Later-phase
+foundation slices are present only where this README names them. Run `npm run
+lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e` for current check
+results. Phases 2 through 7 and their final acceptance criteria remain
+incomplete.
 
 Current owners:
 
@@ -58,7 +61,17 @@ npm run test
 npm run test:e2e
 npm run lint
 npm run typecheck
+npm run format
+npm run lint:md
+npm run ci
 ```
+
+`npm run typecheck` runs the `tsc` binary from TypeScript 7. ESLint and the
+architecture policy read the TypeScript 6 API through the `typescript` alias,
+because typescript-eslint does not support TypeScript 7 yet; that package
+installs its compiler as `tsc6`, so the two never contend for one binary name.
+Dependency versions are pinned exactly, so a fresh install cannot pull a
+formatter or compiler change that fails `npm run ci` without a source edit.
 
 `npm run dev` and `npm run start` both use the canonical origin with strict-port
 behavior. `npm run start` serves only the built static client and exposes no
@@ -66,10 +79,12 @@ product API. Run `npm run build` before `npm run start`.
 
 ## Architecture
 
-Pulsebox has strict engine, state, and UI layers. The engine owns audio and has
-no DOM dependency. State owns serializable data and reversible commands and has
-no DOM or live audio objects. UI owns the components and dispatches typed
-commands without editing the audio graph.
+Pulsebox has strict engine, state, persistence, and UI layers. The engine owns
+the audio clock, the lookahead scheduler, and every voice adapter, and has no
+DOM dependency. State owns serializable data, reversible commands, and the
+project document, and holds no DOM or browser object. Persistence adapts
+IndexedDB behind a state-owned port. UI owns the React components and a Zustand
+store, and dispatches typed commands without editing the audio graph.
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the normative contracts.
 
@@ -83,7 +98,7 @@ project data.
 
 ## Audio
 
-The Phase 1 custom synthesis path runs in an AudioWorklet processor. Suitable
+Custom synthesis runs in AudioWorklet processors. Suitable
 native Web Audio nodes remain behind engine-owned adapters. The processor
 accepts the host frame count and never assumes a 128-frame quantum. The bundled
 WAV, AIFF, and FLAC decoder foundation is present; sample-import UI and
@@ -91,9 +106,13 @@ cross-browser format fixtures remain later work.
 
 ## Persistence
 
-`docs/PROJECT-FORMAT.md` defines the future IndexedDB, atomic save, import,
-migration, recovery, and portable `.pulsebox` behavior. Persistence and portable
-project operations are not implemented in the Phase 1 foundation.
+Projects serialize to the versioned manifest defined by
+`docs/PROJECT-FORMAT.md`. Edits autosave into the `pulsebox-v1` IndexedDB
+database and restore on load. Explicit Save and Open use the same validated
+repository path. Portable `.pulsebox` export wraps the canonical manifest in a
+ZIP archive, and import validates the archive and manifest before state changes.
+Assets, packs, collision resolution, recovery history, and the complete Phase 7
+transaction surface remain later work.
 
 See [PROJECT-FORMAT.md](docs/PROJECT-FORMAT.md).
 
@@ -113,11 +132,15 @@ claim unimplemented behavior.
 
 ## Known limitations
 
-- Persistence, portable projects, the full eight-slot rack, remaining
-  instruments, mixer, effects, advanced editors, and export belong to later
-  roadmap phases.
-- Acid Bass currently implements its Phase 1 sound and compact-rack foundation;
-  its expanded editor remains planned.
+- Asset packs, the full eight-slot rack, the four remaining instruments,
+  effects, advanced editors, and rendered-audio export belong to later roadmap
+  phases.
+- The Pattern bank holds four named Patterns. The module-aware Piano Roll and
+  complete note, trigger, and automation editing surface remain planned.
+- The mixer covers level, pan, mute, solo, and master level. Sends, inserts, and
+  the master chain remain planned.
+- Acid Bass and Drumline Six implement their Phase 1 sound and compact-rack
+  foundation; their expanded editors remain planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
 - Files under `design/` are normally non-normative prototypes, not production

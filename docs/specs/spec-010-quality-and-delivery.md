@@ -90,7 +90,7 @@ Unit tests:
 - Migrations.
 - Import validation.
 - Pattern timing.
-- Swing.
+- Global Swing, including that one change reaches every Pattern.
 - Deterministic humanization.
 - Fixed 1/16 Pattern timing and Alt-drag snap override.
 - Mixer solo logic.
@@ -128,7 +128,7 @@ Component tests:
 - Piano-roll creation, move, and resize.
 - Module-aware Piano Roll switching between monophonic pitched and drum-trigger
   modes.
-- Pattern Swing and Humanize sliders.
+- Global Swing and Pattern Humanize sliders.
 - Lower-editor collapse and restore.
 - Focus restoration.
 - Live keyboard map focus rules.
@@ -342,7 +342,18 @@ Phase 7: Persistence, recovery, project import/export, WAV and stem export,
 final browser matrix.
 
 Phases 1 through 7 end with a runnable application and passing tests for their
-completed scope.
+completed scope. The dependency order remains normative, but an implementation
+change may deliver a narrow, tested vertical foundation from a later phase once
+the owning specification and every dependency through that phase have been
+read and kept consistent. Such a slice does not mark its parent phase or any
+skipped phase complete. User-facing status must name the exact implemented
+slice and the missing parent-phase scope.
+
+The current runnable foundation contains Phase 1 plus narrow slices for
+Drumline Six, named Pattern storage, basic channel mixing, Playlist transport,
+appearance Settings, and browser project persistence. These slices prove shared
+contracts and integration seams. They do not complete Phases 2 through 7 or
+their acceptance criteria.
 
 ### 24.9 Close-out
 
@@ -356,4 +367,3 @@ them to an ignored temporary path and report them to the user. The repository
 records what is required and its implementation status, not how a past run went.
 
 ---
-

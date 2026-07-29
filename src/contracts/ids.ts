@@ -1,8 +1,4 @@
-import {
-  validationFailure,
-  validationSuccess,
-  type ValidationResult,
-} from "./validation";
+import { validationFailure, validationSuccess, type ValidationResult } from "./validation";
 
 type Brand<Value, Name extends string> = Value & {
   readonly __brand: Name;
@@ -42,8 +38,7 @@ export interface IdFactory {
   createUuid(): string;
 }
 
-const UUID_V4_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const CONTENT_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
 function fixedRackSlotId(value: string): RackSlotId {
@@ -82,10 +77,7 @@ export function isCanonicalUuid(value: unknown): value is CanonicalUuid {
   return typeof value === "string" && UUID_V4_PATTERN.test(value);
 }
 
-export function parseCanonicalUuid(
-  value: unknown,
-  path = "id",
-): ValidationResult<CanonicalUuid> {
+export function parseCanonicalUuid(value: unknown, path = "id"): ValidationResult<CanonicalUuid> {
   return isCanonicalUuid(value)
     ? validationSuccess(value)
     : validationFailure(path, "Expected a lowercase canonical UUID version 4.");
@@ -159,36 +151,24 @@ export function createGestureId(factory: IdFactory): GestureId {
   return createCanonicalUuid(factory) as string as GestureId;
 }
 
-export function parseRackSlotId(
-  value: unknown,
-  path = "rackSlotId",
-): ValidationResult<RackSlotId> {
+export function parseRackSlotId(value: unknown, path = "rackSlotId"): ValidationResult<RackSlotId> {
   const match = RACK_SLOT_IDS.find((candidate) => candidate === value);
   return match === undefined
     ? validationFailure(path, "Expected one of slot-01 through slot-08.")
     : validationSuccess(match);
 }
 
-export function parseSendBusId(
-  value: unknown,
-  path = "sendBusId",
-): ValidationResult<SendBusId> {
+export function parseSendBusId(value: unknown, path = "sendBusId"): ValidationResult<SendBusId> {
   const match = SEND_BUS_IDS.find((candidate) => candidate === value);
   return match === undefined
     ? validationFailure(path, "Expected one of send-a through send-d.")
     : validationSuccess(match);
 }
 
-export function parseContentId(
-  value: unknown,
-  path = "contentId",
-): ValidationResult<ContentId> {
+export function parseContentId(value: unknown, path = "contentId"): ValidationResult<ContentId> {
   return typeof value === "string" && CONTENT_ID_PATTERN.test(value)
     ? validationSuccess(value as ContentId)
-    : validationFailure(
-        path,
-        "Expected sha256: followed by 64 lowercase hexadecimal characters.",
-      );
+    : validationFailure(path, "Expected sha256: followed by 64 lowercase hexadecimal characters.");
 }
 
 export function validateProjectRevision(
@@ -232,10 +212,7 @@ function validateRevision(
     typeof record.counter !== "number" ||
     record.counter < 0
   ) {
-    return validationFailure(
-      `${path}.counter`,
-      "Expected a non-negative safe integer.",
-    );
+    return validationFailure(`${path}.counter`, "Expected a non-negative safe integer.");
   }
   return validationSuccess({ epoch: epoch.value, counter: record.counter });
 }

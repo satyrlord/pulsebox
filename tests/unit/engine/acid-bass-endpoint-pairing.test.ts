@@ -148,9 +148,8 @@ beforeAll(async () => {
     }),
   );
   await import("../../../src/engine/modules/bass-mono/bass-mono.worklet");
-  ({ AcidBassAdapter: AcidBassAdapterClass } = await import(
-    "../../../src/engine/modules/bass-mono/adapter"
-  ));
+  ({ AcidBassAdapter: AcidBassAdapterClass } =
+    await import("../../../src/engine/modules/bass-mono/adapter"));
 });
 
 afterAll(() => {
@@ -181,7 +180,9 @@ describe("Acid Bass controller and processor pairing", () => {
     // One processor, so no silent teardown and rebuild occurred.
     expect(nodes).toHaveLength(1);
     expect(
-      acknowledgements(requiredNode(nodes, 0)).every((payload) => payload.disposition === "applied"),
+      acknowledgements(requiredNode(nodes, 0)).every(
+        (payload) => payload.disposition === "applied",
+      ),
     ).toBe(true);
   });
 
@@ -224,8 +225,7 @@ describe("Acid Bass controller and processor pairing", () => {
       (message) => message.kind === "state-snapshot",
     );
     const firstSnapshot = restored[0]?.payload as
-      | { readonly parameters?: Record<string, unknown> }
-      | undefined;
+      { readonly parameters?: Record<string, unknown> } | undefined;
     // Recovery restores the applied value, never the value the processor ignored.
     expect(firstSnapshot?.parameters).toMatchObject({ cutoff: 1_500 });
     expect(firstSnapshot?.parameters?.cutoff).not.toBe(250);

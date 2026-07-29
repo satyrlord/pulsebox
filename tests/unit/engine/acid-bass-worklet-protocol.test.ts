@@ -110,6 +110,20 @@ describe("Acid Bass worklet protocol", () => {
     });
   });
 
+  it("reports a zero meter level when it is suspended", () => {
+    const processor = readyProcessor();
+    processor.port.receive(controllerEnvelope(1, "suspend", {}, 7));
+
+    // `process` returns early while suspended, so this is the last chance to
+    // report a level. Without it the controller keeps the final peak and every
+    // meter stays lit after the transport stops.
+    const meterFrames = processor.port.sent.filter(
+      (value) => (value as { readonly kind?: unknown }).kind === "meter-frame",
+    );
+    expect(meterFrames).toHaveLength(1);
+    expect(meterFrames[0]).toMatchObject({ kind: "meter-frame", payload: { level: 0 } });
+  });
+
   it("faults and closes the session on a sequence gap", () => {
     const processor = readyProcessor();
     processor.port.receive(controllerEnvelope(2, "resume", {}, 7));
@@ -124,9 +138,7 @@ describe("Acid Bass worklet protocol", () => {
     const gapFault = processor.port.sent[2] as {
       readonly payload?: { readonly recoveryAction?: unknown };
     };
-    expect(gapFault.payload?.recoveryAction).toEqual(
-      expect.stringContaining("Replace"),
-    );
+    expect(gapFault.payload?.recoveryAction).toEqual(expect.stringContaining("Replace"));
     expect(processor.port.close).toHaveBeenCalledOnce();
   });
 
@@ -165,9 +177,7 @@ describe("Acid Bass worklet protocol", () => {
       { sequence: 3, kind: "disposed" },
     ]);
     expect(processor.port.close).toHaveBeenCalledOnce();
-    expect(
-      processor.process([], [[new Float32Array(64), new Float32Array(64)]], {}),
-    ).toBe(false);
+    expect(processor.process([], [[new Float32Array(64), new Float32Array(64)]], {})).toBe(false);
   });
 });
 

@@ -10,9 +10,7 @@ import type { PaletteToken, PulsePalette } from "./tokens";
 
 function channelLuminance(component: number): number {
   const normalized = component / 255;
-  return normalized <= 0.040_45
-    ? normalized / 12.92
-    : ((normalized + 0.055) / 1.055) ** 2.4;
+  return normalized <= 0.040_45 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
 }
 
 export function relativeLuminance(color: string): number {
@@ -88,11 +86,7 @@ export const CONTRAST_MATRIX: readonly ContrastRule[] = [
     minimum: 3,
   },
   {
-    foregrounds: [
-      "--pulse-color-meter-low",
-      "--pulse-color-meter-mid",
-      "--pulse-color-meter-high",
-    ],
+    foregrounds: ["--pulse-color-meter-low", "--pulse-color-meter-mid", "--pulse-color-meter-high"],
     backgrounds: ["--pulse-color-meter-track"],
     minimum: 3,
   },

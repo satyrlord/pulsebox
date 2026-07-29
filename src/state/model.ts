@@ -18,20 +18,40 @@ export interface PatternStep {
   readonly slide: boolean;
 }
 
-export interface ModulePattern {
+/**
+ * One named Pattern in the project bank. The bank is project-level so a Pattern
+ * name means the same thing on every module; the steps for it live on each
+ * module as the part at the same index.
+ */
+export interface PatternSlotState {
   readonly id: PatternId;
   readonly name: string;
   readonly length: number;
-  readonly steps: readonly PatternStep[];
 }
 
 export interface RackModuleState {
   readonly id: ModuleInstanceId;
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
-  readonly pattern: ModulePattern;
+  /** One step list per project Pattern slot, indexed in step with it. */
+  readonly parts: readonly (readonly PatternStep[])[];
   readonly muted: boolean;
   readonly solo: boolean;
+  /** Mixer fader position, 0 to 1. */
+  readonly level: number;
+  /** Stereo position, -1 hard left to 1 hard right. */
+  readonly pan: number;
+}
+
+export interface SongEntry {
+  readonly patternIndex: number;
+  readonly repeats: number;
+}
+
+export interface SongState {
+  /** When false the active Pattern loops; when true the chain plays. */
+  readonly enabled: boolean;
+  readonly entries: readonly SongEntry[];
 }
 
 export interface RackSlotState {
@@ -45,8 +65,14 @@ export interface ProjectState {
   readonly revision: StateRevision;
   readonly name: string;
   readonly tempo: number;
+  /** 0 is straight; 1 is a 2:1 triplet shuffle. */
+  readonly swing: number;
+  readonly masterLevel: number;
   readonly rackSlots: readonly RackSlotState[];
   readonly modules: Readonly<Record<ModuleInstanceId, RackModuleState>>;
+  readonly patterns: readonly PatternSlotState[];
+  readonly activePatternIndex: number;
+  readonly song: SongState;
 }
 
 export interface TransportState {

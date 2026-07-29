@@ -133,11 +133,14 @@ function findDuplicateKeyPaths(source: string): readonly string[] {
     }
     if (character === "{") {
       const parent = stack.at(-1);
-      const path = parent === undefined
-        ? ""
-        : pendingKey === undefined
-          ? parent.path
-          : parent.path === "" ? pendingKey : `${parent.path}.${pendingKey}`;
+      const path =
+        parent === undefined
+          ? ""
+          : pendingKey === undefined
+            ? parent.path
+            : parent.path === ""
+              ? pendingKey
+              : `${parent.path}.${pendingKey}`;
       stack.push({ keys: new Set<string>(), path });
       pendingKey = undefined;
     } else if (character === "}") {
@@ -258,7 +261,10 @@ export function importUserTheme(source: string): UserThemeImportResult {
   const root = parsed as Record<string, unknown>;
   const rootKeys = Object.keys(root).sort();
   const expectedKeys = ["formatVersion", "name", "tokens"];
-  if (rootKeys.length !== expectedKeys.length || rootKeys.some((key, i) => key !== expectedKeys[i])) {
+  if (
+    rootKeys.length !== expectedKeys.length ||
+    rootKeys.some((key, i) => key !== expectedKeys[i])
+  ) {
     return rejected([
       {
         path: "$",

@@ -174,8 +174,8 @@ this table is the traceability record.
   Settings. Its centered recessed app mark is independent of side-group widths,
   its two master meters toggle between L/R and M/S analysis, and its compact
   Pattern/Song switch sits left of transport. The lower workspace has one
-  collapse toggle, one module-aware Piano Roll, Pattern-owned Swing and Humanize
-  sliders, a fixed 1/16 grid, and no Performance, full Song timeline, Feel
+  collapse toggle, one module-aware Piano Roll, a global Swing slider, a
+  Pattern-owned Humanize slider, a fixed 1/16 grid, and no Performance, full Song timeline, Feel
   module, Straight selector, local Play, pen, or erase tools. Monophonic pitched
   notes move and resize and support slides; drum triggers paint as fixed one-cell
   events. The master-effects bypass leaves master gain and the protected limiter
@@ -225,4 +225,19 @@ this table is the traceability record.
   return buses with noninteractive labels rather than adding master sends or
   return-state controls. Responsive and accessible behavior continues to be
   owned by the product specifications rather than by raster artifacts.
-
+- **D68.** Numbered phases remain the dependency and completion order, while a
+  narrow vertical foundation from a later phase may land after its owner and
+  all earlier dependencies are applied. A foundation slice never marks its
+  parent phase or a skipped phase complete. Status text names the exact slice
+  and its missing parent-phase scope. This preserves executable integration
+  seams without weakening any final MVP acceptance criterion.
+- **D69.** Swing is one global project property in the MVP, stored in project
+  metadata beside tempo and applied to every Pattern and every module. The Piano
+  Roll header slider edits that single value, so its position is identical on
+  every Pattern. Humanize stays Pattern-owned. Per-Pattern Swing is post-MVP; it
+  would add an override to the `Pattern` record while the project field remains
+  the default. Rejected alternatives: shipping Pattern-owned Swing in the MVP,
+  which multiplies the timing state a user must reason about before there is a
+  Playlist to contrast Patterns in; and omitting Swing until it can be
+  Pattern-owned, which removes the single most identity-defining timing control
+  from the MVP groove.

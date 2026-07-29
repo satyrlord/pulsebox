@@ -15,9 +15,7 @@ describe("plugin registry", () => {
     expect(registry.size).toBe(1);
     expect(registry.require(pluginId("bass-mono")).factory).toBe(factory);
     expect(Object.isFrozen(registry)).toBe(true);
-    expect(Object.isFrozen(registry.require(pluginId("bass-mono")).manifest)).toBe(
-      true,
-    );
+    expect(Object.isFrozen(registry.require(pluginId("bass-mono")).manifest)).toBe(true);
     expect(Object.isFrozen(manifest.parameters)).toBe(true);
   });
 
@@ -44,8 +42,6 @@ describe("plugin registry", () => {
 
   it("fails when a required plugin is absent", () => {
     const registry = createPluginRegistry<unknown>([]);
-    expect(() => registry.require(pluginId("bass-mono"))).toThrow(
-      /not registered/u,
-    );
+    expect(() => registry.require(pluginId("bass-mono"))).toThrow(/not registered/u);
   });
 });

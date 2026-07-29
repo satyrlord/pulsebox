@@ -1,0 +1,8 @@
+.meter {
+  display: block;
+  --meter-track: var(--pulse-color-step-off, #131317);
+  --meter-fill: var(--module-accent, var(--pulse-color-accent, #9be564));
+  --meter-peak: var(--pulse-color-text, #e6e6ea);
+  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  border-radius: 0.125rem;
+}

@@ -16,7 +16,9 @@ export const deterministicIdFactory: IdFactory = {
   createUuid: () => TEST_UUID,
 };
 
-function requiredValue<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
+function requiredValue<T>(
+  result: { readonly ok: true; readonly value: T } | { readonly ok: false },
+): T {
   if (!result.ok) throw new Error("Invalid contract test fixture.");
   return result.value;
 }
@@ -33,9 +35,7 @@ export function meterId(value: string): MeterId {
   return requiredValue(parseMeterId(value));
 }
 
-export function createFloatParameter(
-  id = "cutoff",
-): ParameterDescriptor {
+export function createFloatParameter(id = "cutoff"): ParameterDescriptor {
   return {
     id: parameterId(id),
     name: "Cutoff",
@@ -55,9 +55,7 @@ export function createFloatParameter(
   };
 }
 
-export function createInstrumentManifest(
-  id = "bass-mono",
-): InstrumentPluginManifest {
+export function createInstrumentManifest(id = "bass-mono"): InstrumentPluginManifest {
   const parameter = createFloatParameter();
   return {
     manifestSchemaVersion: 1,

@@ -28,9 +28,7 @@ describe("parameter contracts", () => {
     const result = validateParameterDescriptor(descriptor);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.map((issue) => issue.path)).toContain(
-        "parameter.defaultValue",
-      );
+      expect(result.issues.map((issue) => issue.path)).toContain("parameter.defaultValue");
     }
   });
 
@@ -46,9 +44,7 @@ describe("parameter contracts", () => {
     const result = validateParameterDescriptor(descriptor);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.some((issue) => issue.message.includes('Exponential'))).toBe(
-        true,
-      );
+      expect(result.issues.some((issue) => issue.message.includes("Exponential"))).toBe(true);
     }
   });
 
@@ -68,8 +64,6 @@ describe("parameter contracts", () => {
       modulation: "none",
     };
     expect(validateParameterDescriptor(descriptor).ok).toBe(true);
-    expect(
-      validateParameterDescriptor({ ...descriptor, defaultValue: "triangle" }).ok,
-    ).toBe(false);
+    expect(validateParameterDescriptor({ ...descriptor, defaultValue: "triangle" }).ok).toBe(false);
   });
 });

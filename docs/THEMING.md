@@ -580,8 +580,7 @@ contract.
 The current implementation provides the five built-in token sets, the
 high-contrast overlay, the appearance preference envelope with its cross-tab
 and storage-failure behavior, the bounded user-theme import validator, the
-numeric contrast checks, and the current control primitives. The Settings page
-that exposes theme selection, contrast selection, user-theme import, and
-user-theme deletion is not implemented yet, so those operations are reachable
-only through the theme service. Visual regression snapshots across later MVP
+numeric contrast checks, the current control primitives, and Settings controls
+for built-in theme and high-contrast selection. User-theme import and deletion
+are not yet exposed in Settings. Visual regression snapshots across later MVP
 components also remain future work.

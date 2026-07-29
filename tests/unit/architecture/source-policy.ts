@@ -13,26 +13,10 @@ export interface PolicyViolation {
   readonly message: string;
 }
 
-type Layer =
-  | "composition"
-  | "contracts"
-  | "engine"
-  | "persistence"
-  | "state"
-  | "ui";
+type Layer = "composition" | "contracts" | "engine" | "persistence" | "state" | "ui";
 
 const CODE_EXTENSIONS = new Set([".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 const RESOLUTION_SUFFIXES = ["", ".ts", ".tsx", ".js", ".mjs", "/index.ts", "/index.js"] as const;
-const FORBIDDEN_FRAMEWORKS = [
-  "@angular/",
-  "lit",
-  "preact",
-  "react",
-  "react-dom",
-  "solid-js",
-  "svelte",
-  "vue",
-] as const;
 const UI_AUDIO_GLOBALS = new Set([
   "AudioBuffer",
   "AudioContext",
@@ -113,14 +97,19 @@ export function readCurrentSourceUnits(repositoryRoot = process.cwd()): readonly
 export function readCurrentArtifactUnits(repositoryRoot = process.cwd()): readonly SourceUnit[] {
   const units: SourceUnit[] = [];
   const indexPath = resolve(repositoryRoot, "index.html");
-  if (existsSync(indexPath)) units.push({ path: "index.html", source: readFileSync(indexPath, "utf8") });
+  if (existsSync(indexPath))
+    units.push({ path: "index.html", source: readFileSync(indexPath, "utf8") });
   const publicRoot = resolve(repositoryRoot, "public");
   if (existsSync(publicRoot)) {
     const visit = (directory: string): void => {
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         const absolute = join(directory, entry.name);
         if (entry.isDirectory()) visit(absolute);
-        else if (entry.isFile()) units.push({ path: normalizePath(relative(repositoryRoot, absolute)), source: readFileSync(absolute, "utf8") });
+        else if (entry.isFile())
+          units.push({
+            path: normalizePath(relative(repositoryRoot, absolute)),
+            source: readFileSync(absolute, "utf8"),
+          });
       }
     };
     visit(publicRoot);
@@ -228,7 +217,12 @@ function importSpecifiers(sourceFile: ts.SourceFile): readonly string[] {
 
 function layerFor(path: string): Layer | undefined {
   const normalized = normalizePath(path);
-  if (normalized === "src/main.ts" || normalized.startsWith("src/composition/") || normalized.startsWith("src/app/")) {
+  if (
+    normalized === "src/main.ts" ||
+    normalized === "src/main.tsx" ||
+    normalized.startsWith("src/composition/") ||
+    normalized.startsWith("src/app/")
+  ) {
     return "composition";
   }
   const directory = normalized.split("/")[1];
@@ -302,16 +296,7 @@ export function findLayerViolations(units: readonly SourceUnit[]): readonly Poli
   return violations;
 }
 
-function isForbiddenFramework(specifier: string): boolean {
-  return FORBIDDEN_FRAMEWORKS.some(
-    (framework) => specifier === framework || specifier.startsWith(`${framework}/`),
-  );
-}
-
-function importsExecutableDspCore(
-  sourceFile: ts.SourceFile,
-  importingPath: string,
-): boolean {
+function importsExecutableDspCore(sourceFile: ts.SourceFile, importingPath: string): boolean {
   return sourceFile.statements.some((statement) => {
     if (
       !ts.isImportDeclaration(statement) ||
@@ -321,10 +306,7 @@ function importsExecutableDspCore(
       return false;
     }
     const clause = statement.importClause;
-    if (
-      clause === undefined ||
-      clause.phaseModifier === ts.SyntaxKind.TypeKeyword
-    ) {
+    if (clause === undefined || clause.phaseModifier === ts.SyntaxKind.TypeKeyword) {
       return false;
     }
     if (clause.name !== undefined || clause.namedBindings === undefined) return true;
@@ -332,10 +314,7 @@ function importsExecutableDspCore(
     return clause.namedBindings.elements.some((element) => {
       if (element.isTypeOnly) return false;
       const importedName = (element.propertyName ?? element.name).text;
-      return !(
-        importingPath.endsWith("/manifest.ts") &&
-        importedName.startsWith("DEFAULT_")
-      );
+      return !(importingPath.endsWith("/manifest.ts") && importedName.startsWith("DEFAULT_"));
     });
   });
 }
@@ -347,17 +326,15 @@ export function findForbiddenTechnologyViolations(
   for (const unit of units) {
     const sourceFile = parse(unit);
     const messages = new Set<string>();
-    if (unit.path.endsWith(".jsx") || unit.path.endsWith(".tsx")) {
-      messages.add("JSX and TSX source files are prohibited.");
-    }
     if (/(?:^|\/)(?:service-worker|serviceWorker|sw)\.[cm]?[jt]sx?$/.test(unit.path)) {
       messages.add("Service-worker source files are prohibited.");
     }
     for (const specifier of importSpecifiers(sourceFile)) {
-      if (isForbiddenFramework(specifier)) {
-        messages.add(`UI framework import ${specifier} is prohibited.`);
-      }
-      if (specifier === "workbox" || specifier.startsWith("workbox-") || specifier.includes("vite-plugin-pwa")) {
+      if (
+        specifier === "workbox" ||
+        specifier.startsWith("workbox-") ||
+        specifier.includes("vite-plugin-pwa")
+      ) {
         messages.add(`Service-worker dependency ${specifier} is prohibited.`);
       }
     }
@@ -369,18 +346,14 @@ export function findForbiddenTechnologyViolations(
     }
 
     const visit = (node: ts.Node): void => {
-      if (ts.isJsxElement(node) || ts.isJsxFragment(node) || ts.isJsxSelfClosingElement(node)) {
-        messages.add("JSX syntax is prohibited.");
-      }
       if (ts.isIdentifier(node)) {
         if (/midi/i.test(node.text)) messages.add(`MIDI identifier ${node.text} is prohibited.`);
-        if (node.text === "React" || node.text === "Vue" || node.text === "LitElement") {
-          messages.add(`UI framework identifier ${node.text} is prohibited.`);
-        }
         if (node.text === "ScriptProcessorNode" || node.text === "createScriptProcessor") {
           messages.add(`${node.text} is prohibited.`);
         }
-        if (/^(?:ServiceWorker|ServiceWorkerContainer|ServiceWorkerRegistration)$/.test(node.text)) {
+        if (
+          /^(?:ServiceWorker|ServiceWorkerContainer|ServiceWorkerRegistration)$/.test(node.text)
+        ) {
           messages.add(`${node.text} is prohibited.`);
         }
         if (layerFor(unit.path) === "ui" && UI_AUDIO_GLOBALS.has(node.text)) {
@@ -431,9 +404,7 @@ export function findForbiddenTechnologyViolations(
  * how a past run went. Verification evidence, handoffs, and dated reports belong
  * on an ignored temporary path, so they must not reappear in the tree.
  */
-export function findRunNarrativeViolations(
-  paths: readonly string[],
-): readonly PolicyViolation[] {
+export function findRunNarrativeViolations(paths: readonly string[]): readonly PolicyViolation[] {
   const violations: PolicyViolation[] = [];
   for (const path of paths) {
     const normalized = normalizePath(path);
@@ -468,7 +439,10 @@ export function findForbiddenArtifactViolations(
   const violations: PolicyViolation[] = [];
   for (const unit of units) {
     const normalized = normalizePath(unit.path);
-    if (normalized.endsWith(".webmanifest") || /(?:^|\/)public\/manifest\.json$/i.test(normalized)) {
+    if (
+      normalized.endsWith(".webmanifest") ||
+      /(?:^|\/)public\/manifest\.json$/i.test(normalized)
+    ) {
       violations.push({ path: unit.path, message: "PWA manifest files are prohibited." });
     }
     if (/<link\b[^>]*\brel=["'][^"']*\bmanifest\b[^"']*["']/i.test(unit.source)) {
@@ -502,7 +476,8 @@ function knownPluginIds(units: readonly SourceUnit[]): ReadonlySet<string> {
 
 function isPluginOwnedPath(path: string, pluginIds: ReadonlySet<string>): boolean {
   const normalized = normalizePath(path);
-  if (normalized.includes("/registry/") || /\/registry(?:\.[cm]?[jt]s)?$/.test(normalized)) return true;
+  if (normalized.includes("/registry/") || /\/registry(?:\.[cm]?[jt]s)?$/.test(normalized))
+    return true;
   if (normalized.includes("/plugins/")) return true;
   return [...pluginIds].some(
     (pluginId) =>
@@ -510,10 +485,7 @@ function isPluginOwnedPath(path: string, pluginIds: ReadonlySet<string>): boolea
   );
 }
 
-function branchMentionsPlugin(
-  node: ts.Node,
-  pluginIds: ReadonlySet<string>,
-): boolean {
+function branchMentionsPlugin(node: ts.Node, pluginIds: ReadonlySet<string>): boolean {
   let containsConcreteId = false;
   const visit = (child: ts.Node): void => {
     if (ts.isStringLiteralLike(child) && pluginIds.has(child.text)) containsConcreteId = true;
@@ -531,7 +503,9 @@ function branchMentionsPlugin(
   return containsConcreteId;
 }
 
-export function findPluginBranchViolations(units: readonly SourceUnit[]): readonly PolicyViolation[] {
+export function findPluginBranchViolations(
+  units: readonly SourceUnit[],
+): readonly PolicyViolation[] {
   const pluginIds = knownPluginIds(units);
   const violations: PolicyViolation[] = [];
   for (const unit of units) {
@@ -546,7 +520,8 @@ export function findPluginBranchViolations(units: readonly SourceUnit[]): readon
       if (isBranch && branchMentionsPlugin(node, pluginIds)) {
         violations.push({
           path: unit.path,
-          message: "Product-specific plugin-ID branching is allowed only in its plugin folder or registry.",
+          message:
+            "Product-specific plugin-ID branching is allowed only in its plugin folder or registry.",
         });
         return;
       }

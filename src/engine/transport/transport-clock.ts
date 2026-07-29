@@ -16,7 +16,8 @@ export class TransportClock {
   #anchorFrame = 0;
 
   constructor(sampleRate: number, tempo = 130) {
-    if (!Number.isFinite(sampleRate) || sampleRate <= 0) throw new RangeError("sampleRate must be positive");
+    if (!Number.isFinite(sampleRate) || sampleRate <= 0)
+      throw new RangeError("sampleRate must be positive");
     this.#sampleRate = sampleRate;
     this.setTempo(tempo, 0);
   }
@@ -49,7 +50,8 @@ export class TransportClock {
 
   stop(currentFrame: number): boolean {
     validateFrame(currentFrame);
-    const alreadyAtMarker = this.#status === "stopped" && this.#positionTicks === this.#startMarkerTicks;
+    const alreadyAtMarker =
+      this.#status === "stopped" && this.#positionTicks === this.#startMarkerTicks;
     if (alreadyAtMarker) return false;
     this.#positionTicks = this.#startMarkerTicks;
     this.#anchorFrame = currentFrame;
@@ -60,7 +62,8 @@ export class TransportClock {
   seekWhileStopped(positionTicks: number, currentFrame: number): void {
     validateTicks(positionTicks);
     validateFrame(currentFrame);
-    if (this.#status === "playing") throw new Error("Stop or pause before setting the transport marker.");
+    if (this.#status === "playing")
+      throw new Error("Stop or pause before setting the transport marker.");
     this.#positionTicks = positionTicks;
     this.#startMarkerTicks = positionTicks;
     this.#anchorFrame = currentFrame;
@@ -68,7 +71,8 @@ export class TransportClock {
 
   setTempo(tempo: number, currentFrame: number): void {
     validateFrame(currentFrame);
-    if (!Number.isFinite(tempo) || tempo < 40 || tempo > 240) throw new RangeError("Tempo must be between 40 and 240 BPM.");
+    if (!Number.isFinite(tempo) || tempo < 40 || tempo > 240)
+      throw new RangeError("Tempo must be between 40 and 240 BPM.");
     if (this.#status === "playing") this.#positionTicks = this.#positionAt(currentFrame);
     this.#anchorFrame = currentFrame;
     this.#tempo = tempo;
@@ -83,14 +87,19 @@ export class TransportClock {
     validateFrame(currentFrame);
     if (this.#status !== "playing") return this.#positionTicks;
     const elapsedFrames = Math.max(0, currentFrame - this.#anchorFrame);
-    return this.#positionTicks + Math.round((elapsedFrames * this.#tempo * TICKS_PER_QUARTER) / (60 * this.#sampleRate));
+    return (
+      this.#positionTicks +
+      Math.round((elapsedFrames * this.#tempo * TICKS_PER_QUARTER) / (60 * this.#sampleRate))
+    );
   }
 }
 
 function validateFrame(frame: number): void {
-  if (!Number.isSafeInteger(frame) || frame < 0) throw new RangeError("Audio frame must be a non-negative safe integer.");
+  if (!Number.isSafeInteger(frame) || frame < 0)
+    throw new RangeError("Audio frame must be a non-negative safe integer.");
 }
 
 function validateTicks(ticks: number): void {
-  if (!Number.isSafeInteger(ticks) || ticks < 0) throw new RangeError("Transport ticks must be a non-negative safe integer.");
+  if (!Number.isSafeInteger(ticks) || ticks < 0)
+    throw new RangeError("Transport ticks must be a non-negative safe integer.");
 }

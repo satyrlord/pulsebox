@@ -23,9 +23,9 @@ AudioWorklet. No server product component, no MIDI.
 - Do not silently remove a requirement to resolve a contradiction. Report the
   conflict and obtain a product decision when the current repository cannot
   resolve it.
-- Files under design/ are prototypes and visual evidence. They are not normative
-  unless the specification or user explicitly makes them so. This includes
-  `design/image-gen-mock.png` and `design/claude-mock-up.html`.
+- Files under docs/design/ are prototypes and visual evidence. They are not
+  normative unless the specification or user explicitly makes them so. This
+  includes `docs/design/image-gen-mock.png` and `docs/design/claude-mock-up.html`.
 
 Owning contract documents:
 
@@ -42,13 +42,14 @@ Owning contract documents:
 
 ## Current repository state
 
-- Phase 0 contracts are complete and the Phase 1 foundation is runnable.
+- Phase 0 contracts and the Phase 1 foundation are complete. Narrow foundation
+  slices from later phases are runnable without marking those phases complete.
 - The repository has a strict TypeScript product source tree, package manifest,
   unit tests, and production-browser tests.
 - Claim checks only when their current scripts have been run successfully.
 - Later MVP phases remain governed by the indexed specification set under
-  `docs/specs/`; do not claim that their planned persistence, instruments,
-  mixer, effects, editors, or export exist.
+  `docs/specs/`. Claim only the narrow later-phase slices listed in README.md;
+  do not describe their incomplete parent phases as implemented.
 
 ## Roles and workflow
 
@@ -151,25 +152,26 @@ Inspect the dependency tree before close-out. Remove unused dependencies.
 
 The three domain layers and the wiring-only composition boundary live here:
 
-| Path              | Layer       | Owns                                                                                       |
-| ----------------- | ----------- | ------------------------------------------------------------------------------------------ |
-| `src/main.ts`     | composition | Object creation, port injection, command routing, startup and shutdown                     |
-| `src/engine/`     | engine      | AudioContext, AudioNodes, worklets, transport clock, scheduling, decoding, offline render  |
-| `src/state/`      | state       | Project data, typed commands, undo and redo, selectors, serialization, persistence ports   |
-| `src/ui/`         | UI          | Components, layout, input, focus, accessibility, themes, DOM patching                      |
-| `src/contracts/`  | contracts   | Data-only shared types with no singleton, browser handle, or algorithm                     |
+| Path                | Layer       | Owns                                                                                      |
+| ------------------- | ----------- | ----------------------------------------------------------------------------------------- |
+| `src/main.tsx`      | composition | Object creation, port injection, command routing, startup and shutdown                    |
+| `src/engine/`       | engine      | AudioContext, AudioNodes, worklets, transport clock, scheduling, decoding, offline render |
+| `src/state/`        | state       | Project data, typed commands, undo and redo, selectors, serialization, persistence ports  |
+| `src/persistence/`  | persistence | Browser-storage adapters behind state-owned ports. The only layer that names IndexedDB    |
+| `src/ui/`           | UI          | Components, layout, input, focus, accessibility, themes, DOM patching                     |
+| `src/contracts/`    | contracts   | Data-only shared types with no singleton, browser handle, or algorithm                    |
 
 Cross-layer imports go through the owning layer's `public.ts`
-(`src/engine/public.ts`, `src/state/public.ts`, `src/ui/public.ts`). Two guards
-enforce this:
+(`src/engine/public.ts`, `src/state/public.ts`, `src/persistence/public.ts`,
+`src/ui/public.ts`). Two guards enforce this:
 
-- `no-restricted-imports` per layer in `eslint.config.mjs`.
+- `no-restricted-imports` per layer in `eslint.config.mjs`. Its patterns match a
+  layer directory at any nesting depth, so a deeply nested component cannot
+  reach across a boundary by adding another `../`.
 - The AST policy in `tests/unit/architecture/source-policy.ts`, which also fails
   on `ScriptProcessorNode`, any identifier or string matching `midi`,
   service-worker code, and product-specific plugin-ID branching outside a plugin
-  folder or the registry. Its JSX, TSX, and UI-framework-import checks and the
-  matching `eslint.config.mjs` rules still run and must be removed as part of
-  the framework migration.
+  folder or the registry.
 
 Read that policy file before adding a source directory or a shared branch.
 

@@ -1,0 +1,13 @@
+.led {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  border-radius: 50%;
+  background: var(--pulse-color-step-off, #131317);
+}
+
+.led[data-lit="true"] {
+  background: var(--module-led, var(--pulse-color-accent, #b8ff7a));
+  border-color: var(--module-control-ring, var(--pulse-color-accent, #79b84d));
+}

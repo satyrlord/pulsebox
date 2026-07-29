@@ -49,6 +49,12 @@ The established visible mixer contains:
 - Insert-chain access.
 - A clear indicator when any send is active.
 
+A fader or pan move is audible while the gesture is in progress. The engine
+ramps the live channel value during the drag and the committed value arrives as
+one command at the end, so the move sounds continuous and still produces a
+single history entry. A muted or solo-silenced channel stays silent while its
+fader moves.
+
 The compact state keeps meter, fader, pan, mute, solo, module identity, and all
 four send buttons visible. Selecting a channel does not change strip width or
 create an expanded strip. Monitor, meter detail, and insert-chain editing use a
@@ -361,4 +367,3 @@ Stereo width:
 - Safe mono behavior.
 
 ---
-

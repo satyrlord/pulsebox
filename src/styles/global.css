@@ -271,21 +271,6 @@ select {
   background: var(--pulse-color-scrollbar-thumb, #6d7881);
 }
 
-pulse-unsupported-size {
-  display: none;
-}
-
-@media (max-width: 1279px), (max-height: 719px) {
-  [data-pulse-editable-workspace] {
-    display: none !important;
-  }
-
-  pulse-unsupported-size {
-    display: grid;
-    height: 100%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

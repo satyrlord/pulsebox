@@ -1,0 +1,59 @@
+.fader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  /* The 24 px operable target is the surface itself plus this padding. */
+  padding-inline: 0.25rem;
+}
+
+.surface {
+  display: block;
+  cursor: ns-resize;
+  touch-action: none;
+  border-radius: var(--pulse-radius-control, 4px);
+}
+
+.surface:focus-visible {
+  outline: 2px solid var(--pulse-color-focus, #ffffff);
+  outline-offset: 2px;
+}
+
+.dragging {
+  cursor: grabbing;
+}
+
+.slot {
+  fill: var(--pulse-color-slot, #14161a);
+  stroke: var(--pulse-color-edge, #33383f);
+  stroke-width: 1;
+}
+
+.filled {
+  fill: var(--module-accent-muted, var(--pulse-color-accent-muted, #496b36));
+}
+
+.cap {
+  fill: var(--pulse-color-cap, #2b3038);
+  stroke: var(--module-control-ring, var(--pulse-color-edge, #4a515a));
+  stroke-width: 1;
+}
+
+.capLine {
+  stroke: var(--module-accent, var(--pulse-color-accent, #9be564));
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.label {
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #98a0ab);
+}
+
+.readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
+  color: var(--pulse-color-text, #e6e9ee);
+}

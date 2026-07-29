@@ -25,9 +25,7 @@ const HEX = /^#[0-9A-F]{6}$/;
 function readAccentTable(): Map<string, readonly string[]> {
   const text = readFileSync(join(process.cwd(), "docs/THEMING.md"), "utf8");
   const rows = new Map<string, readonly string[]>();
-  for (const match of text.matchAll(
-    /^\|\s*`(BASS|SIX|BOOM|NINE|SEV|FIVE)`\s*\|([^\n]+)\|\s*$/gm,
-  )) {
+  for (const match of text.matchAll(/^\|\s*`(BASS|SIX|BOOM|NINE|SEV|FIVE)`\s*\|([^\n]+)\|\s*$/gm)) {
     const key = match[1] ?? "";
     const values = (match[2] ?? "")
       .split("|")

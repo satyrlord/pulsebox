@@ -54,11 +54,7 @@ class ScalarSmoother {
     return this.#current;
   }
 
-  setTarget(
-    target: number,
-    curve: "linear" | "exponential",
-    frameCount: number,
-  ): void {
+  setTarget(target: number, curve: "linear" | "exponential", frameCount: number): void {
     if (frameCount <= 0 || Object.is(target, this.#current)) {
       this.#current = target;
       this.#start = target;
@@ -95,13 +91,9 @@ export class AcidBassDsp {
   readonly #tune = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.tune);
   readonly #cutoff = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.cutoff);
   readonly #resonance = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.resonance);
-  readonly #envelopeAmount = new ScalarSmoother(
-    DEFAULT_BASS_PARAMETERS.envelopeAmount,
-  );
+  readonly #envelopeAmount = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.envelopeAmount);
   readonly #decay = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.decay);
-  readonly #accentAmount = new ScalarSmoother(
-    DEFAULT_BASS_PARAMETERS.accentAmount,
-  );
+  readonly #accentAmount = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.accentAmount);
   readonly #waveformMix = new ScalarSmoother(0);
   readonly #glide = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.glide);
   readonly #volume = new ScalarSmoother(DEFAULT_BASS_PARAMETERS.volume);
@@ -126,25 +118,14 @@ export class AcidBassDsp {
     );
   }
 
-  setParameters(
-    update: Partial<BassParameters>,
-    mode: BassParameterUpdateMode = "smooth",
-  ): void {
+  setParameters(update: Partial<BassParameters>, mode: BassParameterUpdateMode = "smooth"): void {
     const next = Object.freeze({
       tune: clamp(update.tune ?? this.#parameters.tune, -24, 24),
       cutoff: clamp(update.cutoff ?? this.#parameters.cutoff, 40, 12_000),
       resonance: clamp(update.resonance ?? this.#parameters.resonance, 0, 0.92),
-      envelopeAmount: clamp(
-        update.envelopeAmount ?? this.#parameters.envelopeAmount,
-        0,
-        1,
-      ),
+      envelopeAmount: clamp(update.envelopeAmount ?? this.#parameters.envelopeAmount, 0, 1),
       decay: clamp(update.decay ?? this.#parameters.decay, 0.02, 2),
-      accentAmount: clamp(
-        update.accentAmount ?? this.#parameters.accentAmount,
-        0,
-        1,
-      ),
+      accentAmount: clamp(update.accentAmount ?? this.#parameters.accentAmount, 0, 1),
       waveform: update.waveform ?? this.#parameters.waveform,
       glide: clamp(update.glide ?? this.#parameters.glide, 0, 1),
       volume: clamp(update.volume ?? this.#parameters.volume, 0, 1),
@@ -167,20 +148,13 @@ export class AcidBassDsp {
       this.#accentAmount.setTarget(next.accentAmount, "linear", frames);
     }
     if (update.waveform !== undefined) {
-      this.#waveformMix.setTarget(
-        next.waveform === "square" ? 1 : 0,
-        "linear",
-        frames,
-      );
+      this.#waveformMix.setTarget(next.waveform === "square" ? 1 : 0, "linear", frames);
     }
     if (update.glide !== undefined) this.#glide.setTarget(next.glide, "linear", frames);
     if (update.volume !== undefined) this.#volume.setTarget(next.volume, "linear", frames);
     this.#parameters = next;
     if (mode === "immediate" && update.tune !== undefined) {
-      this.#targetFrequency = noteNumberToFrequency(
-        this.#currentNote,
-        this.#tune.value,
-      );
+      this.#targetFrequency = noteNumberToFrequency(this.#currentNote, this.#tune.value);
     }
   }
 
@@ -220,12 +194,7 @@ export class AcidBassDsp {
     this.#filterBand = 0;
   }
 
-  process(
-    left: Float32Array,
-    right?: Float32Array,
-    start = 0,
-    end = left.length,
-  ): void {
+  process(left: Float32Array, right?: Float32Array, start = 0, end = left.length): void {
     const frameEnd = Math.min(left.length, end);
     const releaseCoefficient = Math.exp(-1 / (0.025 * this.#sampleRate));
 
@@ -245,8 +214,7 @@ export class AcidBassDsp {
 
       this.#targetFrequency = noteNumberToFrequency(this.#currentNote, tune);
       this.#frequency =
-        this.#targetFrequency +
-        glideCoefficient * (this.#frequency - this.#targetFrequency);
+        this.#targetFrequency + glideCoefficient * (this.#frequency - this.#targetFrequency);
       this.#phase += this.#frequency / this.#sampleRate;
       this.#phase -= Math.floor(this.#phase);
 
@@ -263,18 +231,14 @@ export class AcidBassDsp {
         40,
         Math.min(12_000, this.#sampleRate * 0.42),
       );
-      const coefficient =
-        2 * Math.sin((Math.PI * modulatedCutoff) / this.#sampleRate);
+      const coefficient = 2 * Math.sin((Math.PI * modulatedCutoff) / this.#sampleRate);
       const damping = 1.7 - resonance * 1.55;
       this.#filterLow += coefficient * this.#filterBand;
       const high = oscillator - this.#filterLow - damping * this.#filterBand;
       this.#filterBand += coefficient * high;
 
       const sample = clamp(
-        this.#filterLow *
-          this.#envelope *
-          volume *
-          (0.55 + accentBoost * 0.25),
+        this.#filterLow * this.#envelope * volume * (0.55 + accentBoost * 0.25),
         -0.95,
         0.95,
       );

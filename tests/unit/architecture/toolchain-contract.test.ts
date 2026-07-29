@@ -36,18 +36,7 @@ const REQUIRED_SCRIPTS = [
   "test:e2e",
   "typecheck",
 ] as const;
-const FORBIDDEN_DEPENDENCIES = [
-  "@angular/core",
-  "lit",
-  "preact",
-  "react",
-  "react-dom",
-  "solid-js",
-  "svelte",
-  "vite-plugin-pwa",
-  "vue",
-  "workbox-core",
-] as const;
+const FORBIDDEN_DEPENDENCIES = ["vite-plugin-pwa", "workbox-core"] as const;
 
 function readPackage(): PackageDocument {
   return JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as PackageDocument;
@@ -64,7 +53,8 @@ describe("product toolchain contract", () => {
     expect(missing).toEqual([]);
 
     const html = readFileSync(resolve(ROOT, "index.html"), "utf8");
-    const moduleEntry = /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["'][^>]*>/i.exec(html)?.[1];
+    const moduleEntry =
+      /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["'][^>]*>/i.exec(html)?.[1];
     expect(moduleEntry, "index.html must load one module entry point").toBeDefined();
     expect(existsSync(resolve(ROOT, (moduleEntry ?? "").replace(/^\//, "")))).toBe(true);
   });
@@ -117,8 +107,10 @@ describe("product toolchain contract", () => {
     const projects = new Map(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );
-    expect([...projects.keys()]).toEqual(["chrome"]);
+    expect([...projects.keys()]).toEqual(["chrome", "edge", "firefox"]);
     expect(projects.get("chrome")?.use?.channel).toBe("chrome");
+    expect(projects.get("edge")?.use?.channel).toBe("msedge");
+    expect(projects.get("firefox")?.use?.channel).toBeUndefined();
   });
 
   it("keeps TypeScript strict and emission owned by the production build", () => {
@@ -143,7 +135,7 @@ describe("product toolchain contract", () => {
     expect(launcher).not.toMatch(/(?:port|PORT)\s*(?:\+\+|\+=|=\s*(?:port|PORT)\s*\+)/);
   });
 
-  it("contains no prohibited framework or PWA dependency", () => {
+  it("contains no PWA or service-worker dependency", () => {
     const packageDocument = readPackage();
     const dependencies = {
       ...packageDocument.dependencies,

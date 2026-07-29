@@ -296,5 +296,10 @@ Transient drag input does not create one history entry per pointer event.
 Pointer release commits one command unless the user deliberately creates
 multiple edits.
 
----
+This applies to every continuous control, including a native range input. Such
+an input emits a change per step of a single drag, so each change carries the
+same gesture identifier and the movement collapses into one history entry. A
+numeric field that is typed rather than dragged commits on Enter or blur, so a
+multi-digit value is one entry rather than one per keystroke.
 
+---

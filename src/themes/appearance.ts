@@ -6,10 +6,7 @@
  * project command or enters undo history.
  */
 
-import {
-  isCanonicalUserTheme,
-  type CanonicalUserTheme,
-} from "./user-theme";
+import { isCanonicalUserTheme, type CanonicalUserTheme } from "./user-theme";
 import {
   BUILT_IN_PALETTES,
   HIGH_CONTRAST_OVERLAY,
@@ -87,8 +84,9 @@ export function serializeAppearance(appearance: PulseAppearance): string {
 
 /** Resolves the palette actually shown for an appearance selection. */
 export function resolvePalette(appearance: PulseAppearance): PulsePalette {
-  const base = appearance.theme === "user" && appearance.userTheme !== null
-    ? appearance.userTheme.tokens
-    : BUILT_IN_PALETTES[appearance.theme === "user" ? "rack" : appearance.theme];
+  const base =
+    appearance.theme === "user" && appearance.userTheme !== null
+      ? appearance.userTheme.tokens
+      : BUILT_IN_PALETTES[appearance.theme === "user" ? "rack" : appearance.theme];
   return appearance.highContrast ? { ...base, ...HIGH_CONTRAST_OVERLAY } : base;
 }

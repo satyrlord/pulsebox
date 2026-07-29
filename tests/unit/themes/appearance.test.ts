@@ -106,7 +106,11 @@ describe("palette resolution", () => {
   it("layers high contrast over an installed user theme", () => {
     const theme = importUserTheme(validUserThemeSource()).theme;
     expect(theme).toBeDefined();
-    const resolved = resolvePalette({ theme: "user", highContrast: true, userTheme: theme ?? null });
+    const resolved = resolvePalette({
+      theme: "user",
+      highContrast: true,
+      userTheme: theme ?? null,
+    });
     expect(resolved["--pulse-color-app"]).toBe(HIGH_CONTRAST_OVERLAY["--pulse-color-app"]);
   });
 });
@@ -120,7 +124,9 @@ describe("theme service", () => {
     host = new RecordingHost();
   });
 
-  function createService(overrides: Partial<ConstructorParameters<typeof PulseThemeService>[0]> = {}) {
+  function createService(
+    overrides: Partial<ConstructorParameters<typeof PulseThemeService>[0]> = {},
+  ) {
     return new PulseThemeService({ host, storage, ...overrides });
   }
 
@@ -234,9 +240,7 @@ describe("theme service", () => {
     service.setHighContrast(true);
     // A stylesheet rule cannot outrank the inline user palette, so the overlay
     // has to be resolved before paint.
-    expect(host.tokens.get("--pulse-color-app")).toBe(
-      HIGH_CONTRAST_OVERLAY["--pulse-color-app"],
-    );
+    expect(host.tokens.get("--pulse-color-app")).toBe(HIGH_CONTRAST_OVERLAY["--pulse-color-app"]);
     expect(host.tokens.get("--pulse-color-accent")).toBe(
       HIGH_CONTRAST_OVERLAY["--pulse-color-accent"],
     );

@@ -11,16 +11,11 @@ export function validationSuccess<T>(value: T): ValidationResult<T> {
   return { ok: true, value };
 }
 
-export function validationFailure(
-  path: string,
-  message: string,
-): ValidationResult<never> {
+export function validationFailure(path: string, message: string): ValidationResult<never> {
   return { ok: false, issues: [{ path, message }] };
 }
 
-export function isPlainRecord(
-  value: unknown,
-): value is Readonly<Record<string, unknown>> {
+export function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }

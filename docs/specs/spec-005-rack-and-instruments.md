@@ -23,7 +23,7 @@ Transport and timing:
 - Time signature: 4/4.
 - Pattern length: 16 steps.
 - Grid: 1/16.
-- Swing: 54%.
+- Swing: 54%, global to the project.
 - Humanize: 12%.
 - Quantize strength: 100%.
 - Transport: stopped.
@@ -510,4 +510,3 @@ Compact controls:
 The built-in lo-fi stage starts enabled and can be disabled.
 
 ---
-

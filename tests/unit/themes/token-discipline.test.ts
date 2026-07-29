@@ -58,10 +58,7 @@ const FOUNDATION_TOKENS = new Set([
   "--pulse-operational-outline",
 ]);
 
-const PALETTE_TOKENS = new Set<string>([
-  ...REQUIRED_PALETTE_TOKENS,
-  ...OPTIONAL_PALETTE_TOKENS,
-]);
+const PALETTE_TOKENS = new Set<string>([...REQUIRED_PALETTE_TOKENS, ...OPTIONAL_PALETTE_TOKENS]);
 
 const MODULE_TOKENS = new Set([
   "--module-accent",
@@ -71,10 +68,10 @@ const MODULE_TOKENS = new Set([
 ]);
 
 function readShippedStyleText(): { path: string; text: string }[] {
-  const files = [
-    "src/styles/global.css",
-    "src/themes/themes.css",
-  ].map((path) => ({ path, text: readFileSync(join(process.cwd(), path), "utf8") }));
+  const files = ["src/styles/global.css", "src/themes/themes.css"].map((path) => ({
+    path,
+    text: readFileSync(join(process.cwd(), path), "utf8"),
+  }));
   for (const unit of readCurrentSourceUnits()) {
     if (unit.path.startsWith("src/") && unit.path.endsWith(".ts")) {
       files.push({ path: unit.path, text: unit.source });
@@ -88,7 +85,6 @@ function referencedTokens(text: string): readonly string[] {
   return matches.map((match) => match[1] ?? "");
 }
 
-
 describe("token discipline", () => {
   const files = readShippedStyleText();
 
@@ -96,11 +92,7 @@ describe("token discipline", () => {
     const unknown: string[] = [];
     for (const file of files) {
       for (const token of referencedTokens(file.text)) {
-        if (
-          PALETTE_TOKENS.has(token) ||
-          FOUNDATION_TOKENS.has(token) ||
-          MODULE_TOKENS.has(token)
-        ) {
+        if (PALETTE_TOKENS.has(token) || FOUNDATION_TOKENS.has(token) || MODULE_TOKENS.has(token)) {
           continue;
         }
         // Section 3 allows a component private property, but only one that does

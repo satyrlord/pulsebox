@@ -1,0 +1,22 @@
+.indicator {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1px;
+  width: min(10rem, 28cqi);
+  min-width: 4rem;
+  padding: 1px 0;
+}
+
+.cell {
+  height: 0.35rem;
+  background: var(--pulse-color-control-edge, #37373d);
+}
+
+.current {
+  background: var(--module-accent-muted, var(--pulse-color-accent-muted, #496b36));
+}
+
+.producing {
+  background: var(--module-accent, var(--pulse-color-accent, #9be564));
+}

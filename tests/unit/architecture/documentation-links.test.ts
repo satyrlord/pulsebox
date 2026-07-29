@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const DOCUMENTATION_ROOTS = ["README.md", "AGENTS.md", "docs", ".github/skills"] as const;
-const INLINE_LINK = /!?\[[^\]\r\n]*\]\(\s*(?:<([^>\r\n]+)>|([^\s)]+))(?:\s+(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^\r\n)]*\)))?\s*\)/gu;
+const INLINE_LINK =
+  /!?\[[^\]\r\n]*\]\(\s*(?:<([^>\r\n]+)>|([^\s)]+))(?:\s+(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^\r\n)]*\)))?\s*\)/gu;
 const REFERENCE_LINK = /^\s{0,3}\[[^\]\r\n]+\]:\s*(?:<([^>\r\n]+)>|(\S+))/gmu;
 
 function collectMarkdownFiles(path: string): readonly string[] {
@@ -68,9 +69,10 @@ describe("documentation links", () => {
           ? resolve(ROOT, path.slice(1))
           : resolve(dirname(sourcePath), path);
         const repositoryPath = relative(ROOT, targetPath);
-        const escapesRepository = repositoryPath === ".."
-          || repositoryPath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)
-          || isAbsolute(repositoryPath);
+        const escapesRepository =
+          repositoryPath === ".." ||
+          repositoryPath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
+          isAbsolute(repositoryPath);
         if (escapesRepository || !existsSync(targetPath)) {
           broken.push(`${relative(ROOT, sourcePath)} -> ${target}`);
         }

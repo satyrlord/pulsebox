@@ -29,7 +29,9 @@ const server = createServer((request, response) => {
 
   let requestPath;
   try {
-    requestPath = decodeURIComponent(new URL(request.url ?? "/", `http://${host}:${String(port)}`).pathname);
+    requestPath = decodeURIComponent(
+      new URL(request.url ?? "/", `http://${host}:${String(port)}`).pathname,
+    );
   } catch {
     response.writeHead(400);
     response.end("Invalid path");
@@ -63,7 +65,9 @@ const server = createServer((request, response) => {
 
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
-    console.error(`Pulsebox cannot start because http://${host}:${String(port)} is already in use.`);
+    console.error(
+      `Pulsebox cannot start because http://${host}:${String(port)} is already in use.`,
+    );
     process.exitCode = 1;
     return;
   }

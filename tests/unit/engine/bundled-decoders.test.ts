@@ -22,7 +22,9 @@ function createMonoWav(samples: readonly number[], sampleRate = 8000): ArrayBuff
   view.setUint16(34, 16, true);
   writeAscii(view, 36, "data");
   view.setUint32(40, samples.length * 2, true);
-  samples.forEach((sample, index) => view.setInt16(44 + index * 2, Math.round(sample * 32767), true));
+  samples.forEach((sample, index) =>
+    view.setInt16(44 + index * 2, Math.round(sample * 32767), true),
+  );
   return buffer;
 }
 
@@ -44,17 +46,18 @@ function createExtensibleWav(subformat: 1 | 3, canonicalGuid = true): ArrayBuffe
   view.setUint16(38, bytesPerSample * 8, true);
   view.setUint32(40, 4, true);
   view.setUint32(44, subformat, true);
-  new Uint8Array(buffer).set([
-    0x00, 0x00, 0x10, 0x00, 0x80, 0x00,
-    0x00, 0xaa, 0x00, 0x38, 0x9b, canonicalGuid ? 0x71 : 0x70,
-  ], 48);
+  new Uint8Array(buffer).set(
+    [0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, canonicalGuid ? 0x71 : 0x70],
+    48,
+  );
   writeAscii(view, 60, "data");
   view.setUint32(64, bytesPerSample, true);
   return buffer;
 }
 
 function writeAscii(view: DataView, offset: number, value: string): void {
-  for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index));
+  for (let index = 0; index < value.length; index += 1)
+    view.setUint8(offset + index, value.charCodeAt(index));
 }
 
 function createFlacStreamInfo(
@@ -129,34 +132,34 @@ describe("bundled audio decoders", () => {
   });
 
   it("accepts only canonical PCM and float WAVE extensible subformat GUIDs", () => {
-    expect(preflightBundledAudio(createExtensibleWav(1))).toMatchObject({ codec: "wav", frames: 1 });
-    expect(preflightBundledAudio(createExtensibleWav(3))).toMatchObject({ codec: "wav", frames: 1 });
+    expect(preflightBundledAudio(createExtensibleWav(1))).toMatchObject({
+      codec: "wav",
+      frames: 1,
+    });
+    expect(preflightBundledAudio(createExtensibleWav(3))).toMatchObject({
+      codec: "wav",
+      frames: 1,
+    });
     expect(() => preflightBundledAudio(createExtensibleWav(1, false))).toThrow(
       /Unsupported WAVE extensible subformat/,
     );
   });
 
   it("rejects compressed AIFC before invoking a bundled decoder", () => {
-    expect(() => preflightBundledAudio(createCompressedAifc())).toThrow(
-      /Unsupported AIFC codec/,
-    );
+    expect(() => preflightBundledAudio(createCompressedAifc())).toThrow(/Unsupported AIFC codec/);
   });
 
   it("preflights FLAC STREAMINFO and rejects declared decompression excess", () => {
-    expect(
-      preflightBundledAudio(createFlacStreamInfo(48_000, 2, 24, 48_000n)),
-    ).toEqual({
+    expect(preflightBundledAudio(createFlacStreamInfo(48_000, 2, 24, 48_000n))).toEqual({
       codec: "flac",
       channels: 2,
       sampleRate: 48_000,
       frames: 48_000,
       decodedBytes: 384_000,
     });
-    expect(() =>
-      preflightBundledAudio(
-        createFlacStreamInfo(8_000, 2, 24, 0xfffffffffn),
-      ),
-    ).toThrow(/decoded-memory limit/);
+    expect(() => preflightBundledAudio(createFlacStreamInfo(8_000, 2, 24, 0xfffffffffn))).toThrow(
+      /decoded-memory limit/,
+    );
   });
 
   it("rejects inconsistent declared container lengths before decoding", () => {
@@ -166,7 +169,11 @@ describe("bundled audio decoders", () => {
   });
 
   it("rejects empty and oversize inputs before decoding", async () => {
-    await expect(decodeBundledAudio(new ArrayBuffer(0))).rejects.toThrow(/between 1 byte and 32 MiB/);
-    await expect(decodeBundledAudio(new ArrayBuffer(32 * 1024 * 1024 + 1))).rejects.toThrow(/32 MiB/);
+    await expect(decodeBundledAudio(new ArrayBuffer(0))).rejects.toThrow(
+      /between 1 byte and 32 MiB/,
+    );
+    await expect(decodeBundledAudio(new ArrayBuffer(32 * 1024 * 1024 + 1))).rejects.toThrow(
+      /32 MiB/,
+    );
   });
 });

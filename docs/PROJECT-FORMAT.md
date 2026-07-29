@@ -227,7 +227,14 @@ lineageId           UUID
 revisionEpoch       UUID
 revision            integer from 0 through 9007199254740991
 pinned              boolean
+tempo               number from 40 through 240 BPM
+swing               number from 0 through 100 percent
 ```
+
+`tempo` and `swing` are global transport properties. In the MVP a project holds
+exactly one Swing value that applies to every Pattern and every module. A
+post-MVP per-Pattern Swing override would be added to the `Pattern` record, and
+this field would remain the project default.
 
 `revisionEpoch` and `revision` form one revision token. Export changes neither
 the token nor `modifiedAt`. A successful save advances the token once and writes
@@ -311,7 +318,7 @@ reports every over-cap slot before applying any state.
 
 The root `patterns` array contains 1 through 32 project-wide `Pattern` records.
 A Pattern contains a stable UUID, unique user-visible name, color, positive
-duration in bars, Swing from 0 through 100 percent, Humanize from 0 through 100
+duration in bars, Humanize from 0 through 100
 percent, unsigned 32-bit seed, creation and modification timestamps, referenced
 automation lane IDs, and at most one `PatternPart` per occupied module ID. A
 PatternPart contains the module ID, a nominal step count from 1 through 64,

@@ -1,0 +1,85 @@
+.knob {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  /* The interaction is vertical drag, so the browser must not claim the pointer. */
+  touch-action: none;
+  cursor: ns-resize;
+}
+
+.knob:focus-visible {
+  outline: none;
+}
+
+.dial {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.track {
+  fill: none;
+  stroke: var(--pulse-color-control-track, #2b2b2f);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.fill {
+  fill: none;
+  stroke: var(--module-control-ring, var(--pulse-color-accent, #9be564));
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.cap {
+  fill: var(--pulse-color-control-cap, #17171a);
+  stroke: var(--pulse-color-control-edge, #37373d);
+  stroke-width: 1;
+}
+
+.pointer {
+  stroke: var(--module-led, var(--pulse-color-accent, #b8ff7a));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.knob:focus-visible .cap {
+  stroke: var(--pulse-color-focus-inner, #ffffff);
+  stroke-width: 2;
+}
+
+.label {
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #9a9aa2);
+}
+
+.readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
+  color: var(--pulse-color-text, #e6e6ea);
+}
+
+.numeric {
+  width: 4rem;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--pulse-color-text, #e6e6ea);
+  background: var(--pulse-color-field, #101013);
+  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  border-radius: 0.125rem;
+}
+
+.dragging .cap {
+  stroke: var(--module-accent, var(--pulse-color-accent, #9be564));
+}

@@ -1,0 +1,121 @@
+import type { GestureId } from "../../../contracts";
+import { cx } from "../class-names";
+import { useRangeGesture } from "./use-range-gesture";
+import styles from "./Fader.module.css";
+
+export interface FaderProps {
+  readonly label: string;
+  readonly value: number;
+  readonly min: number;
+  readonly max: number;
+  readonly step: number;
+  readonly defaultValue: number;
+  readonly unit?: string;
+  readonly precision?: number;
+  readonly onInput?: (value: number) => void;
+  readonly onCommit: (value: number, gestureId: GestureId) => void;
+}
+
+const TRACK_HEIGHT = 120;
+const CAP_HEIGHT = 18;
+
+/**
+ * A vertical fader. Shares the whole gesture contract with the knob — drag,
+ * wheel, arrows, Home/End, double-click reset, Escape cancel, and one commit per
+ * gesture — so both controls produce exactly one undo entry per movement.
+ */
+export function Fader({
+  label,
+  value,
+  min,
+  max,
+  step,
+  defaultValue,
+  unit,
+  precision = 2,
+  onInput,
+  onCommit,
+}: FaderProps) {
+  const {
+    displayValue,
+    dragging,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onKeyDown,
+    onKeyUp,
+    onBlur,
+    onDoubleClick,
+    wheelRef,
+  } = useRangeGesture({
+    value,
+    min,
+    max,
+    step,
+    defaultValue,
+    onInput: onInput ?? (() => undefined),
+    onCommit,
+    dragRange: TRACK_HEIGHT,
+  });
+
+  const fraction = max === min ? 0 : (displayValue - min) / (max - min);
+  const travel = TRACK_HEIGHT - CAP_HEIGHT;
+  const capY = travel - fraction * travel;
+  const text = `${displayValue.toFixed(precision)}${unit === undefined ? "" : ` ${unit}`}`;
+
+  return (
+    <div className={styles.fader} data-component="fader">
+      <div
+        ref={wheelRef}
+        className={cx(styles.surface, dragging && styles.dragging)}
+        role="slider"
+        tabIndex={0}
+        aria-label={label}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={displayValue}
+        aria-valuetext={text}
+        aria-orientation="vertical"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
+        onBlur={onBlur}
+        onDoubleClick={onDoubleClick}
+      >
+        <svg
+          viewBox={`0 0 32 ${String(TRACK_HEIGHT)}`}
+          width={32}
+          height={TRACK_HEIGHT}
+          aria-hidden="true"
+          focusable="false"
+        >
+          <rect className={styles.slot} x={14} y={2} width={4} height={TRACK_HEIGHT - 4} rx={2} />
+          <rect
+            className={styles.filled}
+            x={14}
+            y={capY + CAP_HEIGHT / 2}
+            width={4}
+            height={Math.max(0, TRACK_HEIGHT - 2 - (capY + CAP_HEIGHT / 2))}
+            rx={2}
+          />
+          <g transform={`translate(0 ${String(capY)})`}>
+            <rect className={styles.cap} x={4} y={0} width={24} height={CAP_HEIGHT} rx={3} />
+            <line
+              className={styles.capLine}
+              x1={7}
+              y1={CAP_HEIGHT / 2}
+              x2={25}
+              y2={CAP_HEIGHT / 2}
+            />
+          </g>
+        </svg>
+      </div>
+      <span className={styles.label}>{label}</span>
+      <output className={styles.readout}>{text}</output>
+    </div>
+  );
+}

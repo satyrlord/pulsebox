@@ -34,6 +34,46 @@ function deterministicIds(): IdFactory {
 }
 
 describe("PulseStore", () => {
+  it("adds the selected registered plugin and duplicates its complete state", () => {
+    const ids = deterministicIds();
+    const drumSeed = {
+      pluginId: "drumline-six" as PluginId,
+      parameters: { tone: 0.45, drive: 0.2 },
+      steps: seed.steps.map((step, index) => ({ ...step, note: 36 + (index % 6) })),
+    };
+    const seeds = new Map<PluginId, typeof seed | typeof drumSeed>([
+      [seed.pluginId, seed],
+      [drumSeed.pluginId, drumSeed],
+    ]);
+    const store = new PulseStore(createDefaultState(ids, seed), ids, (pluginId) =>
+      seeds.get(pluginId),
+    );
+    const secondSlot = required(store.getState().project.rackSlots[1]);
+
+    expect(
+      store.dispatch(
+        store.createCommand("rack-module-add", {
+          slotId: secondSlot.id,
+          pluginId: drumSeed.pluginId,
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    const drumId = required(store.getState().project.rackSlots[1]?.moduleId);
+    const drum = required(store.getState().project.modules[drumId]);
+    expect(drum).toMatchObject({ pluginId: drumSeed.pluginId, parameters: drumSeed.parameters });
+
+    const thirdSlot = required(store.getState().project.rackSlots[2]);
+    store.dispatch(
+      store.createCommand("rack-module-duplicate", { moduleId: drumId, slotId: thirdSlot.id }),
+    );
+    const duplicateId = required(store.getState().project.rackSlots[2]?.moduleId);
+    const duplicate = required(store.getState().project.modules[duplicateId]);
+    expect(duplicateId).not.toBe(drumId);
+    expect(duplicate.pluginId).toBe(drumSeed.pluginId);
+    expect(duplicate.parameters).toEqual(drum.parameters);
+    expect(duplicate.parts).toEqual(drum.parts);
+  });
+
   it("supports project load, save, export, and import lifecycle operations", () => {
     const ids = deterministicIds();
     const store = createStore(ids);
@@ -47,14 +87,11 @@ describe("PulseStore", () => {
     expect(reloaded).toMatchObject({ status: "accepted", changed: true });
     expect(store.getState().project.name).toBe("Imported project");
 
-    const exported = store.exportProject();
-    expect(JSON.parse(exported)).toMatchObject({ name: "Imported project" });
-
-    const importedSnapshot = JSON.parse(exported) as { name: string };
-    importedSnapshot.name = "Imported from export";
-    const imported = store.importProject(JSON.stringify(importedSnapshot));
-    expect(imported).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.name).toBe("Imported from export");
+    // Serialization belongs to `src/state/persistence`, which validates a
+    // document before any of it reaches the store. The store deliberately has no
+    // raw-JSON import of its own for untrusted data to arrive through.
+    expect("importProject" in store).toBe(false);
+    expect("exportProject" in store).toBe(false);
   });
 
   it("applies one atomic parameter command and supports undo and redo", () => {
@@ -65,7 +102,11 @@ describe("PulseStore", () => {
     const original = required(
       required(store.getState().project.modules[moduleId]).parameters.cutoff,
     );
-    const command = store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 1200 });
+    const command = store.createCommand("rack-parameter-set", {
+      moduleId,
+      parameter: "cutoff",
+      value: 1200,
+    });
     expect(store.dispatch(command)).toMatchObject({ status: "accepted", changed: true });
     const afterEdit = store.getState().project.revision.counter;
     expect(required(store.getState().project.modules[moduleId]).parameters.cutoff).toBe(1200);
@@ -87,12 +128,16 @@ describe("PulseStore", () => {
     const store = createStore(ids, deltas);
 
     expect(store.getState().project.tempo).toBe(130);
-    expect(store.dispatch(store.createCommand("transport-tempo-set", { tempo: 146 }))).toMatchObject({
+    expect(
+      store.dispatch(store.createCommand("transport-tempo-set", { tempo: 146 })),
+    ).toMatchObject({
       status: "accepted",
       changed: true,
     });
     expect(store.getState().project.tempo).toBe(146);
-    expect(deltas).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "transport", payload: { tempo: 146 } }));
+    expect(deltas).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "transport", payload: { tempo: 146 } }),
+    );
 
     expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
     expect(store.getState().project.tempo).toBe(130);
@@ -107,8 +152,20 @@ describe("PulseStore", () => {
     const original = required(store.getState().project.modules[moduleId]).parameters.cutoff;
     const gestureId = createGestureId(ids);
 
-    store.dispatch(store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 900 }, { gestureId }));
-    store.dispatch(store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 1200 }, { gestureId }));
+    store.dispatch(
+      store.createCommand(
+        "rack-parameter-set",
+        { moduleId, parameter: "cutoff", value: 900 },
+        { gestureId },
+      ),
+    );
+    store.dispatch(
+      store.createCommand(
+        "rack-parameter-set",
+        { moduleId, parameter: "cutoff", value: 1200 },
+        { gestureId },
+      ),
+    );
     expect(required(store.getState().project.modules[moduleId]).parameters.cutoff).toBe(1200);
 
     expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
@@ -127,8 +184,20 @@ describe("PulseStore", () => {
     );
     const gestureId = createGestureId(ids);
 
-    store.dispatch(store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 900 }, { gestureId }));
-    store.dispatch(store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: original }, { gestureId }));
+    store.dispatch(
+      store.createCommand(
+        "rack-parameter-set",
+        { moduleId, parameter: "cutoff", value: 900 },
+        { gestureId },
+      ),
+    );
+    store.dispatch(
+      store.createCommand(
+        "rack-parameter-set",
+        { moduleId, parameter: "cutoff", value: original },
+        { gestureId },
+      ),
+    );
 
     expect(store.getState().history).toEqual({ canUndo: false, canRedo: false });
     expect(store.undo()).toMatchObject({ status: "accepted", changed: false });
@@ -141,11 +210,18 @@ describe("PulseStore", () => {
       ...seed,
       parameters: { payload: "x".repeat(9 * 1024 * 1024) },
     };
-    const store = new PulseStore(createDefaultState(ids, oversizedSeed), ids, oversizedSeed, deltas);
+    const store = new PulseStore(
+      createDefaultState(ids, oversizedSeed),
+      ids,
+      oversizedSeed,
+      deltas,
+    );
     const moduleId = required(store.getState().ui.selectedModuleId);
     const snapshot = store.getState();
 
-    expect(store.dispatch(store.createCommand("pattern-step-toggle", { moduleId, step: 0 }))).toMatchObject({
+    expect(
+      store.dispatch(store.createCommand("pattern-step-toggle", { moduleId, step: 0 })),
+    ).toMatchObject({
       status: "rejected",
       error: { field: "history" },
     });
@@ -158,13 +234,23 @@ describe("PulseStore", () => {
     const ids = deterministicIds();
     const store = createStore(ids);
     const moduleId = required(store.getState().ui.selectedModuleId);
-    const command = store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 1200 });
+    const command = store.createCommand("rack-parameter-set", {
+      moduleId,
+      parameter: "cutoff",
+      value: 1200,
+    });
     expect(store.dispatch(command).status).toBe("accepted");
     const snapshot = store.getState();
-    expect(store.dispatch(command)).toMatchObject({ status: "rejected", error: { field: "expectedProjectRevision" } });
+    expect(store.dispatch(command)).toMatchObject({
+      status: "rejected",
+      error: { field: "expectedProjectRevision" },
+    });
     expect(store.getState()).toBe(snapshot);
     const invalid = store.createCommand("transport-tempo-set", { tempo: 999 });
-    expect(store.dispatch(invalid)).toMatchObject({ status: "rejected", error: { field: "payload.tempo" } });
+    expect(store.dispatch(invalid)).toMatchObject({
+      status: "rejected",
+      error: { field: "payload.tempo" },
+    });
     expect(store.getState()).toBe(snapshot);
   });
 
@@ -174,7 +260,9 @@ describe("PulseStore", () => {
     const listener = vi.fn();
     store.subscribe((state) => state.project.tempo, listener);
     const moduleId = required(store.getState().ui.selectedModuleId);
-    store.dispatch(store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 900 }));
+    store.dispatch(
+      store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 900 }),
+    );
     expect(listener).not.toHaveBeenCalled();
     store.dispatch(store.createCommand("transport-tempo-set", { tempo: 132 }));
     expect(listener).toHaveBeenCalledWith(132, 130);
@@ -207,7 +295,11 @@ describe("PulseStore", () => {
     const moduleId = required(store.getState().ui.selectedModuleId);
     const previousEpoch = store.getState().project.revision.epoch;
 
-    expect(store.dispatch(store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 900 }))).toMatchObject({
+    expect(
+      store.dispatch(
+        store.createCommand("rack-parameter-set", { moduleId, parameter: "cutoff", value: 900 }),
+      ),
+    ).toMatchObject({
       status: "accepted",
       changed: true,
     });
@@ -220,7 +312,9 @@ describe("PulseStore", () => {
     const store = createStore(ids);
     const moduleId = required(store.getState().ui.selectedModuleId);
     const revision = store.getState().project.revision;
-    expect(store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId }))).toMatchObject({ status: "accepted" });
+    expect(
+      store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId })),
+    ).toMatchObject({ status: "accepted" });
     expect(store.getState().project.revision).toBe(revision);
     expect(store.getState().ui.collapsedModuleIds.has(moduleId)).toBe(true);
     expect(store.undo()).toMatchObject({ status: "accepted", changed: false });
@@ -231,9 +325,7 @@ describe("PulseStore", () => {
     const store = createStore(ids);
     const moduleId = required(store.getState().ui.selectedModuleId);
 
-    store.dispatch(
-      store.createCommand("rack-module-collapse-toggle", { moduleId }),
-    );
+    store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId }));
     expect(store.getState().ui.collapsedModuleIds.has(moduleId)).toBe(true);
 
     store.dispatch(store.createCommand("rack-module-remove", { moduleId }));
@@ -249,7 +341,9 @@ describe("PulseStore", () => {
     const store = createStore(ids);
     const targetSlot = required(store.getState().project.rackSlots[1]);
 
-    store.dispatch(store.createCommand("rack-module-add", { slotId: targetSlot.id }));
+    store.dispatch(
+      store.createCommand("rack-module-add", { slotId: targetSlot.id, pluginId: seed.pluginId }),
+    );
     const addedModuleId = required(store.getState().project.rackSlots[1]?.moduleId);
     store.dispatch(store.createCommand("rack-module-select", { moduleId: addedModuleId }));
     store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId: addedModuleId }));

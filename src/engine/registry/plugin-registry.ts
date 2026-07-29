@@ -1,8 +1,5 @@
 import type { PluginId } from "../../contracts/parameters";
-import {
-  validatePluginManifest,
-  type PluginManifest,
-} from "../../contracts/plugins";
+import { validatePluginManifest, type PluginManifest } from "../../contracts/plugins";
 import type { ValidationIssue } from "../../contracts/validation";
 
 export interface PluginRegistryEntry<Factory> {

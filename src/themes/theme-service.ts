@@ -14,11 +14,7 @@ import {
   serializeAppearance,
   type PulseAppearance,
 } from "./appearance";
-import {
-  OPTIONAL_PALETTE_TOKENS,
-  REQUIRED_PALETTE_TOKENS,
-  type PaletteToken,
-} from "./tokens";
+import { OPTIONAL_PALETTE_TOKENS, REQUIRED_PALETTE_TOKENS, type PaletteToken } from "./tokens";
 import type { CanonicalUserTheme } from "./user-theme";
 
 const ALL_TOKENS: readonly PaletteToken[] = [

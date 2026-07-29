@@ -24,11 +24,7 @@ const MAX_DECODED_BYTES = 256 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 1800;
 
 export function identifyCodec(bytes: Uint8Array): SupportedCodec {
-  if (
-    bytes.length >= 12 &&
-    ascii(bytes, 0, 4) === "RIFF" &&
-    ascii(bytes, 8, 12) === "WAVE"
-  ) {
+  if (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WAVE") {
     return "wav";
   }
   if (
@@ -61,11 +57,7 @@ export async function decodeBundledAudio(source: ArrayBuffer): Promise<DecodedAu
     : preflight.codec === "aiff"
       ? decodeAiff(bytes)
       : decodeFlac(bytes));
-  return validateDecoded(
-    preflight,
-    decoded.channelData,
-    decoded.sampleRate,
-  );
+  return validateDecoded(preflight, decoded.channelData, decoded.sampleRate);
 }
 
 function preflightWav(bytes: Uint8Array): AudioDecodePreflight {
@@ -74,7 +66,7 @@ function preflightWav(bytes: Uint8Array): AudioDecodePreflight {
   let formatOffset: number | undefined;
   let formatLength = 0;
   let dataLength: number | undefined;
-  for (let offset = 12; offset < formEnd; ) {
+  for (let offset = 12; offset < formEnd;) {
     requireAvailable(offset, 8, formEnd, "WAV chunk header");
     const length = view.getUint32(offset + 4, true);
     const dataOffset = offset + 8;
@@ -97,17 +89,11 @@ function preflightWav(bytes: Uint8Array): AudioDecodePreflight {
   const bitsPerSample = view.getUint16(formatOffset + 14, true);
   let formatTag = view.getUint16(formatOffset, true);
   if (formatTag === 0xfffe) {
-    if (
-      formatLength < 40 ||
-      view.getUint16(formatOffset + 16, true) < 22
-    ) {
+    if (formatLength < 40 || view.getUint16(formatOffset + 16, true) < 22) {
       throw new Error("WAVE extensible fmt data is truncated.");
     }
     const subformatTag = view.getUint32(formatOffset + 24, true);
-    const canonicalTail = [
-      0x00, 0x00, 0x10, 0x00, 0x80, 0x00,
-      0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71,
-    ];
+    const canonicalTail = [0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71];
     const hasCanonicalTail = canonicalTail.every(
       (value, index) => view.getUint8(formatOffset + 28 + index) === value,
     );
@@ -120,16 +106,10 @@ function preflightWav(bytes: Uint8Array): AudioDecodePreflight {
   }
   const validPcm =
     formatTag === 1 &&
-    (bitsPerSample === 8 ||
-      bitsPerSample === 16 ||
-      bitsPerSample === 24 ||
-      bitsPerSample === 32);
-  const validFloat =
-    formatTag === 3 && (bitsPerSample === 32 || bitsPerSample === 64);
+    (bitsPerSample === 8 || bitsPerSample === 16 || bitsPerSample === 24 || bitsPerSample === 32);
+  const validFloat = formatTag === 3 && (bitsPerSample === 32 || bitsPerSample === 64);
   if (!validPcm && !validFloat) {
-    throw new Error(
-      "Unsupported WAV codec. Choose PCM integer or IEEE floating-point WAV audio.",
-    );
+    throw new Error("Unsupported WAV codec. Choose PCM integer or IEEE floating-point WAV audio.");
   }
   const expectedBlockAlign = channels * (bitsPerSample / 8);
   if (
@@ -150,7 +130,7 @@ function preflightAiff(bytes: Uint8Array): AudioDecodePreflight {
   let commonOffset: number | undefined;
   let commonLength = 0;
   let soundBytes: number | undefined;
-  for (let offset = 12; offset < formEnd; ) {
+  for (let offset = 12; offset < formEnd;) {
     requireAvailable(offset, 8, formEnd, "AIFF chunk header");
     const length = view.getUint32(offset + 4, false);
     const dataOffset = offset + 8;
@@ -176,21 +156,14 @@ function preflightAiff(bytes: Uint8Array): AudioDecodePreflight {
   const frames = view.getUint32(commonOffset + 2, false);
   const bitsPerSample = view.getUint16(commonOffset + 6, false);
   const sampleRate = readSampleRate(readExtended80(bytes, commonOffset + 8));
-  if (
-    bitsPerSample !== 8 &&
-    bitsPerSample !== 16 &&
-    bitsPerSample !== 24 &&
-    bitsPerSample !== 32
-  ) {
+  if (bitsPerSample !== 8 && bitsPerSample !== 16 && bitsPerSample !== 24 && bitsPerSample !== 32) {
     throw new Error("Unsupported AIFF bit depth. Choose 8, 16, 24, or 32-bit PCM.");
   }
   if (formType === "AIFC") {
     if (commonLength < 22) throw new Error("AIFC compression data is truncated.");
     const compression = ascii(bytes, commonOffset + 18, commonOffset + 22);
     if (compression !== "NONE" && compression !== "twos" && compression !== "sowt") {
-      throw new Error(
-        "Unsupported AIFC codec. Choose uncompressed PCM AIFF or AIFC audio.",
-      );
+      throw new Error("Unsupported AIFC codec. Choose uncompressed PCM AIFF or AIFC audio.");
     }
   }
   const bytesPerFrame = channels * Math.ceil(bitsPerSample / 8);
@@ -203,8 +176,7 @@ function preflightAiff(bytes: Uint8Array): AudioDecodePreflight {
 function preflightFlac(bytes: Uint8Array): AudioDecodePreflight {
   if (bytes.length < 42) throw new Error("FLAC STREAMINFO metadata is truncated.");
   const metadataType = (bytes[4] ?? 0) & 0x7f;
-  const metadataLength =
-    ((bytes[5] ?? 0) << 16) | ((bytes[6] ?? 0) << 8) | (bytes[7] ?? 0);
+  const metadataLength = ((bytes[5] ?? 0) << 16) | ((bytes[6] ?? 0) << 8) | (bytes[7] ?? 0);
   if (metadataType !== 0 || metadataLength !== 34) {
     throw new Error("FLAC must begin with one complete STREAMINFO block.");
   }
@@ -222,12 +194,7 @@ function preflightFlac(bytes: Uint8Array): AudioDecodePreflight {
   if (framesBig === 0n || framesBig > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new Error("FLAC requires a bounded non-zero total sample count.");
   }
-  return createPreflight(
-    "flac",
-    channels,
-    sampleRate,
-    Number(framesBig),
-  );
+  return createPreflight("flac", channels, sampleRate, Number(framesBig));
 }
 
 function createPreflight(
@@ -245,9 +212,7 @@ function createPreflight(
     decodedBytes > MAX_DECODED_BYTES ||
     frames / sampleRate > MAX_DURATION_SECONDS
   ) {
-    throw new RangeError(
-      "Declared audio exceeds the project duration or decoded-memory limit.",
-    );
+    throw new RangeError("Declared audio exceeds the project duration or decoded-memory limit.");
   }
   return Object.freeze({ codec, channels, sampleRate, frames, decodedBytes });
 }
@@ -262,9 +227,7 @@ function validateDecoded(
     channels.length !== preflight.channels ||
     channels.some((channel) => channel.length !== preflight.frames)
   ) {
-    throw new RangeError(
-      "Decoded audio metadata does not match the validated container headers.",
-    );
+    throw new RangeError("Decoded audio metadata does not match the validated container headers.");
   }
   for (const channel of channels) {
     for (const sample of channel) {
@@ -293,19 +256,9 @@ function checkedContainerEnd(
   return end;
 }
 
-function requireAvailable(
-  offset: number,
-  length: number,
-  limit: number,
-  label: string,
-): void {
+function requireAvailable(offset: number, length: number, limit: number, label: string): void {
   const end = offset + length;
-  if (
-    !Number.isSafeInteger(length) ||
-    length < 0 ||
-    !Number.isSafeInteger(end) ||
-    end > limit
-  ) {
+  if (!Number.isSafeInteger(length) || length < 0 || !Number.isSafeInteger(end) || end > limit) {
     throw new Error(`${label} length is truncated or inconsistent.`);
   }
 }
@@ -333,11 +286,7 @@ function readExtended80(bytes: Uint8Array, offset: number): number {
     mantissa = (mantissa << 8n) | BigInt(bytes[index] ?? 0);
   }
   if (exponent === 0 && mantissa === 0n) return 0;
-  return (
-    sign *
-    Number(mantissa) *
-    2 ** (exponent - 16_383 - 63)
-  );
+  return sign * Number(mantissa) * 2 ** (exponent - 16_383 - 63);
 }
 
 function ascii(bytes: Uint8Array, start: number, end: number): string {

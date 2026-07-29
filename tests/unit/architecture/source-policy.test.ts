@@ -19,10 +19,13 @@ function messages(violations: readonly { readonly message: string }[]): readonly
 
 describe("architecture source policy", () => {
   it("rejects DOM rendering in the composition boundary", () => {
-    const fixture: readonly SourceUnit[] = [{
-      path: "src/main.ts",
-      source: 'const node = document.createElement("div"); host.replaceChildren(node); host.innerHTML = "";',
-    }];
+    const fixture: readonly SourceUnit[] = [
+      {
+        path: "src/main.tsx",
+        source:
+          'const node = document.createElement("div"); host.replaceChildren(node); host.innerHTML = "";',
+      },
+    ];
 
     expect(findCompositionDomRenderingViolations(fixture)).toHaveLength(3);
   });
@@ -57,31 +60,42 @@ describe("architecture source policy", () => {
 
   it("detects every prohibited technology class in negative fixtures", () => {
     const fixture: readonly SourceUnit[] = [
-      { path: "src/ui/view.tsx", source: 'import React from "react"; export const view = <div />;' },
-      { path: "src/engine/legacy.ts", source: "const node: ScriptProcessorNode = context.createScriptProcessor();" },
+      {
+        path: "src/engine/legacy.ts",
+        source: "const node: ScriptProcessorNode = context.createScriptProcessor();",
+      },
       { path: "src/ui/musical-input.ts", source: "navigator.requestMIDIAccess();" },
       { path: "src/composition/sw.ts", source: 'navigator.serviceWorker.register("/worker.js");' },
       { path: "src/ui/meter.ts", source: "const context = new AudioContext();" },
       { path: "src/state/project.ts", source: "interface Project { readonly node: AudioNode }" },
-      { path: "src/engine/preview.ts", source: 'import { AcidBassDsp } from "./modules/bass-mono/dsp-core";' },
+      {
+        path: "src/engine/preview.ts",
+        source: 'import { AcidBassDsp } from "./modules/bass-mono/dsp-core";',
+      },
       { path: "scripts/server.mjs", source: 'const endpoint = "/api/projects";' },
       { path: "src/ui/rack-delete.ts", source: 'if (window.confirm("Delete module?")) remove();' },
     ];
 
     const violations = findForbiddenTechnologyViolations(fixture);
-    expect(violations.some((violation) => violation.message.includes("framework"))).toBe(true);
-    expect(violations.some((violation) => violation.message.includes("JSX"))).toBe(true);
-    expect(violations.some((violation) => violation.message.includes("ScriptProcessorNode"))).toBe(true);
+    expect(violations.some((violation) => violation.message.includes("ScriptProcessorNode"))).toBe(
+      true,
+    );
     expect(violations.some((violation) => violation.message.includes("MIDI"))).toBe(true);
     expect(violations.some((violation) => violation.message.includes("Service-worker"))).toBe(true);
-    expect(violations.some((violation) => violation.message.includes("UI must not own"))).toBe(true);
-    expect(violations.some((violation) => violation.message.includes("State must not hold"))).toBe(true);
+    expect(violations.some((violation) => violation.message.includes("UI must not own"))).toBe(
+      true,
+    );
+    expect(violations.some((violation) => violation.message.includes("State must not hold"))).toBe(
+      true,
+    );
     expect(violations.some((violation) => violation.message.includes("DSP cores"))).toBe(true);
     expect(violations.some((violation) => violation.message.includes("endpoint"))).toBe(true);
-    expect(violations.some((violation) => violation.message.includes("confirmation dialogs"))).toBe(true);
+    expect(violations.some((violation) => violation.message.includes("confirmation dialogs"))).toBe(
+      true,
+    );
   });
 
-  it("contains no prohibited framework, JSX, MIDI, ScriptProcessor, or service-worker code", () => {
+  it("contains no MIDI, ScriptProcessor, or service-worker code", () => {
     expect(findForbiddenTechnologyViolations(readCurrentSourceUnits())).toEqual([]);
   });
 
@@ -102,12 +116,16 @@ describe("architecture source policy", () => {
   });
 
   it("rejects verification evidence, handoffs, and dated run reports", () => {
-    expect(messages(findRunNarrativeViolations([
-      "docs/verification/phase-1.md",
-      "HANDOFF.md",
-      "docs/phase-2.md",
-      "docs/2026-07-27-review.md",
-    ]))).toEqual([
+    expect(
+      messages(
+        findRunNarrativeViolations([
+          "docs/verification/phase-1.md",
+          "HANDOFF.md",
+          "docs/phase-2.md",
+          "docs/2026-07-27-review.md",
+        ]),
+      ),
+    ).toEqual([
       "Verification evidence must use an ignored temporary path.",
       "Handoff and session reports must use an ignored temporary path.",
       "Dated and per-phase run reports must use an ignored temporary path.",
@@ -116,14 +134,16 @@ describe("architecture source policy", () => {
   });
 
   it("keeps owning contracts and the required naming audit allowed", () => {
-    expect(findRunNarrativeViolations([
-      "AGENTS.md",
-      "README.md",
-      "docs/ARCHITECTURE.md",
-      "docs/audits/naming-originality-audit.md",
-      "docs/instruments/acid-bass.md",
-      "docs/specs/spec-010-quality-and-delivery.md",
-    ])).toEqual([]);
+    expect(
+      findRunNarrativeViolations([
+        "AGENTS.md",
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/audits/naming-originality-audit.md",
+        "docs/instruments/acid-bass.md",
+        "docs/specs/spec-010-quality-and-delivery.md",
+      ]),
+    ).toEqual([]);
   });
 
   it("contains no run narrative in the repository tree", () => {
@@ -132,10 +152,14 @@ describe("architecture source policy", () => {
 
   it("rejects concrete plugin-ID branching outside plugin and registry code", () => {
     const fixture: readonly SourceUnit[] = [
-      { path: "src/engine/modules/bass-mono/plugin.ts", source: 'export const pluginId = "bass-mono";' },
+      {
+        path: "src/engine/modules/bass-mono/plugin.ts",
+        source: 'export const pluginId = "bass-mono";',
+      },
       {
         path: "src/state/projector.ts",
-        source: 'export function project(pluginId: string) { if (pluginId === "bass-mono") return 1; return 0; }',
+        source:
+          'export function project(pluginId: string) { if (pluginId === "bass-mono") return 1; return 0; }',
       },
     ];
 
@@ -144,10 +168,14 @@ describe("architecture source policy", () => {
 
   it("rejects manifest-derived plugin-ID branching outside plugin and registry code", () => {
     const fixture: readonly SourceUnit[] = [
-      { path: "src/engine/modules/bass-mono/plugin.ts", source: 'export const pluginId = "bass-mono";' },
+      {
+        path: "src/engine/modules/bass-mono/plugin.ts",
+        source: 'export const pluginId = "bass-mono";',
+      },
       {
         path: "src/ui/rack.ts",
-        source: "declare const ACID_BASS_MANIFEST: { pluginId: string }; declare const pluginId: string; if (pluginId === ACID_BASS_MANIFEST.pluginId) {}",
+        source:
+          "declare const ACID_BASS_MANIFEST: { pluginId: string }; declare const pluginId: string; if (pluginId === ACID_BASS_MANIFEST.pluginId) {}",
       },
     ];
 
@@ -156,7 +184,10 @@ describe("architecture source policy", () => {
 
   it("allows generic plugin-ID validation and comparison", () => {
     const fixture: readonly SourceUnit[] = [
-      { path: "src/engine/modules/bass-mono/plugin.ts", source: 'export const pluginId = "bass-mono";' },
+      {
+        path: "src/engine/modules/bass-mono/plugin.ts",
+        source: 'export const pluginId = "bass-mono";',
+      },
       {
         path: "src/contracts/plugins.ts",
         source: [

@@ -108,7 +108,9 @@ describe("icon rules", () => {
   it("draws inline SVG with currentColor rather than a baked-in hex", () => {
     const baked: string[] = [];
     for (const file of shippedStyleSources()) {
-      for (const match of file.text.matchAll(/<(?:path|circle|rect|line|polyline|polygon)\b[^>]*>/g)) {
+      for (const match of file.text.matchAll(
+        /<(?:path|circle|rect|line|polyline|polygon)\b[^>]*>/g,
+      )) {
         const element = match[0];
         // A shape may be unfilled, inherit, or use a token. A literal hex in an
         // icon body is the case section 11.3 rules out.
