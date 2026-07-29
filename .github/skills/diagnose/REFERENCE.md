@@ -43,8 +43,10 @@ Probe these Pulsebox seams when they match the symptom:
 
 ## Instrumentation
 
-Change one variable at a time. Prefer a debugger or a narrow assertion. Give
-temporary logs one unique prefix.
+Use a non-mutating debugger or current measurement first. If a probe needs a
+workspace edit, get explicit authority before the edit.
+
+Change one variable at a time. Give temporary logs one unique prefix.
 
 For performance work, record the environment, representative workload, method,
 baseline, and result before you change code.
