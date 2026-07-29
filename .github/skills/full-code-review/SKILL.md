@@ -1,29 +1,28 @@
 ---
 name: full-code-review
 description: >
-  Review Pulsebox changes before they land. Use for a diff, branch, change set,
+  Before Pulsebox changes merge, review them. Use for a diff, branch, change set,
   pending work, or requested repair of confirmed review findings.
 ---
 
 # Review Pulsebox code
 
-Review without edits first. Edit only when the user requests repairs.
+Review without edits first. If the user requests repairs, edit the files.
 
-## 1. Establish the review surface
+## 1. Establish the review scope
 
 1. Inspect status, the complete diff, untracked files, and recent history.
-   Finish when you classify every changed path and unrelated dirty path.
+   Completion criterion: You classify every changed path and unrelated dirty path.
 2. Read every changed file and its owning specification sections.
-   Finish when each changed behavior has an identified contract owner.
+   Completion criterion: You identify a contract owner for each changed behavior.
 3. Read relevant callers, registries, commands, migrations, components, and tests.
-   Finish when you can judge each changed seam in context.
+   Completion criterion: You can judge each changed seam in context.
 4. Map each changed contract to its current evidence.
-   Finish when every affected acceptance criterion has a pass, gap, or blocker.
+   Completion criterion: Every affected acceptance criterion has a pass, gap, or blocker.
 
 ## 2. Review each seam
 
-Most defects cross a **seam** that should have one owner. Check every applicable
-item in this list:
+A **seam** must have one owner. Check every applicable item in this list:
 
 - approved behavior and affected acceptance criteria
 - engine, state, UI, persistence, and composition ownership
@@ -41,31 +40,31 @@ item in this list:
 Do not use an arbitrary file-size limit. Judge ownership, cohesion, and
 attention cost from the actual change.
 
-Read [REFERENCE.md](REFERENCE.md) when a confirmed seam defect needs a standard
-Pulsebox remedy.
+If a confirmed seam defect needs a standard Pulsebox remedy, read
+[REFERENCE.md](REFERENCE.md).
 
 ## 3. Report findings
 
 1. Order findings by user impact and release risk.
-   Finish when blocking findings appear before non-blocking findings.
+   Completion criterion: Blocking findings appear before non-blocking findings.
 2. Give a path, location, broken contract, evidence, impact, and remedy.
-   Finish when another agent can reproduce and repair each finding.
+   Completion criterion: Another agent can reproduce and repair each finding.
 3. State when no blocking finding remains.
-   Finish when you account for every changed path and affected criterion.
+   Completion criterion: You account for every changed path and affected criterion.
 
 Treat existing review comments as hypotheses until current evidence confirms
 them.
 
-## 4. Repair when requested
+## 4. Repair authorized findings
 
-1. Implement only confirmed findings inside the authorized scope.
-   Finish when every accepted finding has a complete repair.
+1. In the authorized scope, implement confirmed findings.
+   Completion criterion: Every accepted finding has a complete repair.
 2. Add or update the narrowest regression evidence.
-   Finish when each repair has a test that can detect its defect.
+   Completion criterion: Each repair has a test that can detect its defect.
 3. Run the applicable repository quality gate.
-   Finish when all affected checks pass or have a reported blocker.
-4. Re-review the final diff from a clean context for high-risk work.
-   Finish when no acceptance-blocking finding remains.
+   Completion criterion: All affected checks pass, or you report a blocker.
+4. For high-risk work, re-review the final diff from a clean context.
+   Completion criterion: No acceptance-blocking finding remains.
 
 ## Completion criterion
 

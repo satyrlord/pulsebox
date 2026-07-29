@@ -18,8 +18,8 @@ Other skills can also reach it.
 
 ### User-invoked skill
 
-A user-invoked skill requires an explicit user action. Use this mode only when
-the host supports it.
+User invocation is valid only when the skill requires an explicit user action
+and the host supports this mode.
 
 ### Description
 
@@ -92,7 +92,7 @@ Co-location keeps a concept, its rules, and its limits in one place.
 ### Granularity
 
 Granularity shows how a design divides work across skills and reference files.
-Split only when the split improves invocation or execution.
+If the split improves invocation or execution, split the content.
 
 ## Quality
 
@@ -126,8 +126,7 @@ reference.
 ### Premature completion
 
 Premature completion ends a step before it meets its criterion. First make the
-criterion precise. Split the sequence only when later steps still cause the
-failure.
+criterion precise. If later steps still cause the failure, split the sequence.
 
 ### Duplication
 
@@ -145,5 +144,5 @@ disclosure or a justified skill split.
 
 ### No-op
 
-A no-op instruction does not change agent behavior. Remove it unless it supplies
-required domain reference.
+A no-op instruction does not change agent behavior. If it does not supply
+required domain reference, remove it.

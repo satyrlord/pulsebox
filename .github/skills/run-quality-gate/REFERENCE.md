@@ -16,8 +16,8 @@ Use these phase rules:
 
 ## Stop conditions
 
-Stop repair work when the next action needs a product decision. Also stop when
-the action changes quality policy, expands scope materially, or lacks a verifier.
+If the next action needs a product decision, stop repair work. Also stop if the
+action changes quality policy, expands scope materially, or lacks a verifier.
 
 Report the exact blocker. Do not invent a coverage percentage or reinterpret a
 configured threshold.

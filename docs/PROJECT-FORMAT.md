@@ -11,19 +11,19 @@ approved requirements in the
 If the documents disagree, reconcile the product decision in both before
 product code is changed.
 
-The format is data only. An importer must never evaluate a value as code, load a
-URL named by imported data, or resolve an archive name as a host file-system
-path.
+The format is data only. An importer must never evaluate a value as code or load
+a URL named by imported data. It must never resolve an archive name as a host
+file-system path.
 
 ## 1. Scope and non-goals
 
 This contract covers:
 
-- browser-resident projects and assets in IndexedDB;
-- portable `.pulsebox` project archives;
-- immutable factory and user-installed asset packs;
-- plugin and project migrations;
-- validation, quotas, atomic writes, autosave, and recovery;
+- browser-resident projects and assets in IndexedDB.
+- portable `.pulsebox` project archives.
+- immutable factory and user-installed asset packs.
+- plugin and project migrations.
+- validation, quotas, atomic writes, autosave, and recovery.
 - deterministic serialization and verification fixtures.
 
 It does not define live audio objects, decoded `AudioBuffer` objects, meter
@@ -56,13 +56,13 @@ applies to projects, module instances, effect instances, patterns, notes, steps,
 automation lanes, clips, and user-created asset records. IDs
 are stable across reorder, save, export, ordinary import, and migration. The
 explicit Import as copy action in section 9.4 remaps only the project ID,
-lineage ID, and revision epoch; its project-scoped entity IDs remain stable.
+lineage ID, and revision epoch. Its project-scoped entity IDs remain stable.
 
 Across stored heads, a project-scoped entity identity is the tuple of project
 ID, lineage ID, typed ID. A lineage ID remains stable across ordinary saves,
 counter rollover, export, ordinary import, and migrations. The explicit Replace
 existing and Undo replace actions start new lineages and require complete state
-and engine replacement; code must not correlate their equal typed IDs with an
+and engine replacement. Code must not correlate their equal typed IDs with an
 older lineage.
 
 A lineage ID and revision epoch each use the same canonical UUID version 4 form.
@@ -135,12 +135,12 @@ the record to `embedded`.
 An importer accepts only the Store method, method 0, and Deflate, method 8. It
 rejects:
 
-- encrypted entries;
-- multi-disk archives;
-- ZIP64 records;
-- symlinks, hard links, devices, sockets, and other non-regular entries;
-- a local header that disagrees with its central-directory record;
-- overlapping entry data, invalid offsets, invalid CRC-32, or trailing data;
+- encrypted entries.
+- multi-disk archives.
+- ZIP64 records.
+- symlinks, hard links, devices, sockets, and other non-regular entries.
+- a local header that disagrees with its central-directory record.
+- overlapping entry data, invalid offsets, invalid CRC-32, or trailing data.
 - an entry whose actual output differs from its declared uncompressed size.
 
 Entry names must be valid UTF-8 and already use `/` separators and Unicode NFC.
@@ -150,9 +150,9 @@ normalized result differs from the original name.
 
 An entry is also rejected if its name:
 
-- is empty, begins with `/`, begins with a drive prefix, or contains `:`;
-- contains an empty, `.` or `..` segment;
-- contains NUL, a control character, or a backslash;
+- is empty, begins with `/`, begins with a drive prefix, or contains `:`.
+- contains an empty, `.` or `..` segment.
+- contains NUL, a control character, or a backslash.
 - exceeds 160 UTF-8 bytes or has a segment longer than 80 UTF-8 bytes.
 
 Duplicate paths are invalid. Collision checks use Unicode NFC plus lowercase, so
@@ -162,13 +162,13 @@ names that differ only by case or normalization are also invalid.
 
 A project archive has these hard limits:
 
-- the complete ZIP file at most 522 MiB;
-- the central directory at most 1 MiB;
-- at most 257 entries: one manifest and at most 256 assets;
-- `manifest.json` at most 8 MiB uncompressed;
-- each asset at most 32 MiB uncompressed;
-- all asset entries together at most 512 MiB uncompressed;
-- all entries together at most 520 MiB uncompressed;
+- the complete ZIP file at most 522 MiB.
+- the central directory at most 1 MiB.
+- at most 257 entries: one manifest and at most 256 assets.
+- `manifest.json` at most 8 MiB uncompressed.
+- each asset at most 32 MiB uncompressed.
+- all asset entries together at most 512 MiB uncompressed.
+- all entries together at most 520 MiB uncompressed.
 - a per-entry and aggregate expansion ratio at most 100 to 1.
 
 For the ratio check, an empty entry has ratio 1. Any non-empty entry with zero
@@ -307,9 +307,9 @@ the owning effect. They are not separate plugin IDs.
 order. A slot contains its fixed slot ID and either `module: null` or a module
 record with:
 
-- a stable module UUID;
-- a required instrument plugin reference and plugin state;
-- enabled, mute, solo, level, and output-routing state;
+- a stable module UUID.
+- a required instrument plugin reference and plugin state.
+- enabled, mute, solo, level, and output-routing state.
 - a reference to its module effect chain.
 
 The eight-slot array is an MVP file-format limit. Slot-count-agnostic code may
@@ -317,15 +317,17 @@ support later migrations, but a format-1 importer rejects a ninth slot and
 reports every over-cap slot before applying any state.
 
 The root `patterns` array contains 1 through 32 project-wide `Pattern` records.
-A Pattern contains a stable UUID, unique user-visible name, color, positive
-duration in bars, Humanize from 0 through 100
-percent, unsigned 32-bit seed, creation and modification timestamps, referenced
-automation lane IDs, and at most one `PatternPart` per occupied module ID. A
-PatternPart contains the module ID, a nominal step count from 1 through 64,
-plugin event records, and referenced automation lane IDs. The part cycle repeats
-across the Pattern duration. A drum voice may store its own bounded cycle length
-in plugin-validated event data. The MVP grid is fixed at 1/16 and is not stored
-as a selectable Pattern property.
+A Pattern contains a stable UUID, a unique user-visible name, a color, and a
+positive duration in bars. It also contains Humanize from 0 through 100 percent
+and an unsigned 32-bit seed. The record contains creation and modification
+timestamps and referenced automation lane IDs.
+
+It has at most one `PatternPart` per occupied module ID. A PatternPart contains
+the module ID, a nominal step count from 1 through 64, plugin event records, and
+referenced automation lane IDs. The part cycle repeats across the Pattern
+duration. A drum voice may store its own bounded cycle length in plugin-validated
+event data. The MVP grid is fixed at 1/16 and is not stored as a selectable
+Pattern property.
 
 Pattern array order is display order only. It is not identity and is never shown
 as a compound module-and-pattern number. Removing a module removes its parts from
@@ -366,10 +368,10 @@ structure is fixed at 4/4 for the MVP.
 
 An `AutomationLane` contains:
 
-- a stable lane UUID;
-- scope, target instance ID, and stable parameter ID;
-- `pattern` context and its owning Pattern ID;
-- a fixed grid size of 240 ticks, equal to 1/16 at 960 ticks per quarter note;
+- a stable lane UUID.
+- scope, target instance ID, and stable parameter ID.
+- `pattern` context and its owning Pattern ID.
+- a fixed grid size of 240 ticks, equal to 1/16 at 960 ticks per quarter note.
 - ordered steps containing a non-negative tick and one JSON scalar value.
 
 Two steps in one lane may not occupy the same tick. Automation contains only
@@ -386,11 +388,11 @@ Monitor selection, monitor-only Mono state, and L/R or M/S meter mode are absent
 
 `EffectsState` contains:
 
-- one voice-insert reference per supported drum voice;
-- one ordered module chain per occupied module;
-- four ordered send chains;
-- one ordered master chain;
-- one `masterEffectsBypassed` boolean;
+- one voice-insert reference per supported drum voice.
+- one ordered module chain per occupied module.
+- four ordered send chains.
+- one ordered master chain.
+- one `masterEffectsBypassed` boolean.
 - the pinned compact-focus instance for each send chain or `null`.
 
 Every effect slot is `null` or contains a stable effect instance. Routing is
@@ -468,10 +470,10 @@ Changing a pack or asset byte creates a different content ID.
 
 An asset is rejected if any of these conditions is true:
 
-- decoded duration exceeds 1,800 seconds;
-- `frames * channels * 4` exceeds 256 MiB;
-- the file contains more than two channels;
-- metadata and the bytes disagree;
+- decoded duration exceeds 1,800 seconds.
+- `frames * channels * 4` exceeds 256 MiB.
+- the file contains more than two channels.
+- metadata and the bytes disagree.
 - decoding produces a non-finite sample or an unsupported channel layout.
 
 The sum of `frames * channels * 4` over all distinct project asset content IDs
@@ -491,10 +493,11 @@ pack.json
 assets/<asset-content-id-without-prefix>.<codec-extension>
 ```
 
-The project ZIP safety rules apply. A pack allows at most 257 entries, a 1 MiB
-`pack.json`, 256 assets, 32 MiB per asset, 512 MiB total asset bytes, 513 MiB
-total uncompressed bytes, a 515 MiB complete ZIP file, a 1 MiB central
-directory, and a 100-to-1 expansion ratio.
+The project ZIP safety rules apply. A pack allows at most 257 entries and a 1
+MiB `pack.json`. It allows at most 256 assets, 32 MiB per asset, and 512 MiB of
+total asset bytes. It allows 513 MiB of total uncompressed bytes and a 515 MiB
+complete ZIP file. The central directory is limited to 1 MiB. The expansion
+ratio is limited to 100 to 1.
 
 `pack.json` has exactly these keys:
 
@@ -555,8 +558,8 @@ The pack content ID is SHA-256 over this byte sequence:
 
 1. ASCII `pulsebox-pack-v1`, followed by one zero byte.
 2. Canonical `pack.json` with the `packContentId` member omitted.
-3. For each asset in ascending content-ID order, one zero byte followed by the
-   32 raw digest bytes represented by its content ID.
+3. For each asset by ascending content ID, append one zero byte and its 32 raw
+   digest bytes.
 
 The asset list itself is ordered by content ID. Duplicate asset content IDs are
 invalid. License and provenance are data records only and may not contain URLs
@@ -586,20 +589,20 @@ identical pack is a no-op. A changed pack is a new record with a new content ID,
 even when its visible name and semantic version are unchanged. Asset blobs may
 be deduplicated by content ID and reference count.
 
-Install validates all ZIP structures, JSON, audio metadata, decoded bounds,
-content IDs, license fields, and quota before one IndexedDB transaction inserts
-the pack record, unique blobs, and reference counts. Failure aborts the whole
-install.
+Install validates all ZIP structures, JSON, audio metadata, and decoded bounds.
+It also validates content IDs, license fields, and quota. After validation, one
+IndexedDB transaction inserts the pack record, unique blobs, and reference
+counts. Failure aborts the whole install.
 
 ### 7.3 Missing packs and safe removal
 
 A missing recognized pack does not structurally invalidate a project. The
 project opens in a degraded state with these rules:
 
-- each missing sample layer produces silence;
-- synthesis, other assets, editing, saving, and unrelated playback continue;
-- one actionable report lists every pack and asset content ID;
-- every pack reference is preserved unchanged on ordinary save and round trip;
+- each missing sample layer produces silence.
+- synthesis, other assets, editing, saving, and unrelated playback continue.
+- one actionable report lists every pack and asset content ID.
+- every pack reference is preserved unchanged on ordinary save and round trip.
 - reinstalling matching content resolves the reference without editing the
   project.
 
@@ -636,11 +639,11 @@ extension rejects the import.
 Semantic plugin version records authorship but does not alone decide state
 compatibility. Compatibility requires:
 
-1. a registered plugin with the same ID and kind;
-2. supported `apiVersion` 1;
-3. a state schema equal to the current schema, or a complete registered
-   migration chain from the stored positive `stateVersion`;
-4. successful validation after migration.
+1. A registered plugin with the same ID and kind.
+2. Supported `apiVersion` 1.
+3. A state schema equal to the current schema, or a complete registered
+   migration chain from the stored positive `stateVersion`.
+4. Successful validation after migration.
 
 A newer plugin semantic version may read older state through migrations. A
 reader must not guess at compatibility from semantic-version ranges. A project
@@ -650,14 +653,14 @@ with a newer state version than the installed plugin rejects the import.
 
 Project and plugin migrations are pure, deterministic data transforms. They:
 
-- run on a detached candidate document before storage or active state changes;
-- advance exactly one integer schema version per step;
+- run on a detached candidate document before storage or active state changes.
+- advance exactly one integer schema version per step.
 - never fetch data, read the clock, generate a random value, or inspect UI
-  state;
-- preserve stable IDs and unknown optional extension records;
-- validate output after every step;
+  state.
+- preserve stable IDs and unknown optional extension records.
+- validate output after every step.
 - append a migration record containing from-version, to-version, migration ID,
-  and fixed implementation version;
+  and fixed implementation version.
 - produce a complete repair and migration report.
 
 Format 1 has no predecessor. Unversioned JSON is invalid. A reader rejects a
@@ -699,9 +702,9 @@ at a time.
 
 Safe repairs are limited to:
 
-- clamping a finite known parameter to its registered minimum or maximum;
+- clamping a finite known parameter to its registered minimum or maximum.
 - filling a missing field that the owning versioned schema explicitly marks
-  optional, using its registered deterministic default;
+  optional, using its registered deterministic default.
 - normalizing a user-visible name by trimming outer whitespace.
 
 Repairs never invent IDs, drop events, remove slots, reroute audio, change an
@@ -735,14 +738,14 @@ revision tokens and offers three explicit resolution actions:
 - **Import as copy** assigns a new project UUID, lineage ID, and revision epoch,
   sets revision to 0, and sets both timestamps to the action time. All
   project-scoped module, pattern, event, effect, lane, clip, asset-record, and
-  migration IDs remain unchanged because their identity is
-  scoped by the new project and lineage IDs. Content IDs and pack IDs also
+  migration IDs remain unchanged. Their identity is scoped by the new project
+  and lineage IDs. Content IDs and pack IDs also
   remain unchanged. Rack-collapse preferences are not copied. The remapped
   candidate receives complete validation again before quota preflight and
   commit.
-- **Replace existing** keeps the existing project UUID and `createdAt`, writes
-  the imported musical state and name under a new lineage ID and revision epoch,
-  sets revision to 0, and sets `modifiedAt` to the action time. All imported
+- **Replace existing** keeps the existing project UUID and `createdAt`. It
+  writes the imported musical state and name under a new lineage ID and revision
+  epoch. It sets revision to 0 and sets `modifiedAt` to the action time. All imported
   project-scoped IDs and internal references remain unchanged within that new
   lineage. The prior local head is written to recovery, active command history
   is cleared, and the engine receives a complete replacement in the same
@@ -769,7 +772,7 @@ http://127.0.0.1:4173
 Scheme, host spelling, and port are part of the persistence identity.
 `localhost`, another port, HTTPS, and a file URL have separate storage. Both
 `npm run dev` and `npm run start` use the canonical origin and strict-port
-behavior; they cannot run simultaneously. Automated tests use isolated browser
+behavior. They cannot run simultaneously. Automated tests use isolated browser
 contexts and explicitly labeled temporary storage rather than another
 user-facing origin.
 
@@ -784,25 +787,26 @@ state the export/import procedure before the old origin is retired.
 
 The `pulsebox-v1` IndexedDB database owns these logical object stores:
 
-- `project-heads` for current canonical manifests and revision metadata;
-- `project-assets` for immutable loose and embedded asset blobs by content ID;
-- `project-asset-refs` for project-to-asset reference counts;
-- `recovery-heads` for retained revision records;
-- `pack-records` for immutable pack manifests by pack content ID;
-- `pack-assets` for immutable pack blobs by asset content ID;
+- `project-heads` for current canonical manifests and revision metadata.
+- `project-assets` for immutable loose and embedded asset blobs by content ID.
+- `project-asset-refs` for project-to-asset reference counts.
+- `recovery-heads` for retained revision records.
+- `pack-records` for immutable pack manifests by pack content ID.
+- `pack-assets` for immutable pack blobs by asset content ID.
 - `pack-asset-refs` for pack and project reference counts.
 
-An asset or pack blob remains pinned while it is referenced by a current head,
-retained recovery head, active in-memory project, pending save or import
-candidate, or active Undo or Redo record. Runtime pins need not be serialized,
+An asset or pack blob remains pinned while a current head, retained recovery
+head, or active in-memory project references it. It also remains pinned during a
+pending save or import, or while an active Undo or Redo record references it.
+Runtime pins need not be serialized,
 but the active tab shall register and release them through the persistence port.
 Garbage collection may delete a blob only after a transaction confirms that no
 stored reference and no registered runtime pin remains. A failed or interrupted
 collection shall not change any project, recovery, pack, or history reference.
 
-Database schema upgrades use `versionchange`, close older connections, and do
-not delete an old store until its migrated records have been verified in the
-same upgrade transaction.
+Database schema upgrades use `versionchange` and close older connections. An
+upgrade does not delete an old store until the same transaction verifies its
+migrated records.
 
 ### 10.3 Persistence and quota policy
 
@@ -838,7 +842,7 @@ packs automatically to make room.
 Every committed user edit marks the in-memory project dirty. Autosave starts 750
 milliseconds after the last committed edit and no later than 5 seconds after the
 first unsaved edit in a continuous series. Explicit Save starts the same
-transaction immediately. Saving never blocks editing; edits made during a save
+transaction immediately. Saving never blocks editing. Edits made during a save
 belong to the next revision.
 
 The "next revision" in this section means the next committed
@@ -847,13 +851,13 @@ The "next revision" in this section means the next committed
 
 A save transaction:
 
-1. reads the current stored revision token;
-2. creates one canonical detached snapshot of the intended revision;
-3. writes new immutable asset blobs and reference-count changes;
-4. writes the previous head into recovery history;
-5. replaces the project head with the next revision token;
-6. removes recovery records beyond the retention rule;
-7. reports saved only after the transaction `complete` event.
+1. Reads the current stored revision token.
+2. Creates one canonical detached snapshot of the intended revision.
+3. Writes new immutable asset blobs and reference-count changes.
+4. Writes the previous head into recovery history.
+5. Replaces the project head with the next revision token.
+6. Removes recovery records beyond the retention rule.
+7. Reports saved only after the transaction `complete` event.
 
 When the stored counter is below `9007199254740991`, the next token keeps the
 epoch and increments the counter by one. When it equals that maximum, the save
@@ -870,13 +874,13 @@ as project state.
 Keep the five most recent committed heads before the current head for each
 project. Shared immutable blobs are retained while any current or recovery head
 references them. Recovery JSON for one project is additionally capped at 128
-MiB; oldest heads are pruned until both limits hold. The current head is never
+MiB. Oldest heads are pruned until both limits hold. The current head is never
 pruned by recovery maintenance.
 
-At startup, Pulsebox validates the current head. If it is missing or invalid, it
-selects the newest fully valid retained head without overwriting it, reports the
-recovered revision token and timestamp, and requires a new successful save
-before that revision becomes current. Recovery is announced through visible text
+At startup, Pulsebox validates the current head. If it is missing or invalid,
+Pulsebox selects the newest fully valid retained head without overwriting it. It
+reports the recovered revision token and timestamp. A new successful save must
+occur before that revision becomes current. Recovery is announced through visible text
 and an ARIA live region.
 
 ### 11.3 Multiple tabs
@@ -884,30 +888,33 @@ and an ARIA live region.
 Tabs broadcast the committed project ID and complete revision token. A tab whose
 base token does not exactly equal the stored token shows a non-blocking
 stale-state warning before its next save. Last writer wins remains
-authoritative: the later save transaction re-reads the current stored token,
-writes its complete in-memory snapshot under the next token, and does not create
-an automatic conflict copy. Revision tokens are equality and concurrency
-markers; clients do not order different epochs by UUID or counter.
+authoritative.
+
+The later save transaction reads the current stored token again.
+It writes its complete in-memory snapshot under the next token and does not
+create an automatic conflict copy. Revision tokens are equality and concurrency
+markers. Clients do not order different epochs by UUID or counter.
 
 ## 12. Canonical serialization
 
 Canonical JSON uses these rules:
 
-- UTF-8 without a byte-order mark or trailing newline;
-- no insignificant whitespace;
-- object keys sorted by Unicode code point after NFC normalization;
-- arrays kept in their schema-defined order;
-- strings escaped only as required by JSON, using lowercase hex escapes;
+- UTF-8 without a byte-order mark or trailing newline.
+- no insignificant whitespace.
+- object keys sorted by Unicode code point after NFC normalization.
+- arrays kept in their schema-defined order.
+- strings escaped only as required by JSON, using lowercase hex escapes.
 - finite numbers in the shortest decimal form that round-trips to the same
-  IEEE-754 value;
-- integers without a decimal point or exponent;
-- negative zero serialized as `0` after validation;
+  IEEE-754 value.
+- integers without a decimal point or exponent.
+- negative zero serialized as `0` after validation.
 - no omitted required field and no explicit substitute for an absent optional
   field.
 
 Schema-defined set-like arrays are sorted before serialization. These include
-plugin requirements by kind then ID, assets by content ID then record ID,
-extensions by namespace, and migration records by destination version then ID.
+plugin requirements by kind then ID and assets by content ID then record ID.
+They also include extensions by namespace and migration records by destination
+version then ID.
 Timeline, rack, chain, pattern, event, and automation arrays use their declared
 musical or UI order with stable ID as the final tie-breaker.
 
@@ -941,9 +948,9 @@ validated in-memory snapshot and every still-readable immutable blob. It may
 keep unresolved pack references. It must not claim a complete embedded export if
 any required embedded blob is unreadable.
 
-A successful import followed by ordinary save and the same export choice
-preserves all stable IDs, plugin state, extension data, content IDs, pack
-content IDs, storage modes, and references. Canonical formatting may replace
+A successful import followed by an ordinary save preserves all stable IDs,
+plugin state, extension data, and content IDs. The same export choice also
+preserves pack content IDs, storage modes, and references. Canonical formatting may replace
 noncanonical input bytes. Unknown optional extension data must have the same
 canonical JSON bytes after the round trip.
 
@@ -1013,7 +1020,7 @@ recovery fixtures, then automate their outcomes in unit and browser tests.
   output.
 - Revision increment at the maximum-minus-one counter and epoch rollover at the
   maximum counter.
-- Same-ID Open existing, Import as copy, Replace existing, and cancelled
+- Same-ID Open existing, Import as copy, Replace existing, and canceled
   resolution, including metadata remapping, cross-lineage equal typed IDs,
   recovery, Undo replace, and atomic rollback.
 - Equal module IDs across Replace and Undo-replace lineages, proving that

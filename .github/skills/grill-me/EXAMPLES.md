@@ -18,5 +18,5 @@ Ask whether the user intends to change that contract.
 
 Prompt: "Challenge the plan for a compact mobile layout."
 
-First show the 1280 by 720 editing minimum and mobile exclusion. Do not design
-the layout before the user changes that boundary.
+First show the 1280 by 720 editing minimum and mobile exclusion. Before the user
+changes that boundary, do not design the layout.

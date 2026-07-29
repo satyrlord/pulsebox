@@ -34,9 +34,9 @@ Transport group:
 
 Center:
 
-- `PULSEBOX`, fixed to the horizontal center of the viewport independently of
-  the width of the groups on either side.
-- The app mark uses a restrained inset or recessed surround matching the
+- Place `PULSEBOX` at the horizontal center of the viewport. Keep its position
+  independent of the group widths on each side.
+- Give the app mark a restrained inset or recessed surround that matches the
   approved design target.
 
 Position group:
@@ -57,16 +57,16 @@ Master group:
 - Settings.
 
 The header has no theme selector. Theme and high-contrast selection exists only
-on the Settings page when that page is implemented.
+on the Settings page when that page exists.
 
 Behavior:
 
-- Space toggles play or pause unless focus is in a text field or a conflicting
-  editor.
+- If focus is in a text field or conflicting editor, Space does not control
+  playback. Otherwise, Space toggles play or pause.
 - Escape stops playback.
 - Space pauses in place. Stop halts playback and returns to the last explicit
-  transport start marker, defaulting to Pattern step 1 in Pattern mode or the
-  first Playlist row in Song mode. Repeated Stop presses have no second
+  transport start marker. The default marker is Pattern step 1 in Pattern mode
+  or the first Playlist row in Song mode. Repeated Stop presses have no second
   behavior.
 - The transport start marker updates when the user positions the playhead while
   stopped or starts playback from a manually selected location. Loop wraps,
@@ -80,13 +80,14 @@ Behavior:
 - Meter decay is smooth.
 - Buttons expose idle, hover, pressed, active, disabled, and focus states.
 - Pattern and Song transport modes switch without stopping.
-- Pattern switching is quantized to a configurable boundary, default one bar.
-- Count-in and metronome are configurable for live recording.
-- The header metronome toggle is the single control that switches the metronome
-  on and off. It uses `aria-pressed`, is a global UI preference rather than
-  project data, creates no undo entry, and never changes project state,
+- The transport quantizes Pattern changes to a configurable boundary. The
+  default boundary is one bar.
+- The user can configure the count-in and metronome for live recording.
+- The header metronome toggle is the single control that enables or disables the
+  metronome. It uses `aria-pressed`. Store its state as a global UI preference,
+  not as project data. It creates no undo entry. It never changes project state,
   automation, or export. Count-in length and metronome sound stay with the live
-  recording settings owned by
+  recording settings in
   [pattern editing](spec-006-pattern-editing.md) section 16.4.
 - Pin project toggles whether the current project appears at the top of the
   project selector. It uses `aria-pressed` and persists as project metadata.
@@ -96,10 +97,10 @@ project state, automation, undo history, or export. Meter mode is a transient
 monitoring preference. `M = (L + R) / 2` and `S = (L - R) / 2` for displayed
 analysis.
 
-The separate master Mono control remains in the Master studio view. It is a
-monitor-only fold-down placed after the master chain, affects live listening and
-the displayed master meters, and is excluded from project audio state, master
-WAV export, and stem export.
+The separate master Mono control remains in the Master studio view. The engine
+places this monitor-only fold-down after the master chain. It affects live
+listening and the displayed master meters. Exclude it from project audio state,
+master WAV export, and stem export.
 
 ---
 
@@ -108,13 +109,13 @@ WAV export, and stem export.
 Swing is one global project property in the MVP. It applies to every Pattern and
 to every module. Per-Pattern Swing is post-MVP work.
 
-Timing properties shown as horizontal sliders in the Piano Roll header:
+The Piano Roll header shows these timing properties as horizontal sliders:
 
-- Swing, default 54%. Project-wide in the MVP: moving it on any Pattern changes
-  playback of every Pattern.
+- Swing, default 54%. It is project-wide in the MVP. When the user moves it on
+  any Pattern, it changes playback of every Pattern.
 - Humanize, default 12%. Pattern-owned.
-- Quantize strength is fixed at 100% in the MVP and is not a visible control.
-- The Pattern grid is fixed at 1/16. There is no Straight selector, grid
+- The MVP fixes quantize strength at 100% and shows no control for it.
+- The MVP fixes the Pattern grid at 1/16. There is no Straight selector, grid
   selector, triplet selector, or persistent snap-off control in the MVP.
 
 Behavior:
@@ -122,11 +123,11 @@ Behavior:
 - Swing shifts alternating subdivisions.
 - Humanize changes timing and velocity deterministically.
 - A stored pattern seed produces repeatable playback.
-- Changing the seed creates a new deterministic variation.
+- When the user changes the seed, Pulsebox creates a new deterministic variation.
 - Alt-drag temporarily bypasses the 1/16 snap for a pitched note gesture.
 - Timing is audible.
 - Visual playheads reflect timing where practical.
-- Tempo changes during playback are supported.
+- The engine supports tempo changes during playback.
 - Per-Pattern Swing, selectable grids, triplets, persistent snap-off, per-voice
   grid resolution, tempo automation, and time-signature timelines are post-MVP
   work.
@@ -148,11 +149,11 @@ Behavior:
 - Visual timers are never the musical clock.
 - Parameter smoothing.
 - No zipper noise.
-- No allocation in real-time processing.
-- No logging in real-time processing.
-- No locks in real-time processing.
+- Do not allocate memory during real-time processing.
+- Do not log during real-time processing.
+- Do not use locks during real-time processing.
 - Conservative output level.
-- Master limiter enabled by default.
+- Enable the master limiter by default.
 - Clean voice release.
 - Bounded graph growth.
 - Bounded feedback.
@@ -163,18 +164,18 @@ Behavior:
 
 - Reads audio context time.
 - Schedules ahead.
-- Supports tempo change during playback without changing the current musical
-  position. The engine discards only queued future events and rebuilds them on
-  the new tempo grid.
+- Supports tempo changes during playback. It keeps the current musical position.
+  The engine discards only queued future events and rebuilds them on the new
+  tempo grid.
 - Supports one global Swing value.
 - Supports deterministic humanization.
 - Supports pattern and song modes.
 - Supports quantized named Pattern launches.
 - Keeps visual playheads separate.
 
-A scheduling interval around 20 to 30 milliseconds and a horizon around 80 to
-120 milliseconds may be used by the engine controller, but the audio thread
-remains authoritative.
+The engine controller may use a scheduling interval around 20 to 30
+milliseconds. It may use a horizon around 80 to 120 milliseconds. The audio
+thread remains authoritative.
 
 ### 21.3 Worklet and graph messaging
 
@@ -183,8 +184,8 @@ remains authoritative.
 - Worklets return meter frames and status through preallocated or bounded
   channels.
 - No UI component owns a worklet port directly.
-- Messages are versioned.
-- Parameter changes are timestamped where needed.
+- Messages include a version.
+- Parameter changes include timestamps where needed.
 
 Custom synthesis and custom DSP use AudioWorklet processors. Native Web Audio
 nodes may implement suitable primitives such as delay, filtering, convolution,
@@ -234,12 +235,12 @@ project limits before publishing an asset.
 ### 21.7 Audio unlock and fallback
 
 - Resume audio only from a direct user gesture.
-- Clearly show locked, active, suspended, and unavailable states.
+- Show locked, active, suspended, and unavailable states.
 - A terminal audio-processor fault stops transport and disables audible
   operations while leaving editing available.
 - Editing remains functional if Web Audio is blocked or unavailable.
 - No fake meters while stopped.
-- Demo animation, if used, is deterministic and clearly non-audio.
+- If used, make demo animation deterministic. Mark it as non-audio.
 
 ### 21.8 Startup and first sound
 
@@ -248,13 +249,19 @@ the first valid audio-unlock gesture that also requests an audible result, such
 as the first Play command or an instrument audition. A power-only gesture that
 does not request sound does not start the metric.
 
-For release evidence, serve the production build from the canonical origin, load
-it once successfully, close that browser context, then run five fresh contexts
-with the default project already stored. Measure from the trusted Play action to
-the first non-silent output frame observed by the deterministic audio probe.
+For release evidence:
+
+1. Serve the production build from the canonical origin.
+2. Load it once successfully.
+3. Close that browser context.
+4. Before each run, store the default project in a fresh context.
+5. Run each prepared context.
+6. Measure from the trusted Play action to the first non-silent output frame.
+7. Use the deterministic audio probe to observe that frame.
+
 Every run must finish within three seconds. Record the browser version,
-operating system, processor, memory, audio device, sample rate, and exposed
-buffer setting.
+operating system, processor, and memory. Also record the audio device, sample
+rate, and exposed buffer setting.
 
 ### 21.9 Performance
 
@@ -266,18 +273,18 @@ Target:
 - No avoidable audible dropouts during normal supported use.
 - Stable long-running playback.
 - Pause nonessential visual animation when the document is hidden.
-- Do not keep an animation loop running while inactive unless audio or a visible
-  meter requires it.
+- If audio or a visible meter does not require an animation loop, stop it while
+  inactive.
 - Batch visual patches.
 - Use transforms for playheads, meters, and drag previews.
 - Cache geometry for the duration of pointer gestures.
 - Avoid repeated layout measurement inside pointer-move handlers.
 
-Apart from the functional first-sound metric above, the MVP has no normative
-hardware class, CPU percentage, buffer-size threshold, or timed stress benchmark
-as a release gate. Performance profiling remains required for engineering
-diagnosis, but it is informational rather than a pass-or-fail acceptance
-criterion, and its output belongs in the run report to the user rather than in
-the repository tree.
+Apart from the functional first-sound metric above, the MVP does not use a
+hardware class as a performance release gate. It also does not use a CPU
+percentage, buffer-size threshold, or timed stress benchmark. Engineers must
+profile performance for diagnosis. The profile is informational, not a
+pass-or-fail criterion. Put its result in the run report to the user, not in the
+repository tree.
 
 ---

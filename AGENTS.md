@@ -73,7 +73,7 @@ AudioWorklet. No server product component, no MIDI.
   normative unless the specification or user explicitly makes them so. This
   includes `docs/design/claude-mock-up.html`, which spec-003 section 8.2 makes
   the single approved composition target. Do not reintroduce a second design
-  target in another medium; it drifts from the HTML and contradicts it.
+  target in another medium. It would drift from the HTML and contradict it.
 
 Owning contract documents:
 
@@ -96,8 +96,8 @@ Owning contract documents:
   unit tests, and production-browser tests.
 - Claim checks only when their current scripts have been run successfully.
 - Later MVP phases remain governed by the indexed specification set under
-  `docs/specs/`. Claim only the narrow later-phase slices listed in README.md;
-  do not describe their incomplete parent phases as implemented.
+  `docs/specs/`. Claim only the narrow later-phase slices listed in README.md.
+  Do not describe their incomplete parent phases as implemented.
 
 ## Roles and workflow
 
@@ -110,7 +110,8 @@ Owning contract documents:
   Avoid overlapping edits.
 - `.github/skills/` holds the repository workflows, including add-feature,
   design-pulsebox-ui, run-quality-gate, full-code-review, verify, refactor,
-  dead-code-audit, and handoff. Use skills-router when the right one is unclear.
+  dead-code-audit, and handoff. If the correct workflow is unclear, read
+  `.github/skills/SKILLS.md`.
 - Use higher reasoning for architecture, audio, persistence, security,
   concurrency, and ambiguous product contracts.
 - Before material work, inspect all applicable current documentation and code.
@@ -124,11 +125,12 @@ Owning contract documents:
 - Build a fully client-side, desktop-first browser application that runs locally
   in a browser.
 - Use `http://127.0.0.1:4173` as the canonical development and production-build
-  origin. Fail when that port is unavailable instead of selecting another one.
+  origin. If that port is unavailable, fail instead of selecting another port.
 - A repository-owned static-file launcher is delivery tooling, not a product
   server component. It serves only the built client and exposes no API.
-- Do not add a server, accounts, cloud sync, collaboration, a native wrapper, a
-  PWA, a service worker, or an install flow.
+- Do not add a server, accounts, cloud sync, collaboration, a native wrapper,
+  or a PWA.
+- Do not add a service worker or an install flow.
 - Support current stable Chrome. Other browsers are outside MVP support.
 - Keep the editable workspace usable from 1280 x 720 CSS pixels upward. Below
   either minimum dimension, use the specified unsupported-size behavior.
@@ -141,8 +143,9 @@ Owning contract documents:
 - Render PULSEBOX in uppercase only in the centered app mark and browser title.
   Use Pulsebox in normal prose.
 - Use the .pulsebox extension for portable projects.
-- Keep manufacturer names, historical product names and model numbers, copied
-  layouts, copied artwork, copied presets, and extracted samples out of all
+- Keep manufacturer names, historical product names, and model numbers out of
+  all shipping files.
+- Keep copied layouts, artwork, presets, and extracted samples out of all
   shipping files.
 - Named historical research may exist only under non-shipping research/.
 - Keep factory sounds, generated buffers, patterns, presets, graphics, icons,
@@ -154,23 +157,23 @@ Owning contract documents:
 
 Use:
 
-- strict TypeScript;
+- strict TypeScript.
 - one UI framework or component model for the whole UI layer, applied
-  consistently;
-- style encapsulation for reusable controls and isolated leaf components;
-- CSS Grid, Flexbox, custom properties, and original inline SVG;
-- Canvas only where high-frequency rendering benefits from it;
-- Web Audio and AudioWorklet;
-- IndexedDB for projects and project assets;
-- local storage only for lightweight global UI preferences;
-- Vite or an equivalent lightweight TypeScript build tool;
+  consistently.
+- style encapsulation for reusable controls and isolated leaf components.
+- CSS Grid, Flexbox, custom properties, and original inline SVG.
+- Canvas only where high-frequency rendering benefits from it.
+- Web Audio and AudioWorklet.
+- IndexedDB for projects and project assets.
+- local storage only for lightweight global UI preferences.
+- Vite or an equivalent lightweight TypeScript build tool.
 - Vitest and Playwright.
 
 Do not use:
 
-- third-party sequencer, mixer, piano-roll, knob, or fader components;
-- raster control artwork;
-- ScriptProcessorNode or main-thread custom DSP;
+- third-party sequencer, mixer, piano-roll, knob, or fader components.
+- raster control artwork.
+- ScriptProcessorNode or main-thread custom DSP.
 - MIDI APIs, MIDI files, MIDI learn, or MIDI placeholders.
 
 Inspect the dependency tree before close-out. Remove unused dependencies.
@@ -181,14 +184,16 @@ Inspect the dependency tree before close-out. Remove unused dependencies.
 - The engine owns the audio graph, plugins, transport, scheduling, meters,
   sample decoding, offline rendering, export, and worklet messaging. It has no
   DOM dependency.
-- The state layer owns plain project data, commands, undo and redo,
-  serialization, migrations, validation, selectors, editor state, automation,
-  and persistence state. It has no DOM and stores no live AudioNode objects.
+- The state layer owns plain project data, commands, undo, redo, serialization,
+  migrations, and validation.
+- It also owns selectors, editor state, automation, and persistence state. It
+  has no DOM and stores no live AudioNode objects.
 - The UI owns components, layout, input, accessibility, themes, and visual
   patching. It dispatches typed commands and never edits the audio graph.
-- Define the base plugin manifest, instrument and effect contracts, parameter
-  descriptors, command model, message protocol, project schema, and theme tokens
-  before implementing instruments or effects.
+- Before you implement instruments or effects, define the base plugin manifest
+  and the instrument and effect contracts.
+- Also define parameter descriptors, the command model, the message protocol,
+  the project schema, and theme tokens.
 - Add an instrument or effect through its plugin folder and registry entry. Do
   not spread product-specific branches through shared engine, state,
   persistence, mixer, automation, or UI code.
@@ -213,12 +218,12 @@ Cross-layer imports go through the owning layer's `public.ts`
 `src/ui/public.ts`). Two guards enforce this:
 
 - `no-restricted-imports` per layer in `eslint.config.mjs`. Its patterns match a
-  layer directory at any nesting depth, so a deeply nested component cannot
-  reach across a boundary by adding another `../`.
-- The AST policy in `tests/unit/architecture/source-policy.ts`, which also fails
-  on `ScriptProcessorNode`, any identifier or string matching `midi`,
-  service-worker code, and product-specific plugin-ID branching outside a plugin
-  folder or the registry.
+  layer directory at any nesting depth. Adding another `../` cannot bypass the
+  boundary.
+- The AST policy in `tests/unit/architecture/source-policy.ts` also rejects
+  `ScriptProcessorNode` and any identifier or string that matches `midi`.
+- It rejects service-worker code and product-specific plugin-ID branches outside
+  a plugin folder or the registry.
 
 Read that policy file before adding a source directory or a shared branch.
 
@@ -233,9 +238,9 @@ An instrument or effect folder follows the current module shape under
   worklet through a Vite `?worker&url` import, not a hand-written path.
 - `runtime.ts` implements the lifecycle the engine drives.
 
-`PulseStore` in `src/state/pulse-store.ts` is the only mutation path. Its history
-limits are 100 entries, 64 MiB combined, and 17 MiB per entry, enforced by
-evicting the oldest entries rather than rejecting a valid new action.
+`PulseStore` in `src/state/pulse-store.ts` is the only mutation path. History is
+limited to 100 entries and 64 MiB in total. One entry is limited to 17 MiB.
+`PulseStore` evicts the oldest entries instead of rejecting a valid new action.
 
 ## Audio
 
@@ -255,16 +260,18 @@ evicting the oldest entries rather than rejecting a valid new action.
 
 - Route committed user edits through typed commands.
 - Coalesce a continuous gesture into one undo entry.
-- Use immediate destructive actions with complete Undo while their bounded
-  active-history entry is retained, a non-blocking Undo notice, and an ARIA live
-  announcement. Evict older history rather than reject a valid new action. Do
-  not add confirmation dialogs.
+- Apply destructive actions immediately.
+- Retain complete Undo data while the bounded active-history entry exists.
+- Show a non-blocking Undo notice and an ARIA live announcement.
+- Evict older history instead of rejecting a valid new action. Do not add
+  confirmation dialogs.
 - Store projects and assets in IndexedDB. Store only lightweight global UI
   preferences in local storage.
 - Keep project documents versioned, validated, and migration-aware.
 - Treat imported project data as untrusted. Reject executable content, unsafe
-  paths, invalid structures, unknown or incompatible referenced plugins, and
-  projects exceeding eight rack slots as specified in docs/PROJECT-FORMAT.md.
+  paths, and invalid structures.
+- Reject unknown or incompatible referenced plugins. Reject projects that
+  exceed eight rack slots as specified in docs/PROJECT-FORMAT.md.
 - Keep live audio objects, meter frames, hover, focus, playheads, and temporary
   previews out of serialized state.
 - Preserve project migration paths that remain part of the current format
@@ -297,28 +304,32 @@ evicting the oldest entries rather than rejecting a valid new action.
 ## Commands and verification
 
 - When package.json exists, treat its scripts as the executable command source.
-- The required command surface is npm install, npm run dev, npm run build, npm
-  run start, npm run test, npm run test:e2e, npm run lint, and npm run
+- The required command surface includes npm install, npm run dev, npm run
+  build, and npm run start.
+- It also includes npm run test, npm run test:e2e, npm run lint, and npm run
   typecheck.
 - Do not invent a command or quality threshold that the repository has not
   defined.
-- To narrow a run: `npx vitest run tests/unit/state/pulse-store.test.ts` for one
-  unit file, `npx vitest run -t "name"` for one test, and
-  `npx playwright test tests/e2e/app-shell.spec.ts --project=chrome` for one
-  browser spec. `npm run test:e2e` builds and serves before running.
+- To run one unit file, use
+  `npx vitest run tests/unit/state/pulse-store.test.ts`.
+- To run one test, use `npx vitest run -t "name"`.
+- To run one browser specification, use
+  `npx playwright test tests/e2e/app-shell.spec.ts --project=chrome`.
+- `npm run test:e2e` builds and serves the application before the test run.
 - Every implementation task needs an objective verification method.
 - Add and run the smallest relevant unit, component, Playwright, or visual
   regression check for each changed contract.
 - Verify the production build in real browser contexts, not only a DOM shim.
 - Cover current stable Chrome. Automate every deterministic path and record the
   required manual audio checks.
-- Verify supported layouts at 1536 x 1024, 1440 x 900, 1366 x 768, and 1280 x
-  720, plus the below-minimum notice.
+- Verify supported layouts at 1536 x 1024, 1440 x 900, and 1366 x 768.
+- Also verify 1280 x 720 and the below-minimum notice.
 - Use deterministic state, meters, animation, and audio fixtures for visual or
   rendered-audio assertions.
 - For performance claims, record the browser, sample rate, exposed buffer
-  setting, active modules and effects, workload, method, result, observed
-  glitches, and known hotspots. Do not invent a fixed CPU release threshold.
+  setting, and active modules and effects.
+- Also record the workload, method, result, observed glitches, and known
+  hotspots. Do not invent a fixed CPU release threshold.
 
 ## Documentation and changes
 
@@ -332,9 +343,10 @@ evicting the oldest entries rather than rejecting a valid new action.
 - Keep comments focused on non-obvious contracts and browser or audio hazards.
 - Update the owning product specification in the same change as every accepted
   product change or bug fix.
-- Keep docs/ARCHITECTURE.md, docs/THEMING.md, docs/PROJECT-FORMAT.md, README.md,
-  and domain documentation current when their owning contracts change. Do not
-  claim that planned implementation exists.
+- When their owning contracts change, keep docs/ARCHITECTURE.md,
+  docs/THEMING.md, and docs/PROJECT-FORMAT.md current.
+- Also keep README.md and domain documentation current. Do not claim that a
+  planned implementation exists.
 
 ## Close-out
 
@@ -345,10 +357,10 @@ evicting the oldest entries rather than rejecting a valid new action.
 - For large, high-risk, or difficult changes, request an independent review from
   a clean context. Ask: "Evaluate this work. What may have been missed?"
 - In the final handoff, record:
-  1. least-confident changes and a concrete verification procedure for each;
-  2. skipped, incomplete, or deferred work;
-  3. previously unstated assumptions;
-  4. the largest remaining blind spot;
+  1. least-confident changes and a concrete verification procedure for each.
+  2. skipped, incomplete, or deferred work.
+  3. previously unstated assumptions.
+  4. the largest remaining blind spot.
   5. independent review findings when one was required.
 - Record verified non-blocking limitations, future work, and known issues in
   their owning specification or issue.
@@ -363,7 +375,8 @@ evicting the oldest entries rather than rejecting a valid new action.
   dated evidence file.
 - Report run results in the reply to the user. Anyone who needs current results
   re-runs the command.
-- When a run reveals a durable requirement or a real limitation, put that fact in
-  its owning specification and discard the run narrative.
+- When a run reveals a durable requirement or a real limitation, put that fact
+  in its owning specification.
+- Discard the run narrative.
 - Do not write repository prose describing what a previous agent found, repaired,
   removed, or superseded. Change the affected file and let the diff carry it.

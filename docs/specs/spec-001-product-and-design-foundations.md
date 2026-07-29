@@ -16,17 +16,16 @@ language, themes, and the MVP scope boundary.
 Build **Pulsebox**, a production-quality, desktop-first modular groove
 workstation for the browser.
 
-Pulsebox is:
+Pulsebox requirements:
 
 - Fully client-side.
 - Runnable at the canonical local origin `http://127.0.0.1:4173`.
 - A serious music-production application, not a static mockup.
 - Built around a dense rack, an eight-channel studio mixer, a four-bus effects
   area, pattern editing, piano-roll editing, and song arrangement.
-- Designed for fast results. A new user should be able to start the supplied
-  loop within one minute.
-- Designed so playback continues while modules, effects, patterns, themes, and
-  project data change.
+- A new user can start the supplied loop within one minute.
+- Playback continues while modules, effects, patterns, themes, and project data
+  change.
 - Original in artwork, naming, control layout, code, sample content, and sound
   design.
 - Limited to eight instrument slots in the MVP, with plugin contracts that do
@@ -80,9 +79,10 @@ Rules:
 - Short labels are always uppercase.
 - Short labels are no longer than four characters.
 - Use short labels as the primary identity on faceplates, compact rack cards,
-  rack-overview markers, mixer strips, and dense selectors. A rack faceplate may
-  pair its short label with the approved full name and type as subordinate text;
-  the short label remains the dominant compact identifier.
+  rack-overview markers, mixer strips, and dense selectors.
+- A rack faceplate can show its short label with the approved full name and type
+  as subordinate text.
+- The short label remains the dominant compact identifier.
 - Use full names in the module browser, help text, accessible names, detailed editors,
   and documentation.
 - Do not invent additional visible names for the six instruments.
@@ -105,14 +105,14 @@ file names, factory project data, and user-facing strings must not contain:
 - Traced or recolored reference art.
 
 Named historical sources may appear only in the non-shipping `/research`
-directory. That directory is excluded from production packages and public
-product documentation. Research may be used to understand broad synthesis
-families, but factory voice lists, control ranges, curves, defaults, sound
-targets, panel arrangements, and shipped content must remain original.
+directory. Production packages and public product documentation exclude that
+directory. Research can explain broad synthesis families. Factory
+voice lists, control ranges, curves, defaults, sound targets, panel
+arrangements, and shipped content must remain original.
 
-The interface may use generic rack cues such as handles, screws, inset bays,
-compact pedal enclosures, and dark powder-coated surfaces, but every arrangement
-and drawing must be original.
+The interface may use generic rack cues. These cues include handles, screws,
+inset bays, compact pedal enclosures, and dark powder-coated surfaces. Every
+arrangement and drawing must be original.
 
 All factory sounds, generated buffers, patterns, presets, graphics, and icons
 must be newly created for Pulsebox.
@@ -121,23 +121,23 @@ must be newly created for Pulsebox.
 
 ## 3. Product principles
 
-1. **Editing is not step-toggle-only.** Every sequencer supports painting,
-   direct manipulation, computer-keyboard performance, and generation or
-   transformation.
+1. **Editing includes more than step toggles.** Every sequencer lets users paint,
+   directly manipulate, perform with the computer keyboard, generate, and
+   transform events.
 2. **The system is modular.** Instruments and effects use plugin contracts. Rack
    slots, insert chains, send chains, and the master chain are data-driven.
-3. **Playback remains continuous.** Editing, saving, loading compatible data,
-   switching themes, opening editors, and reordering modules must not produce a
-   dropout or click.
-4. **Undo is the safety system.** User edits go through a command layer.
-   Continuous gestures coalesce into one history entry. Active history is
-   bounded, expires oldest entries first, and never makes a valid new edit fail.
+3. **Playback remains continuous.** Playback continues without a dropout or
+   click while users edit, save, load compatible data, switch themes, open
+   editors, and reorder modules.
+4. **Undo recovers user edits.** User edits go through a command layer.
+   Continuous gestures coalesce into one history entry. The store limits active
+   history. It expires the oldest entries first and never rejects a valid new
+   edit.
 5. **Core controls remain visible.** Compact panels expose the controls needed
    for fast sound design. Expanded editors expose deeper parameters without
    replacing the underlying state.
-6. **Visual feedback follows sound.** Audible parameter changes receive a useful
-   visual response such as a meter, curve, envelope, playhead, waveform, or
-   numerical value.
+6. **Audible changes have visual feedback.** Audible parameter changes show a
+   meter, curve, envelope, playhead, waveform, or numerical value.
 7. **No dead controls.** Every visible operational control must alter state,
    audio, navigation, or a documented preference.
 8. **Mouse and computer keyboard are first-class.** No workflow depends on MIDI.
@@ -145,14 +145,15 @@ must be newly created for Pulsebox.
 10. **Accessibility is part of the component contract.** It is not a late
     retrofit.
 
-Deep effect editors use the already established 760 × 680 editor format.
-Playback continues underneath. The editor restores focus when closed.
+Deep effect editors use the 760 × 680 editor format.
+Playback continues underneath. When the user closes the editor, it restores
+focus.
 
-Pulsebox uses no destructive confirmation dialogs. Destructive edits happen
-immediately, preserve complete recovery data while their bounded history entry
-is retained, and produce a non-blocking notification with an operable Undo
-action and an ARIA live announcement. When the history budget is full, the
-oldest retained entries expire before the new action commits.
+Pulsebox uses no destructive confirmation dialogs. It applies destructive edits
+immediately. It preserves complete recovery data while the bounded history entry
+remains. It shows a non-blocking notification with an operable Undo action and
+an ARIA live announcement. When the history budget is full, the store expires
+the oldest retained entries before it commits the new action.
 
 ---
 
@@ -205,9 +206,9 @@ Use each accent for:
 - Mixer header.
 - Overview marker.
 
-Never rely on color alone. Every accent is paired with the module short label,
-and selection, status, and disabled state each carry a non-color cue that
-survives the high-contrast overlay.
+Never rely on color alone. Pair every accent with the module short label. Give
+selection, status, and disabled states a non-color cue that survives the
+high-contrast overlay.
 
 `THEMING.md` section 3.4 owns the normative token values for these six accents.
 A plugin declares its own accent in its manifest `moduleAccent`, which must match
@@ -235,7 +236,7 @@ Ship exactly one original token-based built-in theme, per decision `D79`:
 | -------- | ------------- | -------------------------------------------- |
 | `rack`   | Rack          | Studio hardware, graphite and steel, default |
 
-Also provide a high-contrast mode that can be layered over the built-in theme
+Also provide a high-contrast mode. The user can apply it over the built-in theme
 or a valid user theme. Additional built-in themes are post-MVP token packs and
 are not part of this contract.
 
@@ -244,25 +245,25 @@ Rules:
 - Themes are CSS custom-property sets.
 - No theme-specific TypeScript.
 - No theme-specific markup.
-- Switching themes does not rebuild the audio graph or interrupt playback.
+- A theme change does not rebuild the audio graph or interrupt playback.
 - Every module and effect must work in every theme.
 - Focus rings and meters remain readable.
-- Theme switching causes no layout shift.
+- A theme change causes no layout shift.
 - Document the token contract in `THEMING.md`.
 - Themes change appearance only. Sample packs and user samples change sound
   independently.
 
 User themes import through the bounded, allowlisted JSON token schema in
-`THEMING.md` only. Raw CSS and values capable of loading resources or injecting
-additional declarations are rejected. Unknown tokens are ignored with a report.
-Any invalid required token rejects the complete theme without changing the
-active theme.
+`THEMING.md` only. The theme validator rejects raw CSS and values that can load
+resources or inject declarations. It ignores unknown tokens and reports them.
+If a required token is invalid, the validator rejects the complete theme. The
+active theme does not change.
 
-Theme and high-contrast settings are global UI preferences stored in local
-storage. Projects never change the user's appearance settings and do not
+Store theme and high-contrast settings in local storage as global UI
+preferences. Projects never change the user's appearance settings and do not
 serialize a theme override. New installations start with the `rack` theme.
-Theme and high-contrast selection appears only on the Settings page when that
-page is implemented. The application header never contains a theme selector.
+When the Settings page exists, show theme and high-contrast selection only on
+that page. The application header never contains a theme selector.
 
 ### 11.5 CSS implementation
 
@@ -291,7 +292,8 @@ Use:
 - Logical properties where practical.
 - Subtle visible scrollbars.
 - Container queries where they simplify adaptation, with media-query fallbacks.
-- Constructable stylesheets where supported, with a small fallback.
+- If the browser supports them, use constructable stylesheets with a small
+  fallback.
 
 Module-scoped variables include:
 

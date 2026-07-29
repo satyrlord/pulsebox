@@ -7,7 +7,7 @@
 - Route committed edits through reversible commands.
 - Coalesce each continuous gesture into one history entry.
 - Keep audio nodes and transient visual state out of persistence.
-- Validate imported data before state construction or asset activation.
+- Before state construction or asset activation, validate imported data.
 - Replace theme-specific logic with documented CSS tokens.
 - Isolate frequent visual updates from structural React rendering.
 - Clean up listeners, observers, ports, timers, and animation frames.

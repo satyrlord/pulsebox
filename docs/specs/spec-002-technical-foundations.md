@@ -17,7 +17,7 @@ Undo foundations.
 Use:
 
 - TypeScript with strict mode.
-- One UI framework or component model for the whole UI layer, applied
+- One UI framework or component model for the whole UI layer. Apply it
   consistently.
 - Style encapsulation for reusable controls and isolated leaf components.
 - CSS Grid and Flexbox.
@@ -43,7 +43,7 @@ Do not use:
 - Main-thread DSP.
 - MIDI APIs, MIDI file code, MIDI learn, or MIDI placeholders.
 
-Inspect the final dependency tree. No unused dependency may remain.
+Inspect the final dependency tree. Remove all unused dependencies.
 
 ---
 
@@ -59,17 +59,17 @@ layers. This section owns the product-level boundary.
 
 Responsibilities:
 
-- Audio graph ownership.
-- Instrument instances.
-- Effect instances.
-- Transport and scheduling.
-- Voice allocation and stealing.
-- Parameter smoothing.
-- Meter extraction.
-- Offline rendering.
-- Audio export.
-- Sample decoding and prepared audio buffers.
-- Worklet messaging.
+- Own the audio graph.
+- Own instrument instances.
+- Own effect instances.
+- Control transport and scheduling.
+- Allocate and steal voices.
+- Smooth parameters.
+- Extract meter data.
+- Render audio offline.
+- Export audio.
+- Decode samples and prepare audio buffers.
+- Exchange worklet messages.
 
 The engine has no DOM dependency.
 
@@ -77,18 +77,18 @@ The engine has no DOM dependency.
 
 Responsibilities:
 
-- Project model.
-- Commands.
-- Undo and redo.
-- Serialization.
-- Migrations.
-- Import validation.
-- Autosave state.
-- Stable IDs.
-- Selectors.
-- Editor state.
-- Automation data.
-- Clipboard data.
+- Own the project model.
+- Own commands.
+- Provide undo and redo.
+- Serialize data.
+- Migrate data.
+- Validate imports.
+- Own the autosave state.
+- Own stable IDs.
+- Provide selectors.
+- Own the editor state.
+- Own automation data.
+- Own clipboard data.
 
 The state layer has no DOM and no live AudioNode objects.
 
@@ -96,24 +96,24 @@ The state layer has no DOM and no live AudioNode objects.
 
 Responsibilities:
 
-- UI components.
-- Layout.
-- Input handling.
-- Accessibility.
-- Direct visual patching.
-- Theme tokens.
-- Canvas rendering.
-- Menus, dialogs, popovers, and tooltips.
-- Dispatching typed commands.
-- Reading selected state.
+- Render UI components.
+- Control the layout.
+- Handle input.
+- Provide accessibility.
+- Patch visuals directly.
+- Apply theme tokens.
+- Render Canvas content.
+- Own menus, dialogs, popovers, and tooltips.
+- Dispatch typed commands.
+- Read selected state.
 
 The UI never constructs, connects, disconnects, or edits the audio graph
 directly. It sends commands to the engine controller. The engine returns
-acknowledgements, transport position, state, warnings, and meter frames.
+acknowledgments, transport position, state, warnings, and meter frames.
 
-Custom synthesis and custom DSP run in AudioWorklet processors. Suitable native
-Web Audio nodes may be used behind engine-owned plugin adapters. The UI never
-touches either worklets or native graph nodes directly.
+Custom synthesis and custom DSP run in AudioWorklet processors. The engine may
+use suitable native Web Audio nodes behind plugin adapters. The UI never touches
+either worklets or native graph nodes directly.
 
 AudioWorklet processors process the frame count supplied by the audio host. No
 plugin may assume or hard-code a 128-frame render quantum. An algorithm that
@@ -131,8 +131,8 @@ Write the plugin contracts before implementing instruments or effects.
 rules. `PROJECT-FORMAT.md` owns their serialized identities, versions, and
 migrations.
 
-Use a shared base manifest and typed specializations rather than forcing
-instruments and effects into one untyped interface.
+Use a shared base manifest and typed specializations. Do not force instruments
+and effects into one untyped interface.
 
 ### 6.1 Base plugin manifest
 
@@ -213,9 +213,9 @@ An effect plugin adds:
 
 ### 6.5 Plugin loading
 
-Adding a new instrument or effect should mean adding one plugin folder and
-registering its manifest. Existing engine, rack, mixer, persistence, automation,
-and UI code must not require product-specific branching beyond the registry.
+To add a new instrument or effect, add one plugin folder. Register its manifest.
+Existing engine, rack, mixer, persistence, automation, and UI code must not
+require product-specific branches beyond the registry.
 
 ---
 
@@ -233,12 +233,12 @@ Required store API:
 - `loadProject(project)`
 - `saveProject()`
 
-`loadProject` accepts an already validated in-memory project and `saveProject`
-returns one. Neither reads nor writes a serialized document.
+`loadProject` accepts a validated in-memory project. `saveProject` returns an
+in-memory project. Neither function reads nor writes a serialized document.
 
 Serialization is a separate required capability that the store does not own.
-Project export and import are owned by the persistence layer and reach the user
-through the composition boundary:
+The persistence layer owns project export and import. The composition boundary
+exposes them to the user:
 
 - Export serializes a validated project document to the portable `.pulsebox`
   representation.
@@ -276,11 +276,10 @@ High-level state for the complete MVP:
 - `history`
 - `persistence`
 
-This is the state vocabulary, not a required literal top-level shape. Serialized
-musical data may be nested under `project` so that one document saves, loads,
-and undoes atomically. Each area arrives with the specification that owns its
-feature in build order, so a phase that has not reached that owner carries no
-placeholder slice for it.
+This is the state vocabulary, not a required literal top-level shape. The state
+can nest serialized musical data under `project`. One document then saves,
+loads, and undoes atomically. Each area enters the state when the build order reaches its
+owning specification. An earlier phase has no placeholder slice for that area.
 
 Do not persist:
 
@@ -299,31 +298,30 @@ directly. It reports the user's intent as a typed, statically checked edit that
 the store validates before any transition.
 
 The command union in the state layer is the single vocabulary for these edits.
-It is exhaustive over the MVP surface and covers at least:
+It is exhaustive over the MVP surface. Its commands:
 
-- continuous control input and its commit;
-- step, note, and automation editing;
-- module add, move, remove, and duplicate;
-- mixer channel and effect changes;
-- pattern selection, rename, and reorder;
-- transport commands.
+- Accept continuous control input and its commit.
+- Edit steps, notes, and automation.
+- Add, move, remove, and duplicate modules.
+- Change mixer channels and effects.
+- Select, rename, and reorder patterns.
+- Control the transport.
 
 Each command carries a unique command ID, a stable command type, a typed
 payload, the expected project revision, an origin, and an optional gesture ID.
 An unknown or malformed edit fails to type-check rather than reaching the store.
 
-The transport mechanism is the component model's own typed dispatch. A DOM
-`CustomEvent` layer is not required and must not be added solely to re-express
-an edit the command union already carries.
+Use the component model's typed dispatch as the transport mechanism. Do not add
+a DOM `CustomEvent` layer only to repeat an edit that the command union carries.
 
 Transient drag input does not create one history entry per pointer event.
 Pointer release commits one command unless the user deliberately creates
 multiple edits.
 
-This applies to every continuous control, including a native range input. Such
-an input emits a change per step of a single drag, so each change carries the
-same gesture identifier and the movement collapses into one history entry. A
-numeric field that is typed rather than dragged commits on Enter or blur, so a
-multi-digit value is one entry rather than one per keystroke.
+This applies to every continuous control, including a native range input. The
+input emits one change for each step of a drag. Each change carries the same
+gesture identifier. The store combines the movement into one history entry.
+When the user types in a numeric field, the field commits on Enter or blur. A
+multi-digit value creates one entry, not one entry for each keystroke.
 
 ---

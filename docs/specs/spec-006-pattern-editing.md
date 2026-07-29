@@ -29,9 +29,9 @@ input, generators, and transforms.
 - Pattern color.
 - Launch quantization.
 
-The Playlist is always the compact Song-building surface beside the inspector.
-It uses the same named Patterns and does not introduce Section or Scene
-entities. The inspector has no Pattern/Song tabs.
+The Playlist always lets the user build a Song beside the inspector. It uses the
+same named Patterns and does not introduce Section or Scene entities. The
+inspector has no Pattern/Song tabs.
 
 ### 16.1 One pattern editing surface
 
@@ -40,29 +40,29 @@ creates, deletes, or modifies steps, notes, or triggers.
 
 Rack module faceplates carry no step grid, no per-step editing, and, per
 decision `D78`, no Pattern activity indicator or other step-shaped readout. A
-faceplate provides the audition control defined in
-[rack and instruments](spec-005-rack-and-instruments.md) section 15. Playback
-position feedback lives in the Piano Roll playhead, the pattern position
-readout, and the transport clock.
+faceplate provides the audition control that
+[rack and instruments](spec-005-rack-and-instruments.md) section 15 defines.
+Playback position feedback lives in the Piano Roll playhead, the pattern
+position readout, and the transport clock.
 
-This rule exists so that a user learns exactly one place to edit a Pattern. A
-second editing grid on the faceplate cannot show accent, tie, slide,
-probability, micro-timing, page position, or parts longer than sixteen steps
-within the module height budget, so it would present an incomplete and
-misleading copy of the same data.
+This rule gives the user one place to edit a Pattern. A second faceplate grid
+cannot show accent, tie, slide, and probability. It also cannot show
+micro-timing, page position, or parts longer than sixteen steps. Within the
+module height limit, it would show an incomplete and misleading copy of the
+same data.
 
 Patterns longer than sixteen steps use sixteen-step pages in the Piano Roll with
-a visible page indicator. Playback follow is enabled by default and advances the
+a visible page indicator. Enable playback follow by default. It advances the
 displayed page with the playhead. The user may lock the viewed page while
 playback continues.
 
 ### 16.2 Named project Patterns
 
-A project owns between 1 and 32 named Patterns. A Pattern is the complete
-multi-module musical block previously described as a section. Section and Scene
-are not separate user-facing terms or stored entities.
+A project owns between 1 and 32 named Patterns. A Pattern is a complete
+multi-module musical block. Section and Scene are not separate user-facing terms
+or stored entities.
 
-Each pattern has:
+Each Pattern has:
 
 - Stable ID.
 - Name.
@@ -91,16 +91,17 @@ repeats across the Pattern's bar duration. Each drum voice may override its own
 cycle length and wraps independently inside that part. Per-voice grid resolution
 is post-MVP.
 
-Patterns are identified to users by names such as `Intro`, `Verse`, `Break`,
+The UI identifies Patterns by names such as `Intro`, `Verse`, `Break`,
 `Drop`, and `Outro`. The UI never presents a compound module-and-pattern number
-such as `1 - 1`. Reordering a Pattern does not change its stable ID or name.
+such as `1 - 1`. When the user reorders a Pattern, its stable ID and name do not
+change.
 
 ### 16.3 Module-aware Piano Roll
 
 The user sees one editor named Piano Roll. Its interaction mode comes from the
 selected module's declared event capability. The MVP implements only:
 
-- `monophonic-pitched` for monophonic synths;
+- `monophonic-pitched` for monophonic synths.
 - `drum-triggers` for drum machines.
 
 The architecture may reserve a `polyphonic-pitched` capability, but the MVP has
@@ -115,8 +116,8 @@ Shared header:
 - Fixed 1/16 grid status.
 - Horizontal Swing slider. It edits the one global project Swing value, so its
   position is the same on every Pattern.
-- Horizontal Humanize slider, owned by the selected Pattern.
-- Parameter selector, default Velocity, in place of a static `Vel 100` label.
+- Horizontal Humanize slider. The selected Pattern owns its value.
+- Parameter selector, default Velocity. Do not show a static `Vel 100` label.
   It is the single entry point to every lane the Piano Roll edits, as defined
   in section 16.3.1.
 - Zoom controls.
@@ -148,7 +149,7 @@ Shared interactions:
 
 The Piano Roll header has no local Play button and no persistent pen or erase
 tools. Pattern playback uses Pattern mode and the global transport Play control.
-Direct pointer gestures perform creation, deletion, movement, and resizing.
+Direct pointer gestures create, delete, move, and resize events.
 Right-click deletion is not the only delete path: Delete or Backspace removes
 the selected note for keyboard users.
 
@@ -158,8 +159,8 @@ Monophonic pitched mode:
 - Prevents overlapping sounding notes in the module part.
 - Left-click creates a note.
 - Right-click deletes a note with Undo available.
-- Dragging the note body moves it; dragging either edge resizes it.
-- Slide is an explicit note property and is shown with a non-color cue.
+- Drag the note body to move it. Drag either edge to resize it.
+- Slide is an explicit note property. The UI shows it with a non-color cue.
 - Scale, key, scale lock, snap-to-scale, and out-of-scale shading apply only in
   this mode.
 
@@ -170,7 +171,7 @@ Drum trigger mode:
 - Left-click adds one fixed one-cell trigger.
 - Left-drag paints fixed one-cell triggers.
 - Right-click deletes a trigger with Undo available.
-- Triggers have no duration edge and cannot be resized.
+- Triggers have no duration edge. Users cannot resize them.
 - Voice cycle lengths may differ and wrap independently.
 - Advanced trigger properties remain keyboard-accessible and do not depend on
   a context menu.
@@ -190,66 +191,69 @@ meaningful accessibility information.
 #### 16.3.1 Parameter selector and the active lane
 
 The Piano Roll owns every lane a Pattern can hold. The Parameter selector in the
-shared header is the only control that chooses which lane is edited. There is no
+shared header is the only control that lets the user choose a lane. There is no
 second lane picker, no per-lane add button in the rack, and no automation editor
 outside the Piano Roll.
 
-The selector is scoped to the selected module. It offers exactly two groups:
+The selected module sets the selector scope. The selector offers exactly two
+groups:
 
 - Note properties supported by the selected module's declared event capability,
   drawn from the per-note property list above.
 - Automatable parameters declared by the selected module's plugin manifest,
   including its voice parameters, in manifest order.
 
-Changing the module selection re-scopes the selector. Mixer, send, effect, and
-master parameters are not module-owned and therefore never appear in it; those
-lanes are armed from their own surface, as required by
-[mixer and effects](spec-007-mixer-and-effects.md), and open in this same Piano
-Roll lane once armed. Whatever the source, the lane is edited only here.
+When the module selection changes, the selector changes its scope. It never
+shows mixer, send, effect, or master parameters because modules do not own them.
+Users arm those lanes from their own surface, as required by
+[mixer and effects](spec-007-mixer-and-effects.md). The lanes then open in this
+same Piano Roll lane. Whatever the source, users edit the lane only here.
 
-Exactly one lane is active and visible at a time. Choosing a parameter replaces
-the displayed lane; it never stacks a second lane and never resizes the grid.
-Lanes that hold data are not lost when hidden, and the selector marks which
-parameters already have data in the active Pattern so a user can find existing
-automation without opening each entry in turn.
+Exactly one lane is active and visible at a time. When the user chooses a
+parameter, it replaces the displayed lane. It never stacks a second lane or
+resizes the grid. Hidden lanes keep their data. The selector marks parameters
+that have data in the active Pattern. This mark helps the user find existing
+automation without opening each entry.
 
-The selector lists a parameter whether or not a lane exists for it yet.
-Selecting a parameter with no lane shows an empty lane at the parameter's
-current value and creates no project data. A lane record is created by the first
-committed edit, which is one undoable command. A lane emptied by erasing every
-step is removed on commit rather than persisting as an empty record.
+The selector lists a parameter even when no lane exists for it. If the user
+selects that parameter, the selector shows an empty lane at the current value.
+This action creates no project data. The first committed edit creates a lane
+record and one undoable command. When the user erases every step, the store
+removes the lane on commit. It does not keep an empty record.
 
 The active lane obeys the automation rules in
-[song and automation](spec-008-song-and-automation.md) section 18.2: step-based
-values on the fixed 1/16 grid, with step draw, erase, select, move, and scale
-values. Note-property lanes edit the selected events rather than a separate
-automation record, so a note property has no lane record of its own and erasing
-its lane content resets the property to its default instead of deleting notes.
+[song and automation](spec-008-song-and-automation.md) section 18.2. It uses
+step-based values on the fixed 1/16 grid. Users can draw, erase, select, move,
+and scale step values. Note-property lanes edit the selected events, not a
+separate automation record.
+
+Therefore, a note property has no lane record. When the user erases its lane
+content, the property resets to its default. The notes remain.
 
 The selector is keyboard reachable, announces the active parameter and its
 group, and reports when a listed parameter has existing data.
 
 #### 16.3.2 Ghost notes and ghost lanes
 
-Ghost notes show the events of non-selected modules in the same Pattern behind
-the active module's events, so a user can place events against the rest of the
-Pattern without switching modules.
+Ghost notes show events from non-selected modules in the same Pattern. They
+appear behind the active module's events. A user can then place events against
+the rest of the Pattern without a module change.
 
-- Ghosts are output only. They never accept pointer or keyboard input, are not
-  focusable, are never selected by marquee or select-all, and are never moved,
-  deleted, or transformed by an edit aimed at the active module.
-- Ghosts are visually recessed and use a non-color cue in addition to color, so
-  the distinction survives the accessible themes required by
+- Ghosts show output only. They accept no pointer or keyboard input. They cannot
+  receive focus or selection. An edit for the active module never moves,
+  deletes, or transforms them.
+- Ghosts are visually recessed and use a non-color cue. Therefore, the distinction
+  survives the accessible themes required by
   [product and design foundations](spec-001-product-and-design-foundations.md).
 - Ghosts follow the module's assigned color where color is available.
-- Ghost display is a local view preference. It is not project data, is not
-  included in portable files, and creates no undo entry.
+- Ghost display is a local view preference. It is not project data. Portable
+  files exclude it, and it creates no undo entry.
 
-The same rule applies to the lower lane: the active lane may show the
-corresponding lane of non-selected modules as recessed ghost content under the
-same output-only constraints. This preserves the single-editing-surface rule of
-section 16.1, because a ghost is a reference image of data that is edited by
-selecting its owning module.
+The same rule applies to the lower lane. The active lane may show lanes from
+non-selected modules as recessed ghost content. These ghosts obey the same
+output-only constraints. This preserves the single-editing-surface rule in
+section 16.1. A ghost is a reference view of data. Select its owning module to
+edit that data.
 
 Keyboard behavior:
 
@@ -269,16 +273,16 @@ Keyboard behavior:
 
 - Play the selected module from the computer keyboard.
 - Show a visible key map.
-- Record into the active pattern.
+- Record into the active Pattern.
 - Quantize on input.
 - Quantize after recording.
 - Record without quantize.
 - Configurable count-in.
 - Configurable metronome.
-- Recording remains undoable as one take or logical group.
+- One take or logical group creates one undo entry.
 
 Musical input uses physical `KeyboardEvent.code` positions. Text fields use
-normal typed characters. The musical map is visible and remappable.
+normal typed characters. Show the musical map. Let the user remap it.
 
 ### 16.5 Generators and transforms
 

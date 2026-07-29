@@ -39,12 +39,12 @@ objects and live nodes are never serialized.
 Loose user imports are project-owned and embedded in portable `.pulsebox`
 exports. A loose file path is never a durable reference. An installed immutable
 sample pack may use a validated `pack-reference` as defined in
-`PROJECT-FORMAT.md`; portable Export offers to embed eligible pack assets.
+`PROJECT-FORMAT.md`. Portable Export offers to embed eligible pack assets.
 
 If a referenced pack is unavailable, the project loads in the defined degraded
-mode, preserves the reference, silences only the unavailable sample layers,
-keeps synthesis layers active, and explains how to install the exact matching
-pack or replace the asset.
+mode. It preserves the reference and silences only the unavailable sample
+layers. Synthesis layers stay active. The UI explains how to install the exact
+matching pack or replace the asset.
 
 ## Removal and replacement
 

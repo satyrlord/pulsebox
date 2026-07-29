@@ -1,12 +1,14 @@
 # Pulsebox
 
 Pulsebox is a desktop-first modular groove workstation for current Chrome. It
-is a fully client-side browser application. The Phase 1
-foundation is runnable with narrow, tested foundations from later phases: a
-React interface, AudioWorklet Acid Bass and Drumline Six paths, transport, a
-four-Pattern bank, basic Playlist transport and channel mixing, appearance
-Settings, and browser project persistence. These slices do not mark their
-parent phases complete. Three rack slots are currently exposed.
+is a fully client-side browser application. The Phase 1 foundation is runnable.
+It includes a React interface, transport, a four-Pattern bank, and basic
+Playlist transport. It also includes channel mixing, appearance Settings, and
+browser project persistence.
+
+Narrow later-phase foundations include the AudioWorklet Acid Bass and Drumline
+Six paths. These slices do not mark their parent phases complete. Three rack
+slots are currently exposed.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications
@@ -69,9 +71,9 @@ npm run ci
 
 `npm run typecheck` runs the compiler from the pinned `@typescript/native`
 TypeScript 7 package. ESLint and the
-architecture policy read the TypeScript 6 API through the `typescript` alias,
-because typescript-eslint does not support TypeScript 7 yet; that package
-installs its compiler as `tsc6`, so the two never contend for one binary name.
+architecture policy read the TypeScript 6 API through the `typescript` alias.
+typescript-eslint does not support TypeScript 7 yet. The alias installs its
+compiler as `tsc6`, so the two compilers use different binary names.
 Dependency versions are pinned exactly, so a fresh install cannot pull a
 compiler or lint-tool change that fails `npm run ci` without a source edit.
 `npm run format` remains available as an optional tool and is not part of the
@@ -105,7 +107,7 @@ project data.
 Custom synthesis runs in AudioWorklet processors. Suitable
 native Web Audio nodes remain behind engine-owned adapters. The processor
 accepts the host frame count and never assumes a 128-frame quantum. The bundled
-WAV, AIFF, and FLAC decoder foundation is present; sample-import UI and
+WAV, AIFF, and FLAC decoder foundation is present. Sample-import UI and
 cross-browser format fixtures remain later work.
 
 ## Persistence
@@ -144,32 +146,39 @@ claim unimplemented behavior.
 - The mixer covers level, pan, mute, solo, and master level. Sends, inserts, and
   the master chain remain planned.
 - Acid Bass and Drumline Six implement their Phase 1 sound and compact-rack
-  foundation; their expanded editors remain planned.
+  foundation. Their expanded editors remain planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
 - Files under `design/` are normally non-normative prototypes, not production
   evidence. `docs/design/claude-mock-up.html` is the specification-approved
-  visual composition target; behavioral and release evidence still comes from
+  visual composition target. Behavioral and release evidence still comes from
   the owning specifications and production checks.
 - Named historical research remains isolated under non-shipping `research/`.
 
 ## Adding an instrument
 
-Define one plugin folder and registry entry that implement the base and
-instrument contracts in `docs/ARCHITECTURE.md`. Use stable IDs, add schema and
-migration coverage, keep product-specific branches out of shared layers, write
-the sanitized instrument design document, and update affected acceptance
-criteria and verification evidence.
+1. Create one plugin folder.
+2. Add one registry entry.
+3. Implement the base and instrument contracts in `docs/ARCHITECTURE.md`.
+4. Use stable IDs.
+5. Add schema and migration coverage.
+6. Keep product-specific branches out of shared layers.
+7. Write the sanitized instrument design document.
+8. Update the affected acceptance criteria and verification evidence.
 
 ## Adding an effect
 
-Define one effect plugin folder and registry entry. Declare channel layout,
-latency, tail, bypass, wet/dry, safety clamps, automation, offline support, and
-compact and detailed UI manifests. Update schema, routing, rendered-audio tests,
-documentation, and acceptance evidence together.
+1. Create one effect plugin folder.
+2. Add one registry entry.
+3. Declare channel layout, latency, tail, bypass, wet/dry, safety clamps,
+   automation, offline support, and UI manifests.
+4. Update the schema and routing.
+5. Add rendered-audio tests.
+6. Update the documentation and acceptance evidence.
 
 ## Adding a theme
 
-Add one built-in token set conforming to [THEMING.md](docs/THEMING.md). Do not add
-theme-specific TypeScript or markup. Verify every component, supported viewport,
-focus state, meter, and high-contrast overlay before accepting it.
+1. Add one built-in token set that conforms to [THEMING.md](docs/THEMING.md).
+2. Do not add theme-specific TypeScript or markup.
+3. Before acceptance, verify each component, viewport, focus state, meter, and
+   high-contrast overlay.

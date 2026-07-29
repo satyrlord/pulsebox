@@ -34,23 +34,27 @@ Capabilities:
 - Prepare safe channel, rate, DC-offset, and boundary handling before playback.
 - Keep decoded buffers out of serializable state.
 - Durable non-embedded references may target immutable factory packs or
-  user-installed packs stored in IndexedDB by content ID. Loose imported files
-  are embedded during portable export.
+  user-installed packs stored in IndexedDB by content ID. Portable export
+  embeds loose imported files.
 
 User-installed packs enter through Settings, Sample packs, Install pack from a
 local `.pulsebox-pack` archive. Packs are immutable and content-addressed as
 defined in `PROJECT-FORMAT.md`. A missing referenced pack loads the project in
-the defined degraded mode: unavailable sample layers are silent, synthesis and
-unrelated audio continue, references round-trip unchanged, and the recovery
-report identifies the exact content needed.
+the defined degraded mode. Unavailable sample layers are silent. Synthesis and
+unrelated audio continue.
+
+References round-trip unchanged. The recovery report
+identifies the exact content needed.
 
 Accepted user-sample formats are WAV, AIFF, and FLAC. Preserve mono and stereo
 channel layouts. Reject files with more than two channels. Enforce hard limits
 of 32 MiB per source file and 512 MiB of total stored imported assets per
 project. Enforce the decoded frame, duration, archive, manifest, and expansion
 limits in `PROJECT-FORMAT.md` before project state changes. A compressed source
-that expands beyond a decoded limit is rejected even when its source file is
-smaller than 32 MiB.
+that expands beyond a decoded limit causes rejection.
+
+This rule applies even
+when its source file is smaller than 32 MiB.
 
 ### 23.1 Browser storage
 
@@ -101,17 +105,18 @@ A `.pulsebox` project has:
   asset: `embedded` or `pack-reference`.
 - Migration metadata.
 
-No executable code is imported.
+Import rejects executable code.
 
-No live AudioNode or worklet object is serialized.
+Serialization excludes each live AudioNode and worklet object.
 
 Browser storage uses a versioned JSON manifest plus separate asset records.
 Portable export uses one `.pulsebox` package containing the manifest and any
 embedded audio assets. A `.pulsebox` file is a standard ZIP-compatible archive
-with `manifest.json` at the root and imported assets under `assets/`. The
-normative schema, canonical serialization, pack-reference contract, plugin
-compatibility rules, resource bounds, and archive safety rules are documented in
-`PROJECT-FORMAT.md`.
+with `manifest.json` at the root and imported assets under `assets/`.
+
+`PROJECT-FORMAT.md` defines the normative schema and canonical serialization.
+It also defines the pack-reference contract, plugin compatibility rules,
+resource bounds, and archive safety rules.
 
 ### 23.3 Save and recovery
 
@@ -122,27 +127,32 @@ compatibility rules, resource bounds, and archive safety rules are documented in
 - Explicit Save.
 - Saving does not block interaction.
 - Recover after refresh or crash.
-- Tell the user what was recovered through a non-blocking panel and ARIA live
-  announcement.
+- Tell the user which data recovery restored. Use a non-blocking panel and ARIA
+  live announcement.
 - Keep a bounded recovery history.
 - Schema migrations exist before version 2 is needed.
 
 After the first explicit Save or sample-pack installation gesture, request
-persistent origin storage once and expose whether it was granted. Before a write
-that adds assets or a recovery snapshot, use the browser storage estimate as an
-early warning and calculate the operation's worst-case new records. Estimates
-never replace transaction error handling.
+persistent origin storage once. Show whether the browser granted the request.
+Before an asset or recovery-snapshot write, get the browser storage estimate.
+Use it as an early warning. Calculate the worst-case new records for the
+operation. Estimates never replace transaction error handling.
 
-Every Save, autosave, import, migration, and recovery update is atomic. A failed
-transaction preserves the last committed project, keeps the current editor
-dirty, shows a storage error and recovery action, and keeps portable Export
-available. `QuotaExceededError` never triggers silent pruning of current project
-assets. Only recovery snapshots outside the protected current and last
-known-good pair may be pruned, oldest first, and the pruning is reported.
+Every Save, autosave, import, migration, and recovery update is atomic. After a
+transaction fails, Pulsebox preserves the last committed project. It keeps the
+current editor dirty. It shows a storage error and recovery action. Portable
+Export remains available.
+
+`QuotaExceededError` never causes silent pruning of current project assets.
+Pulsebox can prune only recovery snapshots outside the protected current and
+last known-good pair.
+
+It prunes the oldest snapshot first
+and reports the action.
 
 Ordinary Save preserves each sample manifest entry's current `embedded` or
 `pack-reference` storage mode without prompting. Portable Export asks whether
-eligible recognized pack references should remain references or be embedded.
+eligible recognized pack references remain references or become embedded.
 Loose imported files are not eligible as durable external references and are
 embedded in the portable package.
 
@@ -163,30 +173,32 @@ save still becomes authoritative.
 - Reject executable content.
 - Report every repaired or rejected item.
 
-Apply the complete validation order and limits in `PROJECT-FORMAT.md`. In
-particular, reject unsafe or colliding archive paths, links, duplicate entries,
-excessive expansion, oversized or deeply nested manifests, excessive record
-counts, decoded audio over the frame limits, and unknown or incompatible
-referenced plugins before decoding assets or mutating IndexedDB.
+Apply the complete validation order and limits in `PROJECT-FORMAT.md`. Reject
+unsafe or colliding archive paths, links, and duplicate entries. Reject
+excessive expansion and oversized or deeply nested manifests. Reject excessive
+record counts and decoded audio over the frame limits. Apply the limits in
+`PROJECT-FORMAT.md`. Reject unknown or incompatible referenced plugins.
+
+Complete these checks before asset decoding or IndexedDB changes.
 
 Import safely repairs numeric ranges and missing optional fields. When only safe
 repairs are needed, it applies the project and then shows a complete repair
 report. Structural damage or an unknown or incompatible referenced plugin
 rejects the import and produces a complete rejection report. Every plugin
 reference in an MVP project is required. No optional-plugin degradation mode
-exists. No confirmation dialog is used.
+exists. Import uses no confirmation dialog.
 
 An imported project containing more than eight rack slots is incompatible with
-the MVP and is rejected in full. The rejection report lists every over-cap slot;
-no partial project state is applied.
+the MVP. Import rejects the full project. The rejection report lists every
+over-cap slot. Import applies no partial project state.
 
 ### 23.5 Audio export
 
 - Master WAV export.
 - One stem per rack slot.
 - Offline rendering.
-- Faster than real time where supported; measure the result informally, but do
-  not treat a hardware-specific threshold as a release gate.
+- Render faster than real time where supported. Measure the result informally.
+  Do not use a hardware-specific threshold as a release gate.
 - Visible progress.
 - Cancel.
 - Deterministic result.
@@ -201,7 +213,7 @@ processing.
 
 All WAV exports use 16-bit, 44.1 kHz PCM, including exports from a 48 kHz live
 project. Offline export uses high-quality deterministic resampling to 44.1 kHz.
-Export does not normalize. Deterministic TPDF dither is applied whenever audio
-is quantized to 16-bit PCM.
+Export does not normalize. Export applies deterministic TPDF dither whenever it
+quantizes audio to 16-bit PCM.
 
 ---

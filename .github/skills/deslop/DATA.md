@@ -11,7 +11,7 @@ Inspect these candidates:
 - paths, URLs, identifiers, or packages that do not resolve
 - environment values outside the configured mechanism
 
-Keep explicit default fields when a schema requires them. Also keep them when
-they record an intentional override or stabilize serialization.
+If a schema requires explicit default fields, keep them. Also keep them if they
+record an intentional override or stabilize serialization.
 
 Validate edited data with its parser, schema check, or narrowest consumer test.

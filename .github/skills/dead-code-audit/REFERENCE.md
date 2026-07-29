@@ -1,6 +1,6 @@
 # Dead-code evidence
 
-Delete a candidate only when all these conditions are true:
+If all these conditions are true, delete a candidate:
 
 1. No production, test, build, plugin, serialization, migration, style, asset, or documentation path needs it.
 2. No dynamic import, registry, manifest, or string-based path reaches it.

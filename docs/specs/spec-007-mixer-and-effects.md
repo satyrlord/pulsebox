@@ -50,10 +50,9 @@ The established visible mixer contains:
 - A clear indicator when any send is active.
 
 A fader or pan move is audible while the gesture is in progress. The engine
-ramps the live channel value during the drag and the committed value arrives as
-one command at the end, so the move sounds continuous and still produces a
-single history entry. A muted or solo-silenced channel stays silent while its
-fader moves.
+ramps the live channel value during the drag. One command commits the final
+value and creates one history entry. A muted or solo-silenced channel stays
+silent while its fader moves.
 
 The compact state keeps meter, fader, pan, mute, solo, module identity, and all
 four send buttons visible. Selecting a channel does not change strip width or
@@ -61,25 +60,27 @@ create an expanded strip. Monitor, meter detail, and insert-chain editing use a
 transient focus-managed channel detail surface. Opening that surface does not
 resize the mixer or expose a duplicate effects bank.
 
-Each send button is identified by both its visible letter and accessible name.
+Each send button has a visible letter and an accessible name.
 The buttons remain in A, B / C, D reading order. A button opens the standard
 send-value surface for amount and pre-fader or post-fader mode. Zero amount is
-shown as inactive; a non-zero amount is shown with a non-color active cue. Empty
-channel send buttons remain visible but disabled.
+inactive. A non-zero amount has a non-color active cue. Empty channel send
+buttons remain visible but disabled.
 
 Selecting a rack module selects its mixer channel. Selecting a mixer channel
 selects the matching module.
 
 Monitor performs exclusive single-channel pre-fader audition through a
 non-exported monitor bus. The tap occurs after the module insert chain and
-before the channel fader and send taps. While Monitor is active, the master
-program continues to render internally but is not sent to the physical output.
-Only the selected channel tap reaches the physical output, through monitor
+before the channel fader and send taps. While Monitor is active, the engine
+continues to render the master program internally. The engine does not send the
+master program to the physical output.
+
+Only the selected channel tap reaches the physical output through monitor
 safety gain and the protected limiter. Displayed master meters switch to the
-monitor signal and show a visible Monitor state. This prevents the selected
-channel from being doubled. Only one channel may be monitored at a time. Monitor
-selection is transient session state and is not serialized, restored, included
-in portable project files, or rendered into audio exports.
+monitor signal and show a visible Monitor state. This prevents duplicate output
+from the selected channel. Monitor can select only one channel at a time.
+Pulsebox does not serialize or restore the transient Monitor selection. Project
+files and audio exports do not include it.
 
 The master strip and all eight instrument strips remain visible whenever the
 Mixer studio tab is active at a supported layout. Empty strips are disabled,
@@ -87,22 +88,23 @@ show their two-digit slot number, and expose the Empty state accessibly. There
 are no hidden mixer banks in the MVP. Effects and Master replace the Mixer view
 inside the same compact studio column.
 
-Sends are an instrument-channel concept. The mix bus is the destination that
-send chains return into, never a send source, and its processing is the serial
-master chain in section 20.6 rather than four parallel send chains. The master
-strip therefore carries no A–D grid in any form, including a noninteractive
-label set. Return levels belong to the compact A–D cards in the Effects view,
-and master processing belongs to the Master view.
+Sends are an instrument-channel concept. Send chains return to the mix bus. The
+mix bus is never a send source. Section 20.6 defines its processing as the
+serial master chain, not four parallel send chains. The master strip therefore
+carries no A–D grid, including a noninteractive label set. Return levels belong
+to the compact A–D cards in the Effects view.
+
+Master processing belongs to the Master view.
 
 The master strip is not an instrument channel and does not copy instrument-strip
 geometry. The fixed compact strip geometry above governs the eight instrument
-channels only. Because the master strip carries no pan control and no send grid,
-its fader occupies the reclaimed height: the master fader is taller than an
-instrument fader, starts below the master label, and ends on the same floor so
-the strips still share a baseline. The reclaimed space is never padded out to
-force the two fader lengths to match. A longer master fader is also the correct
-result on its own terms, since master level is the most frequently adjusted
-control in the mixer and benefits from the finest travel.
+channels only. The master strip has no pan control or send grid. Its fader uses
+the available height and is taller than an instrument fader. It starts below
+the master label. It ends at the same bottom edge as the instrument faders.
+
+Thus, all strips share a baseline. The design does not add padding to make the
+two fader lengths equal. The longer master fader gives the frequently adjusted
+master level more precise travel.
 
 ### 19.3 Internal drum-voice mixer
 
@@ -140,38 +142,39 @@ and circular return Mix control.
 
 ### 19.4.1 Automating a mixer, send, effect, or master parameter
 
-Mixer, send, effect, and master parameters are not owned by a rack module, so
-they do not appear in the Piano Roll's module-scoped Parameter selector defined
-in [pattern editing](spec-006-pattern-editing.md) section 16.3.1.
+A rack module does not own mixer, send, effect, or master parameters. Thus,
+these parameters do not appear in the Piano Roll's module-scoped Parameter
+selector. [Pattern editing](spec-006-pattern-editing.md) section 16.3.1 defines
+that selector.
 
 Each such parameter exposes an `Automate` action on its own control, reached
 from the control's context menu and from the keyboard. The action arms the
 parameter and opens its lane as the Piano Roll's active lane in the active
-Pattern. Editing then follows the single-surface rule: the lane is drawn and
-edited only in the Piano Roll.
+Pattern. Editing then follows the single-surface rule. The user draws and edits
+the lane only in the Piano Roll.
 
-Arming alone writes no project data and creates no undo entry. The lane record
-is created by the first committed edit or by a recorded pass, exactly as for a
-module parameter.
+Arming alone writes no project data and creates no undo entry. The first
+committed edit or recorded pass creates the lane record. This behavior matches
+a module parameter.
 
-While a non-module parameter is armed, the Parameter selector shows it as the
-active lane alongside its owning surface name, so the user can see that the
-visible lane belongs to the mixer rather than to the selected module. Selecting
-any entry from the module-scoped groups replaces it and disarms it.
+While the user arms a non-module parameter, the Parameter selector shows it as the
+active lane. The selector also shows its owning surface name. Thus, the user can
+distinguish a mixer lane from a lane for the selected module. Selecting an entry
+from the module-scoped groups replaces and disarms the non-module parameter.
 
 ### 19.5 Solo and mute
 
 - Channel mute silences the module main path and all four sends, regardless of
-  whether a send tap is configured pre-fader or post-fader.
+  the send tap's pre-fader or post-fader setting.
 - Voice mute silences one drum voice before the module sum.
 - Module solo participates in global mixer solo.
 - Voice solo is local to its drum module and does not place the parent mixer
   channel into global solo.
-- Multiple module solos are additive. When any channel is soloed, only soloed
-  channels and their sends feed the mix.
+- Multiple module solos are additive. When any channel has Solo on, only
+  channels with Solo on and their sends feed the mix.
 - Shared send returns remain audible only for signal contributed by the
   surviving soloed channels.
-- Solo behavior is deterministic and tested.
+- Tests verify deterministic Solo behavior.
 - Muting and soloing do not rebuild the graph.
 
 ### 19.6 Mixer-strip modularity
@@ -230,7 +233,7 @@ The reverb detailed editor retains the previously designed shimmer capability.
 
 The Effects studio tab contains four compact A–D cards. Each card summarizes one
 send-bus effect chain. The Effects view replaces the Mixer view inside the same
-compact studio column; it is never duplicated beside or below the mixer.
+compact studio column. The application never shows it beside or below the mixer.
 
 Default primary effects:
 
@@ -256,11 +259,11 @@ The Add effect row appends a plugin to the selected send chain. The detailed
 editor manages ordering, replacement, per-plugin bypass, and per-plugin wet/dry
 mix.
 
-The user pins one effect in the chain as the compact card focus. The first
-effect is pinned by default. The four macros use the pinned plugin's declared
-compact controls. If the focused effect is removed, focus moves to the next
-surviving effect, then the previous effect, or to an empty-card state when the
-chain has no effects.
+The user pins one effect in the chain as the compact card focus. By default, the
+application pins the first effect. The four macros use the pinned plugin's
+declared compact controls. After the user removes the focused effect, focus
+moves to the next effect. If no next effect exists, focus moves to the previous
+effect. An empty chain uses the empty-card state.
 
 The circular control keeps the visible label `Mix` but acts as the send-chain
 return level from silence to unity. The source remains dry on its main path, and
@@ -288,9 +291,9 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - Default post-fader.
 - Each instrument strip exposes A–D as a 2 × 2 button grid in A, B / C, D
   reading order.
-- Activating a send button opens its amount and pre/post value surface; the
-  compact button itself shows disabled, zero, and non-zero states without
-  relying on color alone.
+- Activating a send button opens its amount and pre/post value surface. The
+  compact button shows disabled, zero, and non-zero states without color-only
+  meaning.
 - Effect chains receive sends and return to master.
 - The master strip exposes no send or return control. Each chain's return level
   is the circular `Mix` control on its compact A–D card in the Effects view.
@@ -304,7 +307,7 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - Compressor and EQ available by default.
 - Limiter in the last slot.
 - Limiter protected from removal.
-- Limiter may be bypassed.
+- The user may bypass the limiter.
 - One master-effects bypass toggles all user master effects while leaving master
   gain and the protected limiter active.
 - Master-effects bypass is project-owned, undoable, playback-safe, and visually

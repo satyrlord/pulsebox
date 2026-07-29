@@ -36,15 +36,17 @@ assets exist yet.
   JSX, and nonexistent worklet source tree.
 - Removed Electron main, preload, build, and distribution ignore entries.
 - Removed stale broad ignores for codec, data, WAV, CSV, and build-configuration
-  paths so future reviewed source, fixtures, factory audio, and tool contracts
-  cannot be omitted silently.
+  paths.
+- These removals prevent silent omission of source, fixtures, factory audio, and
+  tool contracts.
 - Normalized `Pulsebox` capitalization in agent entry documents.
 - Moved the authoritative contracts under `docs/` and updated repository links.
 - Added source-policy tests that reject prohibited frameworks, JSX, MIDI,
-  service workers and PWA manifests, `ScriptProcessorNode`, executable
-  main-thread DSP-core imports, direct UI audio handles, state-held browser
-  objects, product API endpoints, layer violations, and shared-layer
-  product-specific plugin branches.
+  service workers, PWA manifests, and `ScriptProcessorNode`.
+- The tests also reject main-thread DSP-core imports, direct UI audio handles,
+  state-held browser objects, and product API endpoints.
+- The tests reject layer violations and shared-layer product-specific plugin
+  branches.
 - Added an exact package lock and static build launcher for the canonical
   strict-port origin.
 
@@ -57,8 +59,8 @@ assets exist yet.
   `@audio/decode-aiff` 1.2.3, and `@audio/decode-flac` 1.2.3. Their package
   metadata and the transitive `@wasm-audio-decoders/flac` 0.2.10 metadata
   declare the MIT license.
-- `PULSEBOX` remains reserved for the application mark and browser title;
-  documentation uses `Pulsebox`.
+- `PULSEBOX` remains reserved for the application mark and browser title.
+  Documentation uses `Pulsebox`.
 - The six approved instrument names and IDs remain those in the
   [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
 - The current build contains only `index.html`, CSS, the application module, the

@@ -7,7 +7,7 @@ function step {
   param([string]$Message)
   Write-Host ""
   Write-Host ">>> $Message"
-  Read-Host "    [Enter when done]" | Out-Null
+  Read-Host "    [After you complete the step, press Enter]" | Out-Null
 }
 
 function capture {
@@ -22,7 +22,7 @@ function capture {
 # Replace this example with the exact reproduction action.
 step "Open the running Pulsebox browser application at http://127.0.0.1:4173."
 capture REPRODUCED "Perform the target action. Did the exact issue occur? (y/n)"
-capture DETAILS "Paste the error or describe the visible or audible result:"
+capture DETAILS "If an error occurred, paste it. Otherwise, describe the visible or audible result:"
 
 Write-Host ""
 Write-Host "--- Captured ---"

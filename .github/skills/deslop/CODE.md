@@ -1,7 +1,7 @@
 # Code slop
 
-Use the complete file and one sibling as the local baseline. Flag a difference
-only when no contract or behavior needs it.
+Use the complete file and one sibling as the local baseline. If no contract or
+behavior needs a difference, flag it.
 
 ## Comments and errors
 
@@ -26,7 +26,7 @@ Inspect these candidates:
 - half-renamed symbols and abandoned imports
 - local flags that duplicate an owned state model
 
-Do not remove a guard before you prove its upstream invariant and error policy.
+Before you remove a guard, prove its upstream invariant and error policy.
 
 ## Structure and dependencies
 
@@ -43,4 +43,4 @@ A local constant is not slop when it expresses an intentional invariant.
 ## Style
 
 Match the file family for imports, extensions, quotes, indentation, punctuation,
-and blank lines. Use the repository formatter when it owns those rules.
+and blank lines. If the repository formatter owns those rules, use it.

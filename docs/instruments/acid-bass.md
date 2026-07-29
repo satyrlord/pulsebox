@@ -15,9 +15,10 @@ instrument.
 
 ## Signal path
 
-The Phase 1 path is one saw or square oscillator, a resonant state-variable
-low-pass stage, one decaying amplitude and filter envelope, an accent response,
-glide, smoothed output level, and a conservative output clamp. Every numeric
+The Phase 1 path starts with one saw or square oscillator. It then uses a
+resonant state-variable low-pass stage and one decaying amplitude and filter
+envelope. The path also applies an accent response, glide, a smoothed output
+level, and a conservative output clamp. Every numeric
 parameter follows its manifest-declared eight-millisecond trajectory. Waveform
 edits use an eight-millisecond linear crossfade. The processor uses the audio
 host's supplied frame count and the context sample rate.
@@ -25,8 +26,9 @@ host's supplied frame count and the context sample rate.
 Live tempo edits keep the current transport tick position, discard only queued
 future events, and schedule the new tempo grid from a bounded twenty-millisecond
 lead. They do not silence or suspend the current voice. Module removal sends a
-note release and leaves the worklet connected for 100 milliseconds before final
-disposal, so the DSP's bounded release can finish without a hard output cut.
+note release. It keeps the worklet connected for 100 milliseconds before final
+disposal. This delay lets the bounded DSP release finish without a hard output
+cut.
 
 The full expanded editor remains governed by the
 [rack and instruments specification](../specs/spec-005-rack-and-instruments.md).

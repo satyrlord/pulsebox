@@ -9,15 +9,15 @@ Apply the [repository STE contract](../../../AGENTS.md#writing) to technical
 prose. Use strict mode for procedures, runbooks, safety text, and errors.
 Use STE-flavored mode for general technical prose.
 
-Apply STE when the user asks for clear, plain, controlled, or human technical
-writing. Do not apply it to code, identifiers, command syntax, marketing copy,
+If the user asks for clear, plain, controlled, or human technical writing,
+apply STE. Do not apply it to code, identifiers, command syntax, marketing copy,
 essays, or a required distinct voice.
 
-Run the STE self-lint after the evidence pass. Mechanical rules control form.
+After the evidence pass, run the STE self-lint. Mechanical rules control form.
 They do not prove that a claim is true or useful.
 
-The official standard has copyright protection. Link to the
-[official ASD-STE100 site](https://asd-ste100.org) when a source is necessary.
+The official standard has copyright protection. If a source is necessary, link
+to the [official ASD-STE100 site](https://asd-ste100.org).
 Do not copy the complete standard into the repository.
 
 ## Empty framing
@@ -40,8 +40,8 @@ Inspect these candidates:
 - repeated sentence patterns that imply false equivalence
 - modifiers or passive clauses that hide the actor or claim
 
-Outside the STE contract, do not ban a word class or voice. Rewrite only when
-the result is more precise and agrees with sibling documents.
+Outside the STE contract, do not ban a word class or voice. If a rewrite is
+more precise and agrees with sibling documents, use it.
 
 ## Stale information
 
@@ -52,5 +52,5 @@ Inspect these candidates:
 - descriptions of removed files, commands, or behavior
 - summaries that omit evidence needed for action
 
-Keep history when it explains a current constraint or prevents a rejected
-decision. Move that fact to the durable owner when necessary.
+If history explains a current constraint or prevents a rejected decision, keep
+it. If necessary, move that fact to the durable owner.

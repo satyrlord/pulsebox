@@ -10,7 +10,7 @@ Use the first loop that reaches the real failure:
 4. Use an IndexedDB round trip with a minimal `.pulsebox` fixture.
 5. Use a deterministic command, engine, worklet, or transport trace.
 6. Use a focused performance measurement with a representative project.
-7. Use the human-in-the-loop PowerShell template as a last resort.
+7. As a last resort, use the human-in-the-loop PowerShell template.
 
 For browser and audio failures, record these fields:
 
@@ -26,12 +26,12 @@ cause.
 
 ## Reproduction evidence
 
-Confirm the exact symptom more than once when the failure is intermittent.
+If the failure is intermittent, confirm the exact symptom more than once.
 Capture the error, wrong state, output, timing, geometry, or persisted data.
 
 ## Useful seams
 
-Probe these Pulsebox seams when they match the symptom:
+If these Pulsebox seams match the symptom, probe them:
 
 - engine, state, and UI ownership
 - command dispatch, inverse data, and gesture coalescing
@@ -48,8 +48,8 @@ workspace edit, get explicit authority before the edit.
 
 Change one variable at a time. Give temporary logs one unique prefix.
 
-For performance work, record the environment, representative workload, method,
-baseline, and result before you change code.
+For performance work, before you change code, record the environment,
+representative workload, method, baseline, and result.
 
 ## Authorized repair
 

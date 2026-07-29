@@ -5,8 +5,8 @@
 Request: Add a persistent plugin parameter.
 
 Update the plugin descriptor and project schema. Define migration, import,
-undo, round-trip, and acceptance behavior. Implement them only when the user
-requests implementation.
+undo, round-trip, and acceptance behavior. If the user requests implementation,
+implement these items.
 
 ## Visual change
 

@@ -10,7 +10,7 @@ A smell starts an inspection. It does not prove that a test is slop.
 Before you edit a candidate, identify its protected behavior and relevant
 defect. Require current code, an owning contract, and a sibling test.
 
-Classify a test as slop only when evidence proves one of these findings:
+If evidence proves one of these findings, classify a test as slop:
 
 - **No signal:** No observable postcondition exists, or the assertion is tautological.
 - **False signal:** The expected value repeats the production algorithm or mock value.
@@ -39,7 +39,7 @@ Inspect these candidates first:
 
 ## Contract-tracing candidates
 
-Inspect these candidates only after you trace the contract:
+After you trace the contract, inspect these candidates:
 
 - happy paths that omit owned failures or boundaries
 - assertions on private methods or unowned call order
@@ -53,7 +53,7 @@ Inspect these candidates only after you trace the contract:
 
 ## Valid counterexamples
 
-Keep the test when context proves one of these values:
+If context proves one of these values, keep the test:
 
 - the runner detects a throw, compile, callback, or non-throw contract without `expect`
 - several assertions describe one coherent outcome
@@ -68,19 +68,19 @@ Keep the test when context proves one of these values:
 ## Cleanup process
 
 1. Read scripts, runner configuration, setup, production code, contract, test, and one sibling.
-   Finish when you know the runner, environment, fixtures, and claimed behavior.
+   Completion criterion: You know the runner, environment, fixtures, and claimed behavior.
 2. Run the candidate unchanged with the narrowest configured command.
-   Finish when you record the pre-edit result and pre-existing failures.
+   Completion criterion: You record the pre-edit result and pre-existing failures.
 3. State the unique behavior and defect for each candidate.
-   Finish when each proposed edit has evidence beyond a smell name.
-4. Use a temporary controlled fault when static evidence cannot prove signal.
-   Finish when the test responds as predicted and you remove the fault.
+   Completion criterion: Each proposed edit has evidence beyond a smell name.
+4. If static evidence cannot prove signal, use a temporary controlled fault.
+   Completion criterion: The test responds as predicted and you remove the fault.
 5. Select the smallest safe disposition.
-   Finish when the choice follows the rules below.
+   Completion criterion: The choice follows the rules below.
 6. Run every changed test and its owning test project.
-   Finish when the full affected suite passes or has a reported pre-existing blocker.
+   Completion criterion: The full affected suite passes, or you report a pre-existing blocker.
 7. Report each disposition and skipped proof.
-   Finish when you account for every candidate and runtime surface.
+   Completion criterion: You account for every candidate and runtime area.
 
 ## Dispositions
 
@@ -90,5 +90,5 @@ Keep the test when context proves one of these values:
 - **Delete:** The test is empty, irrecoverable, or proven duplicate.
 - **Replace:** A meaningful contract test must preserve the only intended protection.
 
-For browser tests, build and serve the production app. Run the configured
-Chrome project. Do not invent commands.
+For browser tests, build the production app. Serve the production app. Run the
+configured Chrome project. Do not invent commands.

@@ -16,14 +16,14 @@ references only.
 
 ## 0. Specification governance
 
-1. This index and its listed child specifications are the single living
+1. This index and its listed child specifications are the single current
    Pulsebox product contract.
 2. Each requirement has one owning child specification. Other documents may
    refine it but must not redefine it.
 3. Direct product-owner decisions override the current text. Record each
    accepted decision in its owning child specification, affected acceptance
    criteria, and the decision record in the same change.
-4. Never resolve a contradiction by dropping functionality. Report any
+4. Never resolve a contradiction by removing required functionality. Report any
    conflict that the current repository cannot resolve.
 5. Keep global section numbers, decision IDs `D01` through `D81`, and release
    acceptance numbers stable. These identifiers provide cross-file
@@ -36,27 +36,27 @@ references only.
 ### 0.1 Reading and implementation workflow
 
 For a new implementation phase, read the build-order specifications through the
-target phase. For a change to existing behavior, read this index, the owning
-specification, every listed dependency, the affected acceptance criteria, and
-the applicable domain contracts.
+target phase. For a change to existing behavior, read this index and the owning
+specification. Read every listed dependency, affected acceptance criterion, and
+applicable domain contract.
 
 Before product code:
 
-- Write a build plan in specification order.
-- Map the work to exact acceptance criteria.
-- Define shared contracts before dependent modules or features.
-- Begin material research with independent parallel investigations when the
-  available agent environment supports them.
-- Verify unstable browser and Web Audio facts with current primary sources.
-- Keep code, tests, specifications, and user documentation consistent.
-- Keep code, comments, tests, and documentation in simple English. Do not use
-  emoji in those artifacts.
-- Request independent review before implementing a material plugin-contract or
-  architecture change.
-- Re-run the relevant repository audit after naming, asset, sample, or
-  legal-boundary changes.
-- Keep named historical research only in the non-shipping `research/`
-  directory.
+1. Write a build plan in specification order.
+2. Map the work to exact acceptance criteria.
+3. Define shared contracts before dependent modules or features.
+4. If the agent environment supports parallel work, start material research
+   with independent parallel investigations.
+5. Verify unstable browser and Web Audio facts with current primary sources.
+6. Keep code, tests, specifications, and user documentation consistent.
+7. Keep code, comments, tests, and documentation in simple English.
+8. Do not use emoji in those artifacts.
+9. Before a material plugin-contract or architecture change, request an
+   independent review.
+10. After a naming, asset, sample, or legal-boundary change, run the relevant
+    repository audit again.
+11. Keep named historical research only in the non-shipping `research/`
+    directory.
 
 ## Build order and ownership
 
@@ -99,14 +99,14 @@ Supporting traceability records:
 
 When a domain contract and its owning product specification disagree, stop and
 reconcile both documents before implementation. A release acceptance statement
-tests product behavior; it does not create a second behavior owner.
+tests product behavior. It does not create a second behavior owner.
 
 ## Specification maintenance
 
 - Update the smallest owning specification that fully contains the change.
 - Update dependencies only when their contracts also change.
-- Add a new child specification only when no current owner can hold the new
-  domain without mixing unrelated responsibilities.
+- If no current owner can hold the new domain without mixing responsibilities,
+  add a new child specification.
 - Add the new file to this ordered table and to the structure test.
 - Keep requirements testable with exact acceptance criteria and objective
   evidence.

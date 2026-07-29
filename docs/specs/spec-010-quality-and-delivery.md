@@ -15,13 +15,14 @@ phases, and close-out.
 
 ### 24.1 Accessibility
 
-Pulsebox uses WCAG 2.2 Level AA success criteria as the measurement source for
-supported desktop viewports, without claiming full WCAG conformance below the
-product's 1280 × 720 editing boundary. Normal text has at least 4.5:1 contrast;
-large text, essential graphics, control boundaries, state indicators, and focus
-indicators have at least 3:1 contrast where the applicable criterion requires
-it. Pointer targets are at least 24 × 24 CSS pixels or satisfy the WCAG 2.2
-spacing exception. Focus is visible and not fully obscured.
+Pulsebox uses WCAG 2.2 Level AA success criteria to measure supported desktop
+viewports. It does not claim full WCAG conformance below the 1280 × 720 editing
+boundary. Normal text has at least 4.5:1 contrast. Large text and essential
+graphics have at least 3:1 contrast where the applicable criterion requires it.
+
+Control boundaries, state indicators, and focus indicators have the same 3:1
+minimum. Pointer targets are at least 24 × 24 CSS pixels or satisfy the WCAG
+2.2 spacing exception. Focus is visible and not fully obscured.
 
 - Keyboard access for every interactive feature.
 - Semantic native controls.
@@ -62,8 +63,8 @@ Include:
 
 The combined active Undo and Redo history keeps at most 100 entries and 64 MiB
 of canonical patch JSON. One entry is at most 17 MiB. New committed edits clear
-Redo and evict the oldest Undo entries as needed; they do not fail merely
-because history is full. Retained entries pin referenced immutable blobs. The
+Redo and evict the oldest Undo entries as needed. They do not fail when history
+is full. Retained entries pin referenced immutable blobs. The
 exact accounting and eviction contract is in `ARCHITECTURE.md`.
 
 Exclude:
@@ -186,16 +187,16 @@ normative:
 - A same-build project save, reload, and offline render at the same sample rate
   produces the same canonical manifest and event schedule. For deterministic
   rendered samples, maximum absolute sample error is at most `1e-6`.
-- Across 44.1 kHz and 48 kHz fixtures, scheduled event time differs by at most 1
-  millisecond and oscillator pitch differs by at most 1 cent after converting
-  results to seconds and hertz.
+- Across 44.1 kHz and 48 kHz fixtures, scheduled event time differs by at most
+  1 millisecond. Oscillator pitch differs by at most 1 cent after conversion to
+  seconds and hertz.
 - Every audible parameter descriptor declares its smoothing curve and duration.
   A constant-input sweep fixture must match that control trajectory within
-  `1e-6` and introduce no output discontinuity above `0.02` full scale at a
-  control update boundary.
-- Offline 48 kHz to 44.1 kHz resampling is deterministic, keeps passband error
-  within 0.1 dB from 20 Hz through 20 kHz, and keeps aliased or imaged test-tone
-  energy at or below -90 dBFS.
+  `1e-6`. It must introduce no output discontinuity above `0.02` full scale at
+  a control update boundary.
+- Offline 48 kHz to 44.1 kHz resampling is deterministic. It keeps passband
+  error within 0.1 dB from 20 Hz through 20 kHz. It keeps aliased or imaged
+  test-tone energy at or below -90 dBFS.
 - Automated deterministic checks run in the current stable Chrome release
   channel. The evidence records the exact version. Required real-audio checks
   run manually when automation cannot observe the physical result.
@@ -315,9 +316,10 @@ review. Phase 0 ends with complete reviewed documents and passing documentation,
 link, naming, and contract-consistency checks. It does not require a runnable
 product application or product tests.
 
-Phase 1: Application shell, controls, state spine, AudioWorklet spine,
-transport, Acid Bass, three-slot functional rack. During Phase 1, the first
-three slots of the durable eight-slot model are exposed. The development seed
+Phase 1: Application shell, controls, state foundation, AudioWorklet foundation,
+transport, Acid Bass, three-slot functional rack. During Phase 1, the product
+exposes the first three slots of the durable eight-slot model. The development
+seed
 loads Acid Bass in slot 01 and leaves slots 02 and 03 available for Add or
 Duplicate. This seed is not the final default project or the secondary starter
 template.
@@ -341,18 +343,18 @@ Phase 7: Persistence, recovery, project import/export, WAV and stem export,
 final browser matrix.
 
 Phases 1 through 7 end with a runnable application and passing tests for their
-completed scope. The dependency order remains normative, but an implementation
-change may deliver a narrow, tested vertical foundation from a later phase once
-the owning specification and every dependency through that phase have been
-read and kept consistent. Such a slice does not mark its parent phase or any
-skipped phase complete. User-facing status must name the exact implemented
-slice and the missing parent-phase scope.
+completed scope. The dependency order remains normative. An implementation can
+deliver a narrow, tested foundation from a later phase. Before delivery, read
+and keep consistent its owning specification and all dependencies through that
+phase. Such a slice does not complete its parent phase or a skipped phase.
+User-facing status must name the exact implemented slice and its missing
+parent-phase scope.
 
-The current runnable foundation contains Phase 1 plus narrow slices for
-Drumline Six, named Pattern storage, basic channel mixing, Playlist transport,
-appearance Settings, and browser project persistence. These slices prove shared
-contracts and integration seams. They do not complete Phases 2 through 7 or
-their acceptance criteria.
+The current runnable foundation contains Phase 1 and narrow slices for Drumline
+Six, named Pattern storage, and basic channel mixing. It also contains Playlist
+transport, appearance Settings, and browser project persistence. These slices
+verify shared contracts and integration points. They do not complete Phases 2
+through 7 or their acceptance criteria.
 
 ### 24.9 Close-out
 

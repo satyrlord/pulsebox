@@ -41,8 +41,8 @@ Interactions:
 - Add.
 - Undo and redo.
 
-Pattern names are edited on the shared Pattern record, not copied onto each
-Playlist row.
+The user edits Pattern names on the shared Pattern record. Playlist rows do not
+copy Pattern names.
 
 In Pattern mode, the transport loops the selected named Pattern. In Song mode,
 it plays Playlist rows in order, honoring each row's repeat count. Switching
@@ -56,13 +56,14 @@ post-MVP work.
 
 Any automatable parameter may have a lane in a Pattern.
 
-Every automation lane is edited in the Piano Roll's active lower lane and
-nowhere else, as defined in
-[pattern editing](spec-006-pattern-editing.md) section 16.3.1. This section owns
-what a lane stores and how it records; that section owns how a lane is chosen
-and displayed. Module-owned parameters are chosen from the Piano Roll's
-module-scoped Parameter selector. Mixer, send, effect, and master parameters are
-armed from their own surface and then open in the same Piano Roll lane.
+The user edits every automation lane in the Piano Roll's active lower lane and
+nowhere else. [Pattern editing](spec-006-pattern-editing.md) section 16.3.1
+defines this rule. This section owns what a lane stores and how it records. That
+section owns how the user chooses and displays a lane. The user chooses
+module-owned parameters from the Piano Roll's module-scoped Parameter selector.
+
+The user arms mixer, send, effect, and master parameters from their own surface.
+They then open in the same Piano Roll lane.
 
 Automation is step-based only. It stores discrete values on the fixed 1/16
 musical grid. It does not store line segments, curve segments, or dense
@@ -85,14 +86,14 @@ Automation may target:
 - Effect parameters.
 - Master parameters.
 
-Whenever transport Record is armed, every deliberate user parameter movement
-records automatically into the active Pattern's target lane. This is true in
-both Pattern and Song transport modes. The resulting take is one undoable
+Whenever the user arms transport Record, each deliberate parameter movement
+records automatically into the active Pattern's target lane. This rule applies
+in both Pattern and Song transport modes. The resulting take is one undoable
 command.
 
-Within one 1/16 cell, the last recorded value wins and is held until the next
-automation step. One gesture or recording pass creates one undo entry. Playback
-modulation, meters, playheads, theme changes, state restoration, and generated
-patches never write automation.
+Within one 1/16 cell, the last recorded value wins. The engine holds it until
+the next automation step. One gesture or recording pass creates one undo entry.
+Playback modulation, meters, playheads, theme changes, state restoration, and
+generated patches never write automation.
 
 ---

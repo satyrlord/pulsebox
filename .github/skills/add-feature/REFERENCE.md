@@ -1,6 +1,6 @@
 # Feature decision reference
 
-Record a durable decision when it changes one of these items:
+If a durable decision changes one of these items, record it:
 
 - approved behavior or acceptance text
 - a public, plugin, message, command, project, import, or export contract
@@ -8,8 +8,8 @@ Record a durable decision when it changes one of these items:
 - a browser, audio, accessibility, layout, theme, naming, or originality boundary
 - a choice that is costly to reverse or likely to recur
 
-Keep local implementation detail in code and tests. Do not add it to a product
-contract when it does not change durable behavior.
+Keep local implementation detail in code and tests. If the detail does not
+change durable behavior, do not add it to a product contract.
 
 For each durable decision, record the chosen behavior and its reason. Record
 material rejected choices and the exact acceptance effect. Keep one owner for

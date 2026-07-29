@@ -93,7 +93,7 @@ It must contain two independent basslines and an original drum pattern.
 
 ### 13.1 Unified module browser
 
-The module browser has one un-tabbed list. It does not split the same module
+The module browser has one list with no tabs. It does not split the same module
 definitions into separate Rack and Library views.
 
 Browser content:
@@ -120,7 +120,7 @@ Interactions:
 Requirements:
 
 - Slots 01 through 08.
-- Internal scrolling as required.
+- If the slot list does not fit, use internal scrolling.
 - Miniature loaded cards.
 - Empty labels and add controls.
 - Selected border and accent marker.
@@ -154,8 +154,8 @@ Interactions:
 
 ## 14. Rack behavior
 
-The MVP rack holds eight slots. Any slot can hold any instrument. Duplicates are
-allowed.
+The MVP rack holds eight slots. Any slot can hold any instrument. The MVP allows
+duplicates.
 
 The engine, state, plugin, and UI contracts remain slot-count agnostic. Sixteen
 rack slots are an explicit post-MVP target, but the approved MVP and its
@@ -179,12 +179,14 @@ Each slot supports:
 - Visible level.
 - Audition, as defined in section 15.0.
 
-Rack-module collapse is a lightweight local UI preference keyed by project ID,
-project lineage ID, and stable module ID. It is not project data, is not
-included in portable files, and does not create an undo entry. Removing a module
-removes its local collapse preference; Undo restores the module expanded. A
-whole-project Replace, Undo replace, or Import as copy cannot inherit another
-lineage's collapse state even when module IDs match.
+Rack-module collapse is a lightweight local UI preference. Its key contains the
+project ID, project lineage ID, and stable module ID. It is not project data.
+Portable files exclude it, and it creates no undo entry.
+
+When the user removes a module, remove its local collapse preference. Undo
+restores the module in its expanded state. After a whole-project Replace, Undo
+replace, or Import as copy, the project cannot inherit another lineage's
+collapse state. This rule applies even when module IDs match.
 
 Collapsed slots remain usable and show:
 
@@ -200,16 +202,16 @@ Empty slots show an Add control.
 Reordering a module:
 
 - The pull handles on the module's rack ears are the drag affordance.
-  Dragging either handle moves the module up or down the rack.
+  When the user drags either handle, the module moves up or down the rack.
 - The drag uses pointer capture and shows an insertion marker at the position
-  where the module will land. Releasing the pointer commits the move. Escape
-  cancels the active drag and changes nothing.
+  where the module will land. When the user releases the pointer, the store
+  commits the move. If the user presses Escape, the drag stops without a change.
 - A committed move is one undo entry.
 - Keyboard reorder on the focused module commits the same move.
-- A committed move renumbers slots and follows section 13.2: module IDs,
+- A committed move renumbers slots and follows section 13.2. Module IDs,
   named-Pattern parts, automation, mixer routing, and effect chains stay with
-  the module, and an ARIA live region announces the result.
-- Reordering does not interrupt playback.
+  the module. An ARIA live region announces the result.
+- A reorder does not interrupt playback.
 
 Removing a module:
 
@@ -218,7 +220,7 @@ Removing a module:
 - Happens immediately with no confirmation dialog and exposes Undo.
 - Releases its audio resources safely.
 - Clears its matching mixer channel and leaves the corresponding disabled
-  visible strip labeled `Empty`; it never creates a mixer bank.
+  visible strip labeled `Empty`. It never creates a mixer bank.
 - Preserves full recovery data in undo history.
 - Undo restores the module, its named-Pattern parts, mixer state, automation, sample
   references, and effect chains.
@@ -259,8 +261,8 @@ instrument below. Additional synthesis, sample, voice, insert, and routing
 parameters live in the playback-safe expanded editor. Faceplate pages are not
 user-configurable in the MVP.
 
-Faceplates contain no step grid and no per-step editing. All Pattern event
-editing happens in the Piano Roll, as required by
+Faceplates contain no step grid and no per-step editing. Users edit all Pattern
+events in the Piano Roll, as required by
 [pattern editing](spec-006-pattern-editing.md) section 16.1. The horizontal
 space that a faceplate would otherwise spend on a step grid carries the
 promoted fast controls listed for each instrument below.
@@ -269,8 +271,8 @@ promoted fast controls listed for each instrument below.
 
 Per decision `D78`, the faceplate carries no Pattern activity indicator and no
 other step-shaped readout. Playback position feedback lives in the Piano Roll
-playhead, the pattern position readout, and the transport clock. Restoring a
-step-shaped indicator to the faceplate reintroduces the second apparent
+playhead, the pattern position readout, and the transport clock. Do not restore a
+step-shaped indicator to the faceplate. It would reintroduce the second apparent
 pattern editor that decisions `D65` and `D78` removed.
 
 Audition control:
@@ -284,21 +286,21 @@ Audition control:
 - For a drum module, sounds the voice currently chosen in the voice selector.
 - For a pitched module, sounds the module's audition pitch, which defaults to
   the Pattern's key or to a documented fixed pitch when no key applies.
-- Writes nothing. It never creates, deletes, or modifies Pattern events, never
-  mutates project state, and never creates an Undo entry.
+- Writes nothing. It never creates, deletes, or modifies Pattern events. It never
+  mutates project state or creates an Undo entry.
 - Is not a recording path. Recording into a Pattern stays with live input in
   [pattern editing](spec-006-pattern-editing.md) section 16.4.
 - Works while the transport is stopped, playing, or paused, and does not alter
   transport state or position.
 - Respects module mute, solo, routing, inserts, and sends, so an auditioned
-  voice is heard exactly where the module is routed.
+  voice reaches the module's assigned route.
 - Releases its voice when the module is removed, when the project is replaced,
-  and when audio is interrupted. A held control that loses pointer capture or
-  keyboard focus stops the voice rather than leaving it sounding.
+  and when audio is interrupted. If a held control loses pointer capture, it
+  stops the voice. It also stops the voice if it loses keyboard focus.
 - Remains visible and operable when audio is blocked, and reports the blocked
   state instead of failing silently.
-- Is announced to assistive technology as an audition control, not as a step or
-  a toggle.
+- Assistive technology announces it as an audition control, not as a step or a
+  toggle.
 
 ### 15.1 Acid Bass
 
@@ -377,13 +379,13 @@ Each step supports:
 - Per-voice step resolution.
 - Per-voice pattern length.
 
-Factory sample content is original and project-owned. User samples may be
-layered without replacing the synthesis engine.
+Factory sample content is original and project-owned. Users may layer their
+samples without replacing the synthesis engine.
 
-Default layer balance is machine-specific: Drumline Six and Boom Eight are
-synth-heavy, Hybrid Nine is blended, and Digit Seven and Digit Five are
-sample-heavy with their built-in lo-fi stages enabled. Every voice still
-provides both a synthesized layer and an optional sample layer.
+Default layer balance is machine-specific. Drumline Six and Boom Eight are
+synth-heavy. Hybrid Nine uses a balanced blend. Digit Seven and Digit Five are
+sample-heavy with their built-in lo-fi stages enabled. Every voice provides both
+a synthesized layer and an optional sample layer.
 
 ### 15.3 Drumline Six
 
@@ -443,9 +445,9 @@ Compact controls:
 - Selected-voice level.
 - Audition control.
 
-This module's waveform preview occupies the faceplate width that two further
-knobs would need, so its selected-voice pan and its module-send emphasis live in
-the expanded editor rather than on the plate.
+This module's waveform preview uses the space that two more knobs would use.
+Therefore, selected-voice pan and module-send emphasis are in the expanded
+editor, not on the faceplate.
 
 Expanded editor includes:
 
@@ -478,7 +480,7 @@ Compact controls:
 - Selected-voice mute and solo.
 - Audition control.
 
-The built-in lo-fi stage starts enabled and can be disabled.
+The built-in lo-fi stage starts enabled. The user can disable it.
 
 ### 15.7 Digit Five
 
@@ -496,6 +498,6 @@ Compact controls:
 - Selected-voice mute and solo.
 - Audition control.
 
-The built-in lo-fi stage starts enabled and can be disabled.
+The built-in lo-fi stage starts enabled. The user can disable it.
 
 ---

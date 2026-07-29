@@ -7,8 +7,8 @@ URL import and the processor registration string.
 
 ## Plugin
 
-A plugin can be live only through its registry and manifest. Trace both before
-you remove its adapter, runtime, processor, or assets.
+A plugin can be live only through its registry and manifest. Before you remove
+its adapter, runtime, processor, or assets, trace both.
 
 ## Migration
 
@@ -17,5 +17,5 @@ import contract supports its older project version.
 
 ## Asset
 
-CSS, a manifest, or generated build metadata can own an asset URL. Search each
-owner before you classify the asset.
+CSS, a manifest, or generated build metadata can own an asset URL. Before you
+classify the asset, search each owner.

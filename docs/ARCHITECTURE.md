@@ -7,9 +7,10 @@
 **Authority:** The indexed [product specification set](specs/spec-000-index.md)
 remains the product and acceptance source. This document owns the durable
 architecture details that implement that specification set.
+
 **Implementation state:** The Phase 1 contracts, layer guards, state spine,
 AudioWorklet spine, transport, bundled decoder adapter, and React UI foundation
-exist. Narrow later-phase foundations are listed in README.md; their parent
+exist. Narrow later-phase foundations are listed in README.md. Their parent
 phases remain incomplete until their full owned scope and acceptance gates pass.
 
 ## 1. Purpose and interpretation
@@ -24,22 +25,22 @@ together if an accepted decision changes a boundary defined here.
 
 Pulsebox shall remain:
 
-- a fully client-side browser application;
-- a strict-TypeScript application with one consistent UI component model;
-- a three-layer system with engine, state, and UI ownership kept separate;
+- a fully client-side browser application.
+- a strict-TypeScript application with one consistent UI component model.
+- a three-layer system with engine, state, and UI ownership kept separate.
 - limited to eight enabled rack slots in the MVP while keeping internal
-  contracts slot-count agnostic;
-- usable for editing when audio is locked, suspended, or unavailable; and
+  contracts slot-count agnostic.
+- usable for editing when audio is locked, suspended, or unavailable.
 - free of a server product component, accounts, cloud sync, a native wrapper, a
   PWA, and a service worker.
 
 The following are not goals of this contract:
 
-- third-party plugin hosting or executable plugin import;
-- MIDI support or placeholders for later MIDI support;
-- arbitrary audio routing beyond main output and four send buses;
-- network APIs or remote persistence;
-- compatibility scaffolding for code that has not shipped; and
+- third-party plugin hosting or executable plugin import.
+- MIDI support or placeholders for later MIDI support.
+- arbitrary audio routing beyond main output and four send buses.
+- network APIs or remote persistence.
+- compatibility scaffolding for code that has not shipped.
 - editable layouts below 1280 by 720 CSS pixels.
 
 ## 2. Runtime and origin contract
@@ -74,12 +75,12 @@ delivery tool. It shall not become a Pulsebox product layer. It may return the
 application shell, JavaScript modules, styles, fonts, worklet modules, decoder
 modules, and static assets. It shall not:
 
-- expose application APIs;
-- store or transform projects;
-- decode or render audio;
-- perform authentication;
-- proxy remote services;
-- run collaboration or synchronization logic; or
+- expose application APIs.
+- store or transform projects.
+- decode or render audio.
+- perform authentication.
+- proxy remote services.
+- run collaboration or synchronization logic.
 - remain necessary after a page has loaded except to fetch static build assets.
 
 All project operations, decoding, rendering, export, and persistence shall
@@ -130,21 +131,21 @@ Runtime globals shall not be used to evade this rule.
 
 The engine shall own:
 
-- the `AudioContext` and `OfflineAudioContext` lifecycles;
-- all live `AudioNode` objects and graph connections;
-- instrument and effect runtime instances;
-- AudioWorklet registration, nodes, ports, processors, and messages;
+- the `AudioContext` and `OfflineAudioContext` lifecycles.
+- all live `AudioNode` objects and graph connections.
+- instrument and effect runtime instances.
+- AudioWorklet registration, nodes, ports, processors, and messages.
 - the audio clock, lookahead scheduler, transport projection, and voice
-  allocation;
-- smoothing, micro-fades, routing safety, metering, and bounded feedback;
-- the Pulsebox sample-decoding abstraction and prepared PCM buffers;
+  allocation.
+- smoothing, micro-fades, routing safety, metering, and bounded feedback.
+- the Pulsebox sample-decoding abstraction and prepared PCM buffers.
 - offline rendering, deterministic resampling, dither, WAV writing, and export
-  progress; and
+  progress.
 - recovery from an engine or processor fault.
 
 The engine shall have no DOM dependency. It shall not read from or write to
 IndexedDB or local storage directly. It shall consume validated state
-projections and return typed acknowledgements, status, warnings, faults,
+projections and return typed acknowledgments, status, warnings, faults,
 transport observations, and bounded telemetry.
 
 Suitable native Web Audio nodes may exist only behind engine-owned plugin
@@ -155,21 +156,21 @@ processors. Main-thread custom DSP and `ScriptProcessorNode` are prohibited.
 
 The state layer shall own:
 
-- plain project and editor data;
-- stable identifiers and references;
-- typed commands and command validation;
-- atomic state transitions;
-- undo, redo, and gesture coalescing;
-- selectors and selector-based subscriptions;
-- serialization, migration, import validation, and repair reports;
-- automation data and deterministic seeds;
+- plain project and editor data.
+- stable identifiers and references.
+- typed commands and command validation.
+- atomic state transitions.
+- undo, redo, and gesture coalescing.
+- selectors and selector-based subscriptions.
+- serialization, migration, import validation, and repair reports.
+- automation data and deterministic seeds.
 - persistence status, autosave intent, recovery metadata, and multi-tab revision
-  state; and
+  state.
 - project asset metadata and references, but not decoded PCM buffers.
 
-The state layer shall have no DOM dependency and shall store no live
-`AudioNode`, `AudioBuffer`, worklet, port, timer, observer, animation frame, or
-browser file handle in project state.
+The state layer shall have no DOM dependency. It shall store no live
+`AudioNode`, `AudioBuffer`, worklet, port, timer, or observer in project state.
+It shall also store no animation frame or browser file handle in project state.
 
 Persistence implementations shall be adapters behind state-owned repository
 ports. The normative document and archive schema, asset limits, transaction
@@ -181,12 +182,12 @@ disagree, implementation shall stop until the two contracts are reconciled.
 
 The UI shall own:
 
-- the UI components and their composition;
-- style encapsulation for reusable controls and isolated leaf components;
-- layout, keyboard and pointer input, focus, and accessibility;
-- theme application and visual state;
-- Canvas or SVG rendering for high-frequency or geometric views;
-- typed user intents and command dispatch; and
+- the UI components and their composition.
+- style encapsulation for reusable controls and isolated leaf components.
+- layout, keyboard and pointer input, focus, and accessibility.
+- theme application and visual state.
+- Canvas or SVG rendering for high-frequency or geometric views.
+- typed user intents and command dispatch.
 - direct, selected-state DOM patching.
 
 The UI shall not construct, connect, disconnect, inspect, or retain an audio
@@ -242,8 +243,8 @@ Instance and musical-entity IDs shall be lowercase canonical UUID strings
 generated with a cryptographically strong browser source. Tests shall inject a
 deterministic ID factory. Identity across stored heads is project ID, lineage
 ID, and typed entity ID. An entity ID shall never be reused for a different
-entity within one lineage, including after Undo removes an entity and a later
-command creates another entity. Whole-project Replace and Undo replace start new
+entity within one lineage. This rule also applies after Undo removes an entity
+and a later command creates another entity. Whole-project Replace and Undo replace start new
 lineages and use complete state and engine replacement, as defined in
 `PROJECT-FORMAT.md`.
 
@@ -264,7 +265,7 @@ asset, or routing target.
 product code ID or another approved namespaced ID. It shall not include a
 display label or version.
 
-A parameter ID shall be unique within its plugin or owning core domain and shall
+A parameter ID shall be unique within its plugin or owning core domain. It shall
 remain unchanged when its label, order, unit display, editor location, or
 implementation changes. Serialized parameter references shall use the tuple of
 plugin or core owner, instance ID where relevant, and parameter ID.
@@ -291,7 +292,7 @@ Plugin hosting remains outside the MVP.
 The engine shall expose one immutable build-time registry keyed by `PluginId`. A
 registry entry shall pair a declarative manifest with an engine factory. UI
 metadata shall be declarative and shall map to project-owned component
-implementations; a plugin manifest shall not contain arbitrary HTML, CSS,
+implementations. A plugin manifest shall not contain arbitrary HTML, CSS,
 script, or executable callbacks from project data.
 
 Adding an instrument or effect shall require one plugin folder and one registry
@@ -299,9 +300,9 @@ entry. Shared engine, state, persistence, mixer, automation, and UI code shall
 dispatch through typed contracts. They shall not branch on a product-specific
 plugin ID.
 
-Registry startup shall fail before audio activation when two entries claim the
-same plugin ID, stable parameter ID, meter ID, compact control position, or
-incompatible schema tuple.
+Before audio activation, registry startup shall fail if two entries claim the
+same plugin ID or stable parameter ID. It shall also fail for a duplicate meter
+ID, compact control position, or incompatible schema tuple.
 
 ### 6.2 Base manifest
 
@@ -329,7 +330,7 @@ interface BasePluginManifest {
 ```
 
 `PluginUiManifest.moduleAccent` declaratively supplies the four fixed module
-accent tokens owned by `THEMING.md`. Shared UI applies those values generically;
+accent tokens owned by `THEMING.md`. Shared UI applies those values generically.
 it does not branch on a plugin ID, short label, or instrument name.
 
 `pluginVersion` shall use semantic-version syntax. `stateSchemaVersion` shall be
@@ -380,7 +381,7 @@ interface ParameterDescriptor {
 Numeric defaults, resets, and enum values shall validate against the descriptor.
 `minimum`, `maximum`, `step`, and precision shall be finite. An exponential
 smoother shall not cross or target zero. A parameter exposed to automation shall
-have `automation: "step"`; step values may still be smoothed in the engine to
+have `automation: "step"`. Step values may still be smoothed in the engine to
 prevent discontinuities.
 
 Formatting shall be a trusted UI function selected by `unit` and descriptor
@@ -392,18 +393,18 @@ global UI preferences shall not be parameters or automation targets.
 
 An instrument manifest shall add:
 
-- stable voice or lane descriptors;
+- stable voice or lane descriptors.
 - accepted event forms, Pattern compatibility, and one editor capability:
   `monophonic-pitched`, `drum-triggers`, or reserved post-MVP
-  `polyphonic-pitched`;
-- maximum polyphony and deterministic voice-stealing rules;
-- retrigger, choke, and release rules;
-- input and output channel descriptors;
-- per-voice output descriptors where applicable;
-- sample-layer support and asset requirements where applicable;
-- compact faceplate controls;
-- detailed editor sections;
-- a processor or native-adapter factory key; and
+  `polyphonic-pitched`.
+- maximum polyphony and deterministic voice-stealing rules.
+- retrigger, choke, and release rules.
+- input and output channel descriptors.
+- per-voice output descriptors where applicable.
+- sample-layer support and asset requirements where applicable.
+- compact faceplate controls.
+- detailed editor sections.
+- a processor or native-adapter factory key.
 - live and offline-render capability declarations.
 
 The runtime adapter shall expose bounded methods to prepare, activate, update,
@@ -415,15 +416,15 @@ suspend, render offline, reset, and dispose the instance. It shall not expose an
 An effect manifest shall add:
 
 - supported placement: voice insert, module pedalboard, send chain, or master
-  chain;
-- input and output channel configurations;
-- declared latency in frames for every sample rate;
+  chain.
+- input and output channel configurations.
+- declared latency in frames for every sample rate.
 - finite tail policy and maximum tail duration, or an explicitly bounded
-  generated tail;
-- bypass transition and wet/dry law;
-- safety clamps and feedback limits;
-- the four or fewer compact controls and detailed editor sections;
-- a processor or native-adapter factory key; and
+  generated tail.
+- bypass transition and wet/dry law.
+- safety clamps and feedback limits.
+- the four or fewer compact controls and detailed editor sections.
+- a processor or native-adapter factory key.
 - live and offline-render capability declarations.
 
 An effect shall preserve channel count unless its manifest declares an allowed
@@ -435,9 +436,10 @@ shall not rebuild unrelated graph branches.
 Every instrument and effect referenced by a format-1 project is required. The
 MVP project manifest has no optional-plugin mode and no plugin placeholder.
 
-- An unknown plugin, wrong plugin kind, unsupported API version, unknown newer
-  state version, or missing complete migration path shall reject the whole
-  import before project state changes.
+- The reader shall reject the whole import before project state changes if a
+  plugin is unknown or has the wrong kind.
+- It shall also reject an unsupported API version, an unknown newer state
+  version, or a missing complete migration path.
 - A reader shall not create a bypass, silence substitute, replacement plugin, or
   opaque plugin-state placeholder to pass validation.
 - Semantic plugin version records authorship. Compatibility shall depend on
@@ -468,8 +470,8 @@ interface PulseStore {
 
 State shall be treated as immutable at the public boundary. Commands shall be
 discriminated unions. Each command shall include a unique `commandId`, a stable
-command type, a typed payload, an expected complete state revision token, an
-origin, and an optional gesture ID. Wall-clock time may be metadata but shall
+command type, and a typed payload. It shall also include an expected complete
+state revision token, an origin, and an optional gesture ID. Wall-clock time may be metadata but shall
 not decide musical behavior or command validity.
 
 Dispatch shall validate the full command before mutation. A command shall either
@@ -495,8 +497,8 @@ mismatch, suspend affected audio safely, and attempt one bounded full engine
 projection. It shall not mutate project state to match a failed graph.
 
 A voice fault is scoped to its own module. The transport shall release the
-faulted adapter and report the fault against that module, while every other
-voice continues to play and the transport remains able to start. Only a failure
+faulted adapter and report the fault against that module. Every other voice
+shall continue to play, and the transport shall remain able to start. Only a failure
 to create or resume the audio context shall make the runtime unavailable.
 
 Meter frames, meter-analysis mode, playheads, hover, focus, drag previews, audio
@@ -504,9 +506,9 @@ power, monitor selection, and decoder progress are transient. They shall not ent
 history or portable serialization.
 
 A processor shall report a final zero meter frame when it is suspended, stopped,
-or silenced. Rendering stops while suspended, so without that frame the last
-peak would remain the controller's most recent reading and a meter would stay
-lit for a voice that is no longer sounding.
+or silenced. Rendering stops while suspended. Without that frame, the last peak
+would remain the controller's most recent reading. A meter would stay lit for a
+voice that is no longer sounding.
 
 Rack-module collapse shall be a lightweight local UI preference keyed by
 `ProjectId`, `ProjectLineageId`, and `ModuleInstanceId`. It shall use the
@@ -518,8 +520,8 @@ key, so equal module IDs never inherit another lineage's preference.
 
 ### 7.3 Undo and inverse data
 
-Every committed project edit shall store either a complete inverse command or a
-bounded reversible patch with the data needed to restore stable IDs and
+Every committed project edit shall store a complete inverse command or a
+bounded reversible patch. The stored data shall restore stable IDs and
 references. Destructive module edits shall retain the removed module, its parts
 from every named Pattern, mixer state, automation, asset references, and effect
 chains needed by Undo.
@@ -530,19 +532,20 @@ call UI component methods.
 
 Active Undo and Redo history has a combined maximum of 100 entries and 64 MiB of
 canonical inverse and forward-patch JSON. Shared immutable asset and pack blobs
-do not count toward the JSON budget; each retained entry pins every blob it
+do not count toward the JSON budget. Each retained entry pins every blob it
 references through the persistence port.
 
 One entry is limited to 17 MiB. Its canonical before-fragment and after-fragment
 are each bounded by the 8 MiB project-manifest limit. The typed command, paths,
 IDs, version, and entry envelope together are separately limited to 64 KiB.
 Therefore the maximum encoded entry is at most 16 MiB plus 64 KiB and fits the
-17 MiB limit. A valid committed project edit shall always fit that bound. Before
-appending a new entry, clear Redo and evict the oldest Undo entries until both
+17 MiB limit. A valid committed project edit shall always fit that bound.
+
+Before appending a new entry, clear Redo and evict the oldest Undo entries until both
 combined limits will hold. Eviction releases their blob pins atomically. Undo
 and Redo move an entry between stacks without changing the combined budget. The
 UI exposes only retained entries as available. A valid destructive action shall
-not be rejected because history is full; older entries expire first.
+not be rejected because history is full. Older entries expire first.
 
 ### 7.4 Gesture coalescing
 
@@ -562,7 +565,7 @@ Rules:
   the before and after states differ.
 - Escape shall cancel and restore the captured before-state.
 - Pointer cancellation, component disconnection, or window blur shall commit the
-  last valid value when it differs; this prevents an audible edit from escaping
+  last valid value when it differs. This prevents an audible edit from escaping
   history.
 - Pointer gestures end at pointer release or cancellation.
 - Keyboard-repeat gestures end at key release or focus loss.
@@ -615,23 +618,23 @@ safe integers. The protocol field `projectRevision` carries a `StateRevision`,
 and its epoch shall be a canonical UUID. Sequence
 numbers start at zero for each direction and session and increase by one. A
 session shall be replaced before a sequence can exceed
-`Number.MAX_SAFE_INTEGER`; sequence wraparound is prohibited. State-revision
+`Number.MAX_SAFE_INTEGER`. Sequence wraparound is prohibited. State-revision
 rollover does not alter the persisted project revision.
 
 ### 8.2 Message families
 
 Controller-to-processor messages shall be limited to:
 
-- `hello`;
-- `configure`;
-- `state-snapshot`;
-- `parameter-batch`;
-- `event-batch`;
-- `clear-scheduled-events`;
-- `transport`;
-- `sample-attach` and `sample-release`;
-- `reset` and `all-notes-off`;
-- `suspend` and `resume`; and
+- `hello`.
+- `configure`.
+- `state-snapshot`.
+- `parameter-batch`.
+- `event-batch`.
+- `clear-scheduled-events`.
+- `transport`.
+- `sample-attach` and `sample-release`.
+- `reset` and `all-notes-off`.
+- `suspend` and `resume`.
 - `dispose`.
 
 `clear-scheduled-events` removes only queued future musical events at the
@@ -641,23 +644,23 @@ when a live tempo change replaces events inside the lookahead horizon.
 
 Processor-to-controller messages shall be limited to:
 
-- `ready`;
-- `ack`;
-- `meter-frame`;
-- `status`;
-- `warning`;
-- `fault`; and
+- `ready`.
+- `ack`.
+- `meter-frame`.
+- `status`.
+- `warning`.
+- `fault`.
 - `disposed`.
 
 Plugin-specific payloads shall be selected by registry-owned codecs. They shall
 not add unversioned top-level message kinds.
 
-### 8.3 Ordering and acknowledgement
+### 8.3 Ordering and acknowledgment
 
 The receiver shall process control messages in sequence order. A duplicate shall
-not be applied twice and shall repeat the last acknowledgement. A stale project
+not be applied twice and shall repeat the last acknowledgment. A stale project
 revision shall be ignored and acknowledged as stale. A gap or out-of-order
-sequence shall fault the session; the controller shall replace the affected node
+sequence shall fault the session. The controller shall replace the affected node
 and restore it from one current bounded snapshot.
 
 Scheduled event batches shall carry absolute audio-frame targets. Events in one
@@ -665,16 +668,16 @@ batch shall be sorted by frame, then by a deterministic event priority, then by
 stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
 
-An acknowledgement shall identify the highest contiguous applied sequence and
+An acknowledgment shall identify the highest contiguous applied sequence and
 complete state revision token. That token is the receiver's own current
 revision, which legitimately runs ahead of the acknowledged envelope when that
-envelope was stale. The controller shall therefore not require the two to match;
-it shall treat only an acknowledgement of a sequence it never sent as a fault.
+envelope was stale. The controller shall therefore not require the two to match.
+it shall treat only an acknowledgment of a sequence it never sent as a fault.
 
-An acknowledgement clears the acknowledged envelopes whatever its disposition. A
+An acknowledgment clears the acknowledged envelopes whatever its disposition. A
 `stale` disposition means the receiver deliberately ignored the envelope, so its
 values shall not be recorded as the acknowledged snapshot. A snapshot becomes
-authoritative only after acknowledgement. The controller shall not free state or
+authoritative only after acknowledgment. The controller shall not free state or
 sample transfer data still required by an unacknowledged message.
 
 ### 8.4 Bounds and backpressure
@@ -704,10 +707,10 @@ commands, note-off events, transport stop, reset, disposal, or graph-safety
 messages.
 
 If coalescing cannot keep the queue below 256, the controller shall reject new
-nonessential previews, issue one bounded `all-notes-off`, mark the node
-degraded, and rebuild it from the latest state projection at the next safe
-boundary. It shall report the recovery. It shall not continue posting into an
-unbounded browser queue.
+nonessential previews. It shall issue one bounded `all-notes-off` and mark the
+node as degraded. At the next safe boundary, it shall rebuild the node from the
+latest state projection. It shall report the recovery. It shall not continue
+posting into an unbounded browser queue.
 
 Worklet processors shall preallocate their real-time event and parameter storage
 from manifest bounds. They shall not allocate, log, await, lock, decode, fetch,
@@ -722,16 +725,22 @@ frames.
 A fixed-block algorithm may use a preallocated ring buffer whose capacity and
 added latency are declared by the plugin manifest. The maximum capacity shall be
 tested. Overflow shall produce bounded silence or a declared safe bypass plus a
-fault; it shall not overwrite unread audio or allocate more memory.
+fault. It shall not overwrite unread audio or allocate more memory.
 
 ### 8.6 Fault behavior
 
-An unhandled processor exception makes the affected browser node unusable. The
-controller shall listen for processor faults, silence and disconnect only the
-affected branch, close its port, create a new node, restore the last
-acknowledged state, and reconnect with a click-safe transition. A second failure
-during the same recovery attempt shall leave the plugin bypassed or silent
-according to its declared safe mode and shall show an actionable error.
+An unhandled processor exception makes the affected browser node unusable. When
+the controller detects a processor fault, it shall use this sequence:
+
+1. Silence and disconnect only the affected branch.
+2. Close its port.
+3. Create a new node.
+4. Restore the last acknowledged state.
+5. Reconnect with a click-safe transition.
+
+If the same recovery attempt fails again, the controller shall use the declared
+safe mode. It shall leave the plugin bypassed or silent and show an actionable
+error.
 
 Unrelated playback and all editing shall continue when the graph can remain
 safe. No controller fault shall corrupt project state.
@@ -758,16 +767,16 @@ Rules:
 - `faulted` shall use the plugin's declared safe silence or dry bypass behavior.
 - `disposing` shall stop scheduling, apply a bounded release or micro-fade,
   disconnect nodes, close ports, and release references. A receiver may confirm
-  disposal re-entrantly inside the posting call, so a controller shall capture
-  the node it needs before posting and shall re-read its own state afterwards
-  rather than trusting a value narrowed before that call.
+  disposal re-entrantly inside the posting call. Thus, a controller shall
+  capture the required node before posting. After posting, it shall read its
+  state again instead of using a value narrowed before the call.
 - `disposed` is terminal. Messages or graph use after disposal shall fail a
   test.
 
 Graph replacement and reorder shall prepare the new branch before switching. The
 engine shall use a bounded click-safe transition and shall not disconnect
 unrelated branches. Tail-producing effects shall follow their declared
-finite-tail policy; a removed tail shall never keep an unbounded graph alive.
+finite-tail policy. A removed tail shall never keep an unbounded graph alive.
 
 Audio context states are separate from plugin states. Locked, suspended,
 interrupted, or unavailable audio shall not block state commands, saving, import
@@ -798,10 +807,10 @@ state changes.
 
 The bundled decoder set shall support:
 
-- RIFF/WAVE PCM with 8-, 16-, 24-, or 32-bit integer samples;
-- RIFF/WAVE IEEE 32- or 64-bit floating-point samples;
-- WAVE extensible files whose subformat is one of those PCM or float forms;
-- uncompressed AIFF PCM with 8-, 16-, 24-, or 32-bit integer samples; and
+- RIFF/WAVE PCM with 8-, 16-, 24-, or 32-bit integer samples.
+- RIFF/WAVE IEEE 32- or 64-bit floating-point samples.
+- WAVE extensible files whose subformat is one of those PCM or float forms.
+- uncompressed AIFF PCM with 8-, 16-, 24-, or 32-bit integer samples.
 - native FLAC streams with valid stream metadata and integer samples up to 24
   bits.
 
@@ -815,10 +824,10 @@ count, sample rate, sample count, and the project asset budget defined in
 allocation overflow. Decoder output shall be planar finite 32-bit float PCM with
 the original sample rate and channel count.
 
-Integer PCM shall map symmetrically by its signed full-scale divisor; unsigned
+Integer PCM shall map symmetrically by its signed full-scale divisor. Unsigned
 8-bit PCM shall map around 128. Non-finite float input shall reject the file.
 Finite float input outside `[-1, 1]` shall be preserved in prepared PCM and
-controlled by the engine's existing safety stages; import shall report the
+controlled by the engine's existing safety stages. Import shall report the
 out-of-range peak. Decoding shall not normalize.
 
 ### 10.3 Determinism and provenance
@@ -829,9 +838,9 @@ and decoder version shall produce the same channel count, sample rate, frame
 count, and canonical little-endian Float32 PCM bytes in Chrome.
 
 Fixture tests shall include every required bit depth and container, mono and
-stereo, odd-sized chunks, metadata chunks, maximum legal values, truncated
-files, malformed lengths, unsupported codecs, multichannel files, and
-decompression-limit attacks. Expected metadata and SHA-256 hashes of canonical
+stereo, odd-sized chunks, and metadata chunks. They shall also include maximum
+legal values, truncated files, malformed lengths, unsupported codecs,
+multichannel files, and decompression-limit attacks. Expected metadata and SHA-256 hashes of canonical
 PCM output shall be repository-owned evidence.
 
 Decoded buffers are engine cache data. They shall not be serialized. Original
@@ -843,9 +852,10 @@ can be rebuilt deterministically.
 ### 11.1 Program routing
 
 The program path shall follow the routing in the
-[mixer and effects specification](specs/spec-007-mixer-and-effects.md): voice processing to
-module sum, module inserts, channel processing, fader, sends, send returns,
-master chain, monitor-only mono fold-down where selected, and physical output.
+[mixer and effects specification](specs/spec-007-mixer-and-effects.md). The path
+goes through voice processing, module sum, module inserts, channel processing,
+fader, sends, and send returns. It then goes through the master chain, selected
+monitor-only mono fold-down, and physical output.
 Offline rack and return stems shall branch at their specified pre-master points.
 Only the master export shall include the master chain.
 
@@ -897,10 +907,14 @@ ceiling no higher than -1 dBFS and shall add no user-adjustable project
 parameter.
 
 Only one non-empty channel may be selected. Selecting another channel replaces
-the selection. Enabling, disabling, or changing Monitor shall use a total
-4-millisecond fade-through-silence switch: fade the old physical source to zero
-for 2 milliseconds, switch at zero, then fade the new source up for 2
-milliseconds. Program and PFL sources shall never overlap during the transition.
+the selection. A Monitor change shall use this 4-millisecond
+fade-through-silence sequence:
+
+1. Fade the old physical source to zero for 2 milliseconds.
+2. Switch the source at zero.
+3. Fade the new physical source up for 2 milliseconds.
+
+Program and PFL sources shall never overlap during the transition.
 
 Monitor selection shall ignore the selected channel's fader, channel pan, mute,
 global solo gate, and send levels. It shall preserve any pan already created
@@ -918,10 +932,10 @@ automation, autosave, project files, recovery data, ordinary Save, portable
 export, master WAV export, or stem export. Closing or reloading the page shall
 clear Monitor.
 
-Routing tests shall prove zero program contribution at the destination while
-Monitor is active, zero PFL contribution while inactive, one selected source
-only, fixed safety gain, limiter enforcement, meter-source switching, unchanged
-sends, and export isolation.
+Routing tests shall prove zero program contribution while Monitor is active and
+zero PFL contribution while it is inactive. They shall also prove one selected
+source, fixed safety gain, limiter enforcement, and meter-source switching.
+The tests shall prove unchanged sends and export isolation.
 
 ## 12. Persistence boundary
 
@@ -939,13 +953,13 @@ persistence transaction.
 The repository receives project content plus the last committed
 `ProjectRevision`. It shall not serialize the in-memory `StateRevision` used by
 commands and engine projections. A successful transaction assigns the next
-`ProjectRevision` to the stored head; later in-memory edits continue with their
+`ProjectRevision` to the stored head. Later in-memory edits continue with their
 independent state-revision sequence.
 
-The canonical origin in section 2 is part of persistence identity. Quota
-requests, persistent-storage behavior, atomic saves, pack storage, archive
-validation, limits, recovery pruning, and emergency portable export are owned by
-`PROJECT-FORMAT.md` and shall be tested through the state-owned ports.
+The canonical origin in section 2 is part of persistence identity.
+`PROJECT-FORMAT.md` owns quota requests, persistent-storage behavior, atomic
+saves, and pack storage. It also owns archive validation, limits, recovery
+pruning, and emergency portable export. Tests shall use the state-owned ports.
 
 Last-writer-wins behavior shall compare complete committed revision tokens for
 equality, not timestamps or numeric counters alone. Cross-tab notices may warn a
@@ -957,15 +971,15 @@ same-project-ID import resolution are owned by `PROJECT-FORMAT.md`.
 Browser globals shall be wrapped at the owning layer boundary. Tests shall be
 able to inject:
 
-- an `IdFactory`;
-- a monotonic clock and audio-frame clock;
-- a scheduler and lookahead driver;
-- an engine graph factory;
-- a worklet node and message-port harness;
-- a sample decoder and decoder worker transport;
-- project, asset, recovery, and preference repositories;
-- a cross-tab revision channel;
-- file import and export sinks; and
+- an `IdFactory`.
+- a monotonic clock and audio-frame clock.
+- a scheduler and lookahead driver.
+- an engine graph factory.
+- a worklet node and message-port harness.
+- a sample decoder and decoder worker transport.
+- project, asset, recovery, and preference repositories.
+- a cross-tab revision channel.
+- file import and export sinks.
 - visibility, audio-unlock, and audio-context state signals.
 
 The production composition root shall be the only place that selects browser
@@ -975,14 +989,14 @@ production build for integration evidence.
 
 Plugin contract tests shall run every registered manifest through one shared
 suite. The suite shall verify IDs, defaults, ranges, smoothing, state migration,
-serialization, lifecycle, disposal, message bounds, channel behavior,
-live/offline parity, and declared latency and tail rules.
+serialization, lifecycle, and disposal. It shall also verify message bounds,
+channel behavior, live/offline parity, and declared latency and tail rules.
 
 Architecture tests shall fail on prohibited cross-layer imports, direct UI audio
-access, state-held browser objects, unregistered plugin branches,
-`ScriptProcessorNode`, main-thread custom DSP, MIDI code, a service worker, a
-PWA manifest, or a product API endpoint. The current AST and artifact guard is
-implemented in `tests/unit/architecture/source-policy.ts`; it also scans delivery
+access, state-held browser objects, and unregistered plugin branches. They shall
+also fail on `ScriptProcessorNode`, main-thread custom DSP, MIDI code, a service
+worker, a PWA manifest, or a product API endpoint. The current AST and artifact guard is
+implemented in `tests/unit/architecture/source-policy.ts`. It also scans delivery
 scripts so a static launcher cannot silently grow a product API. Publishing the
 static build to GitHub Pages under `.github/workflows/` is permitted, because it
 ships the same backend-free artifact rather than introducing a product server.
@@ -993,16 +1007,16 @@ ships the same backend-free artifact rather than introducing a product server.
 
 Every audio evidence run shall record:
 
-- date and source revision;
-- production build hash;
-- browser name and exact version;
-- operating system;
-- live or offline context;
-- requested and actual sample rate;
-- exposed latency or buffer information where the browser provides it;
-- fixture project and deterministic seed;
-- active instruments, voices, effects, and routing;
-- render length and comparison method; and
+- date and source revision.
+- production build hash.
+- browser name and exact version.
+- operating system.
+- live or offline context.
+- requested and actual sample rate.
+- exposed latency or buffer information where the browser provides it.
+- fixture project and deterministic seed.
+- active instruments, voices, effects, and routing.
+- render length and comparison method.
 - produced report and audio artifact hashes.
 
 The release matrix shall use the then-current stable Chrome. The browser shall
@@ -1042,17 +1056,17 @@ result.
 Each supported browser shall also prove in the production build:
 
 - audio remains locked until a valid gesture and editing still works while
-  locked;
+  locked.
 - the first-sound timer uses the exact start event defined in the
-  [audio engine and transport specification](specs/spec-004-audio-engine-and-transport.md);
+  [audio engine and transport specification](specs/spec-004-audio-engine-and-transport.md).
 - play, pause, stop, tempo change, quantized launch, and pattern/song switching
-  are audibly and visibly coherent;
+  are audibly and visibly coherent.
 - a compatible module or effect edit does not suspend the context or rebuild
-  unrelated branches;
+  unrelated branches.
 - Monitor changes the actual destination source and meter source as section 11
-  requires;
+  requires.
 - saving, reloading, theme changes, and compatible graph edits do not stop
-  transport; and
+  transport.
 - a processor fault affects only its declared branch and produces the defined
   recovery state.
 
@@ -1077,7 +1091,7 @@ Failure shall remain local whenever safe:
 - Protocol or processor failure shall follow sections 8.6 and 9.
 - Audio unavailable shall disable audible operations without disabling editing,
   validation, Save, or project export.
-- Canonical port conflict shall fail startup and name `127.0.0.1:4173`; it shall
+- Canonical port conflict shall fail startup and name `127.0.0.1:4173`. It shall
   not move the user to a different origin.
 
 Errors shall identify what failed, what data remains safe, and the next recovery
@@ -1125,7 +1139,7 @@ before the Phase 1 product source tree was created.
 
 ## 18. Primary technical references
 
-These references support browser-platform constraints; the normative Pulsebox
+These references support browser-platform constraints. The normative Pulsebox
 choices remain in this document:
 
 - [Web Audio API 1.1](https://www.w3.org/TR/webaudio-1.1/) defines

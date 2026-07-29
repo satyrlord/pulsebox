@@ -10,13 +10,13 @@ description: >
 ## 1. Establish the invariant
 
 1. Read `AGENTS.md`, each owning specification, the source, and its tests.
-   Finish when the preserved behavior and affected seams are explicit.
+   Completion criterion: The preserved behavior and affected seams are explicit.
 2. Exclude feature work and unrelated cleanup from the scope.
-   Finish when every planned line serves the stated refactor.
+   Completion criterion: Every planned line serves the stated refactor.
 3. Select one before-and-after complexity measure.
-   Finish when imports, branches, duplicate owners, or edit surface can show improvement.
-4. Add a focused regression test before changing a critical seam.
-   Finish when the test can fail for the behavior at risk.
+   Completion criterion: Imports, branches, duplicate owners, or changed file count can show improvement.
+4. Before you change a critical seam, add a focused regression test.
+   Completion criterion: The test can fail for the behavior at risk.
 
 ## 2. Protect the seams
 
@@ -30,25 +30,25 @@ Preserve each applicable contract:
 - schema versions, migrations, import validation, assets, and preferences
 - theme tokens without theme-specific TypeScript or markup
 
-Finish this stage when every applicable seam has a direct test or inspection
+Completion criterion: Every applicable seam has a direct test or inspection
 method.
 
 ## 3. Refactor in coherent steps
 
-1. Make the smallest structural change.
-   Finish when the code compiles and the preserved behavior remains testable.
+1. Change the structure only as much as the refactor requires.
+   Completion criterion: The code compiles and the preserved behavior remains testable.
 2. Run the narrowest affected checks.
-   Finish when the step passes or you record the exact pre-existing failure.
-3. Repeat only while the next step serves the same refactor.
-   Finish when no planned step adds product behavior.
+   Completion criterion: The step passes or you record the exact pre-existing failure.
+3. If the next step serves the same refactor, repeat the process.
+   Completion criterion: No planned step adds product behavior.
 4. Compare the selected complexity measure with its baseline.
-   Finish when the result is lower and no new owner or branch offsets the gain.
+   Completion criterion: The result is lower and no new owner or branch offsets the gain.
 
-Use `dead-code-audit` for broad reachability cleanup. Use `add-feature` when an
-approved product contract must change.
+Use `dead-code-audit` for broad reachability cleanup. If an approved product
+contract must change, use `add-feature`.
 
 ## Completion criterion
 
-Complete the refactor when behavior and contracts stay unchanged. Every affected
-check must pass. Report the before-and-after complexity measure and account for
-every changed line.
+The refactor is complete after you confirm that behavior and contracts did not
+change. Every affected check must pass. Report the before-and-after complexity
+measure and account for every changed line.

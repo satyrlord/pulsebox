@@ -5,28 +5,13 @@
 <title>PULSEBOX</title>
 <style>
 /* ==========================================================================
-   PULSEBOX v4 — approved rack-cockpit composition target
-   topbar / browser + slots / rack units / right tabs + 2x2 A-D channel sends
-   pattern + module-aware piano roll + playlist / collapsible bottom workspace
-   Themes are tokens only. Geometry never moves.
-   Styling pass: neutral matte
-   graphite, green lamp accent, rounder controls, rack pull handles.
-   Pass 2: closer to the mock — softer lit faceplates with brushed texture,
-   larger knobs with glowing value arcs and labels above, chunkier pull
-   handles with socket bolts, silver fader caps, plain-text wordmark.
-   Pass 3: the composition geometry this file now owns — per-unit faceplate
-   heights, panel widths and the piano gutter.
-   Pass 4: density pass — decorative piano gutter, mixer levels, caps, sends and
-   meter ladders, waveform, and topbar/bottom-bar alignment.
-   Pass 5: photo-real machined pull handles, and the handles become the module
-   reorder drag affordance per spec-005 section 14.
-   This file is the single approved composition target (spec-003 section 8.2):
-   it owns proportion, placement, density, materials, typography scale and
-   control sizing, and the product specifications own behavior. Where the two
-   disagree, the specification wins and this file is corrected.
-   Decision D80: it shows only true or specification-owned state. It renders the
-   spec-005 section 9.1 default project in its real stopped state, so no element
-   may display a value the product would never produce.
+   PULSEBOX v4 is the approved rack-cockpit composition target.
+   This file owns proportion, placement, density, materials, type scale, and
+   control size. The product specifications own behavior.
+   If this file conflicts with a specification, correct this file.
+   Decision D80 permits only true or specification-owned state.
+   This file shows the spec-005 section 9.1 project in its stopped state.
+   No element can show a value that the product cannot produce.
    ========================================================================== */
 :root, html[data-theme="rack"]{
   --surface-app:#08090a; --surface-rail:#101214; --surface-chassis:#141618;
@@ -146,8 +131,8 @@ html[data-theme="rack"] .topbar{
 .iconbtn.on svg{filter:drop-shadow(0 0 4px rgba(113,178,62,.45));}
 .iconbtn svg{width:17px;height:17px;fill:currentColor;}
 .iconbtn.ghost{background:none;box-shadow:none;width:26px;}
-/* Project picker, as in the mock: a raised plate wide enough for the whole
-   name, a dropdown chevron, and the favourite heart on the same plate. */
+/* The project picker is a raised plate. It holds the complete name, a dropdown
+   chevron, and the favorite heart. */
 .projbox{
   width:176px;height:40px;flex:none;min-width:0;display:flex;align-items:center;gap:2px;padding:0 2px;
   border-radius:8px;
@@ -178,7 +163,7 @@ html[data-theme="rack"] .topbar{
 .tempogroup .tapbtn{height:100%;border-radius:0;
   box-shadow:inset 1px 0 0 rgba(0,0,0,.55),inset 0 1px 0 var(--edge-highlight);}
 /* Transport keys: generous square keys seated together in the recessed
-   transport channel, the glyph carrying its signal colour. */
+   transport channel, the glyph carrying its signal color. */
 .tbtn{
   width:auto;height:36px;flex:1 1 0;border-radius:6px;display:grid;place-items:center;
   color:var(--text-secondary);
@@ -192,7 +177,7 @@ html[data-theme="rack"] .topbar{
 .tbtn svg{width:21px;height:21px;fill:currentColor;}
 .tbtn:active{box-shadow:inset 0 3px 6px rgba(0,0,0,.7);}
 .tbtn:hover{color:var(--text-primary);}
-/* Idle transport glyphs keep their signal colours, so Play and Record are
+/* Idle transport glyphs keep their signal colors, so Play and Record are
    identifiable at rest without being lit. The engaged state is a filled key. */
 .tbtn.play{color:var(--signal-play);}
 .tbtn.play svg{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--signal-play) 65%,transparent));}
@@ -290,7 +275,7 @@ html[data-theme="rack"] .wordmark{color:#d4d6d7;}
   background:conic-gradient(from 210deg,var(--metal-cap-bot) 0deg,var(--metal-cap-top) 55deg,var(--metal-cap-bot) 135deg,
     var(--metal-skirt-a) 215deg,var(--metal-cap-bot) 295deg,var(--metal-skirt-a) 360deg);
   box-shadow:0 2px 4px rgba(0,0,0,.55);}
-/* a fine machined indicator line running from the cap centre to its edge */
+/* a fine machined indicator line running from the cap center to its edge */
 .kbody .kptr{position:absolute;left:50%;top:3px;width:2px;height:12px;margin-left:-1px;border-radius:1px;
   background:linear-gradient(180deg,#ffffff,#e6ebef 45%,rgba(230,235,239,.35));
   box-shadow:0 0 6px rgba(255,255,255,.5),0 0 3px color-mix(in srgb,var(--k) 60%,transparent),
@@ -298,9 +283,8 @@ html[data-theme="rack"] .wordmark{color:#d4d6d7;}
   transform-origin:50% 11px;}
 .knob.dragging .kbody{transform:translate(-50%,-50%) scale(1.06);}
 .klabel{
-  /* sits above the dial, as in the mock; two lines at 10px rather than one
-     line at 7.5px — spec section 5 sets a 10px floor, so long labels wrap
-     instead of shrinking */
+  /* The label sits above the dial. It uses two 10px lines because spec section
+     5 sets a 10px minimum. Long labels wrap instead of shrinking. */
   order:-1;max-height:24px;line-height:12px;overflow:hidden;text-align:center;
   display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;
   font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.05em;text-transform:uppercase;
@@ -414,7 +398,7 @@ html[data-theme="rack"] .slots{background-color:#16181a;}
 .rackscroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:1px 1px 1px 4px;display:flex;flex-direction:column;gap:5px;
   position:relative;
   background:var(--mat-speckle),linear-gradient(180deg,var(--surface-chassis),var(--surface-rail));}
-/* body holds name, knobs and sequencer; rails sit outside it so they always
+/* body holds name, knobs and sequencer. Rails sit outside it so they always
    span the full height, whether the body is one row or two */
 .ubody{flex:1;min-width:0;display:flex;align-items:center;}
 .unit{
@@ -423,8 +407,8 @@ html[data-theme="rack"] .slots{background-color:#16181a;}
   --plate-bot:color-mix(in srgb,var(--mod-accent) calc(var(--mod-tint) - 3%),var(--surface-plate-bot));
   flex:none;height:90px;display:flex;align-items:stretch;
   background:var(--mat-plate);border:1px solid #000;border-radius:var(--edge-radius-panel);
-  /* flatter than a floating card: a lit top edge, a dark base line, and a
-     short shadow that seats the unit into the rack rather than levitating it */
+  /* A lit top edge, a dark base line, and a short shadow seat the unit in the
+     rack. */
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.55),
     0 3px 7px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.6);
 }
@@ -475,11 +459,9 @@ html[data-theme="rack"] .rail.r{
   box-shadow:inset 0 3px 7px rgba(0,0,0,.95),inset 0 -2px 5px rgba(0,0,0,.85),
     0 1px 0 var(--edge-highlight);
 }
-/* Chunky machined-steel pull. Photo-real cues, not a flat sliver: the bar is
-   shaded across its width as a cylinder with one hard specular streak left of
-   centre and rolled-off dark edges; fine lathe lines run along its length; the
-   ends darken where the bar turns away into its standoff bolts; and the bar
-   drops a soft double shadow into the recessed channel behind it. */
+/* The machined-steel pull has a cylindrical shade and one hard highlight left
+   of center. Its dark edges turn into the standoff bolts. Fine lathe lines run
+   along its length. A soft double shadow falls into the recessed channel. */
 .rail .handle{
   position:absolute;z-index:1;left:50%;top:9px;bottom:9px;width:12px;margin-left:-6px;
   border-radius:6px;
@@ -517,7 +499,7 @@ html[data-theme="rack"] .rail.r{
 .rail .screw{position:absolute;z-index:2;left:50%;margin-left:-4.5px;}
 .rail .screw.t{top:4px;} .rail .screw.b{bottom:4px;}
 /* Reorder drag, spec-005 section 14: the rails are the drag handles. The
-   dragged unit lifts and follows the pointer; a lit line marks where it
+   dragged unit lifts and follows the pointer. A lit line marks where it
    will land. */
 body.rack-reordering{user-select:none;}
 body.rack-reordering .rail{cursor:grabbing;}
@@ -549,8 +531,8 @@ body.rack-reordering .rail{cursor:grabbing;}
 .unit[data-mod="five"] .urow{top:1px;}
 /* Real buttons: enable, solo and mute are operable by pointer and keyboard.
    The 24px hit area is met with a transparent inset rather than visual bulk. */
-/* The mock's transport pills are small raised keys with a hairline frame; the
-   engaged one fills with the module colour. */
+/* The mock's transport pills are small raised keys with a hairline frame. The
+   engaged one fills with the module color. */
 .upill{
   position:relative;height:18px;padding:0 7px;border-radius:3px;
   font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;font-size:var(--size-1);font-weight:600;
@@ -574,10 +556,9 @@ body.rack-reordering .rail{cursor:grabbing;}
   flex:1;min-width:0;display:flex;align-items:center;justify-content:space-evenly;
   gap:4px;padding:0;
 }
-/* Per-unit bank spreads. A module's knob count differs, but the faceplate width
-   does not, so each bank gets its own padding: seven- and eight-knob banks ride
-   a wider pitch than the ten-knob bass bank instead of every unit crowding its
-   controls to one end. These paddings are composition data this file owns. */
+/* Each module bank has padding for its knob count and the fixed faceplate width.
+   Seven- and eight-knob banks use a wider pitch than the ten-knob bass bank.
+   This file owns these padding values as composition data. */
 .unit[data-mod="six"] .uknobs,.unit[data-mod="boom"] .uknobs,.unit[data-mod="sev"] .uknobs{padding:0 37px 0 15px;}
 .unit[data-mod="nine"] .uknobs{padding:0 0 0 16px;}
 .unit[data-mod="five"] .uknobs{padding:0 6px 0 18px;}
@@ -585,8 +566,8 @@ body.rack-reordering .rail{cursor:grabbing;}
   font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;
 }
 .unit .klabel{color:#d6dade;text-shadow:0 0 3px rgba(255,255,255,.22),0 1px 0 var(--text-engraved-lo);}
-/* Rack arcs burn a hotter lime than the raw module colour, so a lit value arc
-   stays readable against a tinted faceplate on every module accent. */
+/* Rack arcs use a brighter lime than the raw module color. This keeps each lit
+   value arc readable against a tinted faceplate. */
 .unit .kdial .arc-fill{stroke:color-mix(in srgb,var(--k) 82%,#cade6a);
   filter:drop-shadow(0 0 4px color-mix(in srgb,var(--k) 75%,transparent));}
 .unit .kdial{transform:scale(.8);filter:brightness(.95);}
@@ -635,7 +616,7 @@ body.rack-reordering .rail{cursor:grabbing;}
   font-family:var(--type-display);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;
   text-shadow:0 0 7px color-mix(in srgb,var(--k) 45%,transparent);}
 .uactlbl{display:flex;align-items:center;justify-content:space-between;margin-top:5px;}
-/* Module accents are lamp colours, not text colours. Small readouts mix the
+/* Module accents are lamp colors, not text colors. Small readouts mix the
    accent toward the theme ink so the hue survives but contrast passes. */
 .uactlbl .pos{margin-left:auto;font-family:var(--type-num);font-size:var(--size-1);
   color:#a9b1a5;text-shadow:0 0 4px rgba(255,255,255,.12);}
@@ -686,9 +667,8 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
   color:var(--k);text-shadow:0 1px #000;filter:brightness(.95);
   background:none;box-shadow:none;}
 .mstrip.master .mtag{color:var(--text-primary);text-shadow:0 1px 0 var(--text-engraved-lo);}
-/* The master strip carries no pan knob and no send grid, so its well takes that
-   reclaimed height instead of padding it out: the master fader runs from just
-   below the MIX label down to the buttons, taller than the channel faders. */
+/* The master strip has no pan knob or send grid. Its well uses the reclaimed
+   height. The master fader runs from below the MIX label to the buttons. */
 .mstrip.master .fwrap{margin-top:2px;}
 /* Empty channels stay dim rather than taking a lit accent. */
 .mstrip.empty .mtag,.mstrip:not([data-mod]) .mtag{
@@ -699,13 +679,13 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
   padding:4px 3px;margin-bottom:12px;border-radius:4px;
   background:linear-gradient(180deg,#121415,#0c0e0f);
   box-shadow:var(--sink-2),0 1px 0 var(--edge-highlight);}
-/* the fader itself is transparent — the well behind it is the surface; it only
-   carries the coloured travel line and the cap */
+/* the fader itself is transparent — the well behind it is the surface. It only
+   carries the colored travel line and the cap */
 .fader{flex:0 0 11px;min-width:11px;max-width:11px;position:relative;cursor:ns-resize;}
 .fader::before{content:"";position:absolute;left:50%;top:4px;bottom:4px;width:2px;margin-left:-1px;
   background:color-mix(in srgb,var(--k) 26%,#000);border-radius:1px;
   box-shadow:inset 0 1px 2px rgba(0,0,0,.8);}
-/* the travelled range burns in the channel colour */
+/* the travelled range burns in the channel color */
 .ffill{position:absolute;left:50%;bottom:4px;width:3px;margin-left:-1.5px;border-radius:1px;
   background:color-mix(in srgb,var(--k) 62%,#000);opacity:.85;}
 /* The cap: a tall machined silver block with deep grooves — the strongest
@@ -718,7 +698,7 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
     linear-gradient(180deg,#e7e9eb 0%,var(--cap-hi) 22%,var(--cap-lo) 58%,#565c61 88%,#41464a 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 1px rgba(0,0,0,.55),
     0 0 0 1px rgba(0,0,0,.8),0 3px 5px rgba(0,0,0,.75);}
-/* the darker centre groove across the cap face */
+/* the darker center groove across the cap face */
 .fcap::after{content:"";position:absolute;left:1px;right:1px;top:50%;height:4px;margin-top:-2px;border-radius:1px;
   background:linear-gradient(180deg,#0e1113,#23272b);
   box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.5);}
@@ -736,9 +716,9 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
   width:min(33px,100%);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 2px;
   margin:14px auto 17px;
 }
-/* Send chips in the mock are dark squares carrying a coloured letter inside a
-   coloured hairline frame — the frame is the send's identity, not a fill. All
-   four chips wear the channel colour; the engaged ones burn a little hotter. */
+/* Send chips are dark squares with a colored letter and hairline frame. The
+   frame identifies the send. All four chips use the channel color. Engaged
+   chips use a brighter value. */
 .sendbtn{
   --send-k:var(--k);position:relative;min-width:0;height:16px;border-radius:3px;
   display:grid;place-items:center;font-family:var(--type-display);font-size:var(--size-1);font-weight:700;
@@ -812,7 +792,7 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
 .mstrip .knob.sm{width:100%;}
 .mstrip .klabel{color:#9aa1a6;text-shadow:0 1px #000;}
 .mstrip .knob.sm .kdial{transform:translateY(3px) scale(1.02);filter:brightness(.95);}
-/* pan rings in the mock wear the channel colour all the way around, muted */
+/* pan rings in the mock wear the channel color all the way around, muted */
 .mstrip .kdial .arc-track{stroke:color-mix(in srgb,var(--k) 78%,#0a0c0d);stroke-width:2;}
 .mstrip .kdial .arc-fill{stroke:color-mix(in srgb,var(--k) 78%,#0a0c0d);filter:none;stroke-width:2;}
 /* ==================== BOTTOM ROW ==================== */
@@ -842,7 +822,7 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
   font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
 .timingctl{display:grid;grid-template-columns:auto 78px 30px;align-items:center;gap:4px;
   font-family:var(--type-display);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
-/* the visual track stays slim; the control keeps a 24px grab height */
+/* the visual track stays slim. The control keeps a 24px grab height */
 .timingctl input{width:78px;height:24px;accent-color:var(--accent-lamp);appearance:none;-webkit-appearance:none;background:none;}
 .timingctl input::-webkit-slider-runnable-track{height:4px;border-radius:2px;
   background:linear-gradient(90deg,var(--accent-lamp) var(--fill,50%),#3a3f42 var(--fill,50%));}
@@ -864,7 +844,7 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
 /* Piano key gutter: a narrow dark name strip on the left, then the keyboard
    drawn side-on. Every key spans exactly its own grid row, so the key a user
    reads across from a note is the pitch that note actually plays. Naturals are
-   ivory and run to the grid edge; sharps are glossy black and sit inset, as on
+   ivory and run to the grid edge. Sharps are glossy black and sit inset, as on
    a keyboard viewed from the side. */
 .prkeys{width:78px;flex:none;display:block;position:relative;overflow:hidden;
   background:linear-gradient(180deg,#0a0b0c,#050506);
@@ -874,12 +854,12 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
     linear-gradient(90deg,#0a0c0d 0 15px,transparent 15px),
     linear-gradient(90deg,#5c5c5c 15px,#7d7d7d 35%,#a8a8a8 60%,#b2b2b2 78%,#8a8a8a 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.55);}
-/* Labels sit in the dark name strip and centre on their own row, so a label
-   lines up with the key and the grid row it names. */
+/* Each label sits in the dark name strip and centers on its row. It aligns with
+   the key and the named grid row. */
 .pkl{position:absolute;left:1.5px;z-index:3;display:flex;align-items:center;
   font-family:var(--type-num);font-size:8px;letter-spacing:.02em;color:#b9bdc2;}
-/* Sharps span their own row like naturals, but stop short of the grid edge and
-   stay dark, so the gutter still reads as a keyboard seen from the side. */
+/* Sharps span their own row like natural notes. They stop before the grid edge
+   and stay dark. This makes the gutter look like a side view of a keyboard. */
 .pkb{position:absolute;left:15px;right:22px;z-index:2;border-radius:0 2px 2px 0;
   background:
     linear-gradient(90deg,#26292d 0,#191c1f 60%,#0d0f11 100%);
@@ -917,8 +897,8 @@ html[data-theme="rack"] .prgrid{background:#141516;}
   box-shadow:0 0 6px rgba(255,255,255,.4);}
 .vellane{flex:none;height:50px;display:flex;border-top:1px solid var(--edge-hairline);box-shadow:0 -1px 0 var(--edge-highlight);}
 .vellane .vlbl{width:78px;flex:none;display:grid;place-items:center;padding:4px 2px;}
-/* The closed control keeps the 78px gutter width so it stays aligned with the
-   piano-key column; the open list is free to be wider than the control. */
+/* The closed control keeps the 78px gutter width and aligns with the piano-key
+   column. The open list can be wider than the control. */
 .vellane .vlbl select{width:74px;height:24px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);
   color:var(--text-secondary);font-family:var(--type-display);font-size:9px;text-transform:uppercase;box-shadow:var(--sink-1);padding:0 4px;
   text-overflow:ellipsis;}
@@ -978,9 +958,9 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 /* Narrow desktops: the step row drops to its own line inside the unit rather
    than squeezing to nothing. The rails still run the full height. */
 @media (max-width:1499px){
-  /* The grouped header keeps its substance but sheds width evenly: tighter
-     gaps, slimmer keys, a narrower wordmark column, and the project name is
-     the one element allowed to ellipsize. */
+  /* The grouped header reduces its width evenly. It uses tighter gaps, slimmer
+     keys, and a narrower wordmark column. Only the project name can use an
+     ellipsis. */
   .topbar{grid-template-columns:minmax(0,1fr) 132px minmax(0,1fr);}
   .wordmark{width:132px;font-size:19px;}
   .header-left,.header-right{gap:var(--space-1);}
@@ -1008,11 +988,9 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   .unit{height:auto;min-height:152px;}
   .ubody{flex-wrap:wrap;padding:5px 0;}
   .uname{border-right:0;box-shadow:none;}
-  /* The promoted control bank wraps to its own line rather than crushing the
-     knobs. It keeps the evenly spread distribution it has on wide viewports:
-     left-packing a six- or seven-knob bank across the full unit width leaves a
-     dead gap that reads as a cramped cluster, worst on the sampler, which
-     carries the fewest knobs. */
+  /* The promoted control bank wraps to its own line to protect the knob size.
+     It keeps the even distribution from wide viewports. Left alignment would
+     leave an empty area in modules with six or seven knobs. */
   .uknobs{flex:1 0 100%;order:5;flex-wrap:wrap;justify-content:space-evenly;margin-top:4px;}
   .useq{order:3;}
   .uaudition{order:4;flex-direction:row;width:auto;margin-left:auto;}
@@ -1270,9 +1248,9 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
         <div class="prgrid" id="prgrid"><div class="playhead" id="rollPlayhead" style="left:0"></div></div>
       </div>
       <div class="vellane">
-        <!-- Spec section 16.3.1. The Parameter selector is the only control that
-             chooses an edited lane, it is scoped to the selected module, and it is
-             repopulated by renderEditor when the module changes. -->
+        <!-- Spec section 16.3.1. The Parameter selector chooses the edited lane.
+             It is scoped to the selected module. renderEditor repopulates it when
+             the module changes. -->
         <div class="vlbl"><select id="laneSelect" title="Choose the edited parameter lane." aria-label="Parameter"></select></div>
         <div class="vgrid" id="vgrid"></div>
       </div>
@@ -1306,7 +1284,7 @@ const clamp = (v,a,b) => Math.min(b, Math.max(a,v));
 const THIN = "\u2009";
 /* Spec section 11.4 and decision D79. The MVP ships one built-in theme, rack,
    so this composition is captured in the rack theme only. The header carries
-   no theme selector; appearance is chosen on the Settings page. */
+   no theme selector. Appearance is chosen on the Settings page. */
 /* state that paint functions reach during build */
 let playing = false, queuedCommits = [], stepPos = 0;
 
@@ -1367,7 +1345,7 @@ const kFrom=(el,n)=>{n=clamp(n,0,1);const mn=+el.dataset.min,mx=+el.dataset.max;
   return el.dataset.curve==="log" ? Math.exp(Math.log(mn)+n*(Math.log(mx)-Math.log(mn))) : mn+n*(mx-mn);};
 function paintKnob(el){
   /* Decision D80: a knob always paints its own data-value. Pointer angle and arc
-     length are the same reading, so both come from the normalised value. */
+     length are the same reading, so both come from the normalized value. */
   const n=kNorm(el,+el.dataset.value), end=-START+n*SWEEP;
   const f=el.querySelector(".arc-fill");
   if(f) f.setAttribute("d", n<=0.002?"":arcPath(19,19,KR,-START,end));
@@ -1435,7 +1413,7 @@ const initKnobs=(root=document)=>root.querySelectorAll(".knob").forEach(buildKno
 
 /* ================= modules ================= */
 /* Spec section 4 fixes these names. Short labels are uppercase and never more
-   than four characters; they go on faceplates, rack cards and mixer strips.
+   than four characters. They go on faceplates, rack cards and mixer strips.
    Full names and type descriptions go in the library, tooltips and editors. */
 const MODS=[
   {id:"bass",label:"BASS",name:"Acid Bass",type:"Monophonic bass synth",kind:"bass",
@@ -1474,8 +1452,8 @@ const MODS=[
    voices:["Shaker","Bongo","Conga","Tambourine","Cowbell","Claves","Click","Noise"]},
 ];
 /* Spec section 17 and decision D69. Swing is one global project property in the
-   MVP, so it lives beside tempo rather than on a Pattern and the header slider
-   reads the same on every Pattern. Humanize stays Pattern-owned. */
+   MVP. It lives beside tempo, not on a Pattern. The header slider shows the same
+   value for every Pattern. Humanize stays Pattern-owned. */
 let projectSwing=54;
 const PROJECT_PATTERNS=[
   {name:"Intro",bars:8,humanize:8},
@@ -1662,7 +1640,7 @@ function setModulePresent(mid,present){
     });
   }
   /* a restore replaces card markup with its original slot number baked in, so
-     the shared renumber pass runs to honour any reorder since then */
+     the shared renumber pass runs to honor any reorder since then */
   syncRackOrder();
   announce(present?`${m.name} added to slot ${index+1}.`:`${m.name} deleted from slot ${index+1}. Undo is available.`);
 }
@@ -1689,8 +1667,8 @@ addEventListener("keydown",e=>{if(e.key==="Escape"&&!moduleMenu.hidden){e.preven
 addEventListener("resize",()=>closeModuleMenu(false));
 
 /* Voice cycling and audition.
-   The faceplate never edits pattern data: there is no step toggle here and no
-   undo entry, because the Piano Roll is the only pattern editing surface. */
+   The faceplate never edits pattern data. It has no step toggle and creates no
+   undo entry. The Piano Roll is the only pattern editing surface. */
 $$(".useq").forEach(seq=>{
   const mid=seq.dataset.mod, m=MODS.find(x=>x.id===mid);
   let vi=0;
@@ -1784,7 +1762,7 @@ CH.forEach((c,i)=>{
   const paint=()=>{const n=toN(c.db);
     f.querySelector(".fcap").style.bottom=`calc(${(n*100).toFixed(1)}% - 14px)`;
     f.querySelector(".ffill").style.height=(n*100).toFixed(1)+"%";
-    /* the slider reports its own value, so the level is never colour-only */
+    /* the slider reports its own value, so the level is never color-only */
     f.setAttribute("aria-valuenow",c.db.toFixed(1));
     f.setAttribute("aria-valuetext",fmt(c.db,"db"));};
   paint();
@@ -1824,7 +1802,7 @@ CH.forEach((c,i)=>{
   d.className="mstrip master";
   /* Spec section 19.2 and decision D75. The mix bus is where send chains return,
      never a send source, so the master strip carries no A-D grid. Return levels
-     live on the Effects tab's A-D cards; master processing lives on Master. */
+     live on the Effects tab's A-D cards. Master processing lives on Master. */
   d.innerHTML=`<span class="mtag">MIX</span>
     <div class="fwrap"><div class="fader" role="slider" tabindex="0"
         aria-label="Master level" aria-orientation="vertical"
@@ -1898,9 +1876,9 @@ mixstrips.querySelectorAll(".mstrip.empty .knob").forEach(control=>{
 
 /* ================= rack reorder ================= */
 /* Spec-005 section 14: the rack-ear pull handles are the reorder drag
-   affordance. Dragging either handle moves the whole unit up or down behind an
-   insertion marker; with the module itself focused, Alt+Arrow does the same
-   from the keyboard. A committed move renumbers every slot, keeps each
+   controls. Dragging either handle moves the unit behind an insertion marker.
+   When the module has focus, Alt+Arrow provides the keyboard action. A
+   committed move renumbers every slot, keeps each
    module's own mixer channel, lands as one undo entry, and is announced. */
 const slotEntries=[...MODS.map(m=>m.id),"empty7","empty8"];
 const tailEmpty={
@@ -2107,19 +2085,15 @@ let activeEditorModule="bass";
 const KEYS=["C5","B4","A#4","A4","G#4","G4","F#4","F4","E4","D#4","D4","C#4","C4","B3","A#3","A3","G#3","G3","F#3","F3","E3","D#3","D3","C#3","C3"];
 const prkeys=$("#prkeys"), prgrid=$("#prgrid"), vgrid=$("#vgrid"), rbm=$("#rbmeasures");
 const laneSelect=$("#laneSelect");
-/* The timeline starts at the grid's left edge. An earlier composition reserved
-   a 76px column here for per-row controls; the MVP has none, so the grid uses
-   its full width and bar 1 begins against the keybed. These helpers stay as the
-   single place that maps a percentage position onto the timeline. */
+/* The timeline starts at the grid's left edge. The MVP has no per-row controls,
+   so the grid uses its full width. Bar 1 begins against the keybed. These
+   helpers are the only percentage-to-timeline map. */
 const TIMELINE_INSET=0;
 const timelineLeft=pct=>`${pct}%`;
 const timelineWidth=pct=>`${pct}%`;
-/* The gutter is a real keybed: every key is generated from the KEYS row model,
-   so a key occupies exactly the vertical span of the grid row it labels. An
-   earlier version tiled hand-measured percentages that did not correspond to
-   the 25 rows, which drew a picture of a keyboard rather than a keybed and
-   pointed a user at the wrong pitch. Note geometry still comes from the grid
-   model; this table is now derived from the same source. */
+/* The gutter is a real keybed. The KEYS row model generates every key. Each key
+   has the same vertical span as its labeled grid row. The note-row table uses
+   the same source. */
 function buildPiano(){
   const rowHeight=100/KEYS.length;
   KEYS.forEach((key,i)=>{
@@ -2129,9 +2103,8 @@ function buildPiano(){
     d.style.top=(i*rowHeight)+"%";
     d.style.height=rowHeight+"%";
     prkeys.appendChild(d);
-    /* Only C and F are labelled. At 25 rows in this panel height a label on
-       every natural collides with its neighbours; C and F anchor the two
-       black-key groups, which is how a keyboard is read by eye anyway. */
+    /* Only C and F have labels. At this height, a label on every natural note
+       would overlap. C and F identify the two black-key groups. */
     if(!sharp&&/^[CF]/.test(key)){
       const s=document.createElement("span");
       s.className="pkl";s.textContent=key;
@@ -2156,11 +2129,10 @@ for(let step=1;step<64;step++){
   l.className=step%16===0?"gbar":step%4===0?"gbeat":"gstep";
   l.style.left=timelineLeft(step/64*100); prgrid.appendChild(l);
 }
-/* Original Acid Bass "Verse" line for the section 9.1 default project, written
-   in the grid's own terms: step index on the 1/16 grid, pitch name from KEYS,
-   and length in steps. It is a C minor pentatonic riff — repeated roots, an
-   octave answer, and a short run at the end of each two-bar phrase — so the
-   Piano Roll shows a plausible bassline rather than staged pixels. Velocities
+/* Original Acid Bass "Verse" line for the section 9.1 default project. It uses
+   the step index, the KEYS pitch name, and the length in steps. The C minor
+   pentatonic riff has repeated roots, an octave answer, and a short final run.
+   Velocities
    accent the downbeats. Everything below derives from this table, so the view
    is deterministic and note editing keeps the same model. */
 const BASSLINE=[/* step, pitch, length in steps, velocity 0-127 */
@@ -2243,13 +2215,12 @@ NOTES.forEach(attachNote);
 
 /* Spec section 16.3.1. The Parameter selector is module-scoped and offers two
    groups: the note properties the module's event capability supports, then its
-   declared automatable parameters. Section 16.3.1 also requires the selector to
-   mark which parameters already hold data in the active Pattern, so existing
-   automation is findable without opening each entry in turn.
-   The marker is the word "has data", not a bare glyph. A native select option
-   renders text only: it cannot carry an icon, a tooltip, or an accessible name
-   of its own, so a lone bullet would reach a screen reader as an unexplained
-   character and would carry its meaning visually alone. Spec section 11.3 and
+   declared automatable parameters. Section 16.3.1 also requires a mark for each
+   parameter that has data in the active Pattern. The mark makes existing
+   automation easy to find.
+   The marker is the text "has data", not a bare glyph. A native select option
+   renders only text. It cannot have an icon, a tooltip, or its own accessible
+   name. A lone bullet would not explain its meaning to a screen reader. Spec section 11.3 and
    the AGENTS.md accessibility rule both forbid that. */
 const LANE_DATA_SUFFIX=" — has data";
 
@@ -2287,16 +2258,16 @@ function renderLaneSelect(m){
   };
   laneSelect.replaceChildren(
     group("Note properties",noteProperties(m)),
-    /* knob[0] is the display name; the expanded editor holds more parameters
+    /* knob[0] is the display name. The expanded editor holds more parameters
        than the faceplate promotes, and every one of them is automatable */
     group(m.name.toUpperCase(),m.knobs.map(knob=>knob[0])),
   );
   laneSelect.value="Velocity";
 }
 
-/* The initial bass view paints its notes directly rather than through
-   renderEditor, so the Parameter selector is populated here for the module that
-   is selected on load. Every later module change goes through renderEditor. */
+/* The initial bass view paints its notes without renderEditor. Thus, this code
+   populates the Parameter selector for the selected startup module. Every later
+   module change uses renderEditor. */
 renderLaneSelect(MODS.find(m=>m.id===activeEditorModule));
 prgrid.addEventListener("pointerdown",e=>{
   if(activeEditorModule!=="bass"||e.button!==0||e.target.closest(".note"))return;
@@ -2519,15 +2490,15 @@ function paintMeter(cv,lv,vertical=true){
   const cols=[css.getPropertyValue("--meter-low"),css.getPropertyValue("--meter-mid"),
               css.getPropertyValue("--meter-high"),css.getPropertyValue("--meter-peak")];
   /* Vertical ladders use fine 2px cells on a 3px pitch. A level meter fills from
-     its floor upward, so the lit column and the unlit ladder behind it share one
-     baseline at the bottom of the well. Segment zero sits on that floor; there
+     its floor upward. The lit column and unlit ladder share the bottom
+     baseline. Segment zero sits on that floor. There
      is no dead gap beneath the lit base. */
   const padT=vertical?2:0, padB=vertical?2:0, pitch=vertical?3:6, cell=vertical?2:4;
   const segs=vertical?Math.floor((H-padT-padB)/pitch):Math.floor(W/pitch);
   const lit=Math.round(segs*lv);
   const segY=i=>H-padB-(i+1)*pitch+1;
-  /* Lit segments glow; unlit ones stay a barely-there dark ladder so the meter
-     reads as a physical ladder of cells at rest rather than an empty slot. */
+  /* Lit segments glow. Unlit segments form a dark ladder. Thus, the idle meter
+     looks like a physical cell ladder, not an empty slot. */
   if(vertical){
     ctx.fillStyle="rgba(150,165,158,.13)";
     for(let i=lit;i<segs;i++) ctx.fillRect(1,segY(i),W-2,cell);

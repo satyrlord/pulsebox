@@ -8,12 +8,12 @@
 
 This document defines the complete theme boundary for the Pulsebox MVP. It
 specializes section 11 of the
-[product and design foundations specification](specs/spec-001-product-and-design-foundations.md),
-section 23.1 of the
-[persistence and export specification](specs/spec-009-persistence-and-export.md),
-sections 24.1 and 24.3 of the
-[quality and delivery specification](specs/spec-010-quality-and-delivery.md), and
-acceptance criteria 39 through 41 and 67 of
+[product and design foundations specification](specs/spec-001-product-and-design-foundations.md).
+It also specializes section 23.1 of the
+[persistence and export specification](specs/spec-009-persistence-and-export.md)
+and sections 24.1 and 24.3 of the
+[quality and delivery specification](specs/spec-010-quality-and-delivery.md).
+The contract also covers acceptance criteria 39 through 41 and 67 of
 [release acceptance](specs/spec-012-release-acceptance.md). Reconcile all
 affected owners in the same accepted product change before implementation.
 
@@ -60,7 +60,7 @@ Gradients are not theme tokens and are not used for ordinary surfaces.
 
 ## 3. Token architecture
 
-Every token is defined on the application theme host. Shadow-DOM components
+The application theme host defines every token. Shadow-DOM components
 consume inherited tokens and may map them to private component properties. They
 must not redeclare different product values.
 
@@ -72,7 +72,7 @@ There are three token classes:
    user-authorable.
 
 No component may read the active theme ID to select styles. Components use
-semantic tokens only. A missing token is an implementation error; production CSS
+semantic tokens only. A missing token is an implementation error. Production CSS
 must include the `rack` value as its final fallback, for example:
 
 ```css
@@ -110,7 +110,7 @@ table. These names are the complete required user-theme allowlist.
 ### 3.2 Optional palette tokens
 
 These names are the complete optional user-theme allowlist. If omitted, the
-validated `rack` value is used. Any supplied optional value must still validate;
+validated `rack` value is used. Any supplied optional value must still validate.
 an invalid known token is never silently replaced.
 
 | Token                           | Meaning                            |
@@ -174,8 +174,8 @@ fall back to the general accent tokens when no module scope exists.
 
 ## 4. Built-in palette values
 
-Every listed value is normative. Colors use opaque six-digit sRGB hex. The
-shadow grammar is defined in section 8.
+Every listed value is normative. Colors use opaque six-digit sRGB hex. Section
+8 defines the shadow grammar.
 
 | Token                           | `rack`                       |
 | ------------------------------- | ---------------------------- |
@@ -255,8 +255,8 @@ validation. It does not mutate the saved user theme. It uses these exact values:
 
 The overlay also forces a solid `2px` boundary on operational controls and
 selected regions. It keeps every foundation size unchanged. Module accents may
-remain as secondary detail, but selected state, activity, and module identity
-must also have a text, shape, boundary, or icon cue using overlay colors.
+remain as secondary detail. Selected state, activity, and module identity must
+also have a text, shape, boundary, or icon cue that uses overlay colors.
 
 ## 6. Component consumption rules
 
@@ -348,28 +348,29 @@ Validation proceeds in this order:
 7. Run every contrast and computed-style check in section 10.
 8. Canonicalize the accepted theme and persist it before changing the host.
 
-The result report contains the imported name, format version, sorted ignored
-tokens, every error with its JSON path and reason, and whether the theme was
-applied. Reports show all independently detectable errors, not only the first.
+The result report contains the imported name, format version, and sorted ignored
+tokens. It also contains each error with its JSON path and reason. The report
+states whether the theme was applied. Reports show all independently detectable errors, not only the first.
 They never echo more than the first 96 characters of an invalid value.
 
-Validation and application are atomic. Any structural error, missing required
-token, invalid known value, failed contrast pair, or persistence failure leaves
-the active theme, contrast mode, stored preference, focus, and DOM unchanged.
+Validation and application are atomic. The active theme, contrast mode, stored
+preference, focus, and DOM remain unchanged after any validation error. This
+rule also applies after a failed contrast pair or persistence failure.
 Unknown tokens alone do not reject a theme.
 
 ## 8. Value grammar
 
 Validation uses the grammar below, not `CSS.supports()` and not browser CSS
-error recovery. Leading or trailing whitespace is removed before validation.
+error recovery. Before validation, the validator removes leading or trailing
+whitespace.
 Internal whitespace is accepted only where the selected grammar requires one
-ASCII space. Accepted values are serialized in canonical form.
+ASCII space. The validator serializes accepted values in canonical form.
 
 Before type parsing, reject any value that contains, case-insensitively:
 
 - `url(`, `var(`, `env(`, `attr(`, `image(`, `image-set(`, `cross-fade(`, or
-  `element(`;
-- a semicolon, brace, backslash, comment opener, or comment closer;
+  `element(`.
+- a semicolon, brace, backslash, comment opener, or comment closer.
 - a quote, control character, newline, carriage return, or non-ASCII byte.
 
 This rejection prevents external resources, variable indirection, property
@@ -433,8 +434,8 @@ Appearance is one global local-storage preference. The UI layer owns the key
 canonical user-theme object is installed. The entire stored value is limited to
 16,384 UTF-8 bytes. No other layer reads or writes this key.
 
-Theme selection, high-contrast selection, user-theme import, and user-theme
-deletion are exposed only on the Settings page when that page is implemented.
+When the Settings page is implemented, it exposes theme selection, high-contrast
+selection, user-theme import, and user-theme deletion.
 The application header has no appearance selector. This placement rule does not
 change the preference envelope or theme-service ownership.
 
@@ -445,11 +446,11 @@ supply a fallback theme.
 
 The service writes one complete envelope for a preference change. It updates the
 in-memory resolved palette and host only after `localStorage.setItem` succeeds.
-If storage is unavailable or quota is exceeded, it keeps the current appearance
-and shows a non-blocking error that says the preference was not changed and how
-to retry. Cross-tab `storage` events apply a valid newer appearance envelope as
-a UI-only update. Invalid cross-tab data is ignored and reported without
-changing appearance.
+If storage is unavailable or quota is exceeded, the service keeps the current
+appearance. It shows a non-blocking error that says the preference was not
+changed and tells the user how to retry. Cross-tab `storage` events apply a valid
+newer appearance envelope as a UI-only update. The service ignores and reports
+invalid cross-tab data without changing appearance.
 
 Deleting the installed user theme while it is active first commits an envelope
 with `rack` selected and `userTheme: null`, then applies `rack`. Theme import,
@@ -464,17 +465,18 @@ need separate evidence.
 
 - Normal text and operational values have a contrast ratio of at least 4.5:1
   against every background on which they appear.
-- Large text, if used at least 24 CSS pixels normal weight or about 18.66 CSS
-  pixels bold, has a contrast ratio of at least 3:1.
-- Visible boundaries, icons needed to identify a control, selected indicators,
-  meter segments, and other essential non-text UI have at least 3:1 contrast
-  against adjacent colors in every state.
+- Large text has a contrast ratio of at least 3:1. Large text is at least 24 CSS
+  pixels at normal weight or about 18.66 CSS pixels in bold.
+- Visible boundaries, selected indicators, and meter segments have at least 3:1
+  contrast against adjacent colors in every state.
+- Icons that identify a control and other essential non-text UI have the same
+  minimum contrast.
 - Text or icons on `--pulse-color-accent` have at least 4.5:1 contrast through
   `--pulse-color-on-accent`.
 - Every keyboard focus indicator is a persistent two-band perimeter while
   focused. Each band is 2 CSS pixels. The qualifying band has at least 3:1
-  contrast between focused and unfocused pixels and an area at least equal to a
-  2 CSS pixel perimeter of the component. Inner and outer bands also contrast
+  contrast between focused and unfocused pixels. Its area is at least equal to
+  a 2 CSS pixel perimeter of the component. Inner and outer bands also contrast
   with one another by at least 3:1.
 - Pointer targets contain a 24 by 24 CSS pixel square. If visible control art is
   smaller, a pseudo-element or wrapper expands the hit area without changing
@@ -521,16 +523,16 @@ device scale factor, and color profile.
 
 Unit tests must cover:
 
-- every valid grammar boundary and one-below or one-above invalid boundary;
+- every valid grammar boundary and one-below or one-above invalid boundary.
 - malformed UTF-8, oversize input, duplicate keys, depth, entry count, string
-  limits, forbidden keys, trailing data, and unknown root fields;
-- every forbidden CSS construct with mixed case and whitespace variants;
+  limits, forbidden keys, trailing data, and unknown root fields.
+- every forbidden CSS construct with mixed case and whitespace variants.
 - missing required, invalid required, invalid optional, omitted optional, and
-  unknown token behavior;
-- deterministic canonicalization and complete sorted reporting;
-- contrast calculation against published reference color pairs;
-- atomic rejection with an unchanged active and stored appearance;
-- corrupt preference fallback and cross-tab preference validation;
+  unknown token behavior.
+- deterministic canonicalization and complete sorted reporting.
+- contrast calculation against published reference color pairs.
+- atomic rejection with an unchanged active and stored appearance.
+- corrupt preference fallback and cross-tab preference validation.
 - proof that project serialization and `.pulsebox` export contain no theme,
   contrast, or user-theme field.
 
@@ -538,19 +540,19 @@ Unit tests must cover:
 
 For each built-in theme, a valid user theme, and each with high contrast on:
 
-- assert all public tokens resolve to the expected computed value;
-- assert text, non-text, focus, accent-content, and meter contrast pairs;
-- keyboard through every shared control and assert visible, unobscured focus;
-- measure every operational pointer target as at least 24 by 24 CSS pixels;
+- assert all public tokens resolve to the expected computed value.
+- assert text, non-text, focus, accent-content, and meter contrast pairs.
+- keyboard through every shared control and assert visible, unobscured focus.
+- measure every operational pointer target as at least 24 by 24 CSS pixels.
 - switch appearance during active playback and assert transport continuity, the
   same audio graph identity, the same focused element, and no project or
-  undo-state change;
+  undo-state change.
 - compare bounding boxes before and after switching and require zero change in
-  `x`, `y`, width, and height at CSS-pixel precision;
+  `x`, `y`, width, and height at CSS-pixel precision.
 - assert no page-level scrolling, clipped menus, or overlap at 1536 by 1024,
-  1440 by 900, 1366 by 768, and 1280 by 720 CSS pixels;
+  1440 by 900, 1366 by 768, and 1280 by 720 CSS pixels.
 - assert the specified unsupported-size notice and limited actions below either
-  minimum dimension;
+  minimum dimension.
 - run in current stable Chrome for the production build.
 
 Visual regressions cover the `rack` theme, a valid user theme, and the
@@ -562,22 +564,22 @@ assertions.
 
 The release evidence for each browser records:
 
-- browser name and exact version;
-- operating system, viewport, device scale factor, and color profile;
-- production-build identifier;
-- theme ID, contrast state, and token-contract version;
-- unit, component, browser, contrast, target-size, and visual result;
-- screenshot or artifact paths and any manual procedure used;
+- browser name and exact version.
+- operating system, viewport, device scale factor, and color profile.
+- production-build identifier.
+- theme ID, contrast state, and token-contract version.
+- unit, component, browser, contrast, target-size, and visual result.
+- screenshot or artifact paths and any manual procedure used.
 - failures, skipped checks, and the reason for each skip.
 
 Acceptance criteria 39 through 41 and 67 pass only when this evidence is
 complete, all required checks pass, and the implementation matches this
 contract.
 
-The current implementation provides the `rack` built-in token set, the
-high-contrast overlay, the appearance preference envelope with its cross-tab
-and storage-failure behavior, the bounded user-theme import validator, the
-numeric contrast checks, the current control primitives, and a Settings
-control for high-contrast selection. User-theme import and deletion are not
+The current implementation provides the `rack` built-in token set and the
+high-contrast overlay. It provides the appearance preference envelope with its
+cross-tab and storage-failure behavior. It also provides the bounded user-theme
+import validator, numeric contrast checks, and current control primitives. A
+Settings control selects high contrast. User-theme import and deletion are not
 yet exposed in Settings. Visual regression snapshots across later MVP
 components also remain future work.
