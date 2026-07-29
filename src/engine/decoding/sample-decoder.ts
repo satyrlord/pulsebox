@@ -34,7 +34,7 @@ export class SampleDecoder {
     worker.addEventListener("error", this.#onError);
   }
 
-  decode(source: ArrayBuffer): Promise<DecodedAudio> {
+  readonly decode = (source: ArrayBuffer): Promise<DecodedAudio> => {
     if (this.#disposed) return Promise.reject(new Error("Sample decoder is disposed."));
     const requestId = `decode-${String(this.#nextRequest)}`;
     this.#nextRequest += 1;
@@ -42,9 +42,9 @@ export class SampleDecoder {
       this.#pending.set(requestId, { resolve, reject });
       this.#worker.postMessage({ kind: "decode", requestId, source }, [source]);
     });
-  }
+  };
 
-  dispose(): void {
+  readonly dispose = (): void => {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#worker.removeEventListener("message", this.#onMessage);
@@ -53,7 +53,7 @@ export class SampleDecoder {
     for (const request of this.#pending.values())
       request.reject(new Error("Sample decoder was disposed."));
     this.#pending.clear();
-  }
+  };
 
   readonly #onMessage = (event: MessageEvent<unknown>): void => {
     if (!isWorkerResult(event.data)) return;

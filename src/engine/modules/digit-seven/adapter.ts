@@ -1,4 +1,5 @@
-import type { ParameterValue, VoiceAdapterFactory } from "../../transport/voice-adapter";
+import type { ParameterValue } from "../../../contracts/parameters";
+import type { VoiceAdapterFactory } from "../../transport/voice-adapter";
 import {
   WorkletVoiceAdapter,
   type WorkletVoiceDescriptor,
@@ -11,7 +12,7 @@ import workletUrl from "./digit-seven.worklet.ts?worker&url";
  * this module has a boolean control, the lo-fi enable, so booleans survive the
  * filter alongside finite numbers.
  */
-export function toDigitSevenParameters(
+function toDigitSevenParameters(
   values: Readonly<Record<string, ParameterValue>>,
 ): Readonly<Record<string, ParameterValue>> {
   const result: Record<string, ParameterValue> = {};
@@ -30,7 +31,7 @@ const DESCRIPTOR: WorkletVoiceDescriptor = {
   mapParameters: toDigitSevenParameters,
 };
 
-export class DigitSevenAdapter extends WorkletVoiceAdapter {
+class DigitSevenAdapter extends WorkletVoiceAdapter {
   constructor(context: AudioContext, options: Parameters<VoiceAdapterFactory>[1]) {
     super(DESCRIPTOR, context, options);
   }

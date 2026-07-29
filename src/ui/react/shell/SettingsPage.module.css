@@ -20,13 +20,6 @@
   outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
 }
 
-.themes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.theme,
 .contrast {
   display: flex;
   align-items: center;
@@ -36,15 +29,6 @@
   font-size: 0.75rem;
   color: var(--pulse-color-text, #e6e6ea);
   cursor: pointer;
-}
-
-.themeName {
-  min-width: 4rem;
-  font-weight: 600;
-}
-
-.themeDirection {
-  color: var(--pulse-color-text-muted, #9a9aa2);
 }
 
 .close {

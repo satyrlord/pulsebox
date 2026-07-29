@@ -98,6 +98,15 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
 
   constructor(options?: AudioWorkletNodeOptions) {
     super(options);
+    Object.defineProperty(this, "process", {
+      configurable: false,
+      enumerable: false,
+      value: (
+        inputs: readonly (readonly Float32Array[])[],
+        outputs: readonly (readonly Float32Array[])[],
+      ) => this.#process(inputs, outputs),
+      writable: false,
+    });
     this.port.onmessage = (event: MessageEvent<unknown>) => {
       this.#receive(event.data);
     };
@@ -426,7 +435,7 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
     }
   }
 
-  override process(
+  #process(
     _inputs: readonly (readonly Float32Array[])[],
     outputs: readonly (readonly Float32Array[])[],
   ): boolean {

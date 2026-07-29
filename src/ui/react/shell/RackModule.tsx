@@ -2,7 +2,6 @@ import { memo, useMemo } from "react";
 
 import type { PluginManifest, RackSlotId } from "../../../contracts";
 import type { RackModuleState } from "../../../state/public";
-import { ActivityIndicator } from "../controls/ActivityIndicator";
 import { AuditionButton } from "../controls/AuditionButton";
 import { Knob } from "../controls/Knob";
 import { LevelMeter } from "../controls/LevelMeter";
@@ -10,7 +9,7 @@ import { useAppStore, useDependencies } from "../store/app-store-context";
 import { cx } from "../class-names";
 import styles from "./RackModule.module.css";
 
-export interface RackModuleProps {
+interface RackModuleProps {
   readonly slotId: RackSlotId;
   readonly slotNumber: number;
   readonly module: RackModuleState | undefined;
@@ -20,7 +19,6 @@ export interface RackModuleProps {
   readonly previousSlotId: RackSlotId | undefined;
   readonly nextSlotId: RackSlotId | undefined;
   readonly firstEmptySlotId: RackSlotId | undefined;
-  readonly playingStep: number | undefined;
 }
 
 function accentStyle(manifest: PluginManifest | undefined): React.CSSProperties {
@@ -35,16 +33,15 @@ function accentStyle(manifest: PluginManifest | undefined): React.CSSProperties 
 }
 
 /**
- * Memoized because the rack re-renders whenever the playhead crosses a step,
- * and only the module whose indicator moved needs new output. Every prop is a
- * primitive or a frozen state object, so reference equality is a sound test.
+ * Memoized so a rack re-render only produces new output for the module whose
+ * data changed. Every prop is a primitive or a frozen state object, so
+ * reference equality is a sound test.
  */
 export const RackModule = memo(function RackModule(props: RackModuleProps) {
-  const { module, slotId, slotNumber, playingStep } = props;
+  const { module, slotId, slotNumber } = props;
   const { manifestFor, addablePluginIds } = useDependencies();
 
   const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
-  const activePatternIndex = useAppStore((state) => state.project.project.activePatternIndex);
   const collapsed = useAppStore((state) =>
     module === undefined ? false : state.project.ui.collapsedModuleIds.has(module.id),
   );
@@ -122,11 +119,6 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
       <header className={styles.header}>
         <span className={styles.slot}>{String(slotNumber).padStart(2, "0")}</span>
         <span className={styles.title}>{manifest.productName}</span>
-        <ActivityIndicator
-          label={`${manifest.productName} activity`}
-          steps={module.parts[activePatternIndex] ?? []}
-          playingStep={playingStep}
-        />
         <AuditionButton
           label={manifest.productName}
           className={styles.action}

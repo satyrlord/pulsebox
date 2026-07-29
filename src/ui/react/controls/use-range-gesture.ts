@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { browserIdFactory, createGestureId, type GestureId } from "../../../contracts";
 
-export type RangeSource = "keyboard" | "numeric" | "pointer" | "reset" | "wheel";
-
 export interface RangeGestureOptions {
   readonly value: number;
   readonly min: number;

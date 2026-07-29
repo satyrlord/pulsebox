@@ -28,8 +28,6 @@ import {
 } from "../../dsp/primitives";
 import { BOOM_VOICE_IDS, type BoomVoiceId } from "./voices";
 
-export { BOOM_VOICE_IDS, type BoomVoiceId };
-
 export interface BoomVoiceParameters {
   /** Semitone offset applied to the voice's base frequency. */
   readonly tune: number;
@@ -72,7 +70,7 @@ const VOICE_CHARACTER: Readonly<Record<BoomVoiceId, VoiceCharacter>> = {
   "open-hat": { baseFrequency: 6_300, decay: 0.54, punch: 0.44, seed: 0xd3a2646c },
 };
 
-export const DEFAULT_BOOM_VOICE_PARAMETERS: Readonly<Record<BoomVoiceId, BoomVoiceParameters>> =
+const DEFAULT_BOOM_VOICE_PARAMETERS: Readonly<Record<BoomVoiceId, BoomVoiceParameters>> =
   Object.freeze(
     Object.fromEntries(
       BOOM_VOICE_IDS.map((id) => [

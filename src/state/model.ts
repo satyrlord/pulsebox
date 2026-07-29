@@ -6,9 +6,7 @@ import type {
   RackSlotId,
   StateRevision,
 } from "../contracts/ids";
-import type { PluginId } from "../contracts/parameters";
-
-export type ParameterValue = number | boolean | string;
+import type { ParameterValue, PluginId } from "../contracts/parameters";
 
 export interface PatternStep {
   readonly active: boolean;

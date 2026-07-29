@@ -20,7 +20,7 @@ export const ENGINE_PROTOCOL_LIMITS = Object.freeze({
   maximumSampleChunksInFlight: 4,
 });
 
-export const CONTROLLER_TO_PROCESSOR_KINDS = Object.freeze([
+const CONTROLLER_TO_PROCESSOR_KINDS = Object.freeze([
   "hello",
   "configure",
   "state-snapshot",
@@ -37,7 +37,7 @@ export const CONTROLLER_TO_PROCESSOR_KINDS = Object.freeze([
   "dispose",
 ] as const);
 
-export const PROCESSOR_TO_CONTROLLER_KINDS = Object.freeze([
+const PROCESSOR_TO_CONTROLLER_KINDS = Object.freeze([
   "ready",
   "ack",
   "meter-frame",
@@ -51,9 +51,13 @@ export type ControllerToProcessorKind = (typeof CONTROLLER_TO_PROCESSOR_KINDS)[n
 export type ProcessorToControllerKind = (typeof PROCESSOR_TO_CONTROLLER_KINDS)[number];
 export type EngineMessageKind = ControllerToProcessorKind | ProcessorToControllerKind;
 
+type KnownPayloadFields = Partial<
+  ParameterBatchPayload & EventBatchPayload & SampleAttachPayload & ReadyPayload
+>;
+
 export interface EngineMessageEnvelope<
   TKind extends EngineMessageKind = EngineMessageKind,
-  TPayload = Readonly<Record<string, unknown>>,
+  TPayload = Readonly<Record<string, unknown>> & KnownPayloadFields,
 > {
   readonly protocolVersion: 1;
   readonly sessionId: string;
@@ -178,14 +182,15 @@ function validateParameterBatch(
   payload: Readonly<Record<string, unknown>>,
   issues: ValidationIssue[],
 ): void {
-  if (!Array.isArray(payload.changes)) {
+  const candidate = payload as Partial<ParameterBatchPayload>;
+  if (!Array.isArray(candidate.changes)) {
     issues.push({
       path: "payload.changes",
       message: "Parameter batch changes must be an array.",
     });
     return;
   }
-  if (payload.changes.length > ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch) {
+  if (candidate.changes.length > ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch) {
     issues.push({
       path: "payload.changes",
       message: "Parameter batch exceeds 128 changes.",
@@ -197,20 +202,21 @@ function validateEventBatch(
   payload: Readonly<Record<string, unknown>>,
   issues: ValidationIssue[],
 ): void {
-  if (!Array.isArray(payload.events)) {
+  const candidate = payload as Partial<EventBatchPayload>;
+  if (!Array.isArray(candidate.events)) {
     issues.push({
       path: "payload.events",
       message: "Event batch events must be an array.",
     });
     return;
   }
-  if (payload.events.length > ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch) {
+  if (candidate.events.length > ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch) {
     issues.push({
       path: "payload.events",
       message: "Event batch exceeds 256 events.",
     });
   }
-  for (const [index, event] of payload.events.entries()) {
+  for (const [index, event] of candidate.events.entries()) {
     if (
       !isPlainRecord(event) ||
       typeof event.eventId !== "string" ||
@@ -225,7 +231,7 @@ function validateEventBatch(
       });
     }
   }
-  const scheduledEvents = payload.events.filter(
+  const scheduledEvents = candidate.events.filter(
     (event): event is ScheduledEventPayload =>
       isPlainRecord(event) &&
       typeof event.eventId === "string" &&
@@ -254,9 +260,10 @@ function validateSampleAttach(
   payload: Readonly<Record<string, unknown>>,
   issues: ValidationIssue[],
 ): void {
+  const candidate = payload as Partial<SampleAttachPayload>;
   if (
-    !(payload.chunk instanceof ArrayBuffer) ||
-    payload.chunk.byteLength > ENGINE_PROTOCOL_LIMITS.maximumSampleChunkBytes
+    !(candidate.chunk instanceof ArrayBuffer) ||
+    candidate.chunk.byteLength > ENGINE_PROTOCOL_LIMITS.maximumSampleChunkBytes
   ) {
     issues.push({
       path: "payload.chunk",
@@ -264,10 +271,10 @@ function validateSampleAttach(
     });
   }
   if (
-    !isNonNegativeSafeInteger(payload.chunkIndex) ||
-    !isNonNegativeSafeInteger(payload.chunkCount) ||
-    payload.chunkCount === 0 ||
-    payload.chunkIndex >= payload.chunkCount
+    !isNonNegativeSafeInteger(candidate.chunkIndex) ||
+    !isNonNegativeSafeInteger(candidate.chunkCount) ||
+    candidate.chunkCount === 0 ||
+    candidate.chunkIndex >= candidate.chunkCount
   ) {
     issues.push({
       path: "payload.chunkIndex",
@@ -304,7 +311,8 @@ function validateReady(
   payload: Readonly<Record<string, unknown>>,
   issues: ValidationIssue[],
 ): void {
-  if (payload.acceptedProtocolVersion !== ENGINE_PROTOCOL_VERSION) {
+  const candidate = payload as Partial<ReadyPayload>;
+  if (candidate.acceptedProtocolVersion !== ENGINE_PROTOCOL_VERSION) {
     issues.push({
       path: "payload.acceptedProtocolVersion",
       message: "Ready must accept engine protocol version 1.",

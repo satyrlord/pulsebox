@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { validatePluginManifest } from "../../../src/contracts/plugins";
+import { DigitalDrumVoice } from "../../../src/engine/dsp/digital-drum-voice";
 import {
   BoomEightDsp,
   DEFAULT_BOOM_PARAMETERS,
@@ -27,6 +28,26 @@ import { HYBRID_NINE_MANIFEST } from "../../../src/engine/modules/hybrid-nine/ma
 import { HYBRID_VOICE_IDS } from "../../../src/engine/modules/hybrid-nine/voices";
 
 const SAMPLE_RATE = 48_000;
+
+it("drives the shared digital voice lifecycle through its concrete port", () => {
+  const voice = new DigitalDrumVoice(
+    "voice",
+    SAMPLE_RATE,
+    { baseFrequency: 180, decay: 0.2, seed: 7, body: "tonal", oneShotSeconds: 0.01 },
+    { tune: 0, decay: 0.2, level: 0.8, pan: 0 },
+    new Float32Array([1, 0.5, 0.25, 0]),
+  );
+
+  expect(voice.isActive()).toBe(false);
+  voice.setParameters({ tune: 0, decay: 0.2, level: 0.8, pan: -0.5 });
+  expect(voice.getPan()).toBe(-0.5);
+  voice.trigger(0.75, true);
+  expect(voice.isActive()).toBe(true);
+  expect(Number.isFinite(voice.render(16, 1))).toBe(true);
+  voice.choke();
+  for (let frame = 0; frame < 4_000; frame += 1) voice.render(16, 1);
+  expect(voice.isActive()).toBe(false);
+});
 
 /**
  * The four machines added alongside Drumline Six. They have different controls

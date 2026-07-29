@@ -28,8 +28,6 @@ import {
 } from "../../dsp/primitives";
 import { HYBRID_VOICE_IDS, type HybridVoiceId } from "./voices";
 
-export { HYBRID_VOICE_IDS, type HybridVoiceId };
-
 export interface HybridVoiceParameters {
   /** Semitone offset applied to both layers. */
   readonly tune: number;
@@ -114,7 +112,7 @@ const VOICE_CHARACTER: Readonly<Record<HybridVoiceId, VoiceCharacter>> = {
   },
 };
 
-export const DEFAULT_HYBRID_VOICE_PARAMETERS: Readonly<
+const DEFAULT_HYBRID_VOICE_PARAMETERS: Readonly<
   Record<HybridVoiceId, HybridVoiceParameters>
 > = Object.freeze(
   Object.fromEntries(

@@ -29,8 +29,6 @@ import {
 } from "../../dsp/primitives";
 import { DIGIT_FIVE_VOICE_IDS, type DigitFiveVoiceId } from "./voices";
 
-export { DIGIT_FIVE_VOICE_IDS, type DigitFiveVoiceId };
-
 export type DigitFiveVoiceParameters = DigitalVoiceParameters;
 
 export interface DigitFiveParameters {
@@ -85,7 +83,7 @@ const VOICE_CHARACTER: Readonly<Record<DigitFiveVoiceId, DigitalVoiceCharacter>>
   },
 };
 
-export const DEFAULT_DIGIT_FIVE_VOICE_PARAMETERS: Readonly<
+const DEFAULT_DIGIT_FIVE_VOICE_PARAMETERS: Readonly<
   Record<DigitFiveVoiceId, DigitFiveVoiceParameters>
 > = Object.freeze(
   Object.fromEntries(
@@ -223,10 +221,10 @@ export class DigitFiveDsp {
       let mixRight = 0;
 
       for (const voice of this.#voices.values()) {
-        if (!voice.active) continue;
+        if (!voice.isActive()) continue;
         const sample = voice.render(bits, rate);
         if (sample === 0) continue;
-        const [leftGain, rightGain] = panGains(voice.pan);
+        const [leftGain, rightGain] = panGains(voice.getPan());
         mixLeft += sample * leftGain;
         mixRight += sample * rightGain;
       }

@@ -33,14 +33,14 @@ export function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-export interface ContrastRule {
+interface ContrastRule {
   readonly backgrounds: readonly PaletteToken[];
   readonly foregrounds: readonly PaletteToken[];
   readonly minimum: number;
 }
 
 /** The exact matrix in THEMING.md section 10. */
-export const CONTRAST_MATRIX: readonly ContrastRule[] = [
+const CONTRAST_MATRIX: readonly ContrastRule[] = [
   {
     foregrounds: [
       "--pulse-color-text-primary",

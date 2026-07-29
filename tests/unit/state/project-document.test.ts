@@ -423,11 +423,25 @@ describe("legacy saved data", () => {
     const legacy = JSON.stringify({
       version: 1,
       highContrast: true,
-      theme: "cosmic",
+      theme: "rack",
       userTheme: null,
     });
     const parsed = parseAppearanceEnvelope(legacy);
-    expect(parsed).toEqual({ highContrast: true, theme: "cosmic", userTheme: null });
+    expect(parsed).toEqual({ highContrast: true, theme: "rack", userTheme: null });
+  });
+
+  it("treats an envelope naming a removed built-in theme as invalid data", () => {
+    // Earlier builds could store mono, cosmic, analog, or rust. Those themes
+    // were removed, so the envelope is invalid and the reader returns
+    // undefined; the theme service then falls back to rack and reports the
+    // corrupt preference once.
+    const removed = JSON.stringify({
+      version: 1,
+      highContrast: true,
+      theme: "cosmic",
+      userTheme: null,
+    });
+    expect(parseAppearanceEnvelope(removed)).toBeUndefined();
   });
 
   it("falls back to the default appearance when the stored value is unreadable", () => {

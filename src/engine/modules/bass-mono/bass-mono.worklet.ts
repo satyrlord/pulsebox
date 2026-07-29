@@ -4,7 +4,7 @@ import { isPlainRecord } from "../../../contracts/validation";
 import { WorkletVoiceProcessor } from "../../worklets/worklet-voice-processor";
 import { AcidBassDsp, type BassParameters } from "./dsp-core";
 
-export class AcidBassProcessor extends WorkletVoiceProcessor<Partial<BassParameters>> {
+class AcidBassProcessor extends WorkletVoiceProcessor<Partial<BassParameters>> {
   protected readonly displayName = "Acid Bass";
   readonly #dsp = new AcidBassDsp(sampleRate);
 

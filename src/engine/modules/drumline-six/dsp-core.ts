@@ -66,7 +66,7 @@ const VOICE_CHARACTER: Readonly<Record<DrumVoiceId, VoiceCharacter>> = {
   "open-hat": { baseFrequency: 6_100, decay: 0.48, snap: 0.45, seed: 0xd3a2646c },
 };
 
-export const DEFAULT_DRUM_VOICE_PARAMETERS: Readonly<Record<DrumVoiceId, DrumVoiceParameters>> =
+const DEFAULT_DRUM_VOICE_PARAMETERS: Readonly<Record<DrumVoiceId, DrumVoiceParameters>> =
   Object.freeze(
     Object.fromEntries(
       DRUM_VOICE_IDS.map((id) => [

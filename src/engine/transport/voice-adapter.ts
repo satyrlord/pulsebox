@@ -1,7 +1,6 @@
 import type { StateRevision } from "../../contracts/ids";
+import type { ParameterValue } from "../../contracts/parameters";
 import type { ScheduledVoiceEvent } from "./scheduled-event";
-
-export type ParameterValue = number | boolean | string;
 
 export interface VoiceFault {
   readonly code: string;

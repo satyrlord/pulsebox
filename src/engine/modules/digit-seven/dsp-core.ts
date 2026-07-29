@@ -30,8 +30,6 @@ import {
 } from "../../dsp/primitives";
 import { DIGIT_SEVEN_VOICE_IDS, type DigitSevenVoiceId } from "./voices";
 
-export { DIGIT_SEVEN_VOICE_IDS, type DigitSevenVoiceId };
-
 export type DigitSevenVoiceParameters = DigitalVoiceParameters;
 
 export interface DigitSevenParameters {
@@ -85,7 +83,7 @@ const VOICE_CHARACTER: Readonly<Record<DigitSevenVoiceId, DigitalVoiceCharacter>
   },
 };
 
-export const DEFAULT_DIGIT_SEVEN_VOICE_PARAMETERS: Readonly<
+const DEFAULT_DIGIT_SEVEN_VOICE_PARAMETERS: Readonly<
   Record<DigitSevenVoiceId, DigitSevenVoiceParameters>
 > = Object.freeze(
   Object.fromEntries(
@@ -211,10 +209,10 @@ export class DigitSevenDsp {
       let mixRight = 0;
 
       for (const voice of this.#voices.values()) {
-        if (!voice.active) continue;
+        if (!voice.isActive()) continue;
         const sample = voice.render(bits, rate);
         if (sample === 0) continue;
-        const [leftGain, rightGain] = panGains(voice.pan);
+        const [leftGain, rightGain] = panGains(voice.getPan());
         mixLeft += sample * leftGain;
         mixRight += sample * rightGain;
       }

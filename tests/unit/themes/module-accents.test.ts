@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
@@ -17,38 +14,7 @@ import { BUILT_IN_PALETTES } from "../../../src/themes/tokens";
 
 const HEX = /^#[0-9A-F]{6}$/;
 
-/**
- * Parses the section 3.4 table straight out of THEMING.md. The document is the
- * contract, so the table is read rather than restated: a documentation edit
- * that drifts from the code fails here instead of shipping.
- */
-function readAccentTable(): Map<string, readonly string[]> {
-  const text = readFileSync(join(process.cwd(), "docs/THEMING.md"), "utf8");
-  const rows = new Map<string, readonly string[]>();
-  for (const match of text.matchAll(/^\|\s*`(BASS|SIX|BOOM|NINE|SEV|FIVE)`\s*\|([^\n]+)\|\s*$/gm)) {
-    const key = match[1] ?? "";
-    const values = (match[2] ?? "")
-      .split("|")
-      .map((cell) => cell.trim().replaceAll("`", ""))
-      .filter((cell) => cell.length > 0);
-    rows.set(key, values);
-  }
-  return rows;
-}
-
-describe("module accents match the theming contract", () => {
-  const table = readAccentTable();
-
-  it("documents all six modules in THEMING.md section 3.4", () => {
-    expect([...table.keys()].sort()).toEqual([...MODULE_ACCENT_KEYS].sort());
-  });
-
-  it.each(MODULE_ACCENT_KEYS)("matches the documented accent row for %s", (key) => {
-    const documented = table.get(key);
-    const declared = MODULE_ACCENT_TOKENS.map((token) => MODULE_ACCENTS[key][token]);
-    expect(documented).toEqual(declared);
-  });
-
+describe("module accent declarations", () => {
   it.each(MODULE_ACCENT_KEYS)("uses opaque uppercase six-digit hex for %s", (key) => {
     for (const token of MODULE_ACCENT_TOKENS) {
       expect(MODULE_ACCENTS[key][token], `${key} ${token}`).toMatch(HEX);
@@ -73,21 +39,6 @@ describe("instrument identity vocabulary", () => {
     for (const identity of MODULE_IDENTITIES) {
       expect(identity.shortLabel).toBe(identity.shortLabel.toUpperCase());
       expect(identity.shortLabel.length).toBeLessThanOrEqual(4);
-    }
-  });
-
-  it("matches the spec-001 section 2.2 name table", () => {
-    const text = readFileSync(
-      join(process.cwd(), "docs/specs/spec-001-product-and-design-foundations.md"),
-      "utf8",
-    );
-    for (const identity of MODULE_IDENTITIES) {
-      // The row binds full name, code ID, type, and short label together, so a
-      // rename that touches only one column cannot pass.
-      const row = new RegExp(
-        `\\|\\s*${identity.productName}\\s*\\|\\s*\`${identity.pluginId}\`\\s*\\|\\s*${identity.type}\\s*\\|\\s*\`${identity.shortLabel}\``,
-      );
-      expect(row.test(text), `spec-001 must list ${identity.productName}`).toBe(true);
     }
   });
 

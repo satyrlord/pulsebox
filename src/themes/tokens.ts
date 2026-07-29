@@ -4,14 +4,12 @@
  * both the browser and the unit-test environment.
  */
 
-export const PULSE_THEME_IDS = ["rack", "mono", "cosmic", "analog", "rust"] as const;
+export const PULSE_THEME_IDS = ["rack"] as const;
 
 export type PulseThemeId = (typeof PULSE_THEME_IDS)[number];
 
 /** Theme IDs plus the installed-user-theme selector, per THEMING.md section 9. */
-export const PULSE_APPEARANCE_SELECTIONS = [...PULSE_THEME_IDS, "user"] as const;
-
-export type PulseAppearanceSelection = (typeof PULSE_APPEARANCE_SELECTIONS)[number];
+export type PulseAppearanceSelection = PulseThemeId | "user";
 
 /**
  * Required palette tokens. THEMING.md section 3.1 makes this exact list the
@@ -103,152 +101,12 @@ const RACK_PALETTE: PulsePalette = {
   "--pulse-shadow-panel": "0px 4px 12px 0px #00000099",
 };
 
-const MONO_PALETTE: PulsePalette = {
-  "--pulse-color-app": "#050505",
-  "--pulse-color-surface-panel": "#111111",
-  "--pulse-color-surface-control": "#202020",
-  "--pulse-color-surface-inset": "#000000",
-  "--pulse-color-text-primary": "#FFFFFF",
-  "--pulse-color-text-secondary": "#C8C8C8",
-  "--pulse-color-border-default": "#777777",
-  "--pulse-color-border-strong": "#B8B8B8",
-  "--pulse-color-accent": "#E6E6E6",
-  "--pulse-color-on-accent": "#080808",
-  "--pulse-color-focus-inner": "#FFFFFF",
-  "--pulse-color-focus-outer": "#000000",
-  "--pulse-color-control-track": "#6A6A6A",
-  "--pulse-color-control-fill": "#FFFFFF",
-  "--pulse-color-meter-low": "#D4D4D4",
-  "--pulse-color-meter-mid": "#FFFFFF",
-  "--pulse-color-meter-high": "#FFFFFF",
-  "--pulse-color-status-danger": "#FFFFFF",
-  "--pulse-color-status-warning": "#E8E8E8",
-  "--pulse-color-status-success": "#D4D4D4",
-  "--pulse-color-overlay": "#0B0B0B",
-  "--pulse-color-text-muted": "#999999",
-  "--pulse-color-selection": "#393939",
-  "--pulse-color-control-thumb": "#F2F2F2",
-  "--pulse-color-meter-track": "#292929",
-  "--pulse-color-status-info": "#D6D6D6",
-  "--pulse-color-disabled": "#858585",
-  "--pulse-color-scrollbar-track": "#0C0C0C",
-  "--pulse-color-scrollbar-thumb": "#777777",
-  "--pulse-shadow-control": "none",
-  "--pulse-shadow-panel": "none",
-};
-
-const COSMIC_PALETTE: PulsePalette = {
-  "--pulse-color-app": "#070A18",
-  "--pulse-color-surface-panel": "#11162A",
-  "--pulse-color-surface-control": "#1D2642",
-  "--pulse-color-surface-inset": "#050817",
-  "--pulse-color-text-primary": "#F3F5FF",
-  "--pulse-color-text-secondary": "#BCC6E8",
-  "--pulse-color-border-default": "#64729D",
-  "--pulse-color-border-strong": "#98A9D8",
-  "--pulse-color-accent": "#66C7FF",
-  "--pulse-color-on-accent": "#03101A",
-  "--pulse-color-focus-inner": "#FFFFFF",
-  "--pulse-color-focus-outer": "#000000",
-  "--pulse-color-control-track": "#6A799F",
-  "--pulse-color-control-fill": "#A8E9FF",
-  "--pulse-color-meter-low": "#61D8B0",
-  "--pulse-color-meter-mid": "#F2C85E",
-  "--pulse-color-meter-high": "#FF7183",
-  "--pulse-color-status-danger": "#FF8292",
-  "--pulse-color-status-warning": "#F2C85E",
-  "--pulse-color-status-success": "#61D8B0",
-  "--pulse-color-overlay": "#0C1124",
-  "--pulse-color-text-muted": "#929EC2",
-  "--pulse-color-selection": "#173F61",
-  "--pulse-color-control-thumb": "#DDE5FF",
-  "--pulse-color-meter-track": "#202945",
-  "--pulse-color-status-info": "#73B8FF",
-  "--pulse-color-disabled": "#7F8CAF",
-  "--pulse-color-scrollbar-track": "#0D1327",
-  "--pulse-color-scrollbar-thumb": "#64729D",
-  "--pulse-shadow-control": "0px 1px 4px 0px #00000099",
-  "--pulse-shadow-panel": "0px 4px 14px 0px #000000A6",
-};
-
-const ANALOG_PALETTE: PulsePalette = {
-  "--pulse-color-app": "#171512",
-  "--pulse-color-surface-panel": "#26221D",
-  "--pulse-color-surface-control": "#39332C",
-  "--pulse-color-surface-inset": "#100F0D",
-  "--pulse-color-text-primary": "#FFF9ED",
-  "--pulse-color-text-secondary": "#D0C5B6",
-  "--pulse-color-border-default": "#867C70",
-  "--pulse-color-border-strong": "#B8AB9B",
-  "--pulse-color-accent": "#F0B65B",
-  "--pulse-color-on-accent": "#1A1003",
-  "--pulse-color-focus-inner": "#FFFFFF",
-  "--pulse-color-focus-outer": "#000000",
-  "--pulse-color-control-track": "#867C70",
-  "--pulse-color-control-fill": "#FFE0A3",
-  "--pulse-color-meter-low": "#86C878",
-  "--pulse-color-meter-mid": "#EDBC58",
-  "--pulse-color-meter-high": "#F47762",
-  "--pulse-color-status-danger": "#F48170",
-  "--pulse-color-status-warning": "#EDBC58",
-  "--pulse-color-status-success": "#86C878",
-  "--pulse-color-overlay": "#201D19",
-  "--pulse-color-text-muted": "#AAA095",
-  "--pulse-color-selection": "#5B431D",
-  "--pulse-color-control-thumb": "#E8DED2",
-  "--pulse-color-meter-track": "#40392F",
-  "--pulse-color-status-info": "#81BDE8",
-  "--pulse-color-disabled": "#92887C",
-  "--pulse-color-scrollbar-track": "#211E1A",
-  "--pulse-color-scrollbar-thumb": "#867C70",
-  "--pulse-shadow-control": "0px 1px 3px 0px #00000080",
-  "--pulse-shadow-panel": "0px 4px 12px 0px #0000008C",
-};
-
-const RUST_PALETTE: PulsePalette = {
-  "--pulse-color-app": "#130D0A",
-  "--pulse-color-surface-panel": "#251813",
-  "--pulse-color-surface-control": "#38231B",
-  "--pulse-color-surface-inset": "#0D0907",
-  "--pulse-color-text-primary": "#FFF4E8",
-  "--pulse-color-text-secondary": "#D8BFAF",
-  "--pulse-color-border-default": "#8D6B58",
-  "--pulse-color-border-strong": "#C49378",
-  "--pulse-color-accent": "#E58A55",
-  "--pulse-color-on-accent": "#190A03",
-  "--pulse-color-focus-inner": "#FFFFFF",
-  "--pulse-color-focus-outer": "#000000",
-  "--pulse-color-control-track": "#8D6B58",
-  "--pulse-color-control-fill": "#FFC8A5",
-  "--pulse-color-meter-low": "#8DCE75",
-  "--pulse-color-meter-mid": "#F0B956",
-  "--pulse-color-meter-high": "#FF755B",
-  "--pulse-color-status-danger": "#FF826B",
-  "--pulse-color-status-warning": "#F0B956",
-  "--pulse-color-status-success": "#8DCE75",
-  "--pulse-color-overlay": "#1C120E",
-  "--pulse-color-text-muted": "#A98E7E",
-  "--pulse-color-selection": "#62331E",
-  "--pulse-color-control-thumb": "#E6C9B9",
-  "--pulse-color-meter-track": "#40291F",
-  "--pulse-color-status-info": "#78BCE7",
-  "--pulse-color-disabled": "#9B7A68",
-  "--pulse-color-scrollbar-track": "#1D120E",
-  "--pulse-color-scrollbar-thumb": "#8D6B58",
-  "--pulse-shadow-control": "0px 1px 3px 0px #00000099",
-  "--pulse-shadow-panel": "0px 4px 12px 0px #000000A6",
-};
-
 export const BUILT_IN_PALETTES: Readonly<Record<PulseThemeId, PulsePalette>> = {
   rack: RACK_PALETTE,
-  mono: MONO_PALETTE,
-  cosmic: COSMIC_PALETTE,
-  analog: ANALOG_PALETTE,
-  rust: RUST_PALETTE,
 };
 
 /**
- * High contrast is an overlay applied after import validation, not a sixth
+ * High contrast is an overlay applied after import validation, not a separate
  * theme. It replaces every palette token listed in THEMING.md section 5.
  */
 export const HIGH_CONTRAST_OVERLAY: PulsePalette = {
@@ -289,11 +147,11 @@ export function isPulseThemeId(value: string): value is PulseThemeId {
   return PULSE_THEME_IDS.some((theme) => theme === value);
 }
 
-export function isRequiredPaletteToken(value: string): value is RequiredPaletteToken {
+function isRequiredPaletteToken(value: string): value is RequiredPaletteToken {
   return REQUIRED_PALETTE_TOKENS.some((token) => token === value);
 }
 
-export function isOptionalPaletteToken(value: string): value is OptionalPaletteToken {
+function isOptionalPaletteToken(value: string): value is OptionalPaletteToken {
   return OPTIONAL_PALETTE_TOKENS.some((token) => token === value);
 }
 

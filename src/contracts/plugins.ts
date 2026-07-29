@@ -139,7 +139,7 @@ const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*)?$/;
 const CONTRACT_KEY_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-export function isSupportedSemanticVersion(value: unknown): value is string {
+function isSupportedSemanticVersion(value: unknown): value is string {
   return typeof value === "string" && value.length <= 64 && SEMVER_PATTERN.test(value);
 }
 

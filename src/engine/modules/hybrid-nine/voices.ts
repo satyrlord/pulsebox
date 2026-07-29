@@ -34,7 +34,7 @@ export const HYBRID_VOICE_NAMES: Readonly<Record<HybridVoiceId, string>> = {
  * Note numbers select the voice, so one drum lane per voice needs no change to
  * the shared pattern model. The roster starts at C1.
  */
-export const HYBRID_BASE_NOTE = 36;
+const HYBRID_BASE_NOTE = 36;
 
 export function hybridVoiceNote(voiceId: HybridVoiceId): number {
   return HYBRID_BASE_NOTE + HYBRID_VOICE_IDS.indexOf(voiceId);

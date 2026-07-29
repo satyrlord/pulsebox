@@ -4,6 +4,10 @@ import {
   ENGINE_PROTOCOL_LIMITS,
   compareScheduledEvents,
   validateEngineMessageEnvelope,
+  type EventBatchPayload,
+  type ParameterBatchPayload,
+  type ReadyPayload,
+  type SampleAttachPayload,
   type ScheduledEventPayload,
 } from "../../../src/contracts/worklet-protocol";
 import { TEST_UUID } from "./fixtures";
@@ -12,7 +16,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function envelope(kind: string, payload: Readonly<Record<string, unknown>>) {
+function envelope(kind: string, payload: object) {
   return {
     protocolVersion: 1,
     sessionId: "session-1",
@@ -25,8 +29,9 @@ function envelope(kind: string, payload: Readonly<Record<string, unknown>>) {
 
 describe("worklet protocol envelope validation", () => {
   it("accepts a versioned ready envelope", () => {
+    const payload: ReadyPayload = { acceptedProtocolVersion: 1 };
     expect(
-      validateEngineMessageEnvelope(envelope("ready", { acceptedProtocolVersion: 1 })).ok,
+      validateEngineMessageEnvelope(envelope("ready", payload)).ok,
     ).toBe(true);
   });
 
@@ -51,15 +56,14 @@ describe("worklet protocol envelope validation", () => {
   });
 
   it("enforces parameter and event batch bounds", () => {
+    const payload: ParameterBatchPayload = {
+      changes: Array.from(
+        { length: ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch },
+        () => ({}),
+      ),
+    };
     expect(
-      validateEngineMessageEnvelope(
-        envelope("parameter-batch", {
-          changes: Array.from(
-            { length: ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch },
-            () => ({}),
-          ),
-        }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("parameter-batch", payload)).ok,
     ).toBe(true);
     expect(
       validateEngineMessageEnvelope(
@@ -100,14 +104,13 @@ describe("worklet protocol envelope validation", () => {
   });
 
   it("enforces transferred sample chunk bounds", () => {
+    const payload: SampleAttachPayload = {
+      chunk: new ArrayBuffer(ENGINE_PROTOCOL_LIMITS.maximumSampleChunkBytes),
+      chunkIndex: 0,
+      chunkCount: 100,
+    };
     expect(
-      validateEngineMessageEnvelope(
-        envelope("sample-attach", {
-          chunk: new ArrayBuffer(ENGINE_PROTOCOL_LIMITS.maximumSampleChunkBytes),
-          chunkIndex: 0,
-          chunkCount: 100,
-        }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("sample-attach", payload)).ok,
     ).toBe(true);
     expect(
       validateEngineMessageEnvelope(
@@ -136,15 +139,14 @@ describe("worklet protocol envelope validation", () => {
   });
 
   it("rejects an event batch that is not already deterministically sorted", () => {
+    const payload: EventBatchPayload = {
+      events: [
+        { eventId: "later", audioFrame: 20, priority: 0, data: {} },
+        { eventId: "earlier", audioFrame: 10, priority: 0, data: {} },
+      ],
+    };
     expect(
-      validateEngineMessageEnvelope(
-        envelope("event-batch", {
-          events: [
-            { eventId: "later", audioFrame: 20, priority: 0, data: {} },
-            { eventId: "earlier", audioFrame: 10, priority: 0, data: {} },
-          ],
-        }),
-      ).ok,
+      validateEngineMessageEnvelope(envelope("event-batch", payload)).ok,
     ).toBe(false);
   });
 });

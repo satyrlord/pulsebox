@@ -17,7 +17,7 @@ function isDrumVoiceId(value: string): value is DrumVoiceId {
   return (DRUM_VOICE_IDS as readonly string[]).includes(value);
 }
 
-export class DrumlineSixProcessor extends WorkletVoiceProcessor<PartialParameters> {
+class DrumlineSixProcessor extends WorkletVoiceProcessor<PartialParameters> {
   protected readonly displayName = "Drumline Six";
   readonly #dsp = new DrumlineSixDsp(sampleRate);
 

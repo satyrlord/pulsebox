@@ -13,7 +13,7 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node ./node_modules/@typescript/native/bin/tsc --noEmit",
     "ci": "npm run lint && npm run lint:md && npm run typecheck && npm run test && npm run test:e2e && npm run dead-code",
     "lint:md": "markdownlint-cli2",
     "dead-code": "fallow dead-code"

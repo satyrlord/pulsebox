@@ -27,9 +27,9 @@ are arranged in normative build order.
 
 Phase 0 contracts and the Phase 1 foundation are complete. Later-phase
 foundation slices are present only where this README names them. Run `npm run
-lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e` for current check
-results. Phases 2 through 7 and their final acceptance criteria remain
-incomplete.
+lint`, `npm run typecheck`, `npm run dead-code`, `npm test`, and `npm run
+test:e2e` for current check results. Phases 2 through 7 and their final
+acceptance criteria remain incomplete.
 
 Current owners:
 
@@ -61,12 +61,14 @@ npm run test
 npm run test:e2e
 npm run lint
 npm run typecheck
+npm run dead-code
 npm run format
 npm run lint:md
 npm run ci
 ```
 
-`npm run typecheck` runs the `tsc` binary from TypeScript 7. ESLint and the
+`npm run typecheck` runs the compiler from the pinned `@typescript/native`
+TypeScript 7 package. ESLint and the
 architecture policy read the TypeScript 6 API through the `typescript` alias,
 because typescript-eslint does not support TypeScript 7 yet; that package
 installs its compiler as `tsc6`, so the two never contend for one binary name.

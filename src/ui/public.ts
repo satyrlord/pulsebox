@@ -9,13 +9,4 @@ import "../styles/global.css";
  * layer and imported directly by the modules that compose it. Re-exporting them
  * here would advertise a boundary that nothing crosses.
  */
-export { mountPulseboxApp, type MountOptions, type PulseboxAppHandle } from "./react/mount";
-export type {
-  AppStoreDependencies,
-  AppStorePort,
-  AudioControlPort,
-  AudioStatus,
-  ProjectServicePort,
-  SavedProjectSummary,
-  WorkspaceView,
-} from "./react/store/app-store";
+export { mountPulseboxApp, type PulseboxAppHandle } from "./react/mount";

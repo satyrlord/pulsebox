@@ -8,6 +8,7 @@ import {
   parseParameterId,
   parsePluginId,
   type ParameterDescriptor,
+  type ParameterValue,
 } from "../../contracts/parameters";
 import { isPlainRecord, type ValidationIssue } from "../../contracts/validation";
 import {
@@ -17,7 +18,7 @@ import {
   PATTERN_SLOT_COUNT,
   PATTERN_STEP_COUNT,
 } from "../default-state";
-import type { ParameterValue, PatternStep, PulseState, RackModuleState } from "../model";
+import type { PatternStep, PulseState, RackModuleState } from "../model";
 
 /**
  * The on-disk project document, per `docs/PROJECT-FORMAT.md` section 5.
@@ -898,15 +899,15 @@ export function parseProjectJson(
   return parseProjectDocument(parsed, options);
 }
 
-export type DocumentMigration = (document: ProjectDocument) => ProjectDocument;
+type DocumentMigration = (document: ProjectDocument) => ProjectDocument;
 
 /**
  * Ordered upgrades from one format version to the next. Empty until format 2
  * ships; the chain exists so adding one is a data change, not a redesign.
  */
-export const DOCUMENT_MIGRATIONS: ReadonlyMap<number, DocumentMigration> = new Map();
+const DOCUMENT_MIGRATIONS: ReadonlyMap<number, DocumentMigration> = new Map();
 
-export function migrateDocument(document: ProjectDocument): ProjectDocument {
+function migrateDocument(document: ProjectDocument): ProjectDocument {
   let current = document;
   while (current.formatVersion < PROJECT_FORMAT_VERSION) {
     const migration = DOCUMENT_MIGRATIONS.get(current.formatVersion);

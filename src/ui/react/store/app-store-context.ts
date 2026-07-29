@@ -23,10 +23,6 @@ export function useAppStore<Selected>(selector: (state: AppState) => Selected): 
   return useStore(useAppContext().store, selector);
 }
 
-export function useAppActions(): AppState {
-  return useAppStore((state) => state);
-}
-
 export function useDependencies(): AppStoreDependencies {
   return useAppContext().dependencies;
 }

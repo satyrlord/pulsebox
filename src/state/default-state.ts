@@ -8,8 +8,8 @@ import {
   type IdFactory,
   type ModuleInstanceId,
 } from "../contracts/ids";
-import type { PluginId } from "../contracts/parameters";
-import type { ParameterValue, PatternStep, PulseState, RackModuleState } from "./model";
+import type { ParameterValue, PluginId } from "../contracts/parameters";
+import type { PatternStep, PulseState, RackModuleState } from "./model";
 
 export interface ModuleSeed {
   readonly pluginId: PluginId;

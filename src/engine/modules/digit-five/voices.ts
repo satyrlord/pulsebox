@@ -35,7 +35,7 @@ export const DIGIT_FIVE_VOICE_NAMES: Readonly<Record<DigitFiveVoiceId, string>> 
  * Note numbers select the voice, so one drum lane per voice needs no change to
  * the shared pattern model. The roster starts at C1.
  */
-export const DIGIT_FIVE_BASE_NOTE = 36;
+const DIGIT_FIVE_BASE_NOTE = 36;
 
 export function digitFiveVoiceNote(voiceId: DigitFiveVoiceId): number {
   return DIGIT_FIVE_BASE_NOTE + DIGIT_FIVE_VOICE_IDS.indexOf(voiceId);

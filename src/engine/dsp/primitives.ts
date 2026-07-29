@@ -104,7 +104,7 @@ export class DeterministicNoise {
  */
 const SVF_MAXIMUM_CUTOFF_RATIO = 1 / 6;
 
-export function svfCoefficient(cutoff: number, damping: number, sampleRate: number): number {
+function svfCoefficient(cutoff: number, damping: number, sampleRate: number): number {
   const ceiling = sampleRate * SVF_MAXIMUM_CUTOFF_RATIO;
   const bounded = clamp(cutoff, 0, ceiling);
   const coefficient = 2 * Math.sin((Math.PI * bounded) / sampleRate);
@@ -134,10 +134,6 @@ export class StateVariableFilter {
     // cannot come back from. Clearing it costs one branch and keeps a single bad
     // sample from silencing the instrument for the rest of the session.
     if (!Number.isFinite(this.#low + this.#band + this.#high)) this.reset();
-  }
-
-  get low(): number {
-    return this.#low;
   }
 
   get band(): number {
@@ -278,10 +274,6 @@ export class ParameterGlide {
   /** Jumps immediately. Used when a whole-state snapshot replaces the value. */
   set(value: number): void {
     this.#value = value;
-  }
-
-  get value(): number {
-    return this.#value;
   }
 
   advance(target: number): number {

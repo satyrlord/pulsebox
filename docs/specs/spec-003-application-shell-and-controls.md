@@ -70,6 +70,16 @@ routing, and responsive acceptance. Where the composition target and a product
 specification disagree, the specification wins and the target is corrected.
 Other files under `docs/design/` remain non-normative visual evidence.
 
+Per decision `D80`, the target displays only true or specification-owned state.
+It renders the default project defined in
+[rack and instruments](spec-005-rack-and-instruments.md) section 9.1 in its real
+stopped state. Structural content is required, because density is one of the
+properties this file owns. Staged runtime state is not: no control may display a
+value the product would never produce, including parameter readouts that ignore
+their own value, meters that show signal while the transport is stopped, and
+seeded history. A fixture that improves the picture by showing something
+unreachable in the product is a defect in the target.
+
 ### 8.3 Pattern and Song transport modes
 
 The application header provides one compact rectangular two-state toggle,

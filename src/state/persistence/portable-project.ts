@@ -1,4 +1,3 @@
-import type { ValidationIssue } from "../../contracts/validation";
 import {
   DOCUMENT_LIMITS,
   parseProjectJson,
@@ -32,7 +31,7 @@ function canonicalize(value: unknown): unknown {
 }
 
 /** Canonical project JSON: sorted object keys, stable arrays, and no whitespace. */
-export function serializeCanonicalProjectJson(document: ProjectDocument): string {
+function serializeCanonicalProjectJson(document: ProjectDocument): string {
   return JSON.stringify(canonicalize(document));
 }
 
@@ -234,5 +233,3 @@ export function parsePortableProject(
     return archiveFailure(MANIFEST_NAME, "Manifest must be UTF-8 without a byte-order mark.");
   return parseProjectJson(json, options);
 }
-
-export type PortableProjectIssue = ValidationIssue;

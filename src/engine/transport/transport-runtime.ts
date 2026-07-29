@@ -1,6 +1,6 @@
 import type { EngineDelta } from "../../contracts/commands";
 import type { ModuleInstanceId, StateRevision } from "../../contracts/ids";
-import type { PluginId } from "../../contracts/parameters";
+import type { ParameterValue, PluginId } from "../../contracts/parameters";
 import {
   chainedStepResolver,
   loopingStepResolver,
@@ -10,7 +10,6 @@ import {
 import type { PatternStepView } from "./scheduled-event";
 import { TransportClock } from "./transport-clock";
 import type {
-  ParameterValue,
   VoiceAdapterFactory,
   VoiceAdapterPort,
   VoiceAdapterStatus,
@@ -149,14 +148,6 @@ export class TransportRuntime {
 
   get projectRevision(): StateRevision | undefined {
     return this.#projectRevision;
-  }
-
-  get swing(): number {
-    return this.#swing;
-  }
-
-  get arrangement(): TransportArrangement {
-    return this.#arrangement;
   }
 
   /**

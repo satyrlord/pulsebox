@@ -17,8 +17,6 @@ export type PatternId = Brand<string, "PatternId">;
 export type NoteEventId = Brand<string, "NoteEventId">;
 export type EffectInstanceId = Brand<string, "EffectInstanceId">;
 export type AutomationLaneId = Brand<string, "AutomationLaneId">;
-export type SectionId = Brand<string, "SectionId">;
-export type SceneId = Brand<string, "SceneId">;
 export type AssetId = Brand<string, "AssetId">;
 export type ContentId = Brand<string, "ContentId">;
 export type CommandId = Brand<string, "CommandId">;
@@ -37,6 +35,21 @@ export interface StateRevision {
 export interface IdFactory {
   createUuid(): string;
 }
+
+type GeneratedUuidId =
+  | ProjectId
+  | ProjectLineageId
+  | RevisionEpoch
+  | StateRevisionEpoch
+  | ModuleInstanceId
+  | VoiceId
+  | PatternId
+  | NoteEventId
+  | EffectInstanceId
+  | AutomationLaneId
+  | AssetId
+  | CommandId
+  | GestureId;
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const CONTENT_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -91,77 +104,46 @@ export function createCanonicalUuid(factory: IdFactory): CanonicalUuid {
   return candidate;
 }
 
+function createGeneratedUuidId(factory: IdFactory): GeneratedUuidId {
+  return createCanonicalUuid(factory) as string as GeneratedUuidId;
+}
+
 export function createProjectId(factory: IdFactory): ProjectId {
-  return createCanonicalUuid(factory) as string as ProjectId;
+  return createGeneratedUuidId(factory) as string as ProjectId;
 }
 
 export function createProjectLineageId(factory: IdFactory): ProjectLineageId {
-  return createCanonicalUuid(factory) as string as ProjectLineageId;
+  return createGeneratedUuidId(factory) as string as ProjectLineageId;
 }
 
 export function createRevisionEpoch(factory: IdFactory): RevisionEpoch {
-  return createCanonicalUuid(factory) as string as RevisionEpoch;
+  return createGeneratedUuidId(factory) as string as RevisionEpoch;
 }
 
 export function createStateRevisionEpoch(factory: IdFactory): StateRevisionEpoch {
-  return createCanonicalUuid(factory) as string as StateRevisionEpoch;
+  return createGeneratedUuidId(factory) as string as StateRevisionEpoch;
 }
 
 export function createModuleInstanceId(factory: IdFactory): ModuleInstanceId {
-  return createCanonicalUuid(factory) as string as ModuleInstanceId;
-}
-
-export function createEffectInstanceId(factory: IdFactory): EffectInstanceId {
-  return createCanonicalUuid(factory) as string as EffectInstanceId;
-}
-
-export function createVoiceId(factory: IdFactory): VoiceId {
-  return createCanonicalUuid(factory) as string as VoiceId;
+  return createGeneratedUuidId(factory) as string as ModuleInstanceId;
 }
 
 export function createPatternId(factory: IdFactory): PatternId {
-  return createCanonicalUuid(factory) as string as PatternId;
-}
-
-export function createNoteEventId(factory: IdFactory): NoteEventId {
-  return createCanonicalUuid(factory) as string as NoteEventId;
-}
-
-export function createAutomationLaneId(factory: IdFactory): AutomationLaneId {
-  return createCanonicalUuid(factory) as string as AutomationLaneId;
-}
-
-export function createSectionId(factory: IdFactory): SectionId {
-  return createCanonicalUuid(factory) as string as SectionId;
-}
-
-export function createSceneId(factory: IdFactory): SceneId {
-  return createCanonicalUuid(factory) as string as SceneId;
-}
-
-export function createAssetId(factory: IdFactory): AssetId {
-  return createCanonicalUuid(factory) as string as AssetId;
+  return createGeneratedUuidId(factory) as string as PatternId;
 }
 
 export function createCommandId(factory: IdFactory): CommandId {
-  return createCanonicalUuid(factory) as string as CommandId;
+  return createGeneratedUuidId(factory) as string as CommandId;
 }
 
 export function createGestureId(factory: IdFactory): GestureId {
-  return createCanonicalUuid(factory) as string as GestureId;
+  return createGeneratedUuidId(factory) as string as GestureId;
 }
 
 export function parseRackSlotId(value: unknown, path = "rackSlotId"): ValidationResult<RackSlotId> {
   const match = RACK_SLOT_IDS.find((candidate) => candidate === value);
   return match === undefined
     ? validationFailure(path, "Expected one of slot-01 through slot-08.")
-    : validationSuccess(match);
-}
-
-export function parseSendBusId(value: unknown, path = "sendBusId"): ValidationResult<SendBusId> {
-  const match = SEND_BUS_IDS.find((candidate) => candidate === value);
-  return match === undefined
-    ? validationFailure(path, "Expected one of send-a through send-d.")
     : validationSuccess(match);
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   RACK_SLOT_IDS,
@@ -11,10 +11,19 @@ import {
   parseRackSlotId,
   validateProjectRevision,
   validateStateRevision,
+  type AssetId,
+  type AutomationLaneId,
+  type NoteEventId,
 } from "../../../src/contracts/ids";
 import { TEST_UUID, deterministicIdFactory } from "./fixtures";
 
 describe("opaque identifiers", () => {
+  it("keeps future durable entity ID families nominally distinct", () => {
+    expectTypeOf<NoteEventId>().not.toEqualTypeOf<AutomationLaneId>();
+    expectTypeOf<AutomationLaneId>().not.toEqualTypeOf<AssetId>();
+    expectTypeOf<AssetId>().not.toEqualTypeOf<NoteEventId>();
+  });
+
   it("exposes the exact fixed rack and send identities", () => {
     expect(RACK_SLOT_IDS).toEqual([
       "slot-01",

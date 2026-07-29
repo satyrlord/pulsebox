@@ -18,6 +18,10 @@ import type {
   VoiceAdapterPort,
   VoiceAdapterStatus,
 } from "../../../src/engine/transport/voice-adapter";
+import {
+  WorkletVoiceAdapter,
+  type WorkletVoiceDescriptor,
+} from "../../../src/engine/worklets/worklet-voice-adapter";
 import { TEST_UUID } from "../contracts/fixtures";
 
 const PROJECT_REVISION = {
@@ -127,6 +131,88 @@ describe("Acid Bass plugin", () => {
     expect(adapter.state).toBe("suspended");
     adapter.resume();
     expect(adapter.state).toBe("active");
+  });
+
+  it("exposes the complete worklet voice port on the shared adapter", async () => {
+    const sentKinds: string[] = [];
+    class FakePort {
+      onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+
+      postMessage(value: unknown): void {
+        const message = value as {
+          readonly kind: string;
+          readonly sessionId: string;
+          readonly nodeId: string;
+          readonly sequence: number;
+          readonly projectRevision: StateRevision;
+        };
+        sentKinds.push(message.kind);
+        if (message.kind !== "hello") return;
+        this.onmessage?.({
+          data: {
+            protocolVersion: 1,
+            sessionId: message.sessionId,
+            nodeId: message.nodeId,
+            sequence: 0,
+            kind: "ready",
+            projectRevision: message.projectRevision,
+            payload: { acceptedProtocolVersion: 1 },
+          },
+        } as MessageEvent<unknown>);
+        this.onmessage?.({
+          data: {
+            protocolVersion: 1,
+            sessionId: message.sessionId,
+            nodeId: message.nodeId,
+            sequence: 1,
+            kind: "ack",
+            projectRevision: message.projectRevision,
+            payload: {
+              highestContiguousSequence: message.sequence,
+              projectRevision: message.projectRevision,
+              disposition: "applied",
+            },
+          },
+        } as MessageEvent<unknown>);
+      }
+    }
+    class FakeNode extends EventTarget {
+      readonly port = new FakePort();
+      readonly connect = vi.fn();
+      readonly disconnect = vi.fn();
+    }
+    vi.stubGlobal("AudioWorkletNode", FakeNode);
+    const context = {
+      audioWorklet: { addModule: vi.fn().mockResolvedValue(undefined) },
+    } as unknown as AudioContext;
+    const descriptor: WorkletVoiceDescriptor = {
+      processorName: "test-voice",
+      moduleUrl: "test-voice.js",
+      displayName: "Test Voice",
+      mapParameters: (parameters) => parameters,
+    };
+    const adapter = new WorkletVoiceAdapter(descriptor, context, {
+      projectRevision: PROJECT_REVISION,
+    });
+
+    await adapter.prepare();
+    adapter.activate({} as AudioNode);
+    adapter.setProjectRevision(NEXT_PROJECT_REVISION);
+    adapter.previewParameters({ cutoff: 400 });
+    adapter.replaceState({ cutoff: 800 }, NEXT_PROJECT_REVISION);
+    adapter.schedule([
+      { atFrame: 48, type: "note-on", note: 36, velocity: 0.8, accent: false, slide: false },
+    ]);
+    adapter.clearScheduledEvents();
+
+    expect(sentKinds).toEqual(
+      expect.arrayContaining([
+        "parameter-batch",
+        "state-snapshot",
+        "event-batch",
+        "clear-scheduled-events",
+      ]),
+    );
   });
 
   it("replaces one faulted processor without replaying unacknowledged parameters", async () => {

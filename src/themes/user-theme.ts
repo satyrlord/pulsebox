@@ -13,9 +13,7 @@
 import { findContrastFailures } from "./contrast";
 import {
   BUILT_IN_PALETTES,
-  isOptionalPaletteToken,
   isPaletteToken,
-  isRequiredPaletteToken,
   OPTIONAL_PALETTE_TOKENS,
   REQUIRED_PALETTE_TOKENS,
   SHADOW_TOKENS,
@@ -24,8 +22,8 @@ import {
 } from "./tokens";
 import { parseColor, parseShadow } from "./value-grammar";
 
-export const USER_THEME_FORMAT_VERSION = 1;
-export const MAX_USER_THEME_BYTES = 16_384;
+const USER_THEME_FORMAT_VERSION = 1;
+const MAX_USER_THEME_BYTES = 16_384;
 const MAX_TOKEN_ENTRIES = 40;
 const MAX_TOKEN_NAME_LENGTH = 64;
 const MAX_TOKEN_VALUE_LENGTH = 96;
@@ -411,5 +409,3 @@ export function isCanonicalUserTheme(value: unknown): value is CanonicalUserThem
   if (!complete) return false;
   return findContrastFailures(table as PulsePalette).length === 0;
 }
-
-export { isOptionalPaletteToken, isRequiredPaletteToken };

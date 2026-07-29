@@ -1,13 +1,17 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { PulseThemeService, elementThemeHost } from "../../src/themes";
+import {
+  createPulseThemeService,
+  elementThemeHost,
+  type PulseThemeService,
+} from "../../src/themes";
 import { PulseApp } from "../../src/ui/react/PulseApp";
 import { createHarness, renderWithHarness } from "./helpers";
 
 function memoryThemeService(): PulseThemeService {
   const values = new Map<string, string>();
-  return new PulseThemeService({
+  return createPulseThemeService({
     host: elementThemeHost(document.documentElement),
     storage: {
       getItem: (key) => values.get(key) ?? null,

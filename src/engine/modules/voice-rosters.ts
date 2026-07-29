@@ -26,7 +26,7 @@ import {
 import { DRUM_VOICE_IDS, DRUM_VOICE_NAMES, drumVoiceNote } from "./drumline-six/voices";
 import { HYBRID_VOICE_IDS, HYBRID_VOICE_NAMES, hybridVoiceNote } from "./hybrid-nine/voices";
 
-export interface VoiceRoster {
+interface VoiceRoster {
   /** Voice IDs in rack order. Empty for a pitched instrument. */
   readonly voiceIds: readonly string[];
   readonly nameFor: (voiceId: string) => string | undefined;
@@ -75,11 +75,11 @@ const ROSTERS: Readonly<Record<string, VoiceRoster>> = {
   "drum-digital-b": drumRoster(DIGIT_FIVE_VOICE_IDS, DIGIT_FIVE_VOICE_NAMES, digitFiveVoiceNote),
 };
 
-export function voiceRosterFor(pluginId: PluginId | string): VoiceRoster | undefined {
+function voiceRosterFor(pluginId: PluginId | string): VoiceRoster | undefined {
   return ROSTERS[pluginId];
 }
 
-export function voiceNoteFor(
+function voiceNoteFor(
   pluginId: PluginId | string,
   voiceId: string | undefined,
 ): number | undefined {

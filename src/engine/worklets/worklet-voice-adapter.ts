@@ -1,4 +1,5 @@
 import { browserIdFactory, type StateRevision } from "../../contracts/ids";
+import type { ParameterValue } from "../../contracts/parameters";
 import {
   ENGINE_PROTOCOL_LIMITS,
   ENGINE_PROTOCOL_VERSION,
@@ -14,7 +15,6 @@ import {
 import { isPlainRecord } from "../../contracts/validation";
 import type { ScheduledVoiceEvent } from "../transport/scheduled-event";
 import type {
-  ParameterValue,
   VoiceAdapterOptions,
   VoiceAdapterPort,
   VoiceAdapterStatus,
@@ -76,7 +76,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   #handshake: Handshake | undefined;
   #disposeTimer: ReturnType<typeof setTimeout> | undefined;
   #recoveryAttempted = false;
-  #fault: VoiceFault | undefined;
+  fault: VoiceFault | undefined;
   #state: AdapterState = "created";
 
   constructor(
@@ -99,18 +99,8 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     return this.#state;
   }
 
-  get fault(): VoiceFault | undefined {
-    return this.#fault;
-  }
-
   get pendingMessageCount(): number {
     return this.#pending.size;
-  }
-
-  get output(): AudioNode {
-    if (this.#node === undefined)
-      throw new Error(`${this.#descriptor.displayName} is not prepared`);
-    return this.#node;
   }
 
   async prepare(): Promise<void> {
@@ -122,7 +112,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       await this.#context.audioWorklet.addModule(this.#descriptor.moduleUrl);
       await this.#openSession();
     } catch (error) {
-      if (this.#fault === undefined) {
+      if (this.fault === undefined) {
         this.#fail(
           "prepare-failed",
           error instanceof Error
@@ -146,9 +136,9 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#state = "active";
   }
 
-  setProjectRevision(projectRevision: StateRevision): void {
+  readonly setProjectRevision = (projectRevision: StateRevision): void => {
     this.#projectRevision = projectRevision;
-  }
+  };
 
   setParameters(
     parameters: Readonly<Record<string, ParameterValue>>,
@@ -165,7 +155,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#postParameterBatch(mapped);
   }
 
-  previewParameters(parameters: Readonly<Record<string, ParameterValue>>): void {
+  readonly previewParameters = (parameters: Readonly<Record<string, ParameterValue>>): void => {
     if (
       !this.#canSendMusicalControl() ||
       this.#pending.size >= ENGINE_PROTOCOL_LIMITS.backpressureEnvelopeCount
@@ -173,12 +163,12 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       return;
     }
     this.#postParameterBatch(this.#descriptor.mapParameters(parameters));
-  }
+  };
 
-  replaceState(
+  readonly replaceState = (
     parameters: Readonly<Record<string, ParameterValue>>,
     projectRevision: StateRevision,
-  ): void {
+  ): void => {
     const mapped = this.#descriptor.mapParameters(parameters);
     this.#projectRevision = projectRevision;
     this.#currentParameterSnapshot = { ...mapped };
@@ -186,9 +176,9 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     if (this.#canSendMusicalControl()) {
       this.#postControl("state-snapshot", { parameters: mapped });
     }
-  }
+  };
 
-  schedule(events: readonly ScheduledVoiceEvent[]): void {
+  readonly schedule = (events: readonly ScheduledVoiceEvent[]): void => {
     if (
       !this.#canSendMusicalControl() ||
       events.length === 0 ||
@@ -209,13 +199,13 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     }
     scheduled.sort(compareScheduledEvents);
     this.#postControl("event-batch", { events: scheduled });
-  }
+  };
 
-  clearScheduledEvents(): void {
+  readonly clearScheduledEvents = (): void => {
     if (this.#canSendMusicalControl()) {
       this.#postControl("clear-scheduled-events", {});
     }
-  }
+  };
 
   resume(): void {
     if (this.#node === undefined || this.#state !== "suspended") return;
@@ -245,14 +235,6 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       node.disconnect();
       if (this.#currentState() !== "disposed") this.#finishDisposal();
     }, DISPOSE_RELEASE_MILLISECONDS);
-  }
-
-  async recover(): Promise<void> {
-    if (this.#state !== "faulted") {
-      throw new Error(`Cannot recover ${this.#descriptor.displayName} from ${this.#state}`);
-    }
-    this.#recoveryAttempted = true;
-    await this.#recover("suspended");
   }
 
   /**
@@ -512,7 +494,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     }
     clearTimeout(handshake.timer);
     this.#handshake = undefined;
-    this.#fault = undefined;
+    this.fault = undefined;
     this.#state = "ready";
     handshake.resolve();
   }
@@ -533,7 +515,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       handshake.reject(new Error(`${message} ${recoveryAction}`));
     }
     const fault = { code, message, recoveryAction };
-    this.#fault = fault;
+    this.fault = fault;
     this.#state = "faulted";
 
     const recoverable =

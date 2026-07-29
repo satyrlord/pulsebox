@@ -23,7 +23,7 @@ const SHAPE = {
   isVoiceId: isBoomVoiceId,
 } as const;
 
-export class BoomEightProcessor extends WorkletVoiceProcessor<PartialParameters> {
+class BoomEightProcessor extends WorkletVoiceProcessor<PartialParameters> {
   protected readonly displayName = "Boom Eight";
   readonly #dsp = new BoomEightDsp(sampleRate);
 

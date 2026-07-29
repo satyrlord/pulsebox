@@ -4,14 +4,14 @@
  * lifetime of the object URL.
  */
 
-export const PROJECT_FILE_EXTENSION = ".pulsebox";
+const PROJECT_FILE_EXTENSION = ".pulsebox";
 
 /**
  * A project name is free text, so it is reduced to a safe basename. A name made
  * entirely of punctuation reduces to nothing, which would otherwise produce a
  * file called only `.pulsebox`.
  */
-export function safeProjectFilename(name: string): string {
+function safeProjectFilename(name: string): string {
   const filename = name
     .replaceAll(/[^\w-]+/g, "-")
     .replaceAll(/^-+|-+$/g, "")

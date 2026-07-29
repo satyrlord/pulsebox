@@ -1,4 +1,5 @@
-import type { ParameterValue, VoiceAdapterFactory } from "../../transport/voice-adapter";
+import type { ParameterValue } from "../../../contracts/parameters";
+import type { VoiceAdapterFactory } from "../../transport/voice-adapter";
 import {
   WorkletVoiceAdapter,
   type WorkletVoiceDescriptor,
@@ -25,7 +26,7 @@ const NUMERIC_PARAMETER_FIELDS: Readonly<Record<string, NumericBassParameter>> =
   volume: "volume",
 };
 
-export function toBassParameters(
+function toBassParameters(
   values: Readonly<Record<string, ParameterValue>>,
 ): Partial<BassParameters> {
   const result: MutableBassParameters = {};

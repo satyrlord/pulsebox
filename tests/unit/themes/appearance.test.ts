@@ -7,7 +7,10 @@ import {
   resolvePalette,
   serializeAppearance,
 } from "../../../src/themes/appearance";
-import { PulseThemeService } from "../../../src/themes/theme-service";
+import {
+  createPulseThemeService,
+  type ThemeServiceOptions,
+} from "../../../src/themes/theme-service";
 import {
   BUILT_IN_PALETTES,
   HIGH_CONTRAST_OVERLAY,
@@ -16,9 +19,16 @@ import {
 } from "../../../src/themes/tokens";
 import { importUserTheme } from "../../../src/themes/user-theme";
 
+/**
+ * A distinct app color proves an assertion saw the inline user palette rather
+ * than the rack stylesheet values.
+ */
+const USER_THEME_APP_COLOR = "#04070C";
+
 function validUserThemeSource(): string {
   const tokens: Record<string, string> = {};
-  for (const token of REQUIRED_PALETTE_TOKENS) tokens[token] = BUILT_IN_PALETTES.cosmic[token];
+  for (const token of REQUIRED_PALETTE_TOKENS) tokens[token] = BUILT_IN_PALETTES.rack[token];
+  tokens["--pulse-color-app"] = USER_THEME_APP_COLOR;
   return JSON.stringify({ formatVersion: 1, name: "Night Shift", tokens });
 }
 
@@ -78,6 +88,10 @@ describe("appearance envelope", () => {
     ["array root", "[]"],
     ["wrong version", '{"version":2,"theme":"rack","highContrast":false,"userTheme":null}'],
     ["unknown theme", '{"version":1,"theme":"neon","highContrast":false,"userTheme":null}'],
+    [
+      "removed built-in theme",
+      '{"version":1,"theme":"cosmic","highContrast":false,"userTheme":null}',
+    ],
     ["non-boolean contrast", '{"version":1,"theme":"rack","highContrast":"no","userTheme":null}'],
     ["user without theme", '{"version":1,"theme":"user","highContrast":false,"userTheme":null}'],
     ["invalid user theme", '{"version":1,"theme":"user","highContrast":false,"userTheme":{"a":1}}'],
@@ -97,8 +111,8 @@ describe("palette resolution", () => {
     );
   });
 
-  it("layers high contrast over any built-in theme", () => {
-    const resolved = resolvePalette({ theme: "cosmic", highContrast: true, userTheme: null });
+  it("layers high contrast over the built-in theme", () => {
+    const resolved = resolvePalette({ theme: "rack", highContrast: true, userTheme: null });
     expect(resolved["--pulse-color-app"]).toBe(HIGH_CONTRAST_OVERLAY["--pulse-color-app"]);
     expect(resolved["--pulse-color-accent"]).toBe(HIGH_CONTRAST_OVERLAY["--pulse-color-accent"]);
   });
@@ -124,10 +138,8 @@ describe("theme service", () => {
     host = new RecordingHost();
   });
 
-  function createService(
-    overrides: Partial<ConstructorParameters<typeof PulseThemeService>[0]> = {},
-  ) {
-    return new PulseThemeService({ host, storage, ...overrides });
+  function createService(overrides: Partial<ThemeServiceOptions> = {}) {
+    return createPulseThemeService({ host, storage, ...overrides });
   }
 
   it("starts with the rack theme when no preference is stored", () => {
@@ -153,21 +165,34 @@ describe("theme service", () => {
     service.start();
     if (theme !== undefined) service.installUserTheme(theme);
     expect(host.tokens.size).toBeGreaterThan(0);
-    service.setTheme("mono");
+    service.setTheme("rack");
     expect(host.tokens.size).toBe(0);
   });
 
   it("restores a stored preference", () => {
     storage.setItem(
       APPEARANCE_STORAGE_KEY,
-      serializeAppearance({ theme: "rust", highContrast: true, userTheme: null }),
+      serializeAppearance({ theme: "rack", highContrast: true, userTheme: null }),
     );
     const service = createService();
     service.start();
-    expect(service.appearance.theme).toBe("rust");
+    expect(service.appearance.theme).toBe("rack");
     expect(host.highContrast).toBe(true);
-    // The overlay is a stylesheet rule for built-in themes, not an inline write.
+    // The overlay is a stylesheet rule for the built-in theme, not an inline write.
     expect(host.tokens.size).toBe(0);
+  });
+
+  it("resolves a stored removed built-in theme to rack via the invalid-preference fallback", () => {
+    storage.setItem(
+      APPEARANCE_STORAGE_KEY,
+      '{"version":1,"theme":"cosmic","highContrast":false,"userTheme":null}',
+    );
+    const onCorruptPreference = vi.fn();
+    const service = createService({ onCorruptPreference });
+    service.start();
+    expect(service.appearance).toEqual(DEFAULT_APPEARANCE);
+    expect(host.theme).toBe("rack");
+    expect(onCorruptPreference).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to rack and reports corrupt stored data once per session", () => {
@@ -185,18 +210,20 @@ describe("theme service", () => {
     const service = createService();
     service.start();
     expect(storage.getItem(APPEARANCE_STORAGE_KEY)).toBe("{not json");
-    service.setTheme("mono");
-    expect(parseAppearanceEnvelope(storage.getItem(APPEARANCE_STORAGE_KEY))?.theme).toBe("mono");
+    service.setHighContrast(true);
+    expect(parseAppearanceEnvelope(storage.getItem(APPEARANCE_STORAGE_KEY))?.highContrast).toBe(
+      true,
+    );
   });
 
-  it("persists a theme change as one complete envelope", () => {
+  it("persists an appearance change as one complete envelope", () => {
     const service = createService();
     service.start();
-    expect(service.setTheme("cosmic")).toBe(true);
+    expect(service.setHighContrast(true)).toBe(true);
     expect(JSON.parse(storage.getItem(APPEARANCE_STORAGE_KEY) ?? "{}")).toEqual({
       version: 1,
-      theme: "cosmic",
-      highContrast: false,
+      theme: "rack",
+      highContrast: true,
       userTheme: null,
     });
   });
@@ -206,8 +233,9 @@ describe("theme service", () => {
     const service = createService({ onStorageFailure });
     service.start();
     storage.failOnWrite = true;
-    expect(service.setTheme("mono")).toBe(false);
-    expect(service.appearance.theme).toBe("rack");
+    expect(service.setHighContrast(true)).toBe(false);
+    expect(service.appearance.highContrast).toBe(false);
+    expect(host.highContrast).toBe(false);
     expect(host.theme).toBe("rack");
     expect(onStorageFailure).toHaveBeenCalledOnce();
   });
@@ -227,9 +255,7 @@ describe("theme service", () => {
     if (theme !== undefined) expect(service.installUserTheme(theme)).toBe(true);
     expect(service.appearance.theme).toBe("user");
     expect(host.theme).toBe("user");
-    expect(host.tokens.get("--pulse-color-app")).toBe(
-      BUILT_IN_PALETTES.cosmic["--pulse-color-app"],
-    );
+    expect(host.tokens.get("--pulse-color-app")).toBe(USER_THEME_APP_COLOR);
   });
 
   it("resolves high contrast inline for a user theme", () => {
@@ -262,10 +288,10 @@ describe("theme service", () => {
     const listener = vi.fn();
     service.subscribe(listener);
     const applied = service.applyCrossTabValue(
-      serializeAppearance({ theme: "analog", highContrast: false, userTheme: null }),
+      serializeAppearance({ theme: "rack", highContrast: true, userTheme: null }),
     );
     expect(applied).toBe(true);
-    expect(host.theme).toBe("analog");
+    expect(host.highContrast).toBe(true);
     expect(listener).toHaveBeenCalledOnce();
   });
 

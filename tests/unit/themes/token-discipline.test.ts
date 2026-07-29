@@ -134,8 +134,7 @@ describe("themes.css matches the palette contract", () => {
   }
 
   it.each(PULSE_THEME_IDS)("declares every palette token for %s", (theme) => {
-    const selector = theme === "rack" ? '[data-theme="rack"]' : `[data-theme="${theme}"]`;
-    const declared = declaredBlock(selector);
+    const declared = declaredBlock(`[data-theme="${theme}"]`);
     const expected = BUILT_IN_PALETTES[theme];
     for (const token of REQUIRED_PALETTE_TOKENS) {
       const value = declared.get(token);

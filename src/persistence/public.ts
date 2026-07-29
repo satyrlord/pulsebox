@@ -1,4 +1,1 @@
-export {
-  createIndexedDbProjectRepository,
-  openProjectDatabase,
-} from "./indexed-db-project-repository";
+export { createIndexedDbProjectRepository } from "./indexed-db-project-repository";

@@ -21,7 +21,7 @@ export const DRUM_VOICE_NAMES: Readonly<Record<DrumVoiceId, string>> = {
  * Note numbers select the voice, so one drum lane per voice needs no change to
  * the shared pattern model. The roster starts at C1.
  */
-export const DRUM_BASE_NOTE = 36;
+const DRUM_BASE_NOTE = 36;
 
 export function drumVoiceNote(voiceId: DrumVoiceId): number {
   return DRUM_BASE_NOTE + DRUM_VOICE_IDS.indexOf(voiceId);

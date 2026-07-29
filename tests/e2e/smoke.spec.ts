@@ -10,7 +10,6 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 const RACK_MODULE = '[data-component="rack-module"]';
-const ACTIVITY_INDICATOR = '[data-component="activity-indicator"]';
 const KNOB = '[data-component="knob"]';
 
 test.beforeEach(async ({ page }) => {
@@ -50,15 +49,15 @@ test("boots the production shell with the seeded rack", async ({ page }) => {
 });
 
 test("adds an instrument into an empty slot", async ({ page }) => {
-  const loadedBefore = FIRST_EMPTY_SLOT;
   await page
     .locator(RACK_MODULE)
     .nth(FIRST_EMPTY_SLOT)
     .getByRole("button", { name: "Add Acid Bass" })
     .click();
   await expect(page.locator(`${RACK_MODULE}[data-label='Acid Bass']`)).toHaveCount(2);
-  // One indicator per loaded module, so filling a slot adds exactly one.
-  await expect(page.locator(ACTIVITY_INDICATOR)).toHaveCount(loadedBefore + 1);
+  // Faceplates carry no playback-position output; the Piano Roll and transport
+  // clock own that feedback.
+  await expect(page.locator('[data-component="activity-indicator"]')).toHaveCount(0);
 });
 
 test("adds the selected Drumline plugin", async ({ page }) => {
@@ -233,20 +232,18 @@ test("Space toggles playback and Escape stops it", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^play$/i })).toBeVisible();
 });
 
-test("every built-in theme applies and keeps operational targets at least 24 pixels", async ({
+test("the rack theme and high contrast apply and keep operational targets at least 24 pixels", async ({
   page,
 }) => {
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "rack");
+
   await page.getByRole("button", { name: "Settings" }).click();
   const settings = page.locator('[data-component="settings-page"]');
   await expect(settings).toBeVisible();
 
-  for (const theme of ["rack", "mono", "cosmic", "analog", "rust"]) {
-    await settings.getByRole("radio", { name: new RegExp(theme, "i") }).check();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-  }
-
   await settings.getByRole("checkbox", { name: "High contrast" }).check();
   await expect(page.locator("html")).toHaveAttribute("data-high-contrast", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "rack");
 
   const targets = page.locator('[data-component="transport-bar"] button');
   const count = await targets.count();
@@ -269,16 +266,18 @@ test("Escape closes Settings and returns focus to the button that opened it", as
   await expect(page.getByRole("button", { name: /^play$/i })).toBeVisible();
 });
 
-test("a theme selection persists across a reload and creates no undo entry", async ({ page }) => {
+test("the high-contrast choice persists across a reload and creates no undo entry", async ({
+  page,
+}) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await page
     .locator('[data-component="settings-page"]')
-    .getByRole("radio", { name: /cosmic/i })
+    .getByRole("checkbox", { name: "High contrast" })
     .check();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
 
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "cosmic");
+  await expect(page.locator("html")).toHaveAttribute("data-high-contrast", "true");
 });
 
 for (const viewport of [

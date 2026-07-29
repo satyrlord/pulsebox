@@ -41,7 +41,7 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-export function openProjectDatabase(factory: IDBFactory): Promise<IDBDatabase> {
+function openProjectDatabase(factory: IDBFactory): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const open = factory.open(DATABASE_NAME, DATABASE_VERSION);
     open.onupgradeneeded = () => {

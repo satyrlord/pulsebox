@@ -7,11 +7,11 @@ declare global {
   declare abstract class AudioWorkletProcessor {
     readonly port: MessagePort;
     constructor(options?: AudioWorkletNodeOptions);
-    abstract process(
+    readonly process: (
       inputs: readonly (readonly Float32Array[])[],
       outputs: readonly (readonly Float32Array[])[],
       parameters: Readonly<Record<string, Float32Array>>,
-    ): boolean;
+    ) => boolean;
   }
 
   declare function registerProcessor(

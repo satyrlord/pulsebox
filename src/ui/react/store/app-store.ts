@@ -3,13 +3,12 @@ import { createStore, type StoreApi } from "zustand";
 import type {
   GestureId,
   ModuleInstanceId,
+  ParameterValue,
   PluginId,
   PluginManifest,
   RackSlotId,
 } from "../../../contracts";
-import type { PulseCommand, PulseState, PulseStore } from "../../../state/public";
-
-export type ParameterValue = number | boolean | string;
+import type { PulseState, PulseStore } from "../../../state/public";
 
 export type AudioStatus = "faulted" | "recovered" | "recovering";
 
@@ -522,5 +521,3 @@ function manifestForModule(
   const module = state.project.modules[moduleId];
   return module === undefined ? undefined : dependencies.manifestFor(module.pluginId);
 }
-
-export type { PulseCommand };

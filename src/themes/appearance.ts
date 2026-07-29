@@ -16,7 +16,7 @@ import {
 } from "./tokens";
 
 export const APPEARANCE_STORAGE_KEY = "pulsebox.ui.appearance.v1";
-export const APPEARANCE_ENVELOPE_VERSION = 1;
+const APPEARANCE_ENVELOPE_VERSION = 1;
 const MAX_ENVELOPE_BYTES = 16_384;
 
 export interface PulseAppearance {

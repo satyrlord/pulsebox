@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   decodeBundledAudio,
@@ -105,6 +105,41 @@ function createCompressedAifc(): ArrayBuffer {
 describe("bundled audio decoders", () => {
   it("exports the owned decoder through the engine public boundary", () => {
     expect(SampleDecoder).toBeTypeOf("function");
+  });
+
+  it("runs the worker decoder port and releases pending work on disposal", async () => {
+    class FakeWorker extends EventTarget {
+      readonly postMessage = vi.fn();
+      readonly terminate = vi.fn();
+    }
+
+    const worker = new FakeWorker();
+    const decoder = new SampleDecoder(worker as unknown as Worker);
+    const source = new ArrayBuffer(4);
+    const decoded = decoder.decode(source);
+    const request = worker.postMessage.mock.calls[0]?.[0] as
+      | { readonly requestId?: string }
+      | undefined;
+    expect(request?.requestId).toBe("decode-0");
+
+    worker.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          kind: "decoded",
+          requestId: request?.requestId,
+          codec: "wav",
+          sampleRate: 48_000,
+          frames: 1,
+          channelData: [new Float32Array([0.25]).buffer],
+        },
+      }),
+    );
+    await expect(decoded).resolves.toMatchObject({ codec: "wav", sampleRate: 48_000, frames: 1 });
+
+    const pending = decoder.decode(new ArrayBuffer(4));
+    decoder.dispose();
+    await expect(pending).rejects.toThrow(/disposed/u);
+    expect(worker.terminate).toHaveBeenCalledOnce();
   });
 
   it("identifies supported container signatures without using file extensions", () => {

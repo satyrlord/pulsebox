@@ -5,7 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 import { PulseApp } from "../../src/ui/react/PulseApp";
 import { Rack } from "../../src/ui/react/shell/Rack";
 import { TransportBar } from "../../src/ui/react/shell/TransportBar";
-import { PulseThemeService, elementThemeHost } from "../../src/themes";
+import {
+  createPulseThemeService,
+  elementThemeHost,
+  type PulseThemeService,
+} from "../../src/themes";
 import { createHarness, firstModuleId, renderWithHarness } from "./helpers";
 
 /**
@@ -22,7 +26,7 @@ function makeHistory(harness: ReturnType<typeof createHarness>, step: number): v
 
 function memoryThemeService(): PulseThemeService {
   const values = new Map<string, string>();
-  return new PulseThemeService({
+  return createPulseThemeService({
     host: elementThemeHost(document.documentElement),
     storage: {
       getItem: (key) => values.get(key) ?? null,
@@ -160,10 +164,12 @@ describe("Rack", () => {
     expect(screen.getAllByRole("button", { name: "Add Acid Bass" })).toHaveLength(2);
   });
 
-  it("shows Pattern activity without exposing faceplate step editing", () => {
+  it("renders no activity indicator and no faceplate step editing", () => {
     const harness = createHarness();
-    renderWithHarness(<Rack />, harness);
-    expect(screen.getByRole("img", { name: "Acid Bass activity: stopped" })).toBeInTheDocument();
+    const { container } = renderWithHarness(<Rack />, harness);
+    // The faceplate carries no playback-position output and no step grid; the
+    // Piano Roll and transport clock own that feedback.
+    expect(container.querySelector('[data-component="activity-indicator"]')).toBeNull();
     expect(screen.queryByRole("button", { name: /pattern step/i })).toBeNull();
     expect(harness.domain.getState().history.canUndo).toBe(false);
   });

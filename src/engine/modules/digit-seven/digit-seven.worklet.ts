@@ -40,7 +40,7 @@ function toDspParameters(
   };
 }
 
-export class DigitSevenProcessor extends WorkletVoiceProcessor<PartialParameters> {
+class DigitSevenProcessor extends WorkletVoiceProcessor<PartialParameters> {
   protected readonly displayName = "Digit Seven";
   readonly #dsp = new DigitSevenDsp(sampleRate);
 

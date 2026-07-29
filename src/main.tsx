@@ -1,6 +1,7 @@
 import {
   browserIdFactory,
   type ModuleInstanceId,
+  type ParameterValue,
   type PluginId,
   type ProjectRevision,
 } from "./contracts";
@@ -45,7 +46,6 @@ import {
   serializeProject,
   serializePortableProject,
   type ModuleSeed,
-  type ParameterValue,
   type PulseEngineDelta,
   type PulseState,
   type RackModuleState,

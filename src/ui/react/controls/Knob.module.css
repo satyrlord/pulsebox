@@ -62,12 +62,6 @@
   color: var(--pulse-color-text-muted, #9a9aa2);
 }
 
-.readout {
-  font-variant-numeric: tabular-nums;
-  font-size: 0.6875rem;
-  color: var(--pulse-color-text, #e6e6ea);
-}
-
 .numeric {
   width: 4rem;
   font: inherit;

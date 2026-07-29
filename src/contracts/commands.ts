@@ -52,37 +52,3 @@ export interface EngineDelta<TKind extends string, TPayload> {
 export type Selector<State, Selected> = (state: Readonly<State>) => Selected;
 export type Listener<Selected> = (selected: Selected, previous: Selected) => void;
 export type Unsubscribe = () => void;
-
-export interface ProjectStateLike {
-  readonly id: string;
-  readonly lineageId: string;
-  readonly revision: StateRevision;
-  readonly name: string;
-  readonly tempo: number;
-  readonly rackSlots: readonly unknown[];
-  readonly modules: Readonly<Record<string, unknown>>;
-}
-
-export interface PulseStore<State, Command> {
-  getState(): Readonly<State>;
-  dispatch(command: Command): CommandResult;
-  subscribe<Selected>(
-    selector: Selector<State, Selected>,
-    listener: Listener<Selected>,
-  ): Unsubscribe;
-  undo(): CommandResult;
-  redo(): CommandResult;
-  loadProject(project: ProjectStateLike): CommandResult;
-  saveProject(): ProjectStateLike;
-}
-
-export interface EngineProjectionPort<Delta> {
-  project(delta: Delta): Promise<void>;
-  replaceFromCurrentState(projectRevision: StateRevision): Promise<void>;
-}
-
-export interface PreferencePort<Key, Value> {
-  read(key: Key): Promise<Value | undefined>;
-  write(key: Key, value: Value): Promise<void>;
-  remove(key: Key): Promise<void>;
-}

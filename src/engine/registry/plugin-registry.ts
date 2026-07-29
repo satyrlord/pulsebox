@@ -30,7 +30,7 @@ function deepFreeze<T>(value: T, seen = new Set<object>()): Readonly<T> {
   return Object.freeze(value);
 }
 
-export class PluginRegistry<Factory> {
+class PluginRegistry<Factory> {
   readonly #entries: ReadonlyMap<PluginId, PluginRegistryEntry<Factory>>;
 
   constructor(entries: readonly PluginRegistryEntry<Factory>[]) {

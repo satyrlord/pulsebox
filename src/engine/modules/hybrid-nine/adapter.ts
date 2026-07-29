@@ -1,4 +1,5 @@
-import type { ParameterValue, VoiceAdapterFactory } from "../../transport/voice-adapter";
+import type { ParameterValue } from "../../../contracts/parameters";
+import type { VoiceAdapterFactory } from "../../transport/voice-adapter";
 import {
   WorkletVoiceAdapter,
   type WorkletVoiceDescriptor,
@@ -10,7 +11,7 @@ import workletUrl from "./hybrid-nine.worklet.ts?worker&url";
  * validating pass-through rather than a rename map: module fields stay flat and
  * per-voice fields keep their `<voice-id>-<field>` form.
  */
-export function toHybridParameters(
+function toHybridParameters(
   values: Readonly<Record<string, ParameterValue>>,
 ): Readonly<Record<string, ParameterValue>> {
   const result: Record<string, number> = {};
@@ -27,7 +28,7 @@ const DESCRIPTOR: WorkletVoiceDescriptor = {
   mapParameters: toHybridParameters,
 };
 
-export class HybridNineAdapter extends WorkletVoiceAdapter {
+class HybridNineAdapter extends WorkletVoiceAdapter {
   constructor(context: AudioContext, options: Parameters<VoiceAdapterFactory>[1]) {
     super(DESCRIPTOR, context, options);
   }

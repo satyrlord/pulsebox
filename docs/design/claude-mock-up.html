@@ -13,17 +13,18 @@
    graphite, green lamp accent, rounder controls, rack pull handles.
    Pass 2: closer to the mock — softer lit faceplates with brushed texture,
    larger knobs with glowing value arcs and labels above, chunkier pull
-   handles with socket bolts, blooming step lamps, silver fader caps,
-   plain-text wordmark.
-   Pass 3: native 1568 x 1003 composition geometry.
-   Pass 4: pixel parity pass — decorative piano gutter, mixer levels, caps,
-   sends and meter ladders, voice-0 lamp fixtures, uniform rack-knob arc
-   fixture, waveform, and topbar/bottom-bar alignment.
-   Passes 3 and 4 were measured against an early raster study that decision D77
-   has since withdrawn. This file is now the single approved composition target
-   (spec-003 section 8.2): it owns the geometry, and the product specifications
-   own behavior. Where the two disagree, the specification wins and this file is
-   corrected.
+   handles with socket bolts, silver fader caps, plain-text wordmark.
+   Pass 3: the composition geometry this file now owns — per-unit faceplate
+   heights, panel widths and the piano gutter.
+   Pass 4: density pass — decorative piano gutter, mixer levels, caps, sends and
+   meter ladders, waveform, and topbar/bottom-bar alignment.
+   This file is the single approved composition target (spec-003 section 8.2):
+   it owns proportion, placement, density, materials, typography scale and
+   control sizing, and the product specifications own behavior. Where the two
+   disagree, the specification wins and this file is corrected.
+   Decision D80: it shows only true or specification-owned state. It renders the
+   spec-005 section 9.1 default project in its real stopped state, so no element
+   may display a value the product would never produce.
    ========================================================================== */
 :root, html[data-theme="rack"]{
   --surface-app:#08090a; --surface-rail:#101214; --surface-chassis:#141618;
@@ -36,8 +37,7 @@
   --metal-rail-a:#2a2e31; --metal-rail-b:#121416;
   --cap-hi:#d9dcdf; --cap-lo:#8e9499;
   --accent-lamp:#78b943; --accent-dim:rgba(120,185,67,.2); --accent-glow:rgba(120,185,67,.32); --accent-ink:#0a1206;
-  /* accent-text is the accent tuned for use AS text. On dark themes the lamp
-     already passes; the light theme overrides it with a darker oxide. */
+  /* accent-text is the accent tuned for use AS text. */
   --accent-text:var(--accent-lamp);
   --lcd-ink:#d6d9db;
   --text-primary:#f3f5f6; --text-secondary:#c3cad0; --text-muted:#a3abb2;
@@ -55,91 +55,6 @@
   --mod-nine:#9d5ed0; --mod-sev:#4b7fd2; --mod-five:#39b3ac;
   --mod-fx:#93999f;
   --mod-tint:4%;
-}
-html[data-theme="mono"]{
-  --surface-app:#09090a; --surface-rail:#0e0e0f; --surface-chassis:#121213;
-  --surface-plate-top:#232325; --surface-plate-bot:#141415; --surface-plate-brush:rgba(255,255,255,.02);
-  --surface-recess:#070708; --surface-well:#000; --surface-raised:#28282b;
-  --edge-highlight:rgba(255,255,255,.09); --edge-shadow:rgba(0,0,0,.8); --edge-hairline:rgba(0,0,0,.72);
-  --metal-cap-top:#3f3f43; --metal-cap-bot:#1b1b1d; --metal-skirt-a:#323235; --metal-skirt-b:#1f1f21;
-  --metal-screw-top:#505055; --metal-screw-bot:#141416;
-  --metal-rail-a:#2c2c2e; --metal-rail-b:#161617;
-  --cap-hi:#f2f2f4; --cap-lo:#a6a6ab;
-  --accent-lamp:#f2f2f4; --accent-dim:rgba(242,242,244,.2); --accent-glow:rgba(242,242,244,.38); --accent-ink:#0a0a0b;
-  --text-primary:#ededef; --text-secondary:#c0c0c5; --text-muted:#a5a5ab;
-  --text-engraved-lo:rgba(0,0,0,.8); --text-engraved-hi:rgba(255,255,255,.05);
-  --signal-mute:#cfcfd2; --signal-solo:#fff; --signal-rec:#ff5252; --signal-play:#f2f2f4;
-  --meter-low:#8f8f93; --meter-mid:#c9c9cd; --meter-high:#eeeef0; --meter-peak:#ff5252;
-  --scope-glass:#08080a; --scope-grid:rgba(255,255,255,.055);
-  --type-display:"Helvetica Neue","Arial Narrow",ui-sans-serif,sans-serif;
-  --mod-bass:#f2f2f4; --mod-six:#f2f2f4; --mod-boom:#f2f2f4;
-  --mod-nine:#f2f2f4; --mod-sev:#f2f2f4; --mod-five:#f2f2f4; --mod-fx:#f2f2f4;
-  --mod-tint:4%;
-}
-html[data-theme="cosmic"]{
-  --surface-app:#060918; --surface-rail:#0a0e20; --surface-chassis:#0d122e;
-  --surface-plate-top:#1a2148; --surface-plate-bot:#0e1330; --surface-plate-brush:rgba(120,180,255,.05);
-  --surface-recess:#050818; --surface-well:#03050f; --surface-raised:#232c60;
-  --edge-highlight:rgba(150,200,255,.14); --edge-shadow:rgba(0,0,0,.7); --edge-hairline:rgba(0,0,0,.6);
-  --metal-cap-top:#3f4f8c; --metal-cap-bot:#182050; --metal-skirt-a:#303c74; --metal-skirt-b:#1c2454;
-  --metal-screw-top:#52629f; --metal-screw-bot:#151b48;
-  --metal-rail-a:#28326c; --metal-rail-b:#131a40;
-  --cap-hi:#dde7ff; --cap-lo:#8b97bd;
-  --accent-lamp:#54d2ff; --accent-dim:rgba(84,210,255,.26); --accent-glow:rgba(84,210,255,.6); --accent-ink:#04101a;
-  --lcd-ink:#54d2ff;
-  --text-primary:#e6f0ff; --text-secondary:#c2d0ea; --text-muted:#adb4ba;
-  --text-engraved-lo:rgba(0,0,0,.7); --text-engraved-hi:rgba(150,200,255,.08);
-  --signal-mute:#cfe0ff; --signal-solo:#7ef0d0; --signal-rec:#ff5c8a; --signal-play:#3ee0a8;
-  --meter-low:#3ee0a8; --meter-mid:#54d2ff; --meter-high:#8f8cff; --meter-peak:#ff5c8a;
-  --scope-glass:#040818; --scope-grid:rgba(140,190,255,.085);
-  --type-display:"Futura","Century Gothic","Avenir Next",ui-sans-serif,sans-serif;
-  --mod-bass:#5ce8b2; --mod-six:#ffb95c; --mod-boom:#ff6f8f; --mod-nine:#b98cff; --mod-sev:#54d2ff; --mod-five:#4de0d4;
-}
-html[data-theme="analog"]{
-  --surface-app:#b7babe; --surface-rail:#a8abb0; --surface-chassis:#c0c3c8;
-  --surface-plate-top:#e4e6e9; --surface-plate-bot:#c6c9cd; --surface-plate-brush:rgba(255,255,255,.5);
-  --surface-recess:#9b9ea3; --surface-well:#c4c7cb; --surface-raised:#eef0f2;
-  --edge-highlight:rgba(255,255,255,.85); --edge-shadow:rgba(0,0,0,.3); --edge-hairline:rgba(0,0,0,.22);
-  --metal-cap-top:#fbfbfc; --metal-cap-bot:#b4b8bd; --metal-skirt-a:#e2e4e7; --metal-skirt-b:#b9bdc2;
-  --metal-screw-top:#f2f3f4; --metal-screw-bot:#8d9095;
-  --metal-rail-a:#d6d9dc; --metal-rail-b:#a9acb1;
-  --cap-hi:#ffffff; --cap-lo:#c2c6cb;
-  --accent-lamp:#b8501a; --accent-dim:rgba(184,80,26,.2); --accent-glow:rgba(184,80,26,.32); --accent-ink:#fff;
-  /* Analog is the only light theme. Its text ramp is derived against its own
-     light plates rather than inverted from the dark themes, so body text keeps
-     4.5:1 and the oxide accent is darkened for use as text. */
-  --lcd-ink:#5e2609;
-  --accent-text:#5e2609;
-  --text-primary:#1c1f22; --text-secondary:#2e3237; --text-muted:#383c41;
-  --text-engraved-lo:rgba(255,255,255,.85); --text-engraved-hi:rgba(0,0,0,.15);
-  --signal-mute:#3a3d42; --signal-solo:#9a6f0a; --signal-rec:#b0332a; --signal-play:#26804a;
-  --meter-low:#26804a; --meter-mid:#c08f30; --meter-high:#c06a22; --meter-peak:#b0332a;
-  --scope-glass:#d2d5d9; --scope-grid:rgba(0,0,0,.12);
-  --type-display:"Bahnschrift","DIN Alternate","Franklin Gothic",ui-sans-serif,sans-serif;
-  --mod-bass:#2a5610; --mod-six:#6d410c; --mod-boom:#8a271b; --mod-nine:#55247a; --mod-sev:#1a4189; --mod-five:#0b544f;
-  --mod-tint:10%;
-}
-html[data-theme="rust"]{
-  --surface-app:#120f0f; --surface-rail:#191312; --surface-chassis:#1d1614;
-  --surface-plate-top:#312721; --surface-plate-bot:#1e1714; --surface-plate-brush:rgba(255,160,90,.05);
-  --surface-recess:#0d0a09; --surface-well:#070505; --surface-raised:#3e312a;
-  --edge-highlight:rgba(255,180,120,.11); --edge-shadow:rgba(0,0,0,.75); --edge-hairline:rgba(0,0,0,.65);
-  --edge-radius-panel:0px; --edge-radius-ctl:0px; --edge-radius-chip:0px;
-  --metal-cap-top:#5e4a40; --metal-cap-bot:#2e2320; --metal-skirt-a:#4b3a33; --metal-skirt-b:#2b211d;
-  --metal-screw-top:#6e5a4e; --metal-screw-bot:#241b17;
-  --metal-rail-a:#3e302a; --metal-rail-b:#221a16;
-  --cap-hi:#f2e2d4; --cap-lo:#a68e7d;
-  --accent-lamp:#ff5a1f; --accent-dim:rgba(255,90,31,.26); --accent-glow:rgba(255,90,31,.55); --accent-ink:#140a05;
-  /* the oxide lamp is too dark to read as text on raised metal */
-  --accent-text:#ff9a72;
-  --lcd-ink:#ff5a1f;
-  --text-primary:#f0e6e0; --text-secondary:#cdbcb1; --text-muted:#b3a79d;
-  --text-engraved-lo:rgba(0,0,0,.8); --text-engraved-hi:rgba(255,180,120,.06);
-  --signal-mute:#e0d4cc; --signal-solo:#ffb020; --signal-rec:#ff3b1f; --signal-play:#9ec93c;
-  --meter-low:#9ec93c; --meter-mid:#ffb020; --meter-high:#ff7a1f; --meter-peak:#ff3b1f;
-  --scope-glass:#0b0706; --scope-grid:rgba(255,150,90,.075);
-  --type-display:"Impact","Haettenschweiler","Arial Black",ui-sans-serif,sans-serif;
-  --mod-bass:#b8d43c; --mod-six:#e8a020; --mod-boom:#ff5a2b; --mod-nine:#e05a8f; --mod-sev:#5a9fff; --mod-five:#3cc9a0;
 }
 
 :root{
@@ -275,7 +190,8 @@ html[data-theme="rack"] .topbar{
 .tbtn svg{width:21px;height:21px;fill:currentColor;}
 .tbtn:active{box-shadow:inset 0 3px 6px rgba(0,0,0,.7);}
 .tbtn:hover{color:var(--text-primary);}
-/* idle transport glyphs keep their signal colors, as in the reference image */
+/* Idle transport glyphs keep their signal colours, so Play and Record are
+   identifiable at rest without being lit. The engaged state is a filled key. */
 .tbtn.play{color:var(--signal-play);}
 .tbtn.play svg{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--signal-play) 65%,transparent));}
 .tbtn.rec{color:var(--signal-rec);}
@@ -525,8 +441,9 @@ html[data-theme="rack"] .unit{
     radial-gradient(130% 100% at 50% 0%,rgba(255,255,255,.038),transparent 55%),
     linear-gradient(180deg,#1e2122,#1b1d1e);
 }
-/* rack ear with a chunky pull handle standing off a recessed channel,
-   bolted top and bottom, as in the reference image */
+/* Rack ear: a chunky pull handle standing off a recessed channel, bolted top
+   and bottom. It is the tactile studio language spec-001 section 15 asks for —
+   the rails are what make a unit read as rack-mounted hardware. */
 .rail{
   width:28px;flex:none;position:relative;border-radius:var(--edge-radius-panel) 0 0 var(--edge-radius-panel);
   background:
@@ -629,8 +546,10 @@ html[data-theme="rack"] .rail.r{
   flex:1;min-width:0;display:flex;align-items:center;justify-content:space-evenly;
   gap:4px;padding:0;
 }
-/* Per-unit bank spreads, measured from the reference: seven- and eight-knob
-   banks ride a wider pitch than the ten-knob bass bank. */
+/* Per-unit bank spreads. A module's knob count differs, but the faceplate width
+   does not, so each bank gets its own padding: seven- and eight-knob banks ride
+   a wider pitch than the ten-knob bass bank instead of every unit crowding its
+   controls to one end. These paddings are composition data this file owns. */
 .unit[data-mod="six"] .uknobs,.unit[data-mod="boom"] .uknobs,.unit[data-mod="sev"] .uknobs{padding:0 37px 0 15px;}
 .unit[data-mod="nine"] .uknobs{padding:0 0 0 16px;}
 .unit[data-mod="five"] .uknobs{padding:0 6px 0 18px;}
@@ -638,7 +557,8 @@ html[data-theme="rack"] .rail.r{
   font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;
 }
 .unit .klabel{color:#d6dade;text-shadow:0 0 3px rgba(255,255,255,.22),0 1px 0 var(--text-engraved-lo);}
-/* the reference arcs burn a hotter lime than the raw module colour */
+/* Rack arcs burn a hotter lime than the raw module colour, so a lit value arc
+   stays readable against a tinted faceplate on every module accent. */
 .unit .kdial .arc-fill{stroke:color-mix(in srgb,var(--k) 82%,#cade6a);
   filter:drop-shadow(0 0 4px color-mix(in srgb,var(--k) 75%,transparent));}
 .unit .kdial{transform:scale(.8);filter:brightness(.95);}
@@ -655,11 +575,12 @@ html[data-theme="rack"] .rail.r{
 .usample .sname{position:absolute;left:5px;top:4px;font-size:var(--size-1);color:color-mix(in srgb,var(--k) 62%,#aaa);font-family:var(--type-num);z-index:2;}
 .usample svg{position:absolute;inset:0;width:100%;height:100%;}
 .usample polyline{fill:none;stroke:color-mix(in srgb,var(--k) 75%,#000);stroke-width:1;opacity:.8;}
-/* sequencer */
-/* Pattern activity block. Deliberately narrow: the faceplate holds no step
-   grid, so the reclaimed width belongs to the knob bank. */
-/* The mock frames this as a lit readout window: a black glass panel inside a
-   hairline bezel, sitting proud of the faceplate. */
+/* pattern readout window */
+/* Deliberately narrow: the faceplate holds no step grid and, per D78, no
+   activity strip, so the reclaimed width belongs to the knob bank. The mock
+   frames this as a lit readout window: a black glass panel inside a hairline
+   bezel, sitting proud of the faceplate. It holds the pattern selector, the
+   voice selector, and the position readout. */
 .useq{
   flex:none;width:185px;min-width:0;align-self:center;margin:0 3px;border-radius:5px;padding:6px 7px;
   transform:translateY(6px);
@@ -685,23 +606,7 @@ html[data-theme="rack"] .rail.r{
 .voicesel .vname{min-width:72px;text-align:center;font-size:var(--size-1);color:var(--k);
   font-family:var(--type-display);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;
   text-shadow:0 0 7px color-mix(in srgb,var(--k) 45%,transparent);}
-/* read-only pattern activity strip, styled like the mock's lamp row */
-/* Output-only activity readout. It must not read as a row of pressable steps,
-   so it stays a low flat bar graph: no button height, no chip radius, no
-   four-step beat grouping and no per-cell lamp glow. Those cues belong to the
-   Piano Roll, which is the only pattern editing surface. */
-.uactivity{display:flex;gap:3px;height:10px;align-items:stretch;margin-top:7px;}
-.uactivity i{
-  flex:1 1 0;min-width:0;border-radius:1.5px;
-  background:color-mix(in srgb,var(--scope-glass) 55%,var(--surface-well));
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.5),inset 0 0 0 1px var(--edge-highlight);
-}
-.uactivity i{transition:background var(--motion-fast) var(--motion-ease);}
-/* Active cells brighten but stay flat — per-cell glow and button cues stay
-   reserved for the Piano Roll, the only pattern editing surface. */
-.uactivity i.a{background:color-mix(in srgb,var(--k) 58%,var(--scope-glass));}
-.uactivity i.playhead{background:var(--k);}
-.uactlbl{display:flex;align-items:center;justify-content:space-between;}
+.uactlbl{display:flex;align-items:center;justify-content:space-between;margin-top:5px;}
 /* Module accents are lamp colours, not text colours. Small readouts mix the
    accent toward the theme ink so the hue survives but contrast passes. */
 .uactlbl .pos{margin-left:auto;font-family:var(--type-num);font-size:var(--size-1);
@@ -775,9 +680,6 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
 /* the travelled range burns in the channel colour */
 .ffill{position:absolute;left:50%;bottom:4px;width:3px;margin-left:-1.5px;border-radius:1px;
   background:color-mix(in srgb,var(--k) 62%,#000);opacity:.85;}
-/* FIVE idles low in the reference: dim cap, dim fill, dark meter */
-.mstrip[data-mod="five"] .ffill{opacity:.3;}
-.mstrip[data-mod="five"] .fcap{opacity:.45;}
 /* The cap: a tall machined silver block with deep grooves — the strongest
    highlight in the mixer, exactly as the mock draws it. */
 .fcap{position:absolute;left:50%;width:19px;height:28px;transform:translateX(-50%);border-radius:2.5px;
@@ -926,37 +828,38 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
   text-transform:uppercase;color:color-mix(in srgb,var(--mod-bass) 55%,var(--text-primary));}
 .rollbody{flex:1;min-height:0;display:flex;flex-direction:column;}
 .rollbar{flex:none;height:20px;display:flex;background:var(--surface-plate-bot);box-shadow:0 1px 0 var(--edge-hairline);}
-.rollbar .rbcorner{width:154px;flex:none;font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
-  color:var(--mod-bass);display:grid;place-items:center;justify-content:flex-end;padding-right:24px;}
+/* Matches the keybed column exactly, so bar numbers line up with their bar
+   lines in the grid below. */
+.rollbar .rbcorner{width:78px;flex:none;font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
+  color:var(--mod-bass);display:grid;place-items:center;justify-content:flex-end;padding-right:10px;}
 .rollbar .rbmeasures{flex:1;display:flex;}
 .rollbar .rbmeasures span{flex:1;font-family:var(--type-num);font-size:var(--size-1);color:var(--text-muted);
   border-left:1px solid var(--edge-hairline);padding-left:3px;line-height:16px;}
 .rollmain{flex:1;min-height:0;display:flex;}
-/* Piano key gutter, matching the reference: a narrow dark name strip on the
-   left, then the keyboard drawn side-on — ten chunky ivory naturals running
-   to the grid edge, a glossy black key riding every boundary. The reference
-   gutter is decorative, so it is not locked to the grid rows. */
+/* Piano key gutter: a narrow dark name strip on the left, then the keyboard
+   drawn side-on. Every key spans exactly its own grid row, so the key a user
+   reads across from a note is the pitch that note actually plays. Naturals are
+   ivory and run to the grid edge; sharps are glossy black and sit inset, as on
+   a keyboard viewed from the side. */
 .prkeys{width:78px;flex:none;display:block;position:relative;overflow:hidden;
   background:linear-gradient(180deg,#0a0b0c,#050506);
   box-shadow:inset -1px 0 2px rgba(0,0,0,.5);}
 .pkw{position:absolute;left:0;right:0;
   background:
     linear-gradient(90deg,#0a0c0d 0 15px,transparent 15px),
-    linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 72%,rgba(0,0,0,.3)),
-    linear-gradient(90deg,#454545 15px,#535353 35%,#7d7d7d 55%,#b2b2b2 73%,#8a8a8a 85%,#5c5c5c 100%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.4);}
-/* the keyboard continues past the last labelled key; the sliver below A3 sits
-   in shadow */
-.pkw.dim{filter:brightness(.78);}
-.pkl{position:absolute;left:1.5px;transform:translateY(-50%);z-index:3;
+    linear-gradient(90deg,#5c5c5c 15px,#7d7d7d 35%,#a8a8a8 60%,#b2b2b2 78%,#8a8a8a 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.55);}
+/* Labels sit in the dark name strip and centre on their own row, so a label
+   lines up with the key and the grid row it names. */
+.pkl{position:absolute;left:1.5px;z-index:3;display:flex;align-items:center;
   font-family:var(--type-num);font-size:8px;letter-spacing:.02em;color:#b9bdc2;}
-.pks{position:absolute;left:15px;right:0;height:1px;z-index:2;background:rgba(0,0,0,.55);}
-.pkb{position:absolute;left:15px;width:39px;z-index:2;border-radius:0 2px 2px 0;
+/* Sharps span their own row like naturals, but stop short of the grid edge and
+   stay dark, so the gutter still reads as a keyboard seen from the side. */
+.pkb{position:absolute;left:15px;right:22px;z-index:2;border-radius:0 2px 2px 0;
   background:
-    linear-gradient(90deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.5)),
-    linear-gradient(180deg,#34383d 0,#1e2225 32%,#141719 70%,#0a0c0d 100%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -2px 3px rgba(0,0,0,.9),
-    2px 1px 3px rgba(0,0,0,.6);}
+    linear-gradient(90deg,#26292d 0,#191c1f 60%,#0d0f11 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 2px rgba(0,0,0,.9),
+    1px 1px 2px rgba(0,0,0,.55);}
 .prkey{flex:1;min-height:0;position:relative;display:flex;align-items:center;
   padding-left:6px;font-family:var(--type-num);font-size:var(--size-1);
   color:var(--text-secondary);text-shadow:0 1px 0 var(--text-engraved-lo);}
@@ -965,7 +868,7 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
   box-shadow:var(--lift-1);}
 .prgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-2);overflow:hidden;}
 html[data-theme="rack"] .prgrid{background:#141516;}
-.prgrid::before,.vellane .vgrid::before{content:"";position:absolute;z-index:1;top:0;bottom:0;left:76px;width:1px;
+.prgrid::before,.vellane .vgrid::before{content:"";position:absolute;z-index:1;top:0;bottom:0;left:0;width:1px;
   background:rgba(255,255,255,.24);box-shadow:0 0 3px rgba(255,255,255,.08);pointer-events:none;}
 .prgrid .gband{position:absolute;left:0;right:0;background:rgba(0,0,0,.18);}
 .prgrid .grow{position:absolute;left:0;right:0;border-bottom:1px solid rgba(255,255,255,.035);}
@@ -1084,8 +987,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
      knobs. It keeps the evenly spread distribution it has on wide viewports:
      left-packing a six- or seven-knob bank across the full unit width leaves a
      dead gap that reads as a cramped cluster, worst on the sampler, which
-     carries the fewest knobs. The activity readout stays compact beside the
-     audition pad. */
+     carries the fewest knobs. */
   .uknobs{flex:1 0 100%;order:5;flex-wrap:wrap;justify-content:space-evenly;margin-top:4px;}
   .useq{order:3;}
   .uaudition{order:4;flex-direction:row;width:auto;margin-left:auto;}
@@ -1150,7 +1052,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <symbol id="i-undo" viewBox="0 0 16 16"><path d="M6 3L2 7l4 4M2 7h7a4 4 0 010 8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10 3l4 4-4 4M14 7H7a4 4 0 000 8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-save" viewBox="0 0 16 16"><path d="M2.6 2.6h8.2l2.6 2.6v8.2H2.6zM5.4 2.6V6h5.2V2.6M5.4 13.4V9.6h5.2v3.8"/></symbol>
-  <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.4A2.9 2.9 0 018 4.8a2.9 2.9 0 015.5 1.6C13.5 10 8 13.5 8 13.5z" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 16 16"><path d="M5.2 2.2h5.6M6.2 2.2v3.9L4.4 8.3h7.2L9.8 6.1V2.2M8 8.3v5.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-shuffle" viewBox="0 0 16 16"><path d="M2 4h3l6 8h3M2 12h3l6-8h3M12 2l2 2-2 2M12 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
 </defs></svg>
@@ -1186,14 +1088,14 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       </button>
       <button class="iconbtn ghost" type="button" aria-pressed="false"
         title="Pin project. Keeps this project at the top of the project selector."
-        aria-label="Pin project"><svg aria-hidden="true"><use href="#i-heart"/></svg></button>
+        aria-label="Pin project"><svg aria-hidden="true"><use href="#i-pin"/></svg></button>
     </div>
     <div class="mode-toggle" id="transportMode" aria-label="Transport mode">
       <button class="on" type="button" data-mode="pattern" aria-pressed="true">Pattern</button>
       <button type="button" data-mode="song" aria-pressed="false">Song</button>
     </div>
     <div class="transport" role="group" aria-label="Transport">
-      <button class="tbtn play" id="btnPlay" title="Play." aria-label="Play" aria-pressed="false"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
+      <button class="tbtn play" id="btnPlay" title="Play. Press Space to start or stop." aria-label="Play" aria-pressed="false"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
       <button class="tbtn" id="btnStop" title="Stop. Returns to the start." aria-label="Stop"><svg aria-hidden="true"><use href="#i-stop"/></svg></button>
       <button class="tbtn rec" id="btnRec" title="Record." aria-label="Record" aria-pressed="false"><svg aria-hidden="true"><use href="#i-rec"/></svg></button>
     </div>
@@ -1213,7 +1115,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
     </div>
     <button class="iconbtn" id="btnMetro" title="Metronome." aria-label="Metronome" aria-pressed="false"><svg aria-hidden="true"><use href="#i-metro"/></svg></button>
     <button class="iconbtn on" id="btnPower" type="button" aria-pressed="true" title="Audio engine power." aria-label="Audio engine power"><svg aria-hidden="true"><use href="#i-audio"/></svg></button>
-    <button class="meter-mode" id="meterMode" type="button" aria-label="Master meter mode: left and right" aria-pressed="false" title="Switch master analysis between left/right and mid/side.">L/R</button>
+    <button class="meter-mode" id="meterMode" type="button" aria-label="Master meter mode: left and right" aria-pressed="false" title="Switch the master meter between left/right and mid/side.">L/R</button>
     <div class="mastermeter">
       <div class="meterpair" aria-label="Two-channel master meter">
         <span id="meterLabelA">L</span><canvas id="masterMeterA" width="332" height="14" aria-hidden="true"></canvas>
@@ -1221,7 +1123,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       </div>
       <span class="mdb num" id="masterDb">&minus;6.1&thinsp;dB</span>
     </div>
-    <button class="iconbtn" id="settingsButton" title="Settings. Themes are selected here." aria-label="Settings"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
+    <button class="iconbtn" id="settingsButton" title="Settings. Appearance is chosen here." aria-label="Settings"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
   </div>
 </header>
 
@@ -1237,7 +1139,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <aside class="panel slots" aria-label="Slots">
     <div class="slist" id="slist"></div>
     <div class="slotacts">
-      <button title="Duplicate the selected module.">Dupe</button>
+      <button title="Duplicate the selected module.">Duplicate</button>
     </div>
   </aside>
 
@@ -1312,20 +1214,20 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
           <span class="pv" id="patName">Verse</span>
           <button id="patNext" title="Next pattern.">&rsaquo;</button></div></div>
       <div class="pfield"><label>Duration</label>
-        <div class="pstepper"><button title="Shorter.">&minus;</button>
+        <div class="pstepper"><button title="Make the pattern shorter.">&minus;</button>
           <span class="pv" id="patLen">16 bars</span>
-          <button title="Longer.">+</button></div></div>
+          <button title="Make the pattern longer.">+</button></div></div>
       <div class="pfield"><label>Scale</label>
         <select title="Scale. Notes snap to this."><option>Chromatic</option><option>Minor</option>
           <option>Dorian</option><option>Phrygian</option><option>Pentatonic</option></select></div>
-      <button class="addpat" title="Add a new pattern.">+</button>
+      <button class="addpat" title="Add a new pattern." aria-label="Add a new pattern">+</button>
     </div>
   </aside>
 
   <section class="panel" aria-label="Piano roll">
     <div class="rolltools">
-      <span class="gridstatus" title="The MVP Pattern grid is fixed at one sixteenth.">1/16<svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <label class="timingctl" title="Swing. One global project value in the MVP: it applies to every Pattern.">Swing
+      <span class="gridstatus" title="The grid is fixed at one sixteenth.">1/16<svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <label class="timingctl" title="Swing. Shifts the off-beat steps for groove. One value for the whole project.">Swing
         <input id="swingSlider" type="range" min="0" max="100" value="54" aria-label="Project Swing">
         <output id="swingValue">54%</output>
       </label>
@@ -1340,7 +1242,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
       <div class="rollbar"><span class="rbcorner">BASS</span><div class="rbmeasures" id="rbmeasures"></div></div>
       <div class="rollmain">
         <div class="prkeys" id="prkeys"></div>
-        <div class="prgrid" id="prgrid"><div class="playhead" id="rollPlayhead" style="left:76px"></div></div>
+        <div class="prgrid" id="prgrid"><div class="playhead" id="rollPlayhead" style="left:0"></div></div>
       </div>
       <div class="vellane">
         <!-- Spec section 16.3.1. The Parameter selector is the only control that
@@ -1355,7 +1257,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <aside class="panel playlist" aria-label="Playlist">
     <div class="phead"><h2>Playlist</h2><span class="gap"></span></div>
     <div class="plbody" id="plbody"></div>
-    <button class="addpattern">+ Add Pattern</button>
+    <button class="addpattern" title="Add a new pattern.">+ Add pattern</button>
   </aside>
 </div>
 
@@ -1377,15 +1279,9 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const clamp = (v,a,b) => Math.min(b, Math.max(a,v));
 const THIN = "\u2009";
-/* Spec section 11.4. The header carries no theme selector; theme and contrast
-   are chosen on the Settings page. The stored global preference is still applied
-   here so this composition can be captured in any of the five themes. */
-const THEME_IDS = ["rack","mono","cosmic","analog","rust"];
-function applyTheme(theme){
-  document.documentElement.dataset.theme = THEME_IDS.includes(theme) ? theme : "rack";
-}
-try{ applyTheme(localStorage.getItem("pulsebox-theme")||document.documentElement.dataset.theme); }
-catch{ applyTheme(document.documentElement.dataset.theme); }
+/* Spec section 11.4 and decision D79. The MVP ships one built-in theme, rack,
+   so this composition is captured in the rack theme only. The header carries
+   no theme selector; appearance is chosen on the Settings page. */
 /* state that paint functions reach during build */
 let playing = false, queuedCommits = [], stepPos = 0;
 
@@ -1421,9 +1317,6 @@ function pushUndo(label, undo, redo){
 btnUndo.addEventListener("click", ()=>{ const a=undoStack.pop(); if(!a) return; a.undo(); redoStack.push(a); refreshUndo(); });
 btnRedo.addEventListener("click", ()=>{ const a=redoStack.pop(); if(!a) return; a.redo(); undoStack.push(a); refreshUndo(); });
 refreshUndo();
-/* The reference composition shows Undo armed and Redo empty, as if the project
-   had just been opened and one edit made; seed a matching history entry. */
-pushUndo("Open project",()=>{},()=>{});
 
 /* ================= knobs ================= */
 /* arc ring sits outside the knob skirt (r=16.5), ticks just outside the arc */
@@ -1448,14 +1341,12 @@ const kNorm=(el,v)=>el.dataset.curve==="log"
 const kFrom=(el,n)=>{n=clamp(n,0,1);const mn=+el.dataset.min,mx=+el.dataset.max;
   return el.dataset.curve==="log" ? Math.exp(Math.log(mn)+n*(Math.log(mx)-Math.log(mn))) : mn+n*(mx-mn);};
 function paintKnob(el){
-  /* The reference draws every rack knob identically — pointer straight up and
-     the value arc ending just past 1:30 — so unit knobs open on that fixture;
-     the first interaction drops it and shows the true value. */
-  const fixture = el.dataset.fixture==="1";
-  const n=fixture?0.5:kNorm(el,+el.dataset.value), arcN=fixture?0.678:n, end=-START+arcN*SWEEP;
+  /* Decision D80: a knob always paints its own data-value. Pointer angle and arc
+     length are the same reading, so both come from the normalised value. */
+  const n=kNorm(el,+el.dataset.value), end=-START+n*SWEEP;
   const f=el.querySelector(".arc-fill");
-  if(f) f.setAttribute("d", arcN<=0.002?"":arcPath(19,19,KR,-START,end));
-  const p=el.querySelector(".kptr"); if(p) p.style.transform=`rotate(${fixture?0:end}deg)`;
+  if(f) f.setAttribute("d", n<=0.002?"":arcPath(19,19,KR,-START,end));
+  const p=el.querySelector(".kptr"); if(p) p.style.transform=`rotate(${end}deg)`;
   const kv=el.querySelector(".kvalue");
   if(kv && !kv.querySelector("input")) kv.textContent=fmt(+el.dataset.value, el.dataset.unit);
   el.setAttribute("aria-valuenow",(+el.dataset.value).toFixed(2));
@@ -1473,13 +1364,12 @@ function buildKnob(el){
       <div class="kbody"><span class="kptr"></span></div></div>
     <span class="klabel">${el.dataset.param}</span>`;
   el.tabIndex=0; el.setAttribute("role","slider"); el.setAttribute("aria-label",el.dataset.param);
+  el.title=(el.title?el.title+" ":"")+"Drag up or down. Double-click resets. Hold Shift for fine control.";
   el.setAttribute("aria-valuemin",el.dataset.min); el.setAttribute("aria-valuemax",el.dataset.max);
-  if(el.closest(".unit")) el.dataset.fixture="1";
   paintKnob(el);
   let sy=0,sv=0,moved=false;
   el.addEventListener("pointerdown",e=>{
     if(e.target.closest(".kvalue")) return;
-    delete el.dataset.fixture;
     el.setPointerCapture(e.pointerId); sy=e.clientY; sv=kNorm(el,+el.dataset.value);
     moved=false; el.classList.add("dragging"); el.dataset.prev=el.dataset.value;
   });
@@ -1497,16 +1387,14 @@ function buildKnob(el){
   });
   el.addEventListener("dblclick",()=>{
     const p=+el.dataset.value,d=+el.dataset.default; if(p===d) return;
-    delete el.dataset.fixture;
     setKnob(el,d); pushUndo(`${el.dataset.param} reset`,()=>setKnob(el,p),()=>setKnob(el,d));
   });
   el.addEventListener("wheel",e=>{e.preventDefault();
-    delete el.dataset.fixture;
     setKnob(el,kFrom(el,kNorm(el,+el.dataset.value)+(e.deltaY<0?1:-1)*(e.shiftKey?.02:.05)));},{passive:false});
   el.addEventListener("keydown",e=>{
     const st=(+el.dataset.max-+el.dataset.min)/(e.shiftKey?200:40);
-    if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();delete el.dataset.fixture;setKnob(el,+el.dataset.value+st);}
-    if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();delete el.dataset.fixture;setKnob(el,+el.dataset.value-st);}
+    if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();setKnob(el,+el.dataset.value+st);}
+    if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();setKnob(el,+el.dataset.value-st);}
   });
   const kv=el.querySelector(".kvalue");
   kv.addEventListener("click",()=>{
@@ -1586,8 +1474,8 @@ MODS.forEach(m=>{
 });
 const ACCENTS={};
 MODS.forEach(m=>{ ACCENTS[m.id]=m.voices.map(()=>Array.from({length:16},()=>seedRand()>0.85)); });
-/* The reference readouts show a fixed lamp pattern per unit; the displayed
-   voice (index 0) is pinned to it so the stopped composition is reproducible. */
+/* Voice 0 of each module is pinned to a fixed pattern so the stopped
+   composition's Piano Roll drum grid is reproducible. */
 const REF_VOICE0={
   bass:[1,0,1,0,0,1,1,1,1,0,0,0,0,0,0,0],
   six: [1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
@@ -1661,8 +1549,6 @@ function unitHTML(m){
           return `${i},${(i%2?28-a:28+a).toFixed(1)}`;
         }).join(" ")}"/></svg>
     </div>` : "";
-  const activity=Array.from({length:16},(_,i)=>
-    `<i class="${PATTERNS[m.id][0][i]?"a":""}${i===0&&m.id==="bass"?" playhead":""}" data-step="${i}"></i>`).join("");
   return `
   <div class="rail"><span class="screw t"></span><span class="handle"></span><span class="screw b"></span></div>
   <div class="ubody">
@@ -1687,7 +1573,6 @@ function unitHTML(m){
       <span class="gap" style="flex:1"></span>
       <span class="slbl pattern-name">Verse</span>
     </div>
-    <div class="uactivity" role="img" aria-label="${m.name} pattern activity">${activity}</div>
     <div class="uactlbl">
       <span class="pos">01.1</span>
     </div>
@@ -1775,19 +1660,15 @@ addEventListener("pointerdown",e=>{if(!moduleMenu.hidden&&!e.target.closest("#mo
 addEventListener("keydown",e=>{if(e.key==="Escape"&&!moduleMenu.hidden){e.preventDefault();closeModuleMenu();}});
 addEventListener("resize",()=>closeModuleMenu(false));
 
-/* Voice cycling, activity display and audition.
+/* Voice cycling and audition.
    The faceplate never edits pattern data: there is no step toggle here and no
    undo entry, because the Piano Roll is the only pattern editing surface. */
 $$(".useq").forEach(seq=>{
   const mid=seq.dataset.mod, m=MODS.find(x=>x.id===mid);
   let vi=0;
   const nameEl=seq.querySelector(".vname");
-  const cells=[...seq.querySelectorAll(".uactivity i")];
-  const activityEl=seq.querySelector(".uactivity");
   const repaint=()=>{
     nameEl.textContent=m.voices[vi];
-    activityEl.setAttribute("aria-label",`${m.name} ${m.voices[vi]} pattern activity`);
-    cells.forEach((c,i)=>c.classList.toggle("a",!!PATTERNS[mid][vi][i]));
   };
   seq.querySelector(".vprev").addEventListener("click",()=>{vi=(vi-1+m.voices.length)%m.voices.length;repaint();});
   seq.querySelector(".vnext").addEventListener("click",()=>{vi=(vi+1)%m.voices.length;repaint();});
@@ -1861,7 +1742,7 @@ CH.forEach((c,i)=>{
         ${c.mod?"":"disabled"}>${SEND_IDS[sendIndex]}</button>`).join("")}</div>
     <div class="fwrap"><div class="fader" role="slider" tabindex="0"
         aria-label="${c.name} level" aria-orientation="vertical"
-        aria-valuemin="-60" aria-valuemax="6" title="${c.name} level."><div class="ffill"></div><div class="fcap"></div></div>
+        aria-valuemin="-60" aria-valuemax="6" title="${c.name} level. Drag or use arrow keys. Shift is fine, Page keys are coarse. Home and End jump to the ends."><div class="ffill"></div><div class="fcap"></div></div>
       <canvas class="mmeter" data-chm="${i}" width="16" height="240"
         role="img" aria-label="${c.name} output level"></canvas></div>
     <div class="msbtns"><button class="msbtn solo" type="button" aria-pressed="false"
@@ -1920,7 +1801,7 @@ CH.forEach((c,i)=>{
     <div class="fwrap"><div class="fader" role="slider" tabindex="0"
         aria-label="Master level" aria-orientation="vertical"
         aria-valuemin="-60" aria-valuemax="6" aria-valuenow="-6.0" aria-valuetext="-6.0 dB"
-        title="Master level."><div class="ffill" style="height:78.6%"></div><div class="fcap" style="bottom:calc(78.6% - 14px)"></div></div>
+        title="Master level. Drag or use arrow keys. Shift is fine, Page keys are coarse. Home and End jump to the ends."><div class="ffill" style="height:78.6%"></div><div class="fcap" style="bottom:calc(78.6% - 14px)"></div></div>
       <canvas class="mmeter" data-chm="master" width="16" height="240"
         role="img" aria-label="Master output level"></canvas></div>
     <div class="msbtns"><button class="msbtn master-fx-bypass" aria-pressed="false"
@@ -1989,10 +1870,10 @@ mixstrips.querySelectorAll(".mstrip.empty .knob").forEach(control=>{
 
 /* ================= effects pane ================= */
 const FX=[
-  {slot:"A",name:"analog echo",k:"var(--mod-bass)",knobs:[["Time","ms",30,1500,380,380,"log"],["Feedback","pct",0,95,42,35],["Filter","hz",200,12000,5200,5200,"log"],["Mix","pct",0,100,26,20]]},
-  {slot:"B",name:"plate reverb",k:"var(--mod-sev)",knobs:[["Pre-Delay","ms",0,200,24,20],["Decay","pct",0,100,58,50],["Damp","pct",0,100,44,50],["Mix","pct",0,100,20,20]]},
-  {slot:"C",name:"stereo width",k:"var(--mod-five)",knobs:[["Width","pct",0,200,124,100],["Hpf","hz",20,2000,120,120,"log"],["Lpf","hz",1000,20000,14000,14000,"log"],["Mix","pct",0,100,100,100]]},
-  {slot:"D",name:"drive",k:"var(--mod-nine)",knobs:[["Drive","pct",0,100,34,0],["Tone","pct",0,100,52,50],["Output","db",-24,12,-2,0],["Mix","pct",0,100,80,100]]},
+  {slot:"A",name:"Analog echo",k:"var(--mod-bass)",knobs:[["Time","ms",30,1500,380,380,"log"],["Feedback","pct",0,95,42,35],["Filter","hz",200,12000,5200,5200,"log"],["Mix","pct",0,100,26,20]]},
+  {slot:"B",name:"Plate reverb",k:"var(--mod-sev)",knobs:[["Pre-Delay","ms",0,200,24,20],["Decay","pct",0,100,58,50],["Damp","pct",0,100,44,50],["Mix","pct",0,100,20,20]]},
+  {slot:"C",name:"Stereo width",k:"var(--mod-five)",knobs:[["Width","pct",0,200,124,100],["Hpf","hz",20,2000,120,120,"log"],["Lpf","hz",1000,20000,14000,14000,"log"],["Mix","pct",0,100,100,100]]},
+  {slot:"D",name:"Drive",k:"var(--mod-nine)",knobs:[["Drive","pct",0,100,34,0],["Tone","pct",0,100,52,50],["Output","db",-24,12,-2,0],["Mix","pct",0,100,80,100]]},
 ];
 const fxlist=$("#fxlist");
 FX.forEach(fx=>{
@@ -2048,42 +1929,38 @@ let activeEditorModule="bass";
 const KEYS=["C5","B4","A#4","A4","G#4","G4","F#4","F4","E4","D#4","D4","C#4","C4","B3","A#3","A3","G#3","G3","F#3","F3","E3","D#3","D3","C#3","C3"];
 const prkeys=$("#prkeys"), prgrid=$("#prgrid"), vgrid=$("#vgrid"), rbm=$("#rbmeasures");
 const laneSelect=$("#laneSelect");
-const TIMELINE_INSET=76;
-const timelineLeft=pct=>`calc(${pct}% + ${(TIMELINE_INSET*(1-pct/100)).toFixed(3)}px)`;
-const timelineWidth=pct=>`calc(${pct}% - ${(TIMELINE_INSET*pct/100).toFixed(3)}px)`;
-/* The reference gutter is a decorative side-view piano measured from the
-   image: ten naturals with deliberately uneven rows and a black key riding
-   every boundary, labels on the narrow dark strip. Spans are percentages of
-   the grid height; it is not locked to the 25 grid rows. */
-const PIANO_KEYS=[/* label, top%, height% — tiles the full grid height */
-  ["C5",0,7.91],["B4",7.91,8.16],["A4",16.07,11.23],["G4",27.30,8.16],
-  ["F4",35.46,8.67],["E4",44.13,11.74],["D4",55.87,8.67],["C4",64.54,11.74],
-  ["B3",76.28,8.41],["A3",84.69,9.19],["",93.88,6.12]];
-const PIANO_BLACKS=[/* top%, height% */
-  [5.61,4.59],[13.78,4.59],[25.0,4.59],[33.16,4.59],[41.84,4.59],
-  [53.57,4.59],[62.24,5.10],[73.98,5.10],[82.65,4.59],[93.88,6.12]];
-const PIANO_SEAMS=[21.17,49.23,58.93,69.64,90.56]; /* 1px dark seams, top% */
-const PIANO_LABEL_Y=[3.06,11.73,21.94,31.12,39.80,50.0,60.20,70.41,81.12,90.82];
+/* The timeline starts at the grid's left edge. An earlier composition reserved
+   a 76px column here for per-row controls; the MVP has none, so the grid uses
+   its full width and bar 1 begins against the keybed. These helpers stay as the
+   single place that maps a percentage position onto the timeline. */
+const TIMELINE_INSET=0;
+const timelineLeft=pct=>`${pct}%`;
+const timelineWidth=pct=>`${pct}%`;
+/* The gutter is a real keybed: every key is generated from the KEYS row model,
+   so a key occupies exactly the vertical span of the grid row it labels. An
+   earlier version tiled hand-measured percentages that did not correspond to
+   the 25 rows, which drew a picture of a keyboard rather than a keybed and
+   pointed a user at the wrong pitch. Note geometry still comes from the grid
+   model; this table is now derived from the same source. */
 function buildPiano(){
-  PIANO_KEYS.forEach(([key,top,height])=>{
+  const rowHeight=100/KEYS.length;
+  KEYS.forEach((key,i)=>{
+    const sharp=key.includes("#");
     const d=document.createElement("div");
-    d.className="pkw"+(key?"":" dim");d.style.top=top+"%";d.style.height=height+"%";
+    d.className=sharp?"pkb":"pkw";
+    d.style.top=(i*rowHeight)+"%";
+    d.style.height=rowHeight+"%";
     prkeys.appendChild(d);
-  });
-  PIANO_BLACKS.forEach(([top,height])=>{
-    const b=document.createElement("div");
-    b.className="pkb";b.style.top=top+"%";b.style.height=height+"%";
-    prkeys.appendChild(b);
-  });
-  PIANO_SEAMS.forEach(top=>{
-    const s=document.createElement("div");
-    s.className="pks";s.style.top=top+"%";
-    prkeys.appendChild(s);
-  });
-  PIANO_LABEL_Y.forEach((top,i)=>{
-    const s=document.createElement("span");
-    s.className="pkl";s.textContent=PIANO_KEYS[i][0];s.style.top=top+"%";
-    prkeys.appendChild(s);
+    /* Only C and F are labelled. At 25 rows in this panel height a label on
+       every natural collides with its neighbours; C and F anchor the two
+       black-key groups, which is how a keyboard is read by eye anyway. */
+    if(!sharp&&/^[CF]/.test(key)){
+      const s=document.createElement("span");
+      s.className="pkl";s.textContent=key;
+      s.style.top=(i*rowHeight)+"%";
+      s.style.height=rowHeight+"%";
+      prkeys.appendChild(s);
+    }
   });
 }
 buildPiano();
@@ -2101,36 +1978,29 @@ for(let step=1;step<64;step++){
   l.className=step%16===0?"gbar":step%4===0?"gbeat":"gstep";
   l.style.left=timelineLeft(step/64*100); prgrid.appendChild(l);
 }
-/* Explicit stopped-state fixture measured from the approved 1568 × 1003
-   composition. It makes visual comparisons reproducible while note editing
-   still uses the same percentage and pitch model. */
-const REFERENCE_NOTES=[
-  [754,733,38,9],[377,751,19,9],[588,758,18,9],[721,758,16,9],[1045,758,27,9],
-  [810,762,19,9],[904,775,18,8],[987,775,17,9],[350,777,34,9],[721,777,16,9],
-  [1055,777,17,9],[1210,777,39,9],[576,786,10,9],[1099,788,16,9],[617,797,17,9],
-  [679,797,18,10],[904,797,38,10],[570,805,16,9],[856,815,11,9],[987,815,16,9],
-  [542,821,27,9],[842,821,13,9],[1055,821,17,9],[1250,821,11,9],[523,830,22,9],
-  [410,832,38,8],[942,836,17,9],[1200,838,16,9],[1005,842,17,9],[1239,843,21,9],
-  [710,845,15,9],
+/* Original Acid Bass "Verse" line for the section 9.1 default project, written
+   in the grid's own terms: step index on the 1/16 grid, pitch name from KEYS,
+   and length in steps. It is a C minor pentatonic riff — repeated roots, an
+   octave answer, and a short run at the end of each two-bar phrase — so the
+   Piano Roll shows a plausible bassline rather than staged pixels. Velocities
+   accent the downbeats. Everything below derives from this table, so the view
+   is deterministic and note editing keeps the same model. */
+const BASSLINE=[/* step, pitch, length in steps, velocity 0-127 */
+  [0,"C3",2,112],[2,"C3",1,74],[3,"D#3",1,88],[4,"C3",2,104],[7,"G3",1,92],
+  [8,"C3",1,110],[9,"C3",1,70],[10,"A#3",2,96],[12,"C4",1,100],[14,"G3",2,86],
+  [16,"C3",2,118],[18,"C3",1,72],[20,"D#3",2,102],[23,"F3",1,90],
+  [24,"C3",2,108],[26,"D#3",1,80],[28,"G3",1,98],[29,"F3",1,76],[30,"D#3",2,88],
+  [32,"C3",2,114],[34,"C3",1,74],[36,"C4",2,106],[39,"A#3",1,92],
+  [40,"G3",2,96],[43,"F3",1,84],[44,"D#3",1,90],[46,"C3",2,100],
+  [48,"C3",2,116],[51,"D#3",1,86],[52,"F3",2,104],
+  [55,"G3",1,94],[56,"A#3",2,98],[60,"G3",4,90],
 ];
-const REFERENCE_VELOCITIES=[
-  [594,27,4],[946,27,4],[360,26,4],[737,26,3],[904,26,4],[539,25,4],[576,24,3],
-  [721,24,3],[844,24,4],[1044,24,4],[346,23,4],[411,23,3],[642,23,4],[685,23,4],
-  [809,23,4],[986,23,4],[1058,23,4],[1204,23,4],[1245,23,3],[376,22,4],
-  [754,22,4],[1095,22,4],[526,21,4],[860,21,4],[1002,21,4],[610,19,4],
-  [1257,18,3],[428,17,4],[1218,15,4],
-];
-const REFERENCE_X=347,REFERENCE_WIDTH=918,REFERENCE_Y=702,REFERENCE_HEIGHT=199;
-const NOTES=REFERENCE_NOTES.map(([x,y,w,h],index)=>{
-  const [vx,vheight,vwidth]=REFERENCE_VELOCITIES[index%REFERENCE_VELOCITIES.length];
-  return {
-    x:(x-REFERENCE_X)/REFERENCE_WIDTH*100,w:w/REFERENCE_WIDTH*100,
-    row:clamp(Math.round((y-REFERENCE_Y)/(REFERENCE_HEIGHT/KEYS.length)),0,KEYS.length-1),
-    visualTop:(y-REFERENCE_Y)/REFERENCE_HEIGHT*100,visualHeight:h,
-    velocityX:(vx-REFERENCE_X)/REFERENCE_WIDTH*100,velocityHeight:vheight,velocityWidth:vwidth,
-    vel:Math.round(vheight/30*100),slide:false,
-  };
-});
+const STEP_PCT=100/64;
+const NOTES=BASSLINE.map(([step,pitch,length,velocity])=>({
+  x:step*STEP_PCT,w:length*STEP_PCT,
+  row:clamp(KEYS.indexOf(pitch),0,KEYS.length-1),
+  vel:velocity,slide:false,
+}));
 function attachNote(n){
   if(n.el?.isConnected) return;
   if(n.el){n.paint();prgrid.appendChild(n.el);vgrid.appendChild(n.velEl);return;}
@@ -2142,7 +2012,7 @@ function attachNote(n){
     d.style.top=Number.isFinite(n.visualTop)?`${n.visualTop}%`:`calc(${n.row*rowH}% + 1px)`;
     d.style.height=Number.isFinite(n.visualHeight)?`${n.visualHeight}px`:`calc(${rowH}% - 2px)`;
     d.setAttribute("aria-label",`${KEYS[n.row]}, position ${Math.round(n.x/(100/64))+1}, duration ${Math.max(1,Math.round(n.w/(100/64)))} steps`);
-    d.title="Drag to move; drag the right edge to resize; right-click to delete.";
+    d.title="Drag to move. Drag the right edge to resize. Hold Alt to ignore the grid. Press Delete or right-click to remove.";
     v.style.left=timelineLeft(Number.isFinite(n.velocityX)?n.velocityX:n.x);
     v.style.height=Number.isFinite(n.velocityHeight)?`${n.velocityHeight}px`:(n.vel*0.8)+"%";
     v.style.width=Number.isFinite(n.velocityWidth)?`${n.velocityWidth}px`:"";
@@ -2195,11 +2065,15 @@ NOTES.forEach(attachNote);
 
 /* Spec section 16.3.1. The Parameter selector is module-scoped and offers two
    groups: the note properties the module's event capability supports, then its
-   declared automatable parameters. A bullet marks entries that already hold data
-   in the active Pattern, so existing automation is findable without opening each
-   entry in turn. The mock marks a fixed sample set; the product reads real lanes. */
-const LANES_WITH_DATA={bass:["Velocity","Cutoff"],six:["Velocity"],boom:["Velocity"],
-  nine:["Velocity"],sev:["Velocity"],perc:["Velocity"],poly:["Velocity"],keys:["Velocity"]};
+   declared automatable parameters. Section 16.3.1 also requires the selector to
+   mark which parameters already hold data in the active Pattern, so existing
+   automation is findable without opening each entry in turn.
+   The marker is the word "has data", not a bare glyph. A native select option
+   renders text only: it cannot carry an icon, a tooltip, or an accessible name
+   of its own, so a lone bullet would reach a screen reader as an unexplained
+   character and would carry its meaning visually alone. Spec section 11.3 and
+   the AGENTS.md accessibility rule both forbid that. */
+const LANE_DATA_SUFFIX=" — has data";
 
 function noteProperties(m){
   return m.kind==="bass"
@@ -2207,9 +2081,23 @@ function noteProperties(m){
     : ["Velocity","Accent","Probability","Micro-timing"];
 }
 
+/* Which lanes hold data is derived from the Pattern this file actually shows,
+   never asserted from a table. Velocity is real: every note carries one, and the
+   velocity lane below the grid displays them. Nothing else in this composition
+   holds automation yet, so nothing else is marked. Per decision D80 the target
+   may not claim data it does not show. */
+function lanesWithData(m){
+  const lanes=new Set();
+  const hasNotes=m.id===activeEditorModule
+    ? NOTES.length>0||Object.values(PATTERNS[m.id]).some(row=>row.some(Boolean))
+    : Object.values(PATTERNS[m.id]).some(row=>row.some(Boolean));
+  if(hasNotes) lanes.add("Velocity");
+  return lanes;
+}
+
 function renderLaneSelect(m){
-  const withData=new Set(LANES_WITH_DATA[m.id]||[]);
-  const mark=name=>withData.has(name)?`${name} •`:name;
+  const withData=lanesWithData(m);
+  const mark=name=>withData.has(name)?name+LANE_DATA_SUFFIX:name;
   const group=(label,names)=>{
     const g=document.createElement("optgroup");g.label=label;
     names.forEach(name=>{
@@ -2267,8 +2155,8 @@ function addDrumTrigger(mid,row,step){
   if(!m||!PATTERNS[mid][row][step])return;
   const trigger=document.createElement("button");
   trigger.className="trigger";trigger.type="button";
-  trigger.style.left=`calc(${timelineLeft(step*6.25).slice(5,-1)} + 1px)`;
-  trigger.style.width=`calc(${timelineWidth(6.25).slice(5,-1)} - 2px)`;
+  trigger.style.left=`calc(${timelineLeft(step*6.25)} + 1px)`;
+  trigger.style.width=`calc(${timelineWidth(6.25)} - 2px)`;
   trigger.style.top=`calc(${row*(100/m.voices.length)}% + 1px)`;
   trigger.style.height=`calc(${100/m.voices.length}% - 2px)`;
   trigger.setAttribute("aria-label",`${m.voices[row]}, step ${step+1}`);
@@ -2485,15 +2373,10 @@ function paintMeter(cv,lv,vertical=true){
   ctx.shadowBlur=0;
 }
 const chMeters=$$("[data-chm]"), masterMeterA=$("#masterMeterA"), masterMeterB=$("#masterMeterB"), masterDb=$("#masterDb");
-/* Static-picture fixture only, per decision D74. These idle levels came from an
-   early raster study that has since been withdrawn (D77); they survive here so
-   this composition shows a plausible mix at rest. The product must not do this:
-   spec section 21.7 forbids fake meters while stopped, and the header meter
-   below already reports true silence. Do not carry this floor into product
-   code. */
-const IDLE_LV=CH.map((c,i)=>c.mod?[.68,.44,.46,.37,.44,0][i]??0:0);
-const IDLE_MASTER=.69;
-const lv={ch:[...IDLE_LV],master:IDLE_MASTER,masterL:IDLE_MASTER-.02,masterR:IDLE_MASTER+.02};
+/* Spec section 21.7 and decision D80: every meter reads silence while the
+   transport is stopped. The default project is stopped, so the composition opens
+   with dark ladders, and levels only rise while playback is running. */
+const lv={ch:CH.map(()=>0),master:0,masterL:0,masterR:0};
 let lastStep=-1;
 function tick(now){
   if(playing){
@@ -2509,10 +2392,6 @@ function tick(now){
       lv.masterL=0.52+seedRand()*0.38;
       lv.masterR=0.48+seedRand()*0.4;
       lv.master=Math.max(lv.masterL,lv.masterR);
-      /* playhead on the output-only activity indicator */
-      $$(".useq .uactivity").forEach(s=>{
-        [...s.children].forEach((b,i)=>b.classList.toggle("playhead",i===stepPos));
-      });
       const bar=Math.floor(step/16)+1, beat=Math.floor(stepPos/4)+1;
       $$(".useq .uactlbl .pos").forEach(p=>{
         p.textContent=`${String(bar).padStart(2,"0")}.${beat}`;
@@ -2522,11 +2401,11 @@ function tick(now){
     updateClock();
     lv.ch=lv.ch.map(v=>v*0.965); lv.master*=0.97;lv.masterL*=0.97;lv.masterR*=0.97;
   } else {
-    /* settle back onto the idle floor rather than to black */
-    lv.ch=lv.ch.map((v,i)=>Math.max(v*0.93,IDLE_LV[i]));
-    lv.master=Math.max(lv.master*0.93,IDLE_MASTER);
-    lv.masterL=Math.max(lv.masterL*0.93,IDLE_MASTER-.02);
-    lv.masterR=Math.max(lv.masterR*0.93,IDLE_MASTER+.02);
+    /* stopped: decay all the way to silence, never onto a lit floor */
+    lv.ch=lv.ch.map(v=>v<0.001?0:v*0.93);
+    lv.master=lv.master<0.001?0:lv.master*0.93;
+    lv.masterL=lv.masterL<0.001?0:lv.masterL*0.93;
+    lv.masterR=lv.masterR<0.001?0:lv.masterR*0.93;
   }
   chMeters.forEach((cv,i)=>paintMeter(cv, cv.dataset.chm==="master"?lv.master:lv.ch[i]));
   const meterA=playing?(meterModeMS?(lv.masterL+lv.masterR)/2:lv.masterL):0;

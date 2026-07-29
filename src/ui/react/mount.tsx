@@ -2,7 +2,12 @@ import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import type { ModuleInstanceId } from "../../contracts";
-import { APPEARANCE_STORAGE_KEY, elementThemeHost, PulseThemeService } from "../../themes";
+import {
+  APPEARANCE_STORAGE_KEY,
+  createPulseThemeService,
+  elementThemeHost,
+  type PulseThemeService,
+} from "../../themes";
 import { PulseApp } from "./PulseApp";
 import { connectDomainStore, createAppStore, type AppStoreDependencies } from "./store/app-store";
 import { AppStoreProvider } from "./store/app-store-context";
@@ -30,7 +35,7 @@ export interface MountOptions extends AppStoreDependencies {
 export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
   const { host, ...dependencies } = options;
 
-  const themeService = new PulseThemeService({
+  const themeService = createPulseThemeService({
     host: elementThemeHost(document.documentElement),
     storage: {
       getItem: (key) => window.localStorage.getItem(key),

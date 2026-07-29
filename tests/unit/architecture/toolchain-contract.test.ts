@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { version as nativeTypeScriptVersion } from "@typescript/native";
 
 import playwrightConfig from "../../../playwright.config";
 import viteConfig from "../../../vite.config";
@@ -29,6 +30,7 @@ const REQUIRED_FILES = [
 ] as const;
 const REQUIRED_SCRIPTS = [
   "build",
+  "dead-code",
   "dev",
   "lint",
   "start",
@@ -70,7 +72,8 @@ describe("product toolchain contract", () => {
     expect(scripts.start).toMatch(/^node\s+/);
     expect(scripts.test).toMatch(/\bvitest\b/);
     expect(scripts["test:e2e"]).toMatch(/\bplaywright\s+test\b/);
-    expect(scripts.typecheck).toMatch(/\btsc\b/);
+    expect(scripts.typecheck).toBe("node ./node_modules/@typescript/native/bin/tsc --noEmit");
+    expect(nativeTypeScriptVersion).toBe("7.0.2");
   });
 
   it("points npm start at an existing repository-owned launcher", () => {

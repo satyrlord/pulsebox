@@ -64,114 +64,27 @@ export interface ThemeServiceOptions {
   readonly storage: AppearanceStoragePort;
 }
 
-export class PulseThemeService {
-  readonly #host: ThemeHostPort;
-  readonly #listeners = new Set<AppearanceChangeListener>();
-  readonly #onCorruptPreference: (() => void) | undefined;
-  readonly #onStorageFailure: ((message: string) => void) | undefined;
-  readonly #storage: AppearanceStoragePort;
-  #appearance: PulseAppearance = DEFAULT_APPEARANCE;
-  #reportedCorruptPreference = false;
+export interface PulseThemeService {
+  readonly appearance: PulseAppearance;
+  readonly applyCrossTabValue: (raw: string | null) => boolean;
+  readonly deleteUserTheme: () => boolean;
+  readonly installUserTheme: (userTheme: CanonicalUserTheme) => boolean;
+  readonly setAppearance: (next: PulseAppearance) => boolean;
+  readonly setHighContrast: (highContrast: boolean) => boolean;
+  readonly setTheme: (theme: PulseAppearance["theme"]) => boolean;
+  readonly start: () => void;
+  readonly subscribe: (listener: AppearanceChangeListener) => () => void;
+}
 
-  constructor(options: ThemeServiceOptions) {
-    this.#host = options.host;
-    this.#onCorruptPreference = options.onCorruptPreference;
-    this.#onStorageFailure = options.onStorageFailure;
-    this.#storage = options.storage;
-  }
+export function createPulseThemeService(options: ThemeServiceOptions): PulseThemeService {
+  const listeners = new Set<AppearanceChangeListener>();
+  let appearance: PulseAppearance = DEFAULT_APPEARANCE;
+  let reportedCorruptPreference = false;
 
-  get appearance(): PulseAppearance {
-    return this.#appearance;
-  }
-
-  /**
-   * Reads the stored preference and paints the host. Missing or invalid data
-   * resolves to `rack` with high contrast off and no user theme, and is
-   * reported once per session without replacing the stored value.
-   */
-  start(): void {
-    let stored: string | null;
-    try {
-      stored = this.#storage.getItem(APPEARANCE_STORAGE_KEY);
-    } catch {
-      stored = null;
-    }
-    const parsed = parseAppearanceEnvelope(stored);
-    if (parsed === undefined && stored !== null) this.#reportCorruptPreference();
-    this.#appearance = parsed ?? DEFAULT_APPEARANCE;
-    this.#paint();
-  }
-
-  subscribe(listener: AppearanceChangeListener): () => void {
-    this.#listeners.add(listener);
-    return () => this.#listeners.delete(listener);
-  }
-
-  /**
-   * Commits a complete envelope, then updates the host. Appearance changes only
-   * after `setItem` succeeds, so a storage failure leaves the current
-   * appearance, stored preference, and focus unchanged.
-   */
-  setAppearance(next: PulseAppearance): boolean {
-    try {
-      this.#storage.setItem(APPEARANCE_STORAGE_KEY, serializeAppearance(next));
-    } catch {
-      this.#onStorageFailure?.(
-        "The appearance preference was not changed because it could not be saved. Try again.",
-      );
-      return false;
-    }
-    this.#appearance = next;
-    this.#paint();
-    for (const listener of this.#listeners) listener(next);
-    return true;
-  }
-
-  setTheme(theme: PulseAppearance["theme"]): boolean {
-    if (theme === "user" && this.#appearance.userTheme === null) return false;
-    return this.setAppearance({ ...this.#appearance, theme });
-  }
-
-  setHighContrast(highContrast: boolean): boolean {
-    return this.setAppearance({ ...this.#appearance, highContrast });
-  }
-
-  installUserTheme(userTheme: CanonicalUserTheme): boolean {
-    return this.setAppearance({ ...this.#appearance, theme: "user", userTheme });
-  }
-
-  /**
-   * Deleting the installed user theme while it is active commits `rack` with a
-   * null user theme in one envelope, then applies `rack`.
-   */
-  deleteUserTheme(): boolean {
-    return this.setAppearance({
-      highContrast: this.#appearance.highContrast,
-      theme: "rack",
-      userTheme: null,
-    });
-  }
-
-  /**
-   * Applies a valid appearance envelope written by another tab as a UI-only
-   * update. Invalid cross-tab data is ignored without changing appearance.
-   */
-  applyCrossTabValue(raw: string | null): boolean {
-    const parsed = parseAppearanceEnvelope(raw);
-    if (parsed === undefined) {
-      if (raw !== null) this.#reportCorruptPreference();
-      return false;
-    }
-    this.#appearance = parsed;
-    this.#paint();
-    for (const listener of this.#listeners) listener(parsed);
-    return true;
-  }
-
-  #reportCorruptPreference(): void {
-    if (this.#reportedCorruptPreference) return;
-    this.#reportedCorruptPreference = true;
-    this.#onCorruptPreference?.();
+  function reportCorruptPreference(): void {
+    if (reportedCorruptPreference) return;
+    reportedCorruptPreference = true;
+    options.onCorruptPreference?.();
   }
 
   /**
@@ -182,15 +95,99 @@ export class PulseThemeService {
    * built-in palette inline would shadow the stylesheet and make every later
    * theme change a no-op.
    */
-  #paint(): void {
-    if (this.#appearance.theme === "user" && this.#appearance.userTheme !== null) {
+  function paint(): void {
+    if (appearance.theme === "user" && appearance.userTheme !== null) {
       // The overlay is applied here too: a stylesheet rule cannot outrank the
       // inline user palette, so high contrast has to be resolved before paint.
-      const palette = resolvePalette(this.#appearance);
-      for (const token of ALL_TOKENS) this.#host.setToken(token, palette[token]);
+      const palette = resolvePalette(appearance);
+      for (const token of ALL_TOKENS) options.host.setToken(token, palette[token]);
     } else {
-      for (const token of ALL_TOKENS) this.#host.clearToken(token);
+      for (const token of ALL_TOKENS) options.host.clearToken(token);
     }
-    this.#host.setState(this.#appearance.theme, this.#appearance.highContrast);
+    options.host.setState(appearance.theme, appearance.highContrast);
   }
+
+  /**
+   * Commits a complete envelope, then updates the host. Appearance changes only
+   * after `setItem` succeeds, so a storage failure leaves the current
+   * appearance, stored preference, and focus unchanged.
+   */
+  function setAppearance(next: PulseAppearance): boolean {
+    try {
+      options.storage.setItem(APPEARANCE_STORAGE_KEY, serializeAppearance(next));
+    } catch {
+      options.onStorageFailure?.(
+        "The appearance preference was not changed because it could not be saved. Try again.",
+      );
+      return false;
+    }
+    appearance = next;
+    paint();
+    for (const listener of listeners) listener(next);
+    return true;
+  }
+
+  return {
+    get appearance() {
+      return appearance;
+    },
+    /**
+     * Reads the stored preference and paints the host. Missing or invalid data
+     * resolves to `rack` with high contrast off and no user theme, and is
+     * reported once per session without replacing the stored value.
+     */
+    start() {
+      let stored: string | null;
+      try {
+        stored = options.storage.getItem(APPEARANCE_STORAGE_KEY);
+      } catch {
+        stored = null;
+      }
+      const parsed = parseAppearanceEnvelope(stored);
+      if (parsed === undefined && stored !== null) reportCorruptPreference();
+      appearance = parsed ?? DEFAULT_APPEARANCE;
+      paint();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    setAppearance,
+    setTheme(theme) {
+      if (theme === "user" && appearance.userTheme === null) return false;
+      return setAppearance({ ...appearance, theme });
+    },
+    setHighContrast(highContrast) {
+      return setAppearance({ ...appearance, highContrast });
+    },
+    installUserTheme(userTheme) {
+      return setAppearance({ ...appearance, theme: "user", userTheme });
+    },
+    /**
+     * Deleting the installed user theme while it is active commits `rack` with
+     * a null user theme in one envelope, then applies `rack`.
+     */
+    deleteUserTheme() {
+      return setAppearance({
+        highContrast: appearance.highContrast,
+        theme: "rack",
+        userTheme: null,
+      });
+    },
+    /**
+     * Applies a valid appearance envelope written by another tab as a UI-only
+     * update. Invalid cross-tab data is ignored without changing appearance.
+     */
+    applyCrossTabValue(raw) {
+      const parsed = parseAppearanceEnvelope(raw);
+      if (parsed === undefined) {
+        if (raw !== null) reportCorruptPreference();
+        return false;
+      }
+      appearance = parsed;
+      paint();
+      for (const listener of listeners) listener(parsed);
+      return true;
+    },
+  };
 }

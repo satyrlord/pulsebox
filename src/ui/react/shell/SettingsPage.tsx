@@ -1,20 +1,12 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
-import { PULSE_APPEARANCE_SELECTIONS, type PulseThemeService } from "../../../themes";
+import type { PulseThemeService } from "../../../themes";
 import { useAppStore } from "../store/app-store-context";
 import styles from "./SettingsPage.module.css";
 
 export interface SettingsPageProps {
   readonly themeService: PulseThemeService;
 }
-
-const THEME_DIRECTIONS: Readonly<Record<string, string>> = {
-  rack: "Studio hardware, graphite and steel",
-  mono: "Near-black, minimal, high contrast",
-  cosmic: "Deep blue, restrained luminous detail",
-  analog: "Warm silver and tactile metal",
-  rust: "Industrial, angular, weathered",
-};
 
 export function SettingsPage(props: SettingsPageProps) {
   const { themeService } = props;
@@ -83,24 +75,6 @@ export function SettingsPage(props: SettingsPageProps) {
       <h2 ref={headingRef} tabIndex={-1} className={styles.heading} id="appearance-heading">
         Appearance
       </h2>
-
-      <div className={styles.themes} role="radiogroup" aria-label="Theme">
-        {PULSE_APPEARANCE_SELECTIONS.filter((id) => id !== "user").map((id) => (
-          <label key={id} className={styles.theme}>
-            <input
-              type="radio"
-              name="pulse-theme"
-              value={id}
-              checked={appearance.theme === id}
-              onChange={() => {
-                themeService.setTheme(id);
-              }}
-            />
-            <span className={styles.themeName}>{id.charAt(0).toUpperCase() + id.slice(1)}</span>
-            <span className={styles.themeDirection}>{THEME_DIRECTIONS[id]}</span>
-          </label>
-        ))}
-      </div>
 
       <label className={styles.contrast}>
         <input

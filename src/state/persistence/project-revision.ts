@@ -6,7 +6,7 @@ import {
   type RevisionEpoch,
 } from "../../contracts/ids";
 
-export const MAXIMUM_PROJECT_REVISION_COUNTER = Number.MAX_SAFE_INTEGER;
+const MAXIMUM_PROJECT_REVISION_COUNTER = Number.MAX_SAFE_INTEGER;
 
 /**
  * Returns the token for the next committed head. Runtime StateRevision values

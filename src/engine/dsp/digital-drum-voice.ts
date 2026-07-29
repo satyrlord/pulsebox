@@ -138,15 +138,13 @@ export class DigitalDrumVoice {
     this.#noise = new DeterministicNoise(character.seed);
   }
 
-  get active(): boolean {
-    return this.#active;
-  }
+  readonly isActive = (): boolean => this.#active;
 
-  setParameters(parameters: DigitalVoiceParameters): void {
+  readonly setParameters = (parameters: DigitalVoiceParameters): void => {
     this.#parameters = parameters;
-  }
+  };
 
-  trigger(velocity: number, accent: boolean): void {
+  readonly trigger = (velocity: number, accent: boolean): void => {
     this.#noise.reset();
     this.#crusher.reset();
     this.#highpass.reset();
@@ -156,11 +154,11 @@ export class DigitalDrumVoice {
     this.#amplitude = 1;
     this.#active = true;
     this.#choking = false;
-  }
+  };
 
-  choke(): void {
+  readonly choke = (): void => {
     if (this.#active) this.#choking = true;
-  }
+  };
 
   silence(): void {
     this.#active = false;
@@ -203,9 +201,7 @@ export class DigitalDrumVoice {
     return cleaned * this.#amplitude * gain * clamp(this.#parameters.level, 0, 1);
   }
 
-  get pan(): number {
-    return this.#parameters.pan;
-  }
+  readonly getPan = (): number => this.#parameters.pan;
 
   /**
    * Linear interpolation between neighbouring frames. Tune resamples the table,

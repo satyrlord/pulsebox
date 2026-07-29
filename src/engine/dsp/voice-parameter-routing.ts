@@ -37,7 +37,7 @@ export type DecodedParameters<TVoiceId extends string, TVoiceFields> = Record<st
  * single words, so the last hyphen is always the separator even for a
  * multi-word voice ID such as `open-hat`.
  */
-export function applyVoiceParameter<TVoiceId extends string, TVoiceFields>(
+function applyVoiceParameter<TVoiceId extends string, TVoiceFields>(
   target: DecodedParameters<TVoiceId, TVoiceFields>,
   parameterId: string,
   value: unknown,

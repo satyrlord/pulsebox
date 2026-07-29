@@ -300,10 +300,10 @@ this table is the traceability record.
   (section 9.1). The mock's remaining unspecified numbers stay unspecified: its
   960-ticks-per-beat clock resolution is deferred to the section 12 transport
   work, which chooses and records a resolution in the same change. Separately,
-  the mock holds its channel and master meters at a lit idle floor while stopped
-  so it matches the raster reference frame; that is a static-picture fixture
-  only. Section 21.7 governs the product, where meters read silence while the
-  transport is stopped.
+  the mock held its channel and master meters at a lit idle floor while stopped
+  so it matched the raster reference frame; `D80` withdraws that allowance and
+  removes the fixture. Section 21.7 governs the product, where meters read
+  silence while the transport is stopped.
 - **D75.** The master strip carries no A–D grid, in any form. This supersedes the
   noninteractive return labels recorded in `D67`. Sends are an instrument-channel
   concept: a channel taps a portion of its signal to one of four parallel send
@@ -386,3 +386,25 @@ this table is the traceability record.
   whole MVP surface; and removing the theme system entirely, which discards
   the token architecture that user themes and post-MVP theme packs already
   rely on. `AC-039` and `AC-040` gate the reduced scope.
+- **D80.** The composition target displays only true or specification-owned
+  state. It renders the section 9.1 default project in its real stopped state,
+  and no element may show a value the product would never produce. This
+  supersedes the meter-fixture allowance in `D74`. The target owns proportion,
+  placement, density, materials, typography scale, and control sizing, so
+  structural content stays: six loaded modules, two empty slots, the five named
+  Patterns, and a populated Piano Roll are the density evidence that section 8.2
+  requires. Fabricated runtime state is different in kind and is prohibited,
+  because an implementer told that this file owns the composition cannot see
+  which pixels were staged. Four fixtures are removed: uniform rack-knob pointer
+  and arc values that misreport every parameter, lit channel meters while the
+  transport is stopped, which section 21.7 forbids in product, a seeded undo
+  entry that presents opening a project as an undoable edit against `D06`, and
+  Piano Roll notes whose coordinates were measured from the raster study that
+  `D77` withdrew, which section 9.1 separately forbids as copied note data.
+  Replacement content is generated from the file's own grid, scale, and pitch
+  model so it stays deterministic and original. Rejected alternatives: marking
+  each fixture non-normative in place with an attribute or banner, which leaves
+  the false picture on screen and relies on every reader finding the disclaimer;
+  and stripping structural content to an empty skeleton, which removes the
+  density evidence that made this file normative and would require reopening
+  section 8.2. `AC-059` and `AC-067` gate the result.

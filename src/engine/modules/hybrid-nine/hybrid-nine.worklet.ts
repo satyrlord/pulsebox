@@ -23,7 +23,7 @@ const SHAPE = {
   isVoiceId: isHybridVoiceId,
 } as const;
 
-export class HybridNineProcessor extends WorkletVoiceProcessor<PartialParameters> {
+class HybridNineProcessor extends WorkletVoiceProcessor<PartialParameters> {
   protected readonly displayName = "Hybrid Nine";
   readonly #dsp = new HybridNineDsp(sampleRate);
 
