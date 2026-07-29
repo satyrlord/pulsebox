@@ -1,28 +1,23 @@
 # Quality-gate reference
 
-## Command discovery
+## Applicability
 
-Every check in the ordered run list is required when `package.json` defines a
-script for it. Report a required check as blocked when its script is missing
-rather than substituting a hand-written command. Optional Markdown, dead-code,
-coverage, visual, audio, or audit scripts become gates only after the
-repository defines them.
+A check is required when the current contract requires it and the repository
+defines its command or procedure. Report a missing required command as blocked.
+Do not substitute a hand-written command.
 
-## Phase applicability
+Use these phase rules:
 
-- Specification stage: Markdown, links, consistency, and forbidden-name checks.
-- Contract stage: schema, type, serialization, migration, and architecture
-  contract tests.
-- Feature stages: affected unit, component, browser, visual, and audio checks.
-- Final stage: all required commands, supported browsers and layouts, five
-  themes, high contrast, naming, dependencies, persistence, export, and
-  acceptance criteria.
+- For specification work, run Markdown, link, consistency, and policy checks.
+- For contract work, run schema, type, serialization, migration, and architecture tests.
+- For feature work, run affected unit, browser, visual, export, and audio checks.
+- For final work, run all required commands and acceptance procedures.
+- For theme work, verify `rack`, high contrast, and the affected user-theme path.
 
 ## Stop conditions
 
-Stop repair work when the next action requires a product decision, expands
-scope materially, would change a quality policy, or cannot be verified with
-available evidence. Report the exact blocker.
+Stop repair work when the next action needs a product decision. Also stop when
+the action changes quality policy, expands scope materially, or lacks a verifier.
 
-Do not use an invented coverage percentage. Report measured coverage only when
-the repository defines how it is collected and interpreted.
+Report the exact blocker. Do not invent a coverage percentage or reinterpret a
+configured threshold.

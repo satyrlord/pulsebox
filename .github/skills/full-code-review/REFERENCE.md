@@ -1,15 +1,14 @@
 # Pulsebox review remedies
 
-- Move DOM access from engine or state into a Web Component or UI adapter.
-- Move audio-graph work from UI into the engine controller or plugin adapter.
-- Replace product-specific branching with a plugin manifest or registry entry.
+- Move DOM access from engine or state to the React UI layer.
+- Move audio-graph work from UI to an engine controller or plugin adapter.
+- Replace plugin-specific branches with a manifest or registry entry.
 - Replace positional durable references with stable typed IDs.
-- Route committed edits through a reversible command and coalesce gestures.
-- Keep live AudioNodes and transient meter or playhead state out of persistence.
-- Validate imported data before constructing state or decoding assets.
+- Route committed edits through reversible commands.
+- Coalesce each continuous gesture into one history entry.
+- Keep audio nodes and transient visual state out of persistence.
+- Validate imported data before state construction or asset activation.
 - Replace theme-specific logic with documented CSS tokens.
-- Isolate high-frequency visual patching from structural component rendering.
-- Add disconnect cleanup for listeners, observers, worklet ports, timers, and
-  animation frames.
-- Add deterministic rendered-audio checks when ordinary state assertions cannot
-  prove an audible contract.
+- Isolate frequent visual updates from structural React rendering.
+- Clean up listeners, observers, ports, timers, and animation frames.
+- Add deterministic rendered-audio checks for audible contracts.

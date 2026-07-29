@@ -1,28 +1,30 @@
-# Diagnose Examples
+# Diagnose examples
 
-## Example 1: AudioWorklet dropout with unclear root cause
+## AudioWorklet dropout
 
-- Prompt shape: "Playback clicks after I add the eighth rack module."
-- Good behavior: reproduce in a production browser build with deterministic
-  project state, record browser and sample rate, and instrument one engine or
-  worklet seam at a time.
-- Good result: a validated scheduling, allocation, graph, or message-protocol
-  cause with a rendered-audio regression procedure.
+Prompt: "Playback clicks after I add the eighth rack module."
 
-## Example 2: Flaky project reload failure
+Use a deterministic project in the production build. Record the browser and
+sample rate. Probe one engine or worklet seam at a time.
 
-- Prompt shape: "A saved project sometimes reopens with an empty rack."
-- Good behavior: capture the project document and IndexedDB state, then isolate
-  serialization, validation, migration, asset lookup, and UI hydration in that
-  order.
-- Good result: one proven owning seam and a deterministic save-reload regression
-  test that preserves the original failing fixture.
+The result must identify a graph, scheduling, allocation, or message cause. It
+must also include a rendered-audio regression method.
 
-## Example 3: Sample-import performance regression
+## Flaky project reload
 
-- Prompt shape: "Importing a large sample pack got slower after this refactor."
-- Good behavior: use one representative pack, record browser, asset sizes,
-  codecs, workload, and timings, then compare decode, hashing, validation, and
-  IndexedDB write paths before changing code.
-- Good result: a quantified Pulsebox regression source and a repeatable
-  benchmark, not a speculative optimization.
+Prompt: "A saved project sometimes reopens with an empty rack."
+
+Capture the project document and IndexedDB state. Test serialization,
+validation, migration, asset lookup, and UI hydration in that order.
+
+The result must identify one owning seam. Preserve the failing fixture for the
+deterministic save and reload test.
+
+## Sample-import performance
+
+Prompt: "A large sample pack imports more slowly after this refactor."
+
+Use one representative pack. Record browser, asset sizes, codecs, workload,
+and timings. Compare decode, hash, validation, and IndexedDB write stages.
+
+The result must quantify the regression source and supply a repeatable benchmark.

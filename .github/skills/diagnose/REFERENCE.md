@@ -1,70 +1,58 @@
 # Diagnose reference
 
-Skip a phase only with a stated reason.
+## Feedback-loop order
 
-## Build a feedback loop
+Use the first loop that reaches the real failure:
 
-Prefer the fastest deterministic signal that reaches the real failure:
+1. Use a unit or component test for pure state, commands, validation, migration, or React behavior.
+2. Use a worklet or `OfflineAudioContext` harness for DSP, scheduling, or export.
+3. Use Playwright against the production build for browser behavior.
+4. Use an IndexedDB round trip with a minimal `.pulsebox` fixture.
+5. Use a deterministic command, engine, worklet, or transport trace.
+6. Use a focused performance measurement with a representative project.
+7. Use the human-in-the-loop PowerShell template as a last resort.
 
-1. a unit or component test for pure state, commands, validation, migration, or
-   Custom Element behavior;
-2. a worklet or OfflineAudioContext harness for DSP, scheduling, or export;
-3. a Playwright flow against the production browser build;
-4. an IndexedDB round trip with a minimal .pulsebox fixture;
-5. a deterministic trace of typed commands, engine messages, worklet messages,
-   or transport events;
-6. a focused performance measurement with a representative project;
-7. the human-in-the-loop PowerShell template as a last resort.
+For browser and audio failures, record these fields:
 
-For browser and audio failures, record the browser, sample rate, audio-context
-state, viewport, theme, project state, and exact unlock gesture when relevant.
-Raise a flaky reproduction rate through controlled repetition, seeded state,
-and narrower timing before investigating.
+- exact browser version
+- sample rate and audio-context state
+- viewport and theme state
+- project state and input fixture
+- audio unlock gesture
+- reproduction count and result
 
-If no loop can be built, list the attempts and request the missing artifact or
-environment. Do not claim a cause.
+If no loop works, list the attempts and request the missing item. Do not claim a
+cause.
 
-## Reproduce
+## Reproduction evidence
 
-Confirm that the loop shows the user's exact symptom more than once. Capture
-the error, wrong state, rendered output, timing, geometry, or persisted data
-that distinguishes the bug.
+Confirm the exact symptom more than once when the failure is intermittent.
+Capture the error, wrong state, output, timing, geometry, or persisted data.
 
-## Rank hypotheses
+## Useful seams
 
-Write three to five falsifiable hypotheses. Each one must predict a specific
-probe result. Show the ranking to the user without blocking progress.
+Probe these Pulsebox seams when they match the symptom:
 
-Pulsebox boundaries worth probing include:
+- engine, state, and UI ownership
+- command dispatch, inverse data, and gesture coalescing
+- React lifecycle, effects, DOM ownership, and focus
+- audio unlock, worklet registration, message order, frame count, and sample rate
+- IndexedDB transactions, migration, import validation, and asset identity
+- plugin registration and stable IDs
+- theme tokens, viewport geometry, and animation state
 
-- engine, state, and UI ownership;
-- command dispatch, inverse data, and gesture coalescing;
-- Custom Element connection, disconnection, Shadow DOM, and focus;
-- audio unlock, AudioWorklet registration, message ordering, frame counts,
-  smoothing, channel layout, and sample rate;
-- IndexedDB transactions, schema migration, import validation, and asset
-  identity;
-- plugin registration and stable IDs;
-- theme tokens, supported viewport geometry, and animation state.
+## Instrumentation
 
-## Instrument
+Change one variable at a time. Prefer a debugger or a narrow assertion. Give
+temporary logs one unique prefix.
 
-Change one variable at a time. Prefer a debugger or narrow assertion. Tag
-temporary logs with one unique prefix so a final repository search proves
-their removal.
+For performance work, record the environment, representative workload, method,
+baseline, and result before you change code.
 
-For performance work, establish a representative baseline before changing
-code. Record environment, workload, method, and result.
+## Authorized repair
 
-## Fix when authorized
+Turn the minimized reproduction into a failing test at the owning seam. Apply
+the smallest fix. Then run the test and the original reproduction.
 
-Turn the minimized reproduction into a failing regression test at the correct
-seam. Watch it fail, apply the smallest root-cause fix, watch it pass, then run
-the original reproduction. If no correct test seam exists, report that
-architecture gap rather than adding a shallow test.
-
-## Clean up
-
-Remove temporary instrumentation and harness artifacts. Re-run the original
-loop and affected quality checks. State the proven cause, evidence, fix or
-proposed fix, regression coverage, and any remaining manual audio check.
+If no correct test seam exists, report the architecture gap. Do not add a test
+that cannot fail for the defect.

@@ -1,18 +1,16 @@
 # Feature decision reference
 
-Record a decision in the owning specification or domain document when it:
+Record a durable decision when it changes one of these items:
 
-- changes approved behavior or acceptance wording;
-- changes a public, plugin, message, command, project, import, or export
-  contract;
-- changes engine, state, UI, persistence, or worklet ownership;
-- changes the browser, audio, accessibility, responsive, theme, naming, or
-  originality boundary;
-- is costly to reverse or likely to be rediscovered.
+- approved behavior or acceptance text
+- a public, plugin, message, command, project, import, or export contract
+- engine, state, UI, persistence, or worklet ownership
+- a browser, audio, accessibility, layout, theme, naming, or originality boundary
+- a choice that is costly to reverse or likely to recur
 
-Keep local implementation detail in code and tests when it does not change a
-durable contract.
+Keep local implementation detail in code and tests. Do not add it to a product
+contract when it does not change durable behavior.
 
-For each durable decision, record the chosen behavior, why it is needed,
-rejected alternatives that materially affect later work, and the exact
-acceptance or verification consequence. Keep one owner for each fact.
+For each durable decision, record the chosen behavior and its reason. Record
+material rejected choices and the exact acceptance effect. Keep one owner for
+each fact.

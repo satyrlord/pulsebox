@@ -1,57 +1,70 @@
 ---
 name: run-quality-gate
-description: Use when the user wants the Pulsebox quality gate run, checks or CI repaired, or asks whether a change is ready to land; or when another skill needs the gate after a change.
+description: >
+  Run or repair the Pulsebox quality gate. Use for repository checks, CI failures,
+  landing readiness, or a gate requested by another skill.
 ---
 
 # Run the Pulsebox quality gate
 
-## Select a mode
+## 1. Select the branch
 
-- In verify mode, run safe applicable checks and report failures without
-  editing source, tests, or configuration.
-- In repair mode, fix only root causes within the requested scope and re-run
-  each affected check.
+1. Use verify mode when the user requests results only.
+   Finish when source, tests, and configuration will remain unchanged.
+2. Use repair mode when the user requests fixes.
+   Finish when the authorized repair scope is explicit.
 
-Never add suppressions, exclusions, disabled rules, or lower thresholds without
+Do not add suppressions, exclusions, disabled rules, or lower thresholds without
 explicit approval.
 
-## Discover the gate
+## 2. Discover the current gate
 
-1. Read repository root `AGENTS.md`, the
-   [product specification index](../../../docs/specs/spec-000-index.md), each
-   applicable owning specification and dependency, and the current
-   implementation status in
-   [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md).
-2. Read `package.json` and the current test and tool configuration.
-3. Use the scripts in `package.json` as the only command source. Never run a
-   command you did not read there this session.
-4. Treat Prettier and `format:check` as optional formatting tools, not quality
-   gate checks. Run them only when the user separately requests formatting.
-5. Mark a planned but absent check as not available. Do not invent its command,
-   coverage threshold, or pass result.
+1. Read `AGENTS.md`, the specification index, each applicable owner, and each dependency.
+   Finish when the required phase and acceptance checks are known.
+2. Read `package.json` and each active tool configuration.
+   Finish when every configured command and project is known.
+3. Use `package.json` as the only source for repository commands.
+   Finish when no planned command was invented or copied from an old run.
+4. Mark each required check as configured, blocked, or not available.
+   Finish when every requirement has one current status.
 
-## Run applicable checks
+Do not treat Prettier or `format:check` as gate checks. Run formatting only when
+the user requests it separately.
 
-Use this order when each check exists:
+Read [REFERENCE.md](REFERENCE.md) for applicability and stop conditions.
 
-1. Markdown and document links.
-2. Case-insensitive naming and originality audit.
-3. Prohibited and unused dependency audit.
+## 3. Run applicable checks
+
+Use this order when the repository defines each check:
+
+1. Markdown and documentation links.
+2. Naming, originality, and prohibited-technology checks.
+3. Dependency and dead-code checks.
 4. Lint.
 5. Typecheck.
 6. Unit and component tests.
 7. Production build.
-8. Playwright tests in supported browsers.
-9. Dead-code and coverage tools only when configured and documented.
+8. Playwright in Chrome, Edge, and Firefox.
+9. Configured coverage, visual, export, or audio checks.
 
-Continue independent safe checks after a failure in verify mode. In repair
-mode, capture the exact diagnostic, fix the smallest root cause, and re-run the
-same check before moving on.
+Run independent safe checks after a failure in verify mode.
 
-## Report
+In repair mode, capture the exact diagnostic before editing. Fix the smallest
+root cause. Re-run the same check before you continue.
 
-For every check, report the command or procedure, status, and concise evidence.
-Use pass, fail, blocked, or not available. Claim an overall pass only when every
-required and applicable check passes.
+Finish this stage when every applicable check has a current result.
 
-Read [REFERENCE.md](REFERENCE.md) for discovery and stop conditions.
+## 4. Report the gate
+
+1. Report each command or documented procedure, status, and concise evidence.
+   Finish when each check is `pass`, `fail`, `blocked`, or `not available`.
+2. Separate pre-existing failures from failures caused by the scoped change.
+   Finish when attribution has repository evidence.
+3. Claim an overall pass only when every required applicable check passes.
+   Finish when the overall status follows the individual results.
+
+## Completion criterion
+
+Complete verify mode when all safe applicable checks have a current status.
+Complete repair mode when each in-scope root cause is fixed and rechecked. State
+every unavailable gate, blocker, and unverified runtime surface.

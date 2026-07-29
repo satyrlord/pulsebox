@@ -1,55 +1,58 @@
 ---
 name: handoff
-description: Use when the user wants to hand off, wrap up, or write up a Pulsebox session or phase so a fresh agent can resume.
+description: >
+  Create a Pulsebox session or phase handoff. Use when a fresh agent must resume,
+  close, or verify the work without relying on conversation history.
 ---
 
 # Create a Pulsebox handoff
 
-## Choose the artifact
+## 1. Select the handoff location
 
-- Write the handoff to an ignored temporary path, or report it directly to the
-  user. That is the default for every handoff, session or phase.
-- Never add a handoff, session report, or evidence file to the repository tree.
-  Do not create `HANDOFF.md`, a `docs/verification/` entry, or any dated report.
-  A handoff describes a moment in time; the repository records what is required
-  and its implementation status.
-- When a handoff contains a durable requirement, decision, or verified
-  limitation, write that fact into its owning specification and leave the rest of
-  the narrative out of the repository.
-- Do not duplicate facts already owned by the specification, architecture,
-  project-format, theme, instrument, effect, commit, issue, or test report.
-  Link to them.
+1. Use the reply or an ignored temporary path for the handoff.
+   Finish when no handoff file will enter the repository tree.
+2. Put each durable fact in its owning specification or domain document.
+   Finish when the temporary narrative owns no product contract.
+3. Link to current owners instead of copying their full contents.
+   Finish when no fact has a second owner in the handoff.
 
-## Verify before writing
+Do not create `HANDOFF.md`, a verification folder, or a dated repository report.
 
-Inspect current HEAD, status, diff, relevant test results, and the last concrete
-action. Run a self-critique:
+## 2. Verify the current state
 
-1. List least-confident work with a concrete verification command or procedure.
-2. List skipped, incomplete, or deferred work.
-3. Surface previously unstated assumptions.
-4. Name the largest remaining blind spot.
+1. Inspect HEAD, status, the complete diff, and the last concrete action.
+   Finish when the handoff distinguishes current work from unrelated dirty work.
+2. Inspect the latest relevant check results.
+   Finish when each reported pass or failure has current command evidence.
+3. List the least-confident work with a verification procedure.
+   Finish when every uncertainty has one concrete check.
+4. List skipped, incomplete, and deferred work.
+   Finish when no known gap is hidden by a completion claim.
+5. State previously unstated assumptions and the largest remaining blind spot.
+   Finish when the next agent can test each material assumption.
 
-For a completion handoff, fix acceptance-blocking gaps before writing. For an
-intentional mid-task transfer, label blockers and next actions without claiming
-completion.
+Fix acceptance-blocking gaps before a completion handoff. For a mid-task
+handoff, label each blocker and next action without claiming completion.
 
-## Required sections
+## 3. Write the required sections
+
+Write these sections in this order:
 
 1. Current task.
 2. Verified state and last completed action.
-3. Decisions made and their owning documents.
+3. Decisions and owning documents.
 4. Verification commands and results.
-5. Exact next step, or `No next action` when the work is complete.
+5. Exact next step, or `No next action`.
 6. Blocking questions only.
 7. Files touched.
 8. Suggested repository skills.
 9. Self-critique and remaining blind spot.
 
-Use plain Markdown and concise bullets. Exclude conversation history, obsolete
-dead ends, copied source contents, credentials, personal data, and unsupported
-claims.
+Use concise Markdown. Exclude obsolete attempts, copied source, credentials,
+personal data, conversation history, and unsupported claims.
 
-Finish when a fresh agent can identify the current task, verified state, and
-next action using only the handoff and repository, or can tell that no action
-remains after completed work.
+## Completion criterion
+
+Complete the handoff when a fresh agent can identify the task, verified state,
+owners, blockers, and exact next action. For finished work, the agent must be
+able to verify that no action remains.

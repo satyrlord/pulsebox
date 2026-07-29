@@ -1,24 +1,22 @@
-# Grill examples
+# Decision examples
 
 ## Audio contract
 
-Prompt: "Grill me on adding fixed-block DSP."
+Prompt: "Challenge the plan to add fixed-block DSP."
 
-Start with whether the algorithm can process host-supplied frame counts. Then
-resolve bounded buffering, latency, offline parity, sample-rate coverage, and
-the rendered-audio verifier.
+First decide whether the algorithm can process host-supplied frame counts. Then
+resolve buffering, latency, offline parity, sample rates, and audio evidence.
 
 ## Project data
 
-Prompt: "Grill me on storing per-project theme choices."
+Prompt: "Challenge the plan to store theme choices in projects."
 
-First surface that the approved contract makes theme and contrast global local
-preferences. Ask whether the user intends to reopen that decision before
-discussing schema design.
+First show that the approved contract stores theme preferences outside projects.
+Ask whether the user intends to change that contract.
 
 ## UI scope
 
-Prompt: "Grill me on a compact mobile layout."
+Prompt: "Challenge the plan for a compact mobile layout."
 
-Start with the approved 1280 x 720 editing minimum and mobile exclusion. Do not
-design the layout until the user explicitly changes that product boundary.
+First show the 1280 by 720 editing minimum and mobile exclusion. Do not design
+the layout before the user changes that boundary.

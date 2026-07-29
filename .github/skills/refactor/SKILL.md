@@ -1,35 +1,54 @@
 ---
 name: refactor
-description: Use when the user wants to restructure, clean up, simplify, or reorganize Pulsebox code without changing behavior, or when another skill needs a behavior-preserving change.
+description: >
+  Refactor Pulsebox without changing behavior. Use for an authorized restructure,
+  simplification, reorganization, or behavior-preserving change from another skill.
 ---
 
 # Refactor Pulsebox
 
-Read AGENTS.md, the owning specification sections, the affected implementation,
-and its tests. Keep the change minimal and validate after each coherent step.
-Do not mix a refactor with a feature or drive-by cleanup.
+## 1. Establish the invariant
 
-A refactor is safe exactly when it moves code without crossing a **seam**.
-Protect these Pulsebox seams:
+1. Read `AGENTS.md`, each owning specification, the source, and its tests.
+   Finish when the preserved behavior and affected seams are explicit.
+2. Exclude feature work and unrelated cleanup from the scope.
+   Finish when every planned line serves the stated refactor.
+3. Select one before-and-after complexity measure.
+   Finish when imports, branches, duplicate owners, or edit surface can show improvement.
+4. Add a focused regression test before changing a critical seam.
+   Finish when the test can fail for the behavior at risk.
 
-- Engine, state, and UI ownership. Do not move DOM into engine or state, live
-  AudioNodes into state, or audio-graph edits into UI components.
-- Typed commands and undo. Preserve inverse data and gesture coalescing.
-- Plugin contracts and stable IDs. Do not replace registry-driven behavior
-  with product-specific branches or positional references.
-- Custom Element lifecycle. Preserve registration, Shadow DOM styling, typed
-  composed events, focus behavior, and cleanup on disconnect.
-- AudioWorklet processing. Preserve host-supplied frame counts, bounded memory,
-  message ordering, parameter smoothing, and offline-render parity.
-- Persistence. Preserve schema versions, migrations, import validation,
-  embedded assets, and global-versus-project preference boundaries.
-- Themes. Preserve the token contract and avoid theme-specific TypeScript or
-  markup.
+## 2. Protect the seams
 
-Add a focused regression test before a structural change that touches a seam.
-Use dead-code-audit for broad reachability cleanup and add-feature if an
-approved contract must change.
+Preserve each applicable contract:
 
-Complete only when every seam above is intact, behavior and contracts are
-unchanged, complexity is measurably lower, all affected checks pass, and every
-changed line serves the refactor.
+- engine, state, UI, persistence, and composition ownership
+- typed commands, inverse data, and gesture coalescing
+- plugin descriptors, registries, and stable IDs
+- React lifecycle, focus, style, events, and cleanup
+- worklet frame counts, memory, message order, smoothing, and offline parity
+- schema versions, migrations, import validation, assets, and preferences
+- theme tokens without theme-specific TypeScript or markup
+
+Finish this stage when every applicable seam has a direct test or inspection
+method.
+
+## 3. Refactor in coherent steps
+
+1. Make the smallest structural change.
+   Finish when the code compiles and the preserved behavior remains testable.
+2. Run the narrowest affected checks.
+   Finish when the step passes or the exact pre-existing failure is recorded.
+3. Repeat only while the next step serves the same refactor.
+   Finish when no planned step adds product behavior.
+4. Compare the selected complexity measure with its baseline.
+   Finish when the result is lower and no new owner or branch offsets the gain.
+
+Use `dead-code-audit` for broad reachability cleanup. Use `add-feature` when an
+approved product contract must change.
+
+## Completion criterion
+
+Complete the refactor when behavior and contracts are unchanged. Every affected
+check must pass. Report the before-and-after complexity measure and account for
+every changed line.

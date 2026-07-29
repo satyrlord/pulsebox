@@ -840,7 +840,6 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
   color:var(--text-secondary);font-size:var(--size-1);padding:0 var(--space-1);}
 .gridstatus{height:20px;padding:0 6px;display:flex;align-items:center;gap:3px;border-radius:var(--edge-radius-ctl);
   font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
-.gridstatus svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.8;}
 .timingctl{display:grid;grid-template-columns:auto 78px 30px;align-items:center;gap:4px;
   font-family:var(--type-display);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
 /* the visual track stays slim; the control keeps a 24px grab height */
@@ -850,8 +849,6 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
 .timingctl input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
   background:var(--accent-lamp);margin-top:-4px;box-shadow:0 0 4px var(--accent-glow),0 1px 2px rgba(0,0,0,.6);}
 .timingctl output{font-family:var(--type-num);font-size:10px;color:var(--text-secondary);text-align:right;}
-.gridstatus{height:20px;padding:0 6px;display:grid;place-items:center;border-radius:var(--edge-radius-ctl);
-  font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
 .rollctx{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.1em;
   text-transform:uppercase;color:color-mix(in srgb,var(--mod-bass) 55%,var(--text-primary));}
 .rollbody{flex:1;min-height:0;display:flex;flex-direction:column;}
@@ -1254,7 +1251,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 
   <section class="panel" aria-label="Piano roll">
     <div class="rolltools">
-      <span class="gridstatus" title="The grid is fixed at one sixteenth.">1/16<svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="gridstatus" title="The grid is fixed at one sixteenth.">1/16</span>
       <label class="timingctl" title="Swing. Shifts the off-beat steps for groove. One value for the whole project.">Swing
         <input id="swingSlider" type="range" min="0" max="100" value="54" aria-label="Project Swing">
         <output id="swingValue">54%</output>

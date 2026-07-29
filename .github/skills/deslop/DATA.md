@@ -1,18 +1,17 @@
-# Data and Configuration Slop
+# Data and configuration slop
 
-Compare each file with the schema, loader, and sibling entries before editing.
+Compare each file with its schema, loader, and sibling entries.
 
-Flag:
+Inspect these candidates:
 
-- placeholder or scaffold values left in live data,
-- keys unsupported by the consuming schema,
-- duplicate entries with no meaningful behavioral difference,
-- nesting that conflicts with the established sibling shape,
-- paths, URLs, identifiers, or package names that do not resolve,
-- environment-specific values placed outside the repository's existing
-  configuration mechanism.
+- placeholder values in live data
+- keys that the consumer does not support
+- duplicate entries with no behavior difference
+- nesting that conflicts with the sibling shape
+- paths, URLs, identifiers, or packages that do not resolve
+- environment values outside the configured mechanism
 
-Do not remove default-valued fields when their explicit presence documents an
-intentional override, stabilizes serialization, or is required by an external
-schema. Validate edited data with its parser, schema check, or narrowest
-consumer test.
+Keep explicit default fields when a schema requires them. Also keep them when
+they record an intentional override or stabilize serialization.
+
+Validate edited data with its parser, schema check, or narrowest consumer test.

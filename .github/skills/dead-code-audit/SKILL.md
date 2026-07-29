@@ -1,51 +1,65 @@
 ---
 name: dead-code-audit
-description: Use when the user asks whether Pulsebox code, assets, or dependencies are still reachable, or wants dead code found or removed; or when another skill needs reachability proven.
+description: >
+  Audit Pulsebox reachability and remove proven dead items. Use for code, assets,
+  dependencies, false positives, or reachability proof requested by another skill.
 ---
 
 # Audit dead code
 
-## Establish the current graph
+## 1. Select the branch
 
-1. Read AGENTS.md and the relevant product contracts.
-2. Read package.json and tool configuration when they exist.
-3. Identify actual application, test, worklet, worker, plugin, theme, and build
-   entry points.
-4. Run the repository dead-code, typecheck, lint, and build scripts that
-   `package.json` defines.
+1. Use audit mode when the user asks for findings only.
+   Finish when the scope is read-only and explicit.
+2. Use cleanup mode when the user requests removal.
+   Finish when the removal scope and verification authority are explicit.
 
-Do not invent entry points or treat a planned tool as configured until current
-files and a package script prove it.
+## 2. Establish the graph
 
-## Prove each finding
+1. Read `AGENTS.md`, `package.json`, tool configuration, and relevant contracts.
+   Finish when all configured graph tools and protected paths are known.
+2. List each production, test, worklet, worker, plugin, style, asset, and build entry.
+   Finish when every configured entry point has an owner.
+3. Run each applicable repository graph check from `package.json`.
+   Finish when every available tool has a recorded result.
+4. Create a candidate inventory from tool output and repository searches.
+   Finish when every candidate has a stable path or dependency name.
 
-For every candidate, inspect:
+Do not invent entry points or planned tools. Current files and package scripts
+must prove that they exist.
 
-- static imports and dynamic imports;
-- customElements.define registrations and element names in markup;
-- plugin registry and manifest references;
-- AudioWorklet and worker URL construction;
-- typed event names, command unions, selectors, and serialization;
-- Shadow DOM styles, CSS custom properties, inline SVG, Canvas, and asset URLs;
-- migration and import paths;
-- tests, fixtures, build inputs, and public documentation.
+## 3. Prove each candidate
 
-Static analysis is evidence, not permission to delete. Project migrations can be
-live even when ordinary call sites are absent.
+Check these reachability paths for every candidate:
 
-## Act only within scope
+- static and dynamic imports
+- React composition, registries, manifests, and `data-component` hooks
+- AudioWorklet and worker URL construction
+- typed events, command unions, selectors, and serialization
+- CSS modules, custom properties, inline SVG, Canvas, and asset URLs
+- migration, import, test, fixture, build, and documentation paths
+- approved later-phase or research ownership
 
-- In audit mode, report findings and false positives without editing.
-- In cleanup mode, remove the smallest proven dead slice.
-- Preserve research/ as non-shipping research when it complies with the
-  originality boundary; absence from the production graph alone is not proof
-  that approved research is unwanted.
-- Re-run the narrowest graph, type, lint, test, and build checks after each
-  coherent deletion.
+Read [REFERENCE.md](REFERENCE.md) before deletion. Read [EXAMPLES.md](EXAMPLES.md)
+when a dynamic path can create a false positive.
 
-## Completion
+Finish this stage when each candidate is live, dead, or unresolved. Record the
+evidence that excludes the other classifications.
 
-Classify every candidate as live, false positive, removed, or unresolved.
-Provide concrete evidence for each classification and do not claim a clean audit
-when required tooling is absent. Use [REFERENCE.md](REFERENCE.md) for the
-deletion standard and [EXAMPLES.md](EXAMPLES.md) for common Pulsebox roots.
+## 4. Act within scope
+
+1. In audit mode, report each classification without editing.
+   Finish when every inventoried candidate appears in the report.
+2. In cleanup mode, remove the smallest proven dead slice.
+   Finish when no live contract or reference depends on the removed slice.
+3. Re-run the narrowest affected graph, type, lint, test, and build checks.
+   Finish when all applicable checks pass or have a reported blocker.
+
+Do not delete approved research because production code does not reach it.
+Static analysis alone does not authorize deletion.
+
+## Completion criterion
+
+Account for every candidate as live, false positive, removed, or unresolved.
+Give the proof and verifier for each item. Do not claim a clean audit when a
+required tool or dynamic path remains unavailable.

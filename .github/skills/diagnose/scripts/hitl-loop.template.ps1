@@ -1,6 +1,7 @@
 #!/usr/bin/env pwsh
-# Human-in-the-loop Pulsebox reproduction loop.
-# Copy this file to an ignored temporary path and replace the example steps.
+# Pulsebox human-in-the-loop reproduction.
+# Copy this file to an ignored temporary path.
+# Replace the example actions before you run it.
 
 function step {
   param([string]$Message)
@@ -17,8 +18,8 @@ function capture {
   Set-Variable -Name $VariableName -Value $answer -Scope 1
 }
 
-# Use the canonical Pulsebox origin from the repository command contract.
-# Replace this example with the exact action that reproduces the issue.
+# Use the canonical Pulsebox origin.
+# Replace this example with the exact reproduction action.
 step "Open the running Pulsebox browser application at http://127.0.0.1:4173."
 capture REPRODUCED "Perform the target action. Did the exact issue occur? (y/n)"
 capture DETAILS "Paste the error or describe the visible or audible result:"

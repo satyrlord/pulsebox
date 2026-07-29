@@ -1,73 +1,73 @@
 ---
 name: deslop
-description: Remove AI slop from code, prose, data, configuration, and tests while preserving behavior and true information. Use for clear, plain, controlled, or human technical writing.
+description: >
+  Remove evidence-backed slop from code, prose, data, configuration, and tests.
+  Use for full-scope cleanup or clear, plain, controlled technical writing.
 ---
 
-# Deslop
+# Remove slop
 
-Strip **slop**: content that clashes with the evidence supplied by the file,
-its siblings, or the repository's established conventions. This is a
-full-repository pass, not a diff review.
+**Slop** conflicts with file evidence, sibling patterns, or repository contracts.
+Judge the artifact. Do not infer who wrote it.
 
-Slop categories include code, prose, data/config, and tests. Treat test slop as
-low-value or misleading test code, not as a list of forbidden syntax and not as
-proof that AI wrote a test.
+## 1. Select the reference branch
 
-## Branch References
+Read each reference that matches a scoped file:
 
-Load the rule set that matches each file before judging it:
+- [CODE.md](CODE.md) for source code
+- [PROSE.md](PROSE.md) for documentation and technical prose
+- [DATA.md](DATA.md) for data and configuration
+- [TEST.md](TEST.md) for tests
 
-- Code: [CODE.md](CODE.md)
-- Prose and documentation, including Simplified Technical English:
-  [PROSE.md](PROSE.md)
-- Data and configuration: [DATA.md](DATA.md)
-- Tests: [TEST.md](TEST.md)
+Read more than one reference when a file mixes concerns. A listed smell requires
+investigation. It does not authorize an edit.
 
-Apply more than one rule set when a file mixes concerns. A listed smell is a
-prompt to compare context, not automatic permission to delete.
+## 2. Inventory the scope
 
-## Process
+1. List every tracked, non-generated file in the requested scope.
+   Finish when each file has a family and a representative sibling.
+2. List generated, vendored, binary, and excluded paths separately.
+   Finish when every excluded path has a reason.
+3. Read each scoped file and its sibling completely.
+   Finish when local style, behavior, and ownership are known.
 
-1. Inventory every tracked, non-generated file in scope and identify a
-   representative sibling for each file family.
-2. Read one file and its sibling completely, then load the applicable branch
-   reference.
-3. For a test candidate, run it unchanged and record its baseline as required
-   by `TEST.md` before judging or editing it.
-4. Mark only differences that lack a behavioral, informational, or local-style
-   reason.
-5. Remove the smallest proven slop. Preserve behavior, contracts, historical
-   constraints that remain active, and intentional voice.
-6. Run the narrowest relevant validation after each coherent edit group. For
-   test files, follow `TEST.md`: establish a baseline, run every changed test,
-   then run its owning Vitest or Playwright project. Do not finish test cleanup
-   with a new failure or an unverified changed test.
-7. Re-read every scoped file after the pass and account for it in the final
-   report.
+Use the complete repository as the default scope unless the user sets a smaller
+scope.
 
-## Boundaries
+## 3. Prove each candidate
 
-- Do not turn contextual code or data smells into universal bans. Apply the
-  repository STE contract to technical prose. `PROSE.md` owns that branch.
-- Do not delete an artifact merely because static search finds no reference;
-  use `dead-code-audit` when reachability is the question.
-- Do not rewrite user-authored prose into a uniform voice without evidence
-  from sibling documents.
-- Do not modify generated output, vendored code, lockfiles, or binary assets
-  unless the request includes them and their source-of-truth path is known.
-- Do not delete a test because it is "too simple." A trivial test that
-  verifies a real behavioral invariant is valuable. Require the evidence in
-  `TEST.md` before changing it.
-- Do not add mocks, assertions, or test cases without understanding the
-  production code they exercise. An oracle that cannot fail for the relevant
-  defect is slop.
-- Do not merge or split test files without confirming the test runner
-  discovers them the same way after the change.
+1. Compare the candidate with its contract, siblings, and consumers.
+   Finish when the difference has or lacks a valid reason.
+2. For a test, establish the unchanged baseline required by [TEST.md](TEST.md).
+   Finish when the runner and pre-edit result are recorded.
+3. Classify the candidate as valid, slop, or unresolved.
+   Finish when evidence excludes the other classifications.
 
-## Completion Criterion
+Do not use syntax, file size, test count, coverage, or tone alone as proof.
 
-The pass is complete when every scoped file is recorded as unchanged or
-edited, every edit has a sibling or repository-convention justification,
-behavioral validation passes for affected code, config, and tests, a second
-complete read yields no further evidence-backed slop, and the report names
-edited file counts plus any excluded generated or binary paths.
+## 4. Remove proven slop
+
+1. Make the smallest edit that removes the proven problem.
+   Finish when true behavior, information, constraints, and intentional voice remain.
+2. Run the narrowest applicable repository check after each coherent edit group.
+   Finish when the check passes or the exact pre-existing failure is recorded.
+3. For tests, run every changed test and its owning test project.
+   Finish when no changed test remains unverified.
+
+Use `dead-code-audit` when reachability is the question. Do not remove generated
+output, vendored code, lockfiles, or binary assets without an explicit request.
+
+## 5. Re-read and report
+
+1. Re-read every scoped file after all edits.
+   Finish when a second complete pass finds no evidence-backed slop.
+2. Account for every scoped file as edited or unchanged.
+   Finish when the report includes both counts and all exclusions.
+3. Report each unresolved candidate and its required proof.
+   Finish when every uncertainty has a concrete verification step.
+
+## Completion criterion
+
+Complete the pass when every scoped file is accounted for. Every edit must have
+a repository or sibling justification. All affected checks must pass or have a
+reported pre-existing blocker.

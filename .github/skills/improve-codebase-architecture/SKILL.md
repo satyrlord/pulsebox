@@ -1,50 +1,76 @@
 ---
 name: improve-codebase-architecture
-description: Use when the user asks what Pulsebox architecture should change, where boundaries are eroding, or how to reduce structural friction; or when another skill surfaces an architecture gap.
+description: >
+  Improve Pulsebox architecture and ownership boundaries. Use for structural
+  friction, leaking seams, broad edit cost, or an architecture gap from another skill.
 ---
 
 # Improve Pulsebox architecture
 
-Remain read-only unless implementation is explicitly requested.
+## 1. Select the branch
 
-## Establish the system
+1. Use analysis mode unless the user requests implementation.
+   Finish when the work is read-only and the expected proposal is clear.
+2. Use implementation mode only with explicit edit authority.
+   Finish when the approved proposal and change scope are clear.
 
-Read repository root `AGENTS.md`, the
-[product specification index](../../../docs/specs/spec-000-index.md), the
-[technical foundations specification](../../../docs/specs/spec-002-technical-foundations.md),
-[docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md), the current source tree,
-tests, and dependency graph.
+## 2. Establish the system map
 
-## Find leverage
+1. Read `AGENTS.md`, the specification index, and each applicable owner.
+   Finish when the approved architecture and product boundary are known.
+2. Read [spec-002](../../../docs/specs/spec-002-technical-foundations.md) and
+   [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md).
+   Finish when each layer, port, protocol, and registry owner is known.
+3. Inspect the source tree, dependency graph, and relevant tests.
+   Finish when each suspected seam has direct file and dependency evidence.
 
-Leverage lives where a **seam** is missing, misplaced, or leaking. Look for:
+## 3. Find leverage at seams
 
-- engine, state, and UI responsibilities leaking across boundaries;
-- shallow wrappers that do not hide complexity;
-- plugin-specific branches outside registries and adapters;
-- command or undo policy duplicated across features;
-- live audio objects or transient visual state entering persistence;
-- worklet protocols with implicit ordering, frame-size, latency, or allocation
-  assumptions;
-- Custom Elements that rebuild too much DOM or fail to clean up;
-- project schema, validation, migration, or asset ownership spread across
-  unrelated modules;
-- theme-specific markup or TypeScript instead of stable tokens;
-- modules that force broad edits for a local feature;
-- planned interfaces that cannot be tested independently.
+Check for these conditions:
 
-Prefer changes that remove knowledge from callers, make invariants explicit,
-and let one owner absorb complexity.
+- engine, state, UI, persistence, or composition responsibilities have leaked
+- a wrapper hides no policy or complexity
+- plugin-specific branches bypass registries or adapters
+- command, undo, validation, or migration policy has more than one owner
+- audio nodes or temporary visual state enter persistence
+- worklet order, frame count, latency, or allocation assumptions stay implicit
+- React components rebuild broad trees or leave resources active
+- schemas, assets, or theme rules span unrelated modules
+- a local feature requires broad unrelated edits
+- an owner cannot be tested independently
 
-## Propose
+Prefer a change that removes knowledge from callers and makes one owner absorb
+the complexity.
 
-For each proposal, state the current friction, evidence, target owner, contract
-change, migration or compatibility consequence, expected simplification,
-risks, and objective verifier. Separate prerequisite contract work from later
-implementation.
+Finish this stage when every proposed problem has a concrete path, dependency,
+or contract check.
 
-Rank proposals by leverage and risk. Do not turn broad discomfort into a
-proposal without a concrete file, dependency, or contract check.
+## 4. Rank proposals
 
-Complete when the architecture map is evidence-backed, proposals are ranked,
-and no code was changed unless the user authorized it.
+1. State the current friction and direct evidence.
+   Finish when another agent can reproduce the structural cost.
+2. Name the target owner and required contract change.
+   Finish when the new boundary has one accountable owner.
+3. Define a before-and-after measure.
+   Finish when simplification can be checked by imports, branches, owners, or edit surface.
+4. State migration effects, risks, and the objective verifier.
+   Finish when the proposal includes all required transition work.
+5. Rank the proposal by leverage, risk, and prerequisite order.
+   Finish when the order has no hidden dependency.
+
+## 5. Implement when requested
+
+1. Update the owning contract before behavior changes.
+   Finish when the approved boundary is explicit.
+2. Make the smallest complete structural change.
+   Finish when the target owner absorbs the intended responsibility.
+3. Add tests for each changed seam.
+   Finish when a boundary regression can fail a focused test.
+4. Run the applicable repository checks.
+   Finish when all affected checks pass or have a reported blocker.
+
+## Completion criterion
+
+In analysis mode, complete the work when the system map has evidence and each
+ranked proposal has a measurable result. In implementation mode, also require
+contracts, source, tests, and verification to agree.

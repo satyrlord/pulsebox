@@ -1,46 +1,56 @@
 ---
 name: grill-me
-description: Use when the user wants a Pulsebox plan or design grilled, stress-tested, or challenged, or wants open decisions resolved before implementation.
+description: >
+  Challenge a Pulsebox plan or design before implementation. Use to resolve open
+  product, architecture, persistence, audio, UI, verification, or delivery decisions.
 ---
 
-# Grill a Pulsebox decision
+# Challenge a Pulsebox decision
 
-## Prepare
+Remain read-only unless the user authorizes workspace edits.
 
-Read repository root `AGENTS.md`, the
-[product specification index](../../../docs/specs/spec-000-index.md), every
-applicable owning specification and dependency, the canonical domain documents
-under `docs/`, and any implementation
-that the plan says already exists. Do not ask a question the repository or
-current primary documentation can answer.
+## 1. Prepare the decision tree
 
-Inventory decision branches. Start with the highest-risk or least-reversible
-parent branch. Do not jump to a child before its parent is resolved.
+1. Read `AGENTS.md`, the specification index, each owner, and each dependency.
+   Finish when the approved contract and open questions are known.
+2. Inspect implementation that the plan claims already exists.
+   Finish when each implementation claim has direct evidence.
+3. Resolve facts that current repository files or primary sources can answer.
+   Finish when only genuine product choices remain.
+4. List the decision branches from parent to child.
+   Finish when the highest-risk and least-reversible branch is first.
 
-## Ask
+Do not ask a question that available evidence can answer.
 
-- Ask one question at a time.
-- Give a recommended answer with clear trade-offs before asking.
-- Incorporate the answer immediately and do not reopen it without new evidence.
-- Add a branch only when an answer exposes a material dependency.
-- Probe scope, engine/state/UI ownership, plugin and worklet contracts,
-  persistence and migration, undo, accessibility, playback continuity, browser
-  support, responsive layout, originality, verification, and delivery risk when
-  relevant.
+## 2. Resolve one branch at a time
 
-Remain read-only unless the user explicitly authorizes workspace edits. After
-each accepted product decision, record the owning-document change that would be
-needed. If edits are authorized, update the owning file under `docs/specs/` or
-the applicable canonical domain document. Do not create a parallel decision
-document.
+1. State the current branch and its material trade-offs.
+   Finish when the user can compare the valid choices.
+2. Recommend one choice and give the evidence for it.
+   Finish when the recommendation has a clear reason and verifier.
+3. Ask one question.
+   Finish when the user gives an answer or explicitly defers the branch.
+4. Record the answer and its downstream effects.
+   Finish when no child branch depends on an unstated parent choice.
+5. Add a branch only when the answer exposes a material dependency.
+   Finish when the tree contains no speculative branch.
 
-## Conclude
+Probe relevant product and delivery risks. Include ownership, persistence,
+audio, accessibility, browser, layout, originality, and verification risks.
 
-Route resolved work to add-feature for contract implementation, refactor for
-behavior-preserving structure, or diagnose for an unproven runtime fact.
+Read [EXAMPLES.md](EXAMPLES.md) when a concrete question sequence is useful.
 
-Finish when every inventoried branch is resolved or explicitly deferred with an
-owner, reason, and verification step, and a fresh agent can continue without
-reopening decisions.
+## 3. Record authorized decisions
 
-Read [EXAMPLES.md](EXAMPLES.md) when a concrete question sequence would help.
+1. Identify the owning specification or domain document for each decision.
+   Finish when every durable fact has one owner.
+2. If edits are authorized, update only the owning document.
+   Finish when no parallel decision document exists.
+3. If edits are not authorized, report the exact future document change.
+   Finish when another agent can apply it without reopening the decision.
+
+## Completion criterion
+
+Complete the session when every inventoried branch is resolved or deferred.
+Each deferral must name an owner, reason, and verification step. Route authorized
+implementation to `add-feature`, `refactor`, or `diagnose` as applicable.

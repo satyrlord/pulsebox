@@ -1,49 +1,65 @@
 ---
 name: diagnose
 description: >
-  Diagnoses hard bugs and performance regressions with a controlled feedback
-  loop, and implements the fix only when requested. Use when the failure is
-  flaky, not yet reproducible, still lacks a root cause, or needs measurement.
+  Diagnose difficult Pulsebox bugs and performance regressions. Use for flaky,
+  unreproduced, unmeasured, or root-cause-unknown failures. Implement fixes only when requested.
 ---
 
-# Diagnose
+# Diagnose a Pulsebox failure
 
-A discipline for hard bugs. When the failure mode and repro are already
-narrow, use the smallest feedback loop that can still falsify the suspected
-cause.
+Use the smallest feedback loop that can disprove a suspected cause.
 
-## Phases
+## 1. Build the feedback loop
 
-Work through these in order:
+1. Read the reported symptom, relevant contract, source, tests, and environment.
+   Finish when the exact expected and observed outcomes are known.
+2. Select the fastest signal that reaches the real failure.
+   Finish when one repeatable command or procedure can show the symptom.
+3. Record the environment and controlled input.
+   Finish when another agent can run the same loop.
 
-1. **Build a feedback loop** — the highest-leverage step; do not skip.
-2. **Reproduce** — confirm the loop matches the user's reported symptom.
-3. **Hypothesise** — 3–5 ranked, falsifiable hypotheses; show the user.
-4. **Instrument** — one variable at a time; tagged debug logs or perf baseline.
-5. **Conclude or fix** — report the proven cause; implement and regression-test
-   only when the request authorizes a fix.
-6. **Cleanup + post-mortem** — remove instrumentation; hand off architecture
-   findings to `improve-codebase-architecture` when warranted.
+Read [REFERENCE.md](REFERENCE.md) for loop choices and environment fields. Use
+the [PowerShell template](scripts/hitl-loop.template.ps1) only as a last resort.
 
-## Completion Criterion
+## 2. Reproduce and rank causes
 
-The successful diagnosis branch is complete when:
+1. Run the loop enough times to confirm the reported symptom.
+   Finish when the signal distinguishes the failure from correct behavior.
+2. Write three to five ranked, disprovable hypotheses.
+   Finish when each hypothesis predicts one specific probe result.
+3. Show the ranking without stopping the investigation.
+   Finish when the user can see the current evidence and direction.
 
-- the bug or regression is reproduced with a feedback loop,
-- the root cause is supported by evidence that distinguishes it from the other
-  ranked hypotheses,
-- the requested output is delivered: either a diagnosis with a concrete fix
-  and regression-test plan, or an implemented fix with a passing regression
-  test,
-- and the instrumentation is removed unless it remains necessary.
+Read [EXAMPLES.md](EXAMPLES.md) when a concrete loop pattern is useful.
 
-The blocked branch is complete when the feedback loop cannot be built after
-the documented attempts, the missing artifact or access is named, and no root
-cause or fix is claimed.
+## 3. Measure one variable
 
-## Deep Reference
+1. Add the narrowest assertion, trace, debugger probe, or measurement.
+   Finish when the probe separates at least two ranked hypotheses.
+2. Change one controlled variable at a time.
+   Finish when each result has one clear cause.
+3. Repeat until one cause explains all observed evidence.
+   Finish when the evidence excludes the material alternatives.
 
-Use [REFERENCE.md](REFERENCE.md) for full phase instructions, loop construction
-patterns, and the HITL script at
-[scripts/hitl-loop.template.ps1](scripts/hitl-loop.template.ps1). Use
-[EXAMPLES.md](EXAMPLES.md) for concrete diagnosis loops.
+## 4. Conclude or fix
+
+1. If the user requested diagnosis only, report the proven cause and proposed repair.
+   Finish when the report includes evidence and a regression-test plan.
+2. If the user requested a fix, first make a focused regression test fail.
+   Finish when the test fails for the proven cause.
+3. Apply the smallest root-cause fix.
+   Finish when the regression test and original loop pass.
+4. Remove temporary probes and artifacts.
+   Finish when a unique repository search finds no temporary instrumentation.
+
+Route a proven structural gap to `improve-codebase-architecture` when the user
+requests architecture work.
+
+## Completion criterion
+
+Complete a successful diagnosis only when evidence distinguishes the root cause
+from the ranked alternatives. Deliver the requested diagnosis or verified fix.
+Remove all temporary instrumentation that is not part of the final verifier.
+
+If no loop can be built, list each attempt and the missing artifact or access.
+Do not claim a cause or fix in that branch.

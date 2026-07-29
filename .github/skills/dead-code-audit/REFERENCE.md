@@ -1,23 +1,22 @@
 # Dead-code evidence
 
-Delete a candidate only when all of these are true:
+Delete a candidate only when all these conditions are true:
 
-1. No production, test, build, plugin, registration, serialization, migration,
-   style, asset, or documentation path requires it.
-2. Dynamic loading and string-based registration have been checked.
-3. The owning contract does not require the path for a later approved phase.
-4. Removing it leaves no invalid reference or public contract.
-5. The narrowest relevant checks pass after removal.
+1. No production, test, build, plugin, serialization, migration, style, asset, or documentation path needs it.
+2. No dynamic import, registry, manifest, or string-based path reaches it.
+3. No approved contract keeps it for a later phase.
+4. Removal leaves no invalid reference or public contract.
+5. The narrowest affected checks pass after removal.
 
-Common false positives:
+Common false positives include these items:
 
-- Custom Elements referenced only by tag name.
-- AudioWorklet processors loaded through a URL.
-- Plugins reached through a manifest registry.
-- CSS tokens consumed across Shadow DOM boundaries.
-- Command variants reached through deserialization.
-- Project migrations used only by older supported schema versions.
-- Browser-specific fallback modules.
+- worklet processors loaded through generated URLs
+- plugins reached through manifest registries
+- CSS tokens used across style boundaries
+- commands reached through deserialization
+- migrations used only by supported older projects
+- browser-specific fallback modules
+- approved non-shipping research
 
-Report the tool output, local proof, action, and post-action verifier for every
-finding.
+For each finding, report the tool result, local proof, action, and post-action
+verifier.

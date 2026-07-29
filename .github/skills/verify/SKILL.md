@@ -1,60 +1,79 @@
 ---
 name: verify
-description: Use when the user wants proof a Pulsebox change actually works in the real browser build, or asks for browser, layout, theme, or audio evidence; or when another skill needs production-build evidence.
+description: >
+  Verify Pulsebox in the production browser build. Use for browser, interaction,
+  layout, theme, accessibility, persistence, export, or objective audio evidence.
 ---
 
 # Verify Pulsebox
 
-## Prepare the real surface
+Remain read-only unless the user also requests repair.
 
-1. Read AGENTS.md, the changed specification contract, package scripts, and
-   Playwright configuration.
-2. Build the production browser application and serve that output at the exact
-   canonical origin `http://127.0.0.1:4173` using the repository command.
-3. Use deterministic project state and assets. Do not use a static design
-   prototype as product proof.
-4. Close browsers and local servers reliably after the run.
+## 1. Prepare the production surface
 
-If the build or serve commands do not exist, report verification as blocked. Do
-not substitute the prototype or claim a browser pass.
+1. Read `AGENTS.md`, each changed contract, `package.json`, and Playwright configuration.
+   Finish when the required browsers, viewports, states, and assertions are known.
+2. Build and serve the production output with repository commands.
+   Finish when the app responds at exactly `http://127.0.0.1:4173`.
+3. Create deterministic project state, assets, meters, and animation.
+   Finish when repeated runs start from the same observable state.
+4. Record the exact browser version for Chrome, Edge, and Firefox.
+   Finish when each release channel has a version in the evidence.
 
-## Drive the changed behavior
+If a build or serve command is absent, report the affected proof as blocked.
+Do not use a design prototype as product evidence.
 
-- Use Playwright browser contexts for current stable Chrome, Edge, and Firefox.
-- Interact through the user-visible surface, including open Shadow DOM roots.
-- Unlock Web Audio through a valid user gesture before testing audible actions.
-- Verify keyboard and pointer paths, focus restoration, typed command effects,
-  undo and redo, save and reload, and playback continuity as applicable.
-- Verify 1536 x 1024, 1440 x 900, 1366 x 768, and 1280 x 720, plus the
-  below-minimum notice.
-- Verify the rack theme and high contrast for theme-sensitive work.
+## 2. Drive the changed behavior
 
-## Assert more than screenshots
+1. Use the configured Playwright project for each required browser.
+   Finish when Chrome, Edge, and Firefox exercise every deterministic path.
+2. Interact through visible controls and valid user gestures.
+   Finish when pointer, keyboard, focus, and audio unlock paths are covered.
+3. Verify commands, undo, redo, save, reload, and playback when applicable.
+   Finish when each changed state transition has a direct assertion.
+4. Test all required supported viewports and the below-minimum state.
+   Finish when geometry, scrolling, and unsupported-size behavior pass.
+5. Test `rack`, high contrast, and affected user-theme behavior.
+   Finish when theme changes preserve focus, geometry, state, and playback.
 
-- Assert application state, accessible names, focus, computed styles, CSS
-  tokens, element geometry, Canvas pixels, and persisted values as applicable.
-- Reject region overlap, page-level scrolling, layout shift during theme
-  changes, dead controls, and color-only meaning.
-- Use stable animation, playhead, and meter state before pixel comparison.
-- Confirm that nonessential animation pauses when hidden.
+## 3. Assert observable results
 
-## Audio evidence
+Use the narrowest applicable evidence:
 
-Browser automation cannot prove a subjective listening claim. Use the narrowest
-objective evidence available:
+- application state and persisted values
+- accessible names, roles, focus, and keyboard results
+- computed styles, CSS tokens, element geometry, and Canvas pixels
+- overlap, page scrolling, and layout shift checks
+- stable screenshots with deterministic visual state
+- hidden-document animation behavior
 
-- engine and worklet message assertions;
-- OfflineAudioContext or repository offline-render output;
-- deterministic sample counts, timing, peaks, frequency, channel, and silence
-  checks;
-- 44.1 kHz and 48 kHz runs when pitch or timing can vary;
-- WAV or stem parsing for export contracts.
+Finish this stage when every changed browser contract has a direct assertion.
+A screenshot alone does not prove interaction or state.
 
-Record a manual listening procedure for any remaining subjective claim. Never
-present a screenshot or state transition as proof that sound is correct.
+## 4. Collect audio evidence
 
-## Completion
+1. Use engine or worklet messages for protocol behavior.
+   Finish when the message assertion proves the changed contract.
+2. Use offline rendering for objective audio output.
+   Finish when sample count, timing, peak, frequency, channel, or silence checks pass.
+3. Run 44.1 kHz and 48 kHz when pitch or timing can vary.
+   Finish when both sample rates meet the same contract.
+4. Parse WAV or stem output for export behavior.
+   Finish when the file structure and audio values meet the contract.
+5. Record a manual listening procedure for subjective claims.
+   Finish when no automated result is presented as proof of sound quality.
 
-Store temporary evidence under a run-specific ignored path. Report the build,
-browsers, viewports, states, assertions, audio method, results, and remaining
-manual checks. Complete only when every changed contract has direct evidence.
+## 5. Close the run
+
+1. Store temporary evidence only under an ignored run-specific path.
+   Finish when no evidence file enters the repository tree.
+2. Close each browser and local server.
+   Finish when no verification process remains active.
+3. Report build, browser versions, viewports, states, assertions, and results.
+   Finish when every changed contract has evidence or an explicit blocker.
+
+## Completion criterion
+
+Complete verification only when every changed contract has direct evidence.
+Report all failed, blocked, subjective, or manual checks. Do not claim more than
+the recorded browser and audio evidence proves.

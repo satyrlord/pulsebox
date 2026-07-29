@@ -1,55 +1,56 @@
-# Prose Slop
+# Prose slop
 
-Preserve meaning and intentional voice. Remove prose that makes the next
-reader reconstruct the point or that conflicts with the surrounding document.
+Preserve true meaning and intentional voice. Remove prose that hides the point
+or conflicts with its owner.
 
 ## Simplified Technical English
 
 Apply the [repository STE contract](../../../AGENTS.md#writing) to technical
-prose. Use strict mode for procedures, runbooks, safety text, and error
-messages. Use STE-flavored mode for general technical prose.
+prose. Use strict mode for procedures, runbooks, safety text, and errors.
+Use STE-flavored mode for general technical prose.
 
-Use STE when the user asks for clear, plain, controlled, non-AI, or human
-technical writing. Do not apply STE to code, identifiers, or command syntax.
-Do not apply STE to marketing copy, essays, or text that needs a distinct
-voice.
+Apply STE when the user asks for clear, plain, controlled, or human technical
+writing. Do not apply it to code, identifiers, command syntax, marketing copy,
+essays, or a required distinct voice.
 
-Run the STE self-lint after the evidence pass. The mechanical rules control
-form. They do not prove that a claim is true or useful. Check each claim
-against the file, its siblings, and the repository contract.
+Run the STE self-lint after the evidence pass. Mechanical rules control form.
+They do not prove that a claim is true or useful.
 
-The official standard is copyrighted. Link to the
+The official standard has copyright protection. Link to the
 [official ASD-STE100 site](https://asd-ste100.org) when a source is necessary.
-Do not copy the full standard into the repository.
+Do not copy the complete standard into the repository.
 
 ## Empty framing
 
-- Throat-clearing, hand-holding, and signposting before the actual point
-- Rhetorical questions or dramatic fragments used only for emphasis
-- Pull-quote sentences and vague declarations without concrete information
-- Meta-commentary about what the document will say instead of saying it
-- Filler transitions that headings already provide
+Inspect these candidates:
+
+- an introduction that delays the actual point
+- a rhetorical question or fragment used only for emphasis
+- a vague declaration with no concrete information
+- text about what the document will say
+- a transition that the heading already supplies
 
 ## Inflated style
 
-- Business or trend jargon standing in for a specific claim
-- Repeated binary contrasts or negative lists that restate one conclusion
-- Lazy absolutes unsupported by the document's evidence
-- Metronomic list and sentence patterns that make unrelated ideas sound equal
-- Adverbs, passive constructions, or emphatic phrases that obscure the actor
-  or claim
+Inspect these candidates:
 
-Outside the STE contract, do not ban a word class or grammatical voice.
-Rewrite only when the sentence becomes more precise and stays consistent with
-sibling documents.
+- business or trend words that replace a specific claim
+- repeated contrasts that restate one conclusion
+- absolute claims without evidence
+- repeated sentence patterns that imply false equivalence
+- modifiers or passive clauses that hide the actor or claim
+
+Outside the STE contract, do not ban a word class or voice. Rewrite only when
+the result is more precise and agrees with sibling documents.
 
 ## Stale information
 
-- Historical notes whose constraint no longer applies
-- TODOs with no owner, condition, or live work item
-- Descriptions of files, commands, or behavior that no longer exist
-- Polished summaries that omit the evidence needed to act
+Inspect these candidates:
 
-Retain history when it explains a current constraint or prevents a rejected
-decision from being reintroduced; move it to the owning durable document when
-necessary.
+- historical notes with no current constraint
+- TODO items with no owner, condition, or work item
+- descriptions of removed files, commands, or behavior
+- summaries that omit evidence needed for action
+
+Keep history when it explains a current constraint or prevents a rejected
+decision. Move that fact to the durable owner when necessary.
