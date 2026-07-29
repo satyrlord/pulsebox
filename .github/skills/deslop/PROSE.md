@@ -3,6 +3,25 @@
 Preserve meaning and intentional voice. Remove prose that makes the next
 reader reconstruct the point or that conflicts with the surrounding document.
 
+## Simplified Technical English
+
+Apply the [repository STE contract](../../../AGENTS.md#writing) to technical
+prose. Use strict mode for procedures, runbooks, safety text, and error
+messages. Use STE-flavored mode for general technical prose.
+
+Use STE when the user asks for clear, plain, controlled, non-AI, or human
+technical writing. Do not apply STE to code, identifiers, or command syntax.
+Do not apply STE to marketing copy, essays, or text that needs a distinct
+voice.
+
+Run the STE self-lint after the evidence pass. The mechanical rules control
+form. They do not prove that a claim is true or useful. Check each claim
+against the file, its siblings, and the repository contract.
+
+The official standard is copyrighted. Link to the
+[official ASD-STE100 site](https://asd-ste100.org) when a source is necessary.
+Do not copy the full standard into the repository.
+
 ## Empty framing
 
 - Throat-clearing, hand-holding, and signposting before the actual point
@@ -20,8 +39,9 @@ reader reconstruct the point or that conflicts with the surrounding document.
 - Adverbs, passive constructions, or emphatic phrases that obscure the actor
   or claim
 
-Do not ban a word class or grammatical voice. Rewrite only when the sentence
-becomes more precise and remains consistent with sibling documents.
+Outside the STE contract, do not ban a word class or grammatical voice.
+Rewrite only when the sentence becomes more precise and stays consistent with
+sibling documents.
 
 ## Stale information
 

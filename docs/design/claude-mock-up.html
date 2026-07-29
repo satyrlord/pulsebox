@@ -18,6 +18,8 @@
    heights, panel widths and the piano gutter.
    Pass 4: density pass — decorative piano gutter, mixer levels, caps, sends and
    meter ladders, waveform, and topbar/bottom-bar alignment.
+   Pass 5: photo-real machined pull handles, and the handles become the module
+   reorder drag affordance per spec-005 section 14.
    This file is the single approved composition target (spec-003 section 8.2):
    it owns proportion, placement, density, materials, typography scale and
    control sizing, and the product specifications own behavior. Where the two
@@ -410,6 +412,7 @@ html[data-theme="rack"] .slots{background-color:#16181a;}
 /* ---------- rack ---------- */
 .rack{background:var(--surface-chassis);}
 .rackscroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:1px 1px 1px 4px;display:flex;flex-direction:column;gap:5px;
+  position:relative;
   background:var(--mat-speckle),linear-gradient(180deg,var(--surface-chassis),var(--surface-rail));}
 /* body holds name, knobs and sequencer; rails sit outside it so they always
    span the full height, whether the body is one row or two */
@@ -443,8 +446,10 @@ html[data-theme="rack"] .unit{
 }
 /* Rack ear: a chunky pull handle standing off a recessed channel, bolted top
    and bottom. It is the tactile studio language spec-001 section 15 asks for —
-   the rails are what make a unit read as rack-mounted hardware. */
+   the rails are what make a unit read as rack-mounted hardware. They are also
+   the module's reorder drag affordance, per spec-005 section 14. */
 .rail{
+  cursor:grab;touch-action:none;
   width:28px;flex:none;position:relative;border-radius:var(--edge-radius-panel) 0 0 var(--edge-radius-panel);
   background:
     var(--mat-speckle),
@@ -470,35 +475,58 @@ html[data-theme="rack"] .rail.r{
   box-shadow:inset 0 3px 7px rgba(0,0,0,.95),inset 0 -2px 5px rgba(0,0,0,.85),
     0 1px 0 var(--edge-highlight);
 }
-/* Chunky chrome pull. The mock's handles are wide bars with a hard specular
-   band down the left third and a rolled dark edge on the right — a machined
-   round bar lit from the upper left, not a flat sliver. */
+/* Chunky machined-steel pull. Photo-real cues, not a flat sliver: the bar is
+   shaded across its width as a cylinder with one hard specular streak left of
+   centre and rolled-off dark edges; fine lathe lines run along its length; the
+   ends darken where the bar turns away into its standoff bolts; and the bar
+   drops a soft double shadow into the recessed channel behind it. */
 .rail .handle{
-  position:absolute;z-index:1;left:50%;top:9px;bottom:9px;width:11px;margin-left:-5.5px;
-  border-radius:5px;
-  filter:brightness(.62);
+  position:absolute;z-index:1;left:50%;top:9px;bottom:9px;width:12px;margin-left:-6px;
+  border-radius:6px;
+  filter:brightness(.68);
   background:
+    repeating-linear-gradient(180deg,rgba(255,255,255,.028) 0 1px,rgba(0,0,0,.04) 1px 2px,transparent 2px 3px),
+    linear-gradient(180deg,rgba(0,0,0,.62) 0,rgba(255,255,255,.12) 7%,transparent 17% 83%,rgba(0,0,0,.28) 93%,rgba(0,0,0,.68) 100%),
     linear-gradient(90deg,
-      #0c0e0f 0%,#43494e 20%,#9ba1a6 38%,#c2c6ca 46%,#62686d 62%,#24282b 80%,#0b0d0e 100%),
-    linear-gradient(180deg,rgba(255,255,255,.08),transparent 22%,transparent 78%,rgba(0,0,0,.35));
-  background-blend-mode:normal,overlay;
+      #08090a 0%,#2a2f33 8%,#666d74 20%,#cfd4d9 33%,#f6f9fb 40%,#c0c6cb 47%,
+      #6d747b 60%,#33383c 74%,#1a1d20 84%,#2e3337 93%,#0a0c0d 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.32),
-    inset 0 -1px 0 rgba(0,0,0,.75),
-    0 0 0 1px rgba(0,0,0,.85),
-    2px 3px 5px rgba(0,0,0,.72);
+    inset 0 1px 1px rgba(255,255,255,.38),
+    inset 0 -1px 1px rgba(0,0,0,.8),
+    inset -1.5px 0 2px rgba(0,0,0,.5),
+    0 0 0 1px rgba(0,0,0,.9),
+    3px 5px 7px rgba(0,0,0,.55),
+    1px 2px 3px rgba(0,0,0,.8);
+  transition:filter var(--motion-fast) var(--motion-ease);
 }
-/* socket bolts that pin the pull to the rail */
+.rail:hover .handle{filter:brightness(.82);}
+/* Socket-head standoff bolts pinning the pull to the rail: a turned chamfer
+   ring under domed cap shading, one upper-left glint, and a dark socket well. */
 .rail .handle::before,.rail .handle::after{
-  content:"";position:absolute;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;
-  background:radial-gradient(circle at 36% 28%,#8b9299 0 22%,#4a5057 46%,#191c1f 78%);
-  box-shadow:inset 0 -1px 2px rgba(0,0,0,.9),inset 0 1px 1px rgba(255,255,255,.35),
-    0 1px 2px rgba(0,0,0,.7);
+  content:"";position:absolute;left:50%;width:11px;height:11px;margin-left:-5.5px;border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 54%,#000 0 2px,rgba(8,10,11,.9) 2.8px,transparent 3.6px),
+    radial-gradient(circle at 33% 26%,rgba(255,255,255,.8) 0 1.2px,transparent 36%),
+    radial-gradient(circle at 38% 30%,rgba(214,220,226,.92) 0 16%,rgba(88,95,102,.6) 42%,rgba(22,26,29,.35) 64%,rgba(5,7,8,.78) 92%),
+    conic-gradient(from 130deg,#7c848b 0 12%,#31363a 20% 38%,#8f969d 46% 56%,#23272b 64% 88%,#7c848b 96%);
+  box-shadow:inset 0 -1.5px 2px rgba(0,0,0,.85),inset 0 1px 1px rgba(255,255,255,.35),
+    0 2px 3px rgba(0,0,0,.72),0 0 0 1px rgba(0,0,0,.68);
 }
 .rail .handle::before{top:-5px;}
 .rail .handle::after{bottom:-5px;}
 .rail .screw{position:absolute;z-index:2;left:50%;margin-left:-4.5px;}
 .rail .screw.t{top:4px;} .rail .screw.b{bottom:4px;}
+/* Reorder drag, spec-005 section 14: the rails are the drag handles. The
+   dragged unit lifts and follows the pointer; a lit line marks where it
+   will land. */
+body.rack-reordering{user-select:none;}
+body.rack-reordering .rail{cursor:grabbing;}
+.unit.dragging{position:relative;z-index:5;opacity:.94;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.55),
+    0 10px 22px rgba(0,0,0,.75),0 2px 6px rgba(0,0,0,.7);}
+.rack-insert{position:absolute;left:6px;right:6px;height:0;z-index:6;pointer-events:none;
+  border-top:2px solid var(--accent-lamp);
+  box-shadow:0 0 8px var(--accent-glow),0 0 2px var(--accent-lamp);}
 /* unit name block */
 .uname{
   width:115px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:0;
@@ -1636,6 +1664,9 @@ function setModulePresent(mid,present){
       control.tabIndex=present?0:-1; control.setAttribute("aria-disabled",String(!present));
     });
   }
+  /* a restore replaces card markup with its original slot number baked in, so
+     the shared renumber pass runs to honour any reorder since then */
+  syncRackOrder();
   announce(present?`${m.name} added to slot ${index+1}.`:`${m.name} deleted from slot ${index+1}. Undo is available.`);
 }
 function bindModuleMenu(el,mid){
@@ -1866,6 +1897,156 @@ CH.forEach((c,i)=>{
 initKnobs(mixstrips);
 mixstrips.querySelectorAll(".mstrip.empty .knob").forEach(control=>{
   control.tabIndex=-1;control.setAttribute("aria-disabled","true");
+});
+
+/* ================= rack reorder ================= */
+/* Spec-005 section 14: the rack-ear pull handles are the reorder drag
+   affordance. Dragging either handle moves the whole unit up or down behind an
+   insertion marker; with the module itself focused, Alt+Arrow does the same
+   from the keyboard. A committed move renumbers every slot, keeps each
+   module's own mixer channel, lands as one undo entry, and is announced. */
+const slotEntries=[...MODS.map(m=>m.id),"empty7","empty8"];
+const tailEmpty={
+  empty7:{row:$$(".slot.empty")[0],strip:$$(".mstrip:not([data-mod]):not(.master)")[0]},
+  empty8:{row:$$(".slot.empty")[1],strip:$$(".mstrip:not([data-mod]):not(.master)")[1]},
+};
+const insertMarker=document.createElement("div");
+insertMarker.className="rack-insert";insertMarker.hidden=true;
+rackscroll.insertBefore(insertMarker,rackscroll.firstChild);
+/* move only the children that are out of place, so unrelated focus survives */
+function orderChildren(parent,nodes,offset=0){
+  nodes.forEach((node,i)=>{
+    if(parent.children[i+offset]!==node) parent.insertBefore(node,parent.children[i+offset]||null);
+  });
+}
+function syncRackOrder(){
+  orderChildren(slist,slotEntries.map(id=>MODS.some(m=>m.id===id)?loadedSlots.get(id).el:tailEmpty[id].row));
+  orderChildren(rackscroll,slotEntries.filter(id=>MODS.some(m=>m.id===id)).map(id=>$(`.unit[data-mod="${id}"]`)),1);
+  orderChildren(mixstrips,slotEntries.map(id=>MODS.some(m=>m.id===id)?$(`.mstrip[data-mod="${id}"]`):tailEmpty[id].strip));
+  slotEntries.forEach((id,i)=>{
+    const num=String(i+1).padStart(2,"0"), m=MODS.find(x=>x.id===id);
+    if(!m){
+      const {row,strip}=tailEmpty[id], emptyName=`Channel ${i+1}`;
+      row.querySelector(".snum").textContent=num;
+      const card=row.querySelector(".scard");
+      card.setAttribute("aria-label",`Empty slot ${i+1}. Add a module`);
+      card.title=`Empty slot ${i+1}. Click to add a module.`;
+      strip.querySelector(".mtag").textContent=num;
+      strip.title=`Channel ${num} — Empty`;
+      strip.setAttribute("aria-label",strip.title);
+      strip.querySelectorAll("[aria-label],[title]").forEach(el=>{
+        const label=el.getAttribute("aria-label");
+        if(label&&/^Channel \d+\b/.test(label)) el.setAttribute("aria-label",label.replace(/^Channel \d+\b/,emptyName));
+        if(el.title&&/^Channel \d+\b/.test(el.title)) el.title=el.title.replace(/^Channel \d+\b/,emptyName);
+      });
+      return;
+    }
+    const slotData=loadedSlots.get(id), present=presentModules.has(id);
+    slotData.index=i;
+    slotData.el.querySelector(".snum").textContent=num;
+    const card=slotData.el.querySelector(".scard");
+    if(present){
+      card.setAttribute("aria-label",`Select ${m.name}, slot ${i+1}`);
+      card.title=`${m.name} in slot ${i+1}.`;
+    }else{
+      card.setAttribute("aria-label",`Empty slot ${i+1}. Add ${m.name}`);
+      card.title=`Empty slot ${i+1}. Click to add ${m.name}.`;
+    }
+    const unit=$(`.unit[data-mod="${id}"]`);
+    unit.setAttribute("aria-label",`${m.name}, ${m.type}, slot ${i+1}`);
+    const strip=$(`.mstrip[data-mod="${id}"]`);
+    strip.title=present?`Channel ${num} — ${m.name}`:`Channel ${num} — Empty`;
+    strip.setAttribute("aria-label",strip.title);
+    if(!present) strip.querySelector(".mtag").textContent=num;
+  });
+}
+function placeModule(mid,finalIndex){
+  const from=slotEntries.indexOf(mid);
+  if(from<0||from===finalIndex) return;
+  slotEntries.splice(from,1);
+  slotEntries.splice(finalIndex,0,mid);
+  syncRackOrder();
+  announce(`${MODS.find(x=>x.id===mid).name} moved to slot ${finalIndex+1}.`);
+}
+function commitModuleMove(mid,from,to){
+  if(from===to||to<0||to>=slotEntries.length) return false;
+  placeModule(mid,to);
+  const name=MODS.find(x=>x.id===mid).name;
+  pushUndo(`Move ${name} to slot ${to+1}`,()=>placeModule(mid,from),()=>placeModule(mid,to));
+  return true;
+}
+const visibleUnits=()=>$$(".unit").filter(u=>!u.hidden);
+let railDrag=null;
+function railDragMove(e){
+  const dy=e.clientY-railDrag.startY;
+  if(!railDrag.active){
+    if(Math.abs(dy)<4) return;
+    railDrag.active=true;
+    railDrag.unit.classList.add("dragging");
+    document.body.classList.add("rack-reordering");
+    insertMarker.hidden=false;
+  }
+  railDrag.unit.style.transform=`translateY(${dy}px)`;
+  const rect=rackscroll.getBoundingClientRect();
+  if(e.clientY<rect.top+24) rackscroll.scrollTop-=8;
+  else if(e.clientY>rect.bottom-24) rackscroll.scrollTop+=8;
+  const y=e.clientY-rect.top+rackscroll.scrollTop;
+  const others=visibleUnits().filter(u=>u!==railDrag.unit);
+  let insert=others.length;
+  for(let i=0;i<others.length;i++){
+    if(y<others[i].offsetTop+others[i].offsetHeight/2){insert=i;break;}
+  }
+  railDrag.insert=insert;
+  insertMarker.style.top=(insert===0
+    ? Math.max(1,(others[0]?.offsetTop??4)-4)
+    : others[insert-1].offsetTop+others[insert-1].offsetHeight+1)+"px";
+}
+function railDragStop(commit){
+  if(!railDrag) return;
+  const {unit,mid,active,insert}=railDrag; railDrag=null;
+  unit.classList.remove("dragging"); unit.style.transform="";
+  document.body.classList.remove("rack-reordering");
+  insertMarker.hidden=true;
+  if(!active||!commit) return;
+  const others=visibleUnits().filter(u=>u!==unit);
+  if(!others.length) return;
+  const from=slotEntries.indexOf(mid);
+  let to;
+  if(insert>=others.length){
+    const last=slotEntries.indexOf(others[others.length-1].dataset.mod);
+    to=(from<last?last-1:last)+1;
+  }else{
+    const target=slotEntries.indexOf(others[insert].dataset.mod);
+    to=from<target?target-1:target;
+  }
+  commitModuleMove(mid,from,to);
+}
+$$(".unit").forEach(unit=>{
+  const mid=unit.dataset.mod;
+  unit.querySelectorAll(".rail").forEach(rail=>{
+    rail.title="Drag to move this module up or down the rack.";
+    rail.addEventListener("pointerdown",e=>{
+      if(e.button!==0) return;
+      e.preventDefault();
+      rail.setPointerCapture(e.pointerId);
+      railDrag={unit,mid,rail,startY:e.clientY,active:false,insert:-1};
+    });
+    rail.addEventListener("pointermove",e=>{if(railDrag?.rail===rail)railDragMove(e);});
+    rail.addEventListener("pointerup",()=>{if(railDrag?.rail===rail)railDragStop(true);});
+    rail.addEventListener("pointercancel",()=>{if(railDrag?.rail===rail)railDragStop(false);});
+  });
+  /* Keyboard reorder targets the focused module itself, so the arrow keys on
+     knobs inside the unit keep their own meaning. */
+  unit.setAttribute("aria-keyshortcuts","Alt+ArrowUp Alt+ArrowDown");
+  unit.addEventListener("keydown",e=>{
+    if(e.target!==unit||!e.altKey||(e.key!=="ArrowUp"&&e.key!=="ArrowDown")) return;
+    e.preventDefault();
+    const from=slotEntries.indexOf(mid);
+    if(commitModuleMove(mid,from,from+(e.key==="ArrowUp"?-1:1))) unit.focus();
+  });
+});
+addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&railDrag?.active){e.preventDefault();railDragStop(false);}
 });
 
 /* ================= effects pane ================= */

@@ -408,3 +408,16 @@ this table is the traceability record.
   and stripping structural content to an empty skeleton, which removes the
   density evidence that made this file normative and would require reopening
   section 8.2. `AC-059` and `AC-067` gate the result.
+- **D81.** The rack-ear pull handles are a rack module's reorder drag
+  affordance. Dragging a module by either handle moves it up or down the rack:
+  the gesture uses pointer capture, shows an insertion marker at the landing
+  position, commits one undoable move on release, and Escape cancels the
+  active drag. Keyboard reorder on the focused module commits the same move.
+  Before this decision the handles were visual language only, and a
+  handle-shaped surface that invites a grab but does nothing breaks the rule
+  that every visible control operates. Rejected alternatives: dragging the
+  module anywhere on its faceplate, which fights the faceplate's knobs,
+  buttons, and selectors for the same pointer gesture; and dedicated move-up
+  and move-down buttons, which add two controls per module for a move the
+  handles already afford. Section 14 owns the behavior; `AC-010` gates
+  reorder.

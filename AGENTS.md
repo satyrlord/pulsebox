@@ -2,8 +2,54 @@
 
 Imperative rules for AI coding agents working on Pulsebox.
 
-Use simple English. Prefer short sentences and a plain structure. Do not use
-emoji in code, comments, tests, specifications, documentation, or skills.
+## Writing
+
+Use ASD-STE100 Simplified Technical English (STE) for technical prose.
+This rule covers documentation, READMEs, pull request text, error messages,
+release notes, and comments. It does not cover code, identifiers, command
+syntax, marketing copy, essays, or text that needs a distinct voice.
+
+Use strict mode for procedures, runbooks, safety text, and error messages.
+Apply all rules in strict mode. Use STE-flavored mode for general technical
+prose. Keep the sentence, paragraph, active-voice, and verb rules in that mode.
+Use technical words outside the STE dictionary when they improve clarity.
+
+- Use one name for one item.
+- Use short common words. For example, use start, use, help, make sure, before,
+  after, about, get, show, and also.
+- Give each word one meaning. Use a literal meaning when possible.
+- Do not use marketing adjectives such as seamless, robust, powerful,
+  cutting-edge, effortless, world-class, next-generation, or revolutionary.
+- Use American spelling.
+- Use active voice when you know the actor.
+- Use a verb for an action. Do not replace the verb with a noun phrase.
+- Use a plain verb when it can replace a phrasal verb.
+- Remove stacked auxiliary verbs and empty framing.
+- Use a simple tense when it can replace an `-ing` main verb.
+- Put one instruction in each sentence. Limit an instruction to 20 words.
+- Limit a descriptive sentence to 25 words.
+- Do not use contractions. Use articles such as a, an, the, this, and these.
+- Do not use semicolons. Use two sentences.
+- Put one topic in each paragraph. Limit a paragraph to six sentences.
+- Use a numbered vertical list for steps. Put one imperative action in each
+  step.
+- Put a condition before its command.
+- Do not use emoji in code, comments, tests, specifications, documentation, or
+  skills.
+
+Run this self-lint before you finish technical prose:
+
+1. Split each instruction longer than 20 words.
+2. Split each descriptive sentence longer than 25 words.
+3. Replace each semicolon with a period.
+4. Expand each contraction.
+5. Change passive voice when you know the actor.
+6. Replace an `-ing` main verb, a nominalization, or a phrasal verb when a plain
+   verb works.
+7. Use one name for each item.
+
+For a prose-only request, return only the requested text. Do not add a
+preamble, summary, or closing.
 
 Pulsebox is a fully client-side, desktop-first modular groove workstation for
 Chrome, Edge, and Firefox. It is built with strict TypeScript, Web Audio, and

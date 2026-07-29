@@ -1,6 +1,6 @@
 ---
 name: deslop
-description: Remove AI slop, including low-value and misleading test code, from every file in the repository while preserving behavior and genuine information.
+description: Remove AI slop from code, prose, data, configuration, and tests while preserving behavior and true information. Use for clear, plain, controlled, or human technical writing.
 ---
 
 # Deslop
@@ -18,7 +18,8 @@ proof that AI wrote a test.
 Load the rule set that matches each file before judging it:
 
 - Code: [CODE.md](CODE.md)
-- Prose and documentation: [PROSE.md](PROSE.md)
+- Prose and documentation, including Simplified Technical English:
+  [PROSE.md](PROSE.md)
 - Data and configuration: [DATA.md](DATA.md)
 - Tests: [TEST.md](TEST.md)
 
@@ -46,9 +47,8 @@ prompt to compare context, not automatic permission to delete.
 
 ## Boundaries
 
-- Do not turn stylistic preferences into universal bans. Adverbs, passive
-  voice, comments, guards, hardcoded values, and abstraction can all be valid
-  in context.
+- Do not turn contextual code or data smells into universal bans. Apply the
+  repository STE contract to technical prose. `PROSE.md` owns that branch.
 - Do not delete an artifact merely because static search finds no reference;
   use `dead-code-audit` when reachability is the question.
 - Do not rewrite user-authored prose into a uniform voice without evidence

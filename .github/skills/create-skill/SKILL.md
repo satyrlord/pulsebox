@@ -1,6 +1,6 @@
 ---
 name: create-skill
-description: Reference for writing and editing skills well — the vocabulary and principles that make a skill predictable.
+description: Write and edit predictable skills with clear triggers, checkable completion criteria, structured reference, and Simplified Technical English.
 ---
 
 # Writing Great Skills
@@ -9,6 +9,20 @@ A skill exists to wrangle determinism out of a stochastic system. **Predictabili
 not producing the same output — is the root virtue; every lever below serves it.
 
 **Bold terms** are defined in [`GLOSSARY.md`](GLOSSARY.md); look them up there for the full meaning.
+
+## Writing style
+
+Apply the [repository STE contract](../../../AGENTS.md#writing) to skill prose.
+Use strict mode for procedures, safety rules, and error text. Use STE-flavored
+mode for descriptions, definitions, and general reference text.
+
+Do not change code, identifiers, or command syntax to satisfy a prose rule.
+Keep a distinct voice only when the skill must produce text that needs one.
+State that branch and its boundary in the skill.
+
+Run the STE self-lint before the skill validation. A mechanical check can find
+form errors. It cannot prove that an instruction is true, useful, or
+predictable. Apply each completion criterion after the self-lint.
 
 ## Invocation
 

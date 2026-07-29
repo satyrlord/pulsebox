@@ -197,6 +197,20 @@ Collapsed slots remain usable and show:
 
 Empty slots show an Add control.
 
+Reordering a module:
+
+- The pull handles on the module's rack ears are the drag affordance.
+  Dragging either handle moves the module up or down the rack.
+- The drag uses pointer capture and shows an insertion marker at the position
+  where the module will land. Releasing the pointer commits the move. Escape
+  cancels the active drag and changes nothing.
+- A committed move is one undo entry.
+- Keyboard reorder on the focused module commits the same move.
+- A committed move renumbers slots and follows section 13.2: module IDs,
+  named-Pattern parts, automation, mixer routing, and effect chains stay with
+  the module, and an ARIA live region announces the result.
+- Reordering does not interrupt playback.
+
 Removing a module:
 
 - Starts from `Delete module` in the loaded module's context menu. There is no
