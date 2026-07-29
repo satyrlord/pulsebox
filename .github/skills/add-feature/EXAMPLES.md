@@ -13,9 +13,9 @@ round-trip tests, and the affected acceptance criterion.
 Request: add a new compact rack control.
 
 Confirm that the control belongs on the compact faceplate, dispatches a typed
-command, changes audible or documented state, works by keyboard, appears in all
-five themes, causes no supported-size overlap, and has component and browser
-evidence.
+command, changes audible or documented state, works by keyboard, appears in
+the rack theme and high-contrast mode, causes no supported-size overlap, and
+has component and browser evidence.
 
 ## Technical change
 

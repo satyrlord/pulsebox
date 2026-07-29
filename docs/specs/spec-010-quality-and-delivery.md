@@ -173,7 +173,7 @@ Visual regression:
 - 1440 × 900.
 - 1366 × 768.
 - 1280 × 720.
-- All five themes.
+- The `rack` theme.
 - High-contrast mode.
 - Deterministic meters and animation.
 
@@ -201,7 +201,7 @@ normative:
   real-audio checks run manually in all three browsers when automation cannot
   observe the physical result.
 - Accessibility evidence checks the numeric requirements in section 24.1 at
-  every supported viewport, in all five themes and high-contrast mode.
+  every supported viewport, in the `rack` theme and high-contrast mode.
 - The first-sound procedure in section 21.8 passes all five runs in every
   supported browser on the recorded release host.
 - Before final release, five people unfamiliar with Pulsebox attempt to start
@@ -335,8 +335,8 @@ chain, complete effect catalog.
 Phase 5: Named-Pattern Playlist, Pattern automation, and Pattern/Song transport
 modes.
 
-Phase 6: Five themes, user theme import, accessibility, default projects, visual
-polish, performance measurements.
+Phase 6: The `rack` theme, user theme import, accessibility, default projects,
+visual polish, performance measurements.
 
 Phase 7: Persistence, recovery, project import/export, WAV and stem export,
 final browser matrix.

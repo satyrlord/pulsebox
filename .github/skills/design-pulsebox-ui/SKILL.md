@@ -40,8 +40,8 @@ description: Use when the user wants Pulsebox interface work designed, built, au
 - Avoid glassmorphism, translucent floating cards, excessive glow or gradients,
   generic dashboard cards, cartoon controls, fake wood, and large mobile pills.
 - Keep module accents local. Never use color as the only signal.
-- Use only the five built-in theme IDs: rack, mono, cosmic, analog, and rust.
-  Keep rack as the default. High contrast layers over every theme.
+- Use only the built-in theme ID rack, per decision D79. High contrast layers
+  over the built-in theme and valid user themes.
 - Implement themes only through the documented CSS token contract. Do not add
   theme-specific TypeScript or markup.
 
@@ -65,7 +65,7 @@ description: Use when the user wants Pulsebox interface work designed, built, au
   and modal editor use.
 - Verify 1536 x 1024, 1440 x 900, 1366 x 768, and 1280 x 720, plus the
   below-minimum notice. Reject overlap and page-level scrolling.
-- Test every changed theme token in all five themes and high-contrast mode.
+- Test every changed theme token in the rack theme and high-contrast mode.
 - Use deterministic state for screenshots and assert behavior or computed
   values in addition to pixels.
 - Use the verify skill for production-build browser evidence.

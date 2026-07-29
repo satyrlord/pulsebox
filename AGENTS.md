@@ -237,8 +237,9 @@ evicting the oldest entries rather than rejecting a valid new action.
   frames when components disconnect.
 - Follow the fixed rack, studio, mixer, effects, editor, and bottom-bar
   hierarchy in the specification.
-- Use the approved tactile studio visual language and the five themes: rack,
-  mono, cosmic, analog, and rust. The rack theme is the default.
+- Use the approved tactile studio visual language and the single built-in
+  `rack` theme (decision `D79`). High contrast is an overlay, and user themes
+  follow docs/THEMING.md.
 - Do not add glassmorphism, floating translucent cards, excessive glow, generic
   dashboard styling, mobile-style pills, or decorative fake controls.
 - Every visible operational control must change state, sound, navigation, or a

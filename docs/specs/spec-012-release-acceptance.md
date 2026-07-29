@@ -36,8 +36,8 @@ The merged MVP is complete only when:
     and the standard keyboard context-menu gesture; no persistent Add or minus
     buttons exist below the slot list.
 11. **AC-011.** The Piano Roll is the only surface that edits Pattern event
-    data. No rack faceplate contains a step grid or any per-step editing.
-    Faceplate Pattern activity is output-only and not focusable. The faceplate
+    data. No rack faceplate contains a step grid, any per-step editing, or a
+    Pattern activity indicator. The faceplate
     audition control sounds the module while held by pointer or by keyboard,
     stops on release or on lost focus or capture, respects mute, solo, and
     routing, and writes no Pattern event, no project state, and no Undo entry.
@@ -98,8 +98,8 @@ The merged MVP is complete only when:
 39. **AC-039.** Theme switching from Settings does not interrupt audio or shift
     layout; theme and contrast persist globally, never travel in project files,
     and have no selector in the application header.
-40. **AC-040.** All five themes and high-contrast mode pass the numeric accessibility checks
-    in section 24.1 at every supported viewport.
+40. **AC-040.** The `rack` theme and high-contrast mode pass the numeric accessibility
+    checks in section 24.1 at every supported viewport.
 41. **AC-041.** User theme import enforces the complete bounded allowlist and safe value
     grammar in `THEMING.md`, ignores unknown tokens with a report, applies
     atomically, and rejects raw CSS and unsafe values.

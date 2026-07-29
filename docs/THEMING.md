@@ -24,8 +24,9 @@ behavior, navigation, text, accessible names, or the application hierarchy.
 
 The following rules are mandatory:
 
-- Ship exactly the built-in theme IDs `rack`, `mono`, `cosmic`, `analog`, and
-  `rust`. `rack` is the default for a new installation.
+- Ship exactly one built-in theme ID, `rack`, per decision `D79`. It is the
+  default for a new installation. Additional built-in themes are post-MVP
+  token packs and are outside this contract.
 - Apply high contrast as an overlay on any built-in or valid user theme. It is
   not a sixth theme.
 - Implement themes as CSS custom-property values owned by the UI layer.
@@ -48,15 +49,11 @@ user-visible behavior changes.
 
 ## 2. Built-in theme direction
 
-| ID       | Label  | Required direction                                         |
-| -------- | ------ | ---------------------------------------------------------- |
-| `rack`   | Rack   | Graphite and steel studio hardware. This is the default.   |
-| `mono`   | Mono   | Near-black, low-chroma, minimal, and sharply separated.    |
-| `cosmic` | Cosmic | Deep navy with restrained cyan and violet detail.          |
-| `analog` | Analog | Warm charcoal and silver-metal cues without fake wood.     |
-| `rust`   | Rust   | Dark iron and restrained oxide detail without texture art. |
+| ID     | Label | Required direction                                       |
+| ------ | ----- | -------------------------------------------------------- |
+| `rack` | Rack  | Graphite and steel studio hardware. This is the default. |
 
-All five themes remain dark studio interfaces. Theme direction does not permit
+The built-in theme remains a dark studio interface. Theme direction does not permit
 glassmorphism, translucent floating cards, photorealistic texture, copied
 hardware art, excessive glow, large pill containers, or decorative controls.
 Gradients are not theme tokens and are not used for ordinary surfaces.
@@ -180,39 +177,39 @@ fall back to the general accent tokens when no module scope exists.
 Every listed value is normative. Colors use opaque six-digit sRGB hex. The
 shadow grammar is defined in section 8.
 
-| Token                           | `rack`                       | `mono`    | `cosmic`                     | `analog`                     | `rust`                       |
-| ------------------------------- | ---------------------------- | --------- | ---------------------------- | ---------------------------- | ---------------------------- |
-| `--pulse-color-app`             | `#0B0D0F`                    | `#050505` | `#070A18`                    | `#171512`                    | `#130D0A`                    |
-| `--pulse-color-surface-panel`   | `#15191D`                    | `#111111` | `#11162A`                    | `#26221D`                    | `#251813`                    |
-| `--pulse-color-surface-control` | `#242A30`                    | `#202020` | `#1D2642`                    | `#39332C`                    | `#38231B`                    |
-| `--pulse-color-surface-inset`   | `#080A0C`                    | `#000000` | `#050817`                    | `#100F0D`                    | `#0D0907`                    |
-| `--pulse-color-text-primary`    | `#F3F5F6`                    | `#FFFFFF` | `#F3F5FF`                    | `#FFF9ED`                    | `#FFF4E8`                    |
-| `--pulse-color-text-secondary`  | `#BAC2C8`                    | `#C8C8C8` | `#BCC6E8`                    | `#D0C5B6`                    | `#D8BFAF`                    |
-| `--pulse-color-border-default`  | `#6D7881`                    | `#777777` | `#64729D`                    | `#867C70`                    | `#8D6B58`                    |
-| `--pulse-color-border-strong`   | `#AAB4BC`                    | `#B8B8B8` | `#98A9D8`                    | `#B8AB9B`                    | `#C49378`                    |
-| `--pulse-color-accent`          | `#7ED9A3`                    | `#E6E6E6` | `#66C7FF`                    | `#F0B65B`                    | `#E58A55`                    |
-| `--pulse-color-on-accent`       | `#07110B`                    | `#080808` | `#03101A`                    | `#1A1003`                    | `#190A03`                    |
-| `--pulse-color-focus-inner`     | `#FFFFFF`                    | `#FFFFFF` | `#FFFFFF`                    | `#FFFFFF`                    | `#FFFFFF`                    |
-| `--pulse-color-focus-outer`     | `#000000`                    | `#000000` | `#000000`                    | `#000000`                    | `#000000`                    |
-| `--pulse-color-control-track`   | `#6F7B84`                    | `#6A6A6A` | `#6A799F`                    | `#867C70`                    | `#8D6B58`                    |
-| `--pulse-color-control-fill`    | `#B0F2CA`                    | `#FFFFFF` | `#A8E9FF`                    | `#FFE0A3`                    | `#FFC8A5`                    |
-| `--pulse-color-meter-low`       | `#62D28A`                    | `#D4D4D4` | `#61D8B0`                    | `#86C878`                    | `#8DCE75`                    |
-| `--pulse-color-meter-mid`       | `#F2C14E`                    | `#FFFFFF` | `#F2C85E`                    | `#EDBC58`                    | `#F0B956`                    |
-| `--pulse-color-meter-high`      | `#FF7667`                    | `#FFFFFF` | `#FF7183`                    | `#F47762`                    | `#FF755B`                    |
-| `--pulse-color-status-danger`   | `#FF8178`                    | `#FFFFFF` | `#FF8292`                    | `#F48170`                    | `#FF826B`                    |
-| `--pulse-color-status-warning`  | `#F2C14E`                    | `#E8E8E8` | `#F2C85E`                    | `#EDBC58`                    | `#F0B956`                    |
-| `--pulse-color-status-success`  | `#62D28A`                    | `#D4D4D4` | `#61D8B0`                    | `#86C878`                    | `#8DCE75`                    |
-| `--pulse-color-overlay`         | `#101317`                    | `#0B0B0B` | `#0C1124`                    | `#201D19`                    | `#1C120E`                    |
-| `--pulse-color-text-muted`      | `#919BA3`                    | `#999999` | `#929EC2`                    | `#AAA095`                    | `#A98E7E`                    |
-| `--pulse-color-selection`       | `#244D38`                    | `#393939` | `#173F61`                    | `#5B431D`                    | `#62331E`                    |
-| `--pulse-color-control-thumb`   | `#E1E6E9`                    | `#F2F2F2` | `#DDE5FF`                    | `#E8DED2`                    | `#E6C9B9`                    |
-| `--pulse-color-meter-track`     | `#20262B`                    | `#292929` | `#202945`                    | `#40392F`                    | `#40291F`                    |
-| `--pulse-color-status-info`     | `#6BB8FF`                    | `#D6D6D6` | `#73B8FF`                    | `#81BDE8`                    | `#78BCE7`                    |
-| `--pulse-color-disabled`        | `#7B858D`                    | `#858585` | `#7F8CAF`                    | `#92887C`                    | `#9B7A68`                    |
-| `--pulse-color-scrollbar-track` | `#111519`                    | `#0C0C0C` | `#0D1327`                    | `#211E1A`                    | `#1D120E`                    |
-| `--pulse-color-scrollbar-thumb` | `#6D7881`                    | `#777777` | `#64729D`                    | `#867C70`                    | `#8D6B58`                    |
-| `--pulse-shadow-control`        | `0px 1px 3px 0px #00000080`  | `none`    | `0px 1px 4px 0px #00000099`  | `0px 1px 3px 0px #00000080`  | `0px 1px 3px 0px #00000099`  |
-| `--pulse-shadow-panel`          | `0px 4px 12px 0px #00000099` | `none`    | `0px 4px 14px 0px #000000A6` | `0px 4px 12px 0px #0000008C` | `0px 4px 12px 0px #000000A6` |
+| Token                           | `rack`                       |
+| ------------------------------- | ---------------------------- |
+| `--pulse-color-app`             | `#0B0D0F`                    |
+| `--pulse-color-surface-panel`   | `#15191D`                    |
+| `--pulse-color-surface-control` | `#242A30`                    |
+| `--pulse-color-surface-inset`   | `#080A0C`                    |
+| `--pulse-color-text-primary`    | `#F3F5F6`                    |
+| `--pulse-color-text-secondary`  | `#BAC2C8`                    |
+| `--pulse-color-border-default`  | `#6D7881`                    |
+| `--pulse-color-border-strong`   | `#AAB4BC`                    |
+| `--pulse-color-accent`          | `#7ED9A3`                    |
+| `--pulse-color-on-accent`       | `#07110B`                    |
+| `--pulse-color-focus-inner`     | `#FFFFFF`                    |
+| `--pulse-color-focus-outer`     | `#000000`                    |
+| `--pulse-color-control-track`   | `#6F7B84`                    |
+| `--pulse-color-control-fill`    | `#B0F2CA`                    |
+| `--pulse-color-meter-low`       | `#62D28A`                    |
+| `--pulse-color-meter-mid`       | `#F2C14E`                    |
+| `--pulse-color-meter-high`      | `#FF7667`                    |
+| `--pulse-color-status-danger`   | `#FF8178`                    |
+| `--pulse-color-status-warning`  | `#F2C14E`                    |
+| `--pulse-color-status-success`  | `#62D28A`                    |
+| `--pulse-color-overlay`         | `#101317`                    |
+| `--pulse-color-text-muted`      | `#919BA3`                    |
+| `--pulse-color-selection`       | `#244D38`                    |
+| `--pulse-color-control-thumb`   | `#E1E6E9`                    |
+| `--pulse-color-meter-track`     | `#20262B`                    |
+| `--pulse-color-status-info`     | `#6BB8FF`                    |
+| `--pulse-color-disabled`        | `#7B858D`                    |
+| `--pulse-color-scrollbar-track` | `#111519`                    |
+| `--pulse-color-scrollbar-thumb` | `#6D7881`                    |
+| `--pulse-shadow-control`        | `0px 1px 3px 0px #00000080`  |
+| `--pulse-shadow-panel`          | `0px 4px 12px 0px #00000099` |
 
 The built-in palette must pass the contrast matrix in section 10 before it can
 ship. The table is not a claim that unimplemented UI already passes.
@@ -556,8 +553,8 @@ For each built-in theme, a valid user theme, and each with high contrast on:
   minimum dimension;
 - run in current stable Chrome, Edge, and Firefox for the production build.
 
-Visual regressions cover all five themes and the high-contrast overlay at all
-four supported viewports. Screenshots use deterministic meters and animation.
+Visual regressions cover the `rack` theme, a valid user theme, and the
+high-contrast overlay at all four supported viewports. Screenshots use deterministic meters and animation.
 Pixel snapshots supplement, but do not replace, computed-value and behavior
 assertions.
 
@@ -577,10 +574,10 @@ Acceptance criteria 39 through 41 and 67 pass only when this evidence is
 complete, all required checks pass, and the implementation matches this
 contract.
 
-The current implementation provides the five built-in token sets, the
+The current implementation provides the `rack` built-in token set, the
 high-contrast overlay, the appearance preference envelope with its cross-tab
 and storage-failure behavior, the bounded user-theme import validator, the
-numeric contrast checks, the current control primitives, and Settings controls
-for built-in theme and high-contrast selection. User-theme import and deletion
-are not yet exposed in Settings. Visual regression snapshots across later MVP
+numeric contrast checks, the current control primitives, and a Settings
+control for high-contrast selection. User-theme import and deletion are not
+yet exposed in Settings. Visual regression snapshots across later MVP
 components also remain future work.

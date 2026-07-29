@@ -353,3 +353,36 @@ this table is the traceability record.
   follow it; and regenerating the raster to match the current HTML, which
   restores the same drift the moment the next composition decision lands.
   `AC-067` now gates against the composition target rather than a raster.
+- **D78.** Rack faceplates carry no Pattern activity indicator. The faceplate
+  contents that `D65` and `D72` fixed reduce to the short label and metadata,
+  the pattern selector, the established fast controls, the audition control,
+  and the module state controls. This supersedes the activity-indicator part of
+  `D65` and `D72`. The single-editing-surface rule itself is unchanged:
+  faceplates still carry no step grid and no per-step editing, and the Piano
+  Roll stays the only Pattern editing surface. Even under the section 15.0
+  visual constraints, a sixteen-cell row sitting where classic drum machines
+  put their step buttons reads as a step sequencer. Users click it, and a
+  surface that invites clicks but does nothing breaks the rule that every
+  visible control operates. Playback position feedback lives in the Piano Roll
+  playhead, the pattern position readout, and the transport clock. Rejected
+  alternatives: keeping the flat bar-graph styling, which the approved
+  composition already used and which still read as pressable steps; and making
+  the row an operable shortcut that focuses the Piano Roll, which restores a
+  pattern-shaped control on the faceplate and re-creates the two-editor
+  reading that `D65` removed. `AC-011` continues to gate the single editing
+  surface.
+- **D79.** The MVP ships exactly one built-in theme, `rack`. The `mono`,
+  `cosmic`, `analog`, and `rust` themes leave the MVP scope. The token
+  architecture, the high-contrast overlay, and the bounded user-theme import
+  contract are unchanged, so appearance remains one built-in ID or `user` plus
+  the independent high-contrast state. Every built-in theme is a normative
+  palette with a full contrast matrix that must stay correct across every
+  supported viewport and state; four extra matrices bought appearance variety,
+  not capability, and personalization already belongs to user-theme import. A
+  stored appearance preference that names a removed theme is invalid data and
+  resolves to `rack` through the existing corrupt-preference fallback.
+  Rejected alternatives: keeping all five palettes, which multiplies every
+  visual regression, contrast audit, and accessibility check by five for the
+  whole MVP surface; and removing the theme system entirely, which discards
+  the token architecture that user themes and post-MVP theme packs already
+  rely on. `AC-039` and `AC-040` gate the reduced scope.

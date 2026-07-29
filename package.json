@@ -14,8 +14,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "ci": "npm run format:check && npm run lint && npm run lint:md && npm run typecheck && npm run test && npm run test:e2e",
-    "lint:md": "markdownlint-cli2"
+    "ci": "npm run lint && npm run lint:md && npm run typecheck && npm run test && npm run test:e2e && npm run dead-code",
+    "lint:md": "markdownlint-cli2",
+    "dead-code": "fallow dead-code"
   },
   "dependencies": {
     "@audio/decode-aiff": "1.2.3",
@@ -30,7 +31,6 @@
     "@playwright/test": "1.62.0",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
-
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
@@ -39,6 +39,7 @@
     "eslint": "10.8.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
+    "fallow": "^3.10.0",
     "globals": "17.8.0",
     "jsdom": "30.0.0",
     "markdownlint-cli2": "0.23.2",

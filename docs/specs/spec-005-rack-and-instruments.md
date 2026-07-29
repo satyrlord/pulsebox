@@ -177,7 +177,6 @@ Each slot supports:
 - Module menu.
 - Selection.
 - Visible level.
-- Pattern activity, as the output-only indicator defined in section 15.0.
 - Audition, as defined in section 15.0.
 
 Rack-module collapse is a lightweight local UI preference keyed by project ID,
@@ -194,7 +193,6 @@ Collapsed slots remain usable and show:
 - Mute.
 - Solo.
 - Pattern selector.
-- Activity.
 - Expand control.
 
 Empty slots show an Add control.
@@ -233,7 +231,6 @@ Each instrument has:
 - Expanded editor.
 - Stable parameter IDs.
 - Pattern selector.
-- Pattern activity indicator.
 - Audition control.
 - Per-module output level.
 - Mute and solo.
@@ -254,31 +251,13 @@ editing happens in the Piano Roll, as required by
 space that a faceplate would otherwise spend on a step grid carries the
 promoted fast controls listed for each instrument below.
 
-### 15.0 Pattern activity and audition
+### 15.0 Audition
 
-Pattern activity indicator:
-
-- Output only. It never accepts pointer or keyboard input and is not focusable.
-- Shows that the module is producing events during playback, and shows the
-  current position within the module part.
-- Shows no per-step accent, tie, slide, probability, or micro-timing detail.
-- Carries no editing affordance and is not a paged view of step data.
-
-The indicator must not look like a row of pressable steps. A user must not have
-to click it to learn that it is not an editor, so the following visual
-constraints are normative:
-
-- It reads as a flat bar graph, not as controls. Cells use no button geometry:
-  no control-sized height, no control corner radius, no raised or lit cap
-  treatment, and no per-cell glow.
-- Cell height stays at or below one third of the faceplate control height.
-- Unlit cells are visually uniform. The indicator does not group cells into
-  beats or bars, because that grouping reads as an editable grid.
-- Only the current playback position may use an emphasized treatment.
-
-A visual restyle of the rack must preserve these constraints. Restoring step
-button styling to this indicator reintroduces the second apparent pattern
-editor that decision `D65` removed.
+Per decision `D78`, the faceplate carries no Pattern activity indicator and no
+other step-shaped readout. Playback position feedback lives in the Piano Roll
+playhead, the pattern position readout, and the transport clock. Restoring a
+step-shaped indicator to the faceplate reintroduces the second apparent
+pattern editor that decisions `D65` and `D78` removed.
 
 Audition control:
 
@@ -323,7 +302,6 @@ Compact controls:
 - Sub-oscillator level.
 - Second-oscillator detune.
 - Clean or dirty filter model.
-- Pattern activity indicator.
 - Audition control.
 - Compact filter response.
 
@@ -406,7 +384,6 @@ Compact controls:
 - Voice selector.
 - Selected-voice pan.
 - Selected-voice mute and solo.
-- Pattern activity indicator.
 - Audition control.
 
 Expanded editor:
@@ -433,7 +410,6 @@ Compact controls:
 - Voice selector.
 - Selected-voice pan.
 - Selected-voice mute and solo.
-- Pattern activity indicator.
 - Audition control.
 
 Expanded editor includes the shared drum capabilities and original large-machine
@@ -451,7 +427,6 @@ Compact controls:
 - Filter.
 - Attack.
 - Selected-voice level.
-- Pattern activity indicator.
 - Audition control.
 
 This module's waveform preview occupies the faceplate width that two further
@@ -487,7 +462,6 @@ Compact controls:
 - Voice selector.
 - Selected-voice pan.
 - Selected-voice mute and solo.
-- Pattern activity indicator.
 - Audition control.
 
 The built-in lo-fi stage starts enabled and can be disabled.
@@ -506,7 +480,6 @@ Compact controls:
 - Sample-rate reduction.
 - Voice selector.
 - Selected-voice mute and solo.
-- Pattern activity indicator.
 - Audition control.
 
 The built-in lo-fi stage starts enabled and can be disabled.

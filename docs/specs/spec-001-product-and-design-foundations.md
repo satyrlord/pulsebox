@@ -227,19 +227,17 @@ that table.
 - No icon font.
 - Every icon-only control has an accessible label and tooltip.
 
-### 11.4 Built-in themes
+### 11.4 Built-in theme
 
-Ship five original token-based themes:
+Ship exactly one original token-based built-in theme, per decision `D79`:
 
-| Theme ID | Visible label | Direction                                             |
-| -------- | ------------- | ----------------------------------------------------- |
-| `rack`   | Rack          | Studio hardware, graphite and steel, default          |
-| `mono`   | Mono          | Near-black, minimal, high contrast                    |
-| `cosmic` | Cosmic        | Deep blue, restrained luminous detail                 |
-| `analog` | Analog        | Warm silver and tactile metal                         |
-| `rust`   | Rust          | Industrial, angular, weathered without copied artwork |
+| Theme ID | Visible label | Direction                                    |
+| -------- | ------------- | -------------------------------------------- |
+| `rack`   | Rack          | Studio hardware, graphite and steel, default |
 
-Also provide a high-contrast mode that can be layered over a theme.
+Also provide a high-contrast mode that can be layered over the built-in theme
+or a valid user theme. Additional built-in themes are post-MVP token packs and
+are not part of this contract.
 
 Rules:
 
@@ -319,7 +317,7 @@ The following are out of scope for version 1.0:
 - Plugin hosting.
 - Microphone or line-input recording.
 - MIDI of any kind.
-- Eleven additional built-in themes.
+- Additional built-in themes beyond `rack`.
 - Editable layouts below 1280 × 720 CSS pixels, compact-desktop rescue layouts,
   and full touch-first mobile design.
 - More than eight rack slots in the MVP. Sixteen slots remain an explicit

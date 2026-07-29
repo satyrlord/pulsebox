@@ -63,11 +63,11 @@ assets exist yet.
   [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
 - The current build contains only `index.html`, CSS, the application module, the
   Acid Bass worklet asset, and the sample decoder worker.
-- The five built-in theme palettes and the high-contrast overlay are original
+- The built-in `rack` theme palette and the high-contrast overlay are original
   token values authored for Pulsebox. They carry no copied color scheme, no
   hardware artwork, and no community theme data.
-- Theme identifiers and visible labels are the approved `rack`, `mono`,
-  `cosmic`, `analog`, and `rust` set. No theme name refers to a real product.
+- The theme identifier and visible label are the approved `rack` set per
+  decision `D79`. The theme name refers to no real product.
 
 ## Required future audit
 

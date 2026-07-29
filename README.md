@@ -71,7 +71,9 @@ architecture policy read the TypeScript 6 API through the `typescript` alias,
 because typescript-eslint does not support TypeScript 7 yet; that package
 installs its compiler as `tsc6`, so the two never contend for one binary name.
 Dependency versions are pinned exactly, so a fresh install cannot pull a
-formatter or compiler change that fails `npm run ci` without a source edit.
+compiler or lint-tool change that fails `npm run ci` without a source edit.
+`npm run format` remains available as an optional tool and is not part of the
+quality gate.
 
 `npm run dev` and `npm run start` both use the canonical origin with strict-port
 behavior. `npm run start` serves only the built static client and exposes no

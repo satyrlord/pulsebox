@@ -25,7 +25,9 @@ explicit approval.
 2. Read `package.json` and the current test and tool configuration.
 3. Use the scripts in `package.json` as the only command source. Never run a
    command you did not read there this session.
-4. Mark a planned but absent check as not available. Do not invent its command,
+4. Treat Prettier and `format:check` as optional formatting tools, not quality
+   gate checks. Run them only when the user separately requests formatting.
+5. Mark a planned but absent check as not available. Do not invent its command,
    coverage threshold, or pass result.
 
 ## Run applicable checks
@@ -40,10 +42,7 @@ Use this order when each check exists:
 6. Unit and component tests.
 7. Production build.
 8. Playwright tests in supported browsers.
-9. Visual regression at required sizes, themes, and high contrast.
-10. Stage-specific rendered-audio, persistence, import/export, or performance
-    checks.
-11. Dead-code and coverage tools only when configured and documented.
+9. Dead-code and coverage tools only when configured and documented.
 
 Continue independent safe checks after a failure in verify mode. In repair
 mode, capture the exact diagnostic, fix the smallest root cause, and re-run the

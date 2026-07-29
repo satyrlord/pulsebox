@@ -27,8 +27,7 @@ not substitute the prototype or claim a browser pass.
   undo and redo, save and reload, and playback continuity as applicable.
 - Verify 1536 x 1024, 1440 x 900, 1366 x 768, and 1280 x 720, plus the
   below-minimum notice.
-- Verify rack, mono, cosmic, analog, and rust themes and high contrast for
-  theme-sensitive work.
+- Verify the rack theme and high contrast for theme-sensitive work.
 
 ## Assert more than screenshots
 

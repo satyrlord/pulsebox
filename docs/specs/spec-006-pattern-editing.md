@@ -38,11 +38,12 @@ entities. The inspector has no Pattern/Song tabs.
 The Piano Roll is the only surface that edits Pattern event data. No other view
 creates, deletes, or modifies steps, notes, or triggers.
 
-Rack module faceplates carry no step grid and no per-step editing. A faceplate
-shows non-editing Pattern activity and provides the audition control defined in
-[rack and instruments](spec-005-rack-and-instruments.md) section 15. Pattern
-activity is an output-only indicator: it never accepts pointer or keyboard
-input, and it is not a paged or scrubbable view of step data.
+Rack module faceplates carry no step grid, no per-step editing, and, per
+decision `D78`, no Pattern activity indicator or other step-shaped readout. A
+faceplate provides the audition control defined in
+[rack and instruments](spec-005-rack-and-instruments.md) section 15. Playback
+position feedback lives in the Piano Roll playhead, the pattern position
+readout, and the transport clock.
 
 This rule exists so that a user learns exactly one place to edit a Pattern. A
 second editing grid on the faceplate cannot show accent, tie, slide,
