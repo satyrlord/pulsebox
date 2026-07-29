@@ -2,8 +2,8 @@
 
 ## Applicability
 
-A check is required when the current contract requires it and the repository
-defines its command or procedure. Report a missing required command as blocked.
+The current contract marks each required check. The repository must define its
+command or procedure. Report a missing required command as blocked.
 Do not substitute a hand-written command.
 
 Use these phase rules:

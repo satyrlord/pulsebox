@@ -551,7 +551,7 @@ For each built-in theme, a valid user theme, and each with high contrast on:
   1440 by 900, 1366 by 768, and 1280 by 720 CSS pixels;
 - assert the specified unsupported-size notice and limited actions below either
   minimum dimension;
-- run in current stable Chrome, Edge, and Firefox for the production build.
+- run in current stable Chrome for the production build.
 
 Visual regressions cover the `rack` theme, a valid user theme, and the
 high-contrast overlay at all four supported viewports. Screenshots use deterministic meters and animation.

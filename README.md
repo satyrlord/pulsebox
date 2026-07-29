@@ -1,7 +1,7 @@
 # Pulsebox
 
-Pulsebox is a desktop-first modular groove workstation for current Chrome,
-Edge, and Firefox. It is a fully client-side browser application. The Phase 1
+Pulsebox is a desktop-first modular groove workstation for current Chrome. It
+is a fully client-side browser application. The Phase 1
 foundation is runnable with narrow, tested foundations from later phases: a
 React interface, AudioWorklet Acid Bass and Drumline Six paths, transport, a
 four-Pattern bank, basic Playlist transport and channel mixing, appearance

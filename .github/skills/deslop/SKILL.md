@@ -29,7 +29,7 @@ investigation. It does not authorize an edit.
 2. List generated, vendored, binary, and excluded paths separately.
    Finish when every excluded path has a reason.
 3. Read each scoped file and its sibling completely.
-   Finish when local style, behavior, and ownership are known.
+   Finish when you know the local style, behavior, and ownership.
 
 Use the complete repository as the default scope unless the user sets a smaller
 scope.
@@ -39,7 +39,7 @@ scope.
 1. Compare the candidate with its contract, siblings, and consumers.
    Finish when the difference has or lacks a valid reason.
 2. For a test, establish the unchanged baseline required by [TEST.md](TEST.md).
-   Finish when the runner and pre-edit result are recorded.
+   Finish when you record the runner and pre-edit result.
 3. Classify the candidate as valid, slop, or unresolved.
    Finish when evidence excludes the other classifications.
 
@@ -50,7 +50,7 @@ Do not use syntax, file size, test count, coverage, or tone alone as proof.
 1. Make the smallest edit that removes the proven problem.
    Finish when true behavior, information, constraints, and intentional voice remain.
 2. Run the narrowest applicable repository check after each coherent edit group.
-   Finish when the check passes or the exact pre-existing failure is recorded.
+   Finish when the check passes or you record the exact pre-existing failure.
 3. For tests, run every changed test and its owning test project.
    Finish when no changed test remains unverified.
 
@@ -68,6 +68,6 @@ output, vendored code, lockfiles, or binary assets without an explicit request.
 
 ## Completion criterion
 
-Complete the pass when every scoped file is accounted for. Every edit must have
+Complete the pass when you account for every scoped file. Every edit must have
 a repository or sibling justification. All affected checks must pass or have a
 reported pre-existing blocker.

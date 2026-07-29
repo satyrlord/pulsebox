@@ -26,6 +26,6 @@ jobs:
 
       - run: npm test
 
-      - run: npx playwright install --with-deps chrome msedge firefox
+      - run: npx playwright install --with-deps chrome
 
       - run: npm run test:e2e

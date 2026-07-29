@@ -40,7 +40,6 @@ export function downloadPortableProject(
     anchor.href = url;
     anchor.download = `${safeProjectFilename(projectName)}${PROJECT_FILE_EXTENSION}`;
     anchor.rel = "noopener";
-    // Firefox only dispatches a download for an anchor in the document.
     anchor.style.display = "none";
     document.body.append(anchor);
     anchor.click();

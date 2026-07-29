@@ -20,7 +20,7 @@ Classify a test as slop only when evidence proves one of these findings:
 - **Disproportionate cost:** The test adds maintenance or runtime without distinct evidence.
 
 Coverage, test count, file size, mock count, and assertion count are not proof.
-Coverage shows execution. It does not prove that a meaningful result was checked.
+Coverage shows execution. It does not prove that a test checked a meaningful result.
 
 ## High-confidence candidates
 
@@ -68,19 +68,19 @@ Keep the test when context proves one of these values:
 ## Cleanup process
 
 1. Read scripts, runner configuration, setup, production code, contract, test, and one sibling.
-   Finish when the runner, environment, fixtures, and claimed behavior are known.
+   Finish when you know the runner, environment, fixtures, and claimed behavior.
 2. Run the candidate unchanged with the narrowest configured command.
-   Finish when the pre-edit result and pre-existing failures are recorded.
+   Finish when you record the pre-edit result and pre-existing failures.
 3. State the unique behavior and defect for each candidate.
    Finish when each proposed edit has evidence beyond a smell name.
 4. Use a temporary controlled fault when static evidence cannot prove signal.
-   Finish when the test passes or fails as predicted and the fault is removed.
+   Finish when the test responds as predicted and you remove the fault.
 5. Select the smallest safe disposition.
    Finish when the choice follows the rules below.
 6. Run every changed test and its owning test project.
    Finish when the full affected suite passes or has a reported pre-existing blocker.
 7. Report each disposition and skipped proof.
-   Finish when every candidate and runtime surface is accounted for.
+   Finish when you account for every candidate and runtime surface.
 
 ## Dispositions
 
@@ -91,4 +91,4 @@ Keep the test when context proves one of these values:
 - **Replace:** A meaningful contract test must preserve the only intended protection.
 
 For browser tests, build and serve the production app. Run the configured
-Chrome, Edge, and Firefox projects. Do not invent commands.
+Chrome project. Do not invent commands.

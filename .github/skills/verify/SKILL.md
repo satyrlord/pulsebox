@@ -12,23 +12,23 @@ Remain read-only unless the user also requests repair.
 ## 1. Prepare the production surface
 
 1. Read `AGENTS.md`, each changed contract, `package.json`, and Playwright configuration.
-   Finish when the required browsers, viewports, states, and assertions are known.
+   Finish when you know the required browsers, viewports, states, and assertions.
 2. Build and serve the production output with repository commands.
    Finish when the app responds at exactly `http://127.0.0.1:4173`.
 3. Create deterministic project state, assets, meters, and animation.
    Finish when repeated runs start from the same observable state.
-4. Record the exact browser version for Chrome, Edge, and Firefox.
-   Finish when each release channel has a version in the evidence.
+4. Record the exact browser version for Chrome.
+   Finish when the release channel has a version in the evidence.
 
 If a build or serve command is absent, report the affected proof as blocked.
 Do not use a design prototype as product evidence.
 
 ## 2. Drive the changed behavior
 
-1. Use the configured Playwright project for each required browser.
-   Finish when Chrome, Edge, and Firefox exercise every deterministic path.
+1. Use the configured Playwright project for the required browser.
+   Finish when Chrome exercises every deterministic path.
 2. Interact through visible controls and valid user gestures.
-   Finish when pointer, keyboard, focus, and audio unlock paths are covered.
+   Finish when you test pointer, keyboard, focus, and audio unlock paths.
 3. Verify commands, undo, redo, save, reload, and playback when applicable.
    Finish when each changed state transition has a direct assertion.
 4. Test all required supported viewports and the below-minimum state.
@@ -61,7 +61,7 @@ A screenshot alone does not prove interaction or state.
 4. Parse WAV or stem output for export behavior.
    Finish when the file structure and audio values meet the contract.
 5. Record a manual listening procedure for subjective claims.
-   Finish when no automated result is presented as proof of sound quality.
+   Finish when no automated result claims to prove sound quality.
 
 ## 5. Close the run
 

@@ -201,42 +201,47 @@ Behavior:
 
 ## 10. Component structure
 
-Use the `pulse-` prefix without exceptions.
+Use the React component model for the complete UI layer. Name components in
+PascalCase. Give each rendered component root a kebab-case `data-component`
+hook for tests.
+
+Reserve the `pulse-` prefix for CSS custom properties and storage keys. Do not
+use it as a React component-name prefix.
 
 Recommended hierarchy:
 
-- `pulse-app`
-  - `pulse-transport-bar`
-  - `pulse-main-workspace`
-    - `pulse-module-browser`
-    - `pulse-rack-overview`
-    - `pulse-rack`
-      - `pulse-rack-module`
-      - `pulse-pattern-strip`
-    - `pulse-studio-panel`
-      - `pulse-mixer`
-        - `pulse-channel-strip`
-        - `pulse-master-strip`
-      - `pulse-effects-bank`
-        - `pulse-effect-slot`
-  - `pulse-editor-workspace`
-    - `pulse-pattern-inspector`
-    - `pulse-piano-roll`
-    - `pulse-playlist-summary`
-    - `pulse-automation-editor`
-  - `pulse-workspace-bar`
+- `PulseApp`
+  - `TransportBar`
+  - `MainWorkspace`
+    - `ModuleBrowser`
+    - `RackOverview`
+    - `Rack`
+      - `RackModule`
+      - `PatternStrip`
+    - `StudioPanel`
+      - `Mixer`
+        - `ChannelStrip`
+        - `MasterStrip`
+      - `EffectsBank`
+        - `EffectSlot`
+  - `EditorWorkspace`
+    - `PatternInspector`
+    - `PianoRoll`
+    - `PlaylistSummary`
+    - `AutomationEditor`
+  - `WorkspaceBar`
   - shared controls:
-    - `pulse-knob`
-    - `pulse-fader`
-    - `pulse-meter`
-    - `pulse-led-button`
-    - `pulse-toggle`
-    - `pulse-segment-display`
-    - `pulse-tooltip`
-    - `pulse-context-menu`
-    - `pulse-value-popover`
-    - `pulse-dialog`
-    - `pulse-curve-editor`
+    - `Knob`
+    - `Fader`
+    - `LevelMeter`
+    - `Led`
+    - `Toggle`
+    - `SegmentDisplay`
+    - `Tooltip`
+    - `ContextMenu`
+    - `ValuePopover`
+    - `Dialog`
+    - `CurveEditor`
 
 Do not create a component for every static wrapper.
 
@@ -259,7 +264,7 @@ Rules:
 
 ### 22.1 Knobs
 
-Use `pulse-knob`.
+Use the shared `Knob` React component.
 
 Support:
 
@@ -281,7 +286,7 @@ Support:
 
 ### 22.2 Faders
 
-Use `pulse-fader`.
+Use the shared `Fader` React component.
 
 Support:
 

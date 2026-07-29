@@ -19,5 +19,5 @@ supported layout. Require component and production-browser evidence.
 
 Request: Use a browser API that differs across engines.
 
-Verify current primary sources for Chrome, Edge, and Firefox. Record the
+Verify current primary sources for Chrome. Record the
 support contract, fallback, user error, and verification method.

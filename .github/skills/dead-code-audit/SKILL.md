@@ -17,7 +17,7 @@ description: >
 ## 2. Establish the graph
 
 1. Read `AGENTS.md`, `package.json`, tool configuration, and relevant contracts.
-   Finish when all configured graph tools and protected paths are known.
+   Finish when you know all configured graph tools and protected paths.
 2. List each production, test, worklet, worker, plugin, style, asset, and build entry.
    Finish when every configured entry point has an owner.
 3. Run each applicable repository graph check from `package.json`.

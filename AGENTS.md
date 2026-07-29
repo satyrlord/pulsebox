@@ -52,7 +52,7 @@ For a prose-only request, return only the requested text. Do not add a
 preamble, summary, or closing.
 
 Pulsebox is a fully client-side, desktop-first modular groove workstation for
-Chrome, Edge, and Firefox. It is built with strict TypeScript, Web Audio, and
+Chrome. It is built with strict TypeScript, Web Audio, and
 AudioWorklet. No server product component, no MIDI.
 
 ## Source of truth
@@ -129,8 +129,7 @@ Owning contract documents:
   server component. It serves only the built client and exposes no API.
 - Do not add a server, accounts, cloud sync, collaboration, a native wrapper, a
   PWA, a service worker, or an install flow.
-- Support current stable Chrome, Edge, and Firefox. Safari is outside MVP
-  support.
+- Support current stable Chrome. Other browsers are outside MVP support.
 - Keep the editable workspace usable from 1280 x 720 CSS pixels upward. Below
   either minimum dimension, use the specified unsupported-size behavior.
 - Keep the MVP at eight rack slots, eight visible instrument mixer strips, and
@@ -311,8 +310,8 @@ evicting the oldest entries rather than rejecting a valid new action.
 - Add and run the smallest relevant unit, component, Playwright, or visual
   regression check for each changed contract.
 - Verify the production build in real browser contexts, not only a DOM shim.
-- Cover current stable Chrome, Edge, and Firefox. Automate every deterministic
-  path and record the required manual audio checks for each browser.
+- Cover current stable Chrome. Automate every deterministic path and record the
+  required manual audio checks.
 - Verify supported layouts at 1536 x 1024, 1440 x 900, 1366 x 768, and 1280 x
   720, plus the below-minimum notice.
 - Use deterministic state, meters, animation, and audio fixtures for visual or

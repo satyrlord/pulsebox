@@ -20,18 +20,18 @@ description: >
 
 1. Read repository root `AGENTS.md` and the
    [specification index](../../../docs/specs/spec-000-index.md).
-   Finish when the owning specification and dependencies are known.
+   Finish when you know the owning specification and dependencies.
 2. Read sections 8, 10, and 22 of
    [spec-003](../../../docs/specs/spec-003-application-shell-and-controls.md).
-   Finish when composition, component, and control rules are known.
+   Finish when you know the composition, component, and control rules.
 3. Read section 11 of
    [spec-001](../../../docs/specs/spec-001-product-and-design-foundations.md).
-   Finish when the visual language and theme boundary are known.
+   Finish when you know the visual language and theme boundary.
 4. Read sections 24.1 and 24.3 of
    [spec-010](../../../docs/specs/spec-010-quality-and-delivery.md).
-   Finish when accessibility and test requirements are known.
+   Finish when you know the accessibility and test requirements.
 5. Read [THEMING.md](../../../docs/THEMING.md).
-   Finish when token ownership and user-theme rules are known.
+   Finish when you know the token ownership and user-theme rules.
 
 Use `docs/design/claude-mock-up.html` as the approved composition target. Treat
 other files under `docs/design/` as non-normative evidence.
@@ -49,7 +49,9 @@ other files under `docs/design/` as non-normative evidence.
 
 Finish this stage when each visual choice has a contract or approved target.
 
-## 4. Build React controls
+## 4. Implement React controls
+
+Run this stage only in implementation mode.
 
 1. Use the repository React component model for the complete UI layer.
    Finish when no second component model exists.
@@ -64,7 +66,11 @@ Finish this stage when each visual choice has a contract or approved target.
 6. Clean up listeners, observers, timers, and animation frames.
    Finish when component removal leaves no active resource.
 
-## 5. Verify the interaction contract
+## 5. Audit or verify the interaction contract
+
+In audit mode, use these items as review checks. Do not require new browser or
+visual artifacts. In implementation and verification modes, execute each
+applicable check.
 
 1. Test pointer, keyboard, focus, accessible names, and reduced motion.
    Finish when each changed control supports all applicable input paths.

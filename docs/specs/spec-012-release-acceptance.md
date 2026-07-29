@@ -135,9 +135,8 @@ The merged MVP is complete only when:
     reports every over-cap slot.
 55. **AC-055.** Type checking passes.
 56. **AC-056.** Unit, component, end-to-end, and visual tests pass in the current stable
-    Chrome, Edge, and Firefox release channels. Exact versions are recorded, and
-    any physical-audio-only claim has a passing manual procedure in all three
-    browsers.
+    Chrome release channel. The exact version is recorded, and any
+    physical-audio-only claim has a passing manual procedure.
 57. **AC-057.** The production build completes without unresolved imports, a
     service worker, or PWA packaging.
 58. **AC-058.** The legal audit permits named historical sources only under non-shipping

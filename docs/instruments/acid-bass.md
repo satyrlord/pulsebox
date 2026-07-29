@@ -73,8 +73,7 @@ unavailable until a real offline plugin runtime is implemented and verified.
   live tempo edit.
 - Controller-to-processor pairing verifies that tempo rescheduling clears only
   future events, while module disposal uses the bounded release path.
-- Production-browser tests activate the AudioWorklet path in Chrome, Edge, and
-  Firefox.
+- Production-browser tests activate the AudioWorklet path in Chrome.
 - Parameter and pattern edits, Undo, rack add, and the three exposed Phase 1
   slots have browser coverage.
 - Final acceptance still requires the rendered-audio, startup, and manual

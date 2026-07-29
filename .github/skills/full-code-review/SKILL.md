@@ -12,11 +12,11 @@ Review without edits first. Edit only when the user requests repairs.
 ## 1. Establish the review surface
 
 1. Inspect status, the complete diff, untracked files, and recent history.
-   Finish when every changed path and unrelated dirty path is classified.
+   Finish when you classify every changed path and unrelated dirty path.
 2. Read every changed file and its owning specification sections.
    Finish when each changed behavior has an identified contract owner.
 3. Read relevant callers, registries, commands, migrations, components, and tests.
-   Finish when each changed seam can be judged in context.
+   Finish when you can judge each changed seam in context.
 4. Map each changed contract to its current evidence.
    Finish when every affected acceptance criterion has a pass, gap, or blocker.
 
@@ -51,7 +51,7 @@ Pulsebox remedy.
 2. Give a path, location, broken contract, evidence, impact, and remedy.
    Finish when another agent can reproduce and repair each finding.
 3. State when no blocking finding remains.
-   Finish when every changed path and affected criterion is accounted for.
+   Finish when you account for every changed path and affected criterion.
 
 Treat existing review comments as hypotheses until current evidence confirms
 them.
@@ -69,6 +69,6 @@ them.
 
 ## Completion criterion
 
-The review is complete when every changed path, contract, and acceptance
-criterion is accounted for. Each finding must have reproducible evidence and an
+The review is complete when you account for every changed path, contract, and
+acceptance criterion. Each finding must have reproducible evidence and an
 actionable remedy. Authorized repairs must pass their direct regression checks.

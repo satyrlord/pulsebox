@@ -11,12 +11,14 @@ description: >
 
 1. Use the reply or an ignored temporary path for the handoff.
    Finish when no handoff file will enter the repository tree.
-2. Put each durable fact in its owning specification or domain document.
+2. Link each recorded durable fact to its owning document.
    Finish when the temporary narrative owns no product contract.
 3. Link to current owners instead of copying their full contents.
    Finish when no fact has a second owner in the handoff.
 
 Do not create `HANDOFF.md`, a verification folder, or a dated repository report.
+If a durable fact has no owner update, list that update as the next action. Do
+not edit an owning document without explicit authority.
 
 ## 2. Verify the current state
 
@@ -27,12 +29,12 @@ Do not create `HANDOFF.md`, a verification folder, or a dated repository report.
 3. List the least-confident work with a verification procedure.
    Finish when every uncertainty has one concrete check.
 4. List skipped, incomplete, and deferred work.
-   Finish when no known gap is hidden by a completion claim.
+   Finish when no completion claim hides a known gap.
 5. State previously unstated assumptions and the largest remaining blind spot.
    Finish when the next agent can test each material assumption.
 
-Fix acceptance-blocking gaps before a completion handoff. For a mid-task
-handoff, label each blocker and next action without claiming completion.
+Do not repair a gap without explicit authority. If a gap blocks the underlying
+task, report that task as incomplete. Label each blocker and next action.
 
 ## 3. Write the required sections
 

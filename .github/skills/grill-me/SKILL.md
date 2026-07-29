@@ -12,7 +12,7 @@ Remain read-only unless the user authorizes workspace edits.
 ## 1. Prepare the decision tree
 
 1. Read `AGENTS.md`, the specification index, each owner, and each dependency.
-   Finish when the approved contract and open questions are known.
+   Finish when you know the approved contract and open questions.
 2. Inspect implementation that the plan claims already exists.
    Finish when each implementation claim has direct evidence.
 3. Resolve facts that current repository files or primary sources can answer.
@@ -44,13 +44,13 @@ Read [EXAMPLES.md](EXAMPLES.md) when a concrete question sequence is useful.
 
 1. Identify the owning specification or domain document for each decision.
    Finish when every durable fact has one owner.
-2. If edits are authorized, update only the owning document.
+2. If the user authorizes edits, update only the owning document.
    Finish when no parallel decision document exists.
-3. If edits are not authorized, report the exact future document change.
+3. If the user does not authorize edits, report the exact future document change.
    Finish when another agent can apply it without reopening the decision.
 
 ## Completion criterion
 
-Complete the session when every inventoried branch is resolved or deferred.
+Complete the session when you resolve or defer every inventoried branch.
 Each deferral must name an owner, reason, and verification step. Route authorized
 implementation to `add-feature`, `refactor`, or `diagnose` as applicable.

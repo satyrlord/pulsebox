@@ -15,7 +15,7 @@ Read [GLOSSARY.md](GLOSSARY.md) when a term in this skill needs a definition.
 ## 1. Establish the contract
 
 1. Read the repository instructions and the complete current skill.
-   Finish when all applicable rules and existing user changes are known.
+   Finish when you know all applicable rules and existing user changes.
 2. Collect concrete request examples for each valid branch.
    Finish when each branch has a trigger, output, boundary, and failure case.
 3. Decide whether the agent or only the user must invoke the skill.

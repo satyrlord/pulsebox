@@ -2,6 +2,13 @@
 
 This file defines the terms used by [create-skill](SKILL.md).
 
+## Contents
+
+- [Invocation](#invocation)
+- [Structure](#structure)
+- [Quality](#quality)
+- [Failure modes](#failure-modes)
+
 ## Invocation
 
 ### Model-invoked skill
@@ -84,8 +91,8 @@ Co-location keeps a concept, its rules, and its limits in one place.
 
 ### Granularity
 
-Granularity is the degree to which work is divided across skills and reference
-files. Split only when the split improves invocation or execution.
+Granularity shows how a design divides work across skills and reference files.
+Split only when the split improves invocation or execution.
 
 ## Quality
 
@@ -118,8 +125,8 @@ reference.
 
 ### Premature completion
 
-Premature completion ends a step before its criterion is satisfied. First make
-the criterion precise. Split the sequence only when later steps still cause the
+Premature completion ends a step before it meets its criterion. First make the
+criterion precise. Split the sequence only when later steps still cause the
 failure.
 
 ### Duplication

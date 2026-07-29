@@ -196,10 +196,9 @@ normative:
 - Offline 48 kHz to 44.1 kHz resampling is deterministic, keeps passband error
   within 0.1 dB from 20 Hz through 20 kHz, and keeps aliased or imaged test-tone
   energy at or below -90 dBFS.
-- Automated deterministic checks run in the current stable Chrome, Edge, and
-  Firefox release channels. The evidence records exact versions. Required
-  real-audio checks run manually in all three browsers when automation cannot
-  observe the physical result.
+- Automated deterministic checks run in the current stable Chrome release
+  channel. The evidence records the exact version. Required real-audio checks
+  run manually when automation cannot observe the physical result.
 - Accessibility evidence checks the numeric requirements in section 24.1 at
   every supported viewport, in the `rack` theme and high-contrast mode.
 - The first-sound procedure in section 21.8 passes all five runs in every
@@ -251,11 +250,11 @@ global stylesheet.
 
 ### 24.6 Browser support
 
-Support the current stable releases of Chrome, Edge, and Firefox. Safari is
-outside MVP support. Run every deterministic browser-specific audio, file,
-Canvas, persistence, and component check in all three release channels. Use
-documented manual checks only for physical audio behavior that browser
-automation cannot observe. Record exact browser versions in release evidence.
+Support the current stable release of Chrome. Other browsers are outside MVP
+support. Run every deterministic browser-specific audio, file, Canvas,
+persistence, and component check in that release channel. Use documented manual
+checks only for physical audio behavior that browser automation cannot observe.
+Record the exact browser version in release evidence.
 
 ### 24.7 Documentation
 

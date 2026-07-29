@@ -39,7 +39,7 @@ this table is the traceability record.
   `D65`.
 - **D10.** Browser projects use JSON manifests plus asset records; portable
   export is one `.pulsebox` package.
-- **D11.** Support current stable Chrome, Edge, and Firefox.
+- **D11.** Support current stable Chrome.
 - **D12.** Rack stems are post-module-insert and post-fader; send returns are
   separate; export also includes the master mix.
 - **D13.** Voice-level send controls are removed. Sends exist only on the parent

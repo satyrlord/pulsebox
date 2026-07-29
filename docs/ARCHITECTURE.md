@@ -826,8 +826,7 @@ out-of-range peak. Decoding shall not normalize.
 Decoder versions and licenses shall be pinned in the dependency lockfile and
 recorded in the legal and dependency audit before shipping. The same valid bytes
 and decoder version shall produce the same channel count, sample rate, frame
-count, and canonical little-endian Float32 PCM bytes in Chrome, Edge, and
-Firefox.
+count, and canonical little-endian Float32 PCM bytes in Chrome.
 
 Fixture tests shall include every required bit depth and container, mono and
 stereo, odd-sized chunks, metadata chunks, maximum legal values, truncated
@@ -1006,8 +1005,8 @@ Every audio evidence run shall record:
 - render length and comparison method; and
 - produced report and audio artifact hashes.
 
-The release matrix shall use the then-current stable Chrome, Edge, and Firefox.
-Each browser shall run at 44.1 kHz and 48 kHz where the browser and device allow
+The release matrix shall use the then-current stable Chrome. The browser shall
+run at 44.1 kHz and 48 kHz where the browser and device allow
 the requested live rate. Unsupported live-rate selection shall be recorded and
 covered with an offline context at that rate rather than reported as a pass.
 

@@ -12,7 +12,7 @@ Use the smallest feedback loop that can disprove a suspected cause.
 ## 1. Build the feedback loop
 
 1. Read the reported symptom, relevant contract, source, tests, and environment.
-   Finish when the exact expected and observed outcomes are known.
+   Finish when you know the exact expected and observed outcomes.
 2. Select the fastest signal that reaches the real failure.
    Finish when one repeatable command or procedure can show the symptom.
 3. Record the environment and controlled input.
@@ -34,11 +34,13 @@ Read [EXAMPLES.md](EXAMPLES.md) when a concrete loop pattern is useful.
 
 ## 3. Measure one variable
 
-1. Add the narrowest assertion, trace, debugger probe, or measurement.
+1. Use the narrowest non-mutating debugger probe or current measurement.
    Finish when the probe separates at least two ranked hypotheses.
-2. Change one controlled variable at a time.
+2. If a new assertion, trace, or log needs an edit, request explicit authority.
+   Finish when the user authorizes the edit or a non-mutating probe replaces it.
+3. Change one controlled variable at a time.
    Finish when each result has one clear cause.
-3. Repeat until one cause explains all observed evidence.
+4. Repeat until one cause explains all observed evidence.
    Finish when the evidence excludes the material alternatives.
 
 ## 4. Conclude or fix

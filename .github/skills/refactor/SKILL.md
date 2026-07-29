@@ -38,7 +38,7 @@ method.
 1. Make the smallest structural change.
    Finish when the code compiles and the preserved behavior remains testable.
 2. Run the narrowest affected checks.
-   Finish when the step passes or the exact pre-existing failure is recorded.
+   Finish when the step passes or you record the exact pre-existing failure.
 3. Repeat only while the next step serves the same refactor.
    Finish when no planned step adds product behavior.
 4. Compare the selected complexity measure with its baseline.
@@ -49,6 +49,6 @@ approved product contract must change.
 
 ## Completion criterion
 
-Complete the refactor when behavior and contracts are unchanged. Every affected
+Complete the refactor when behavior and contracts stay unchanged. Every affected
 check must pass. Report the before-and-after complexity measure and account for
 every changed line.

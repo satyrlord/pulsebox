@@ -23,11 +23,11 @@ contract edit in the implementation or repair branch.
 
 1. Read repository root `AGENTS.md` and the
    [specification index](../../../docs/specs/spec-000-index.md).
-   Finish when the build order and owning specification are known.
+   Finish when you know the build order and owning specification.
 2. Read the owning specification and each listed dependency in full.
-   Finish when every applicable requirement and acceptance criterion is known.
+   Finish when you know every applicable requirement and acceptance criterion.
 3. Inspect the current implementation and tests when they exist.
-   Finish when the present behavior and test seams are known.
+   Finish when you know the present behavior and test seams.
 4. Verify unstable browser or Web Audio facts with current primary sources.
    Finish when each material API claim has current evidence.
 
@@ -81,7 +81,7 @@ Skip this stage in the definition branch.
 ## Completion criterion
 
 In the definition branch, complete the work when all requested contracts and
-acceptance criteria agree. Report that implementation was not requested.
+acceptance criteria agree. Report that the user did not request implementation.
 
 In the implementation or repair branch, complete the work when contracts,
 source, tests, and user documentation agree. Every affected acceptance criterion

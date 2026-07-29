@@ -17,10 +17,10 @@ description: >
 ## 2. Establish the system map
 
 1. Read `AGENTS.md`, the specification index, and each applicable owner.
-   Finish when the approved architecture and product boundary are known.
+   Finish when you know the approved architecture and product boundary.
 2. Read [spec-002](../../../docs/specs/spec-002-technical-foundations.md) and
    [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md).
-   Finish when each layer, port, protocol, and registry owner is known.
+   Finish when you know each layer, port, protocol, and registry owner.
 3. Inspect the source tree, dependency graph, and relevant tests.
    Finish when each suspected seam has direct file and dependency evidence.
 
@@ -37,7 +37,7 @@ Check for these conditions:
 - React components rebuild broad trees or leave resources active
 - schemas, assets, or theme rules span unrelated modules
 - a local feature requires broad unrelated edits
-- an owner cannot be tested independently
+- tests do not isolate one owner
 
 Prefer a change that removes knowledge from callers and makes one owner absorb
 the complexity.
@@ -52,7 +52,7 @@ or contract check.
 2. Name the target owner and required contract change.
    Finish when the new boundary has one accountable owner.
 3. Define a before-and-after measure.
-   Finish when simplification can be checked by imports, branches, owners, or edit surface.
+   Finish when the selected measure shows fewer imports, branches, owners, or changed files.
 4. State migration effects, risks, and the objective verifier.
    Finish when the proposal includes all required transition work.
 5. Rank the proposal by leverage, risk, and prerequisite order.

@@ -1028,7 +1028,7 @@ recovery fixtures, then automate their outcomes in unit and browser tests.
 
 This contract relies on IndexedDB transaction rollback and atomic commit, the
 origin-scoped storage model, and the Storage Manager persistence and estimate
-APIs. Implementations must verify current Chrome, Edge, and Firefox behavior
+APIs. Implementations must verify current Chrome behavior
 against the primary IndexedDB specification and current browser documentation:
 
 - <https://www.w3.org/TR/IndexedDB/>
