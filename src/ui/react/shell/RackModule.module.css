@@ -10,12 +10,14 @@
   --plate-bot: color-mix(in srgb, var(--k) calc(var(--mod-tint) - 3%), var(--surface-plate-bot));
 
   flex: 0 0 94px;
+  position: relative;
   min-block-size: 86px;
   max-block-size: 98px;
   display: grid;
   grid-template-columns: 128px minmax(0, 1fr) auto;
   align-items: center;
   overflow: visible;
+  padding-inline: 12px;
   background: var(--mat-plate);
   border: 1px solid var(--edge-hairline);
   border-radius: var(--pulse-radius-panel, 6px);
@@ -28,16 +30,59 @@
   container-type: inline-size;
 }
 
+/* Metal rails seat each faceplate in the rack. The fasteners are decorative. */
+.module::before,
+.module::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset-block: 4px;
+  inline-size: 9px;
+  pointer-events: none;
+  border-radius: 4px;
+  background:
+    radial-gradient(
+      circle at 50% 7px,
+      var(--metal-screw-top) 0 1.5px,
+      var(--metal-screw-bot) 1.75px 3px,
+      transparent 3.25px
+    ),
+    radial-gradient(
+      circle at 50% calc(100% - 7px),
+      var(--metal-screw-top) 0 1.5px,
+      var(--metal-screw-bot) 1.75px 3px,
+      transparent 3.25px
+    ),
+    linear-gradient(90deg, var(--metal-rail-b), var(--metal-rail-a), var(--metal-rail-b));
+  box-shadow:
+    inset 0 0 0 1px var(--edge-hairline),
+    inset 1px 0 0 var(--edge-highlight),
+    0 1px 2px var(--edge-shadow);
+}
+
+.module::before {
+  inset-inline-start: 2px;
+}
+
+.module::after {
+  inset-inline-end: 2px;
+}
+
 /* Selection lights the plate perimeter. It is paired with `data-selected` and
-   the disabled Select key, so it never rests on colour alone. */
+   the disabled Select key, so it never rests on color alone. */
 .selected {
   border-color: color-mix(in srgb, var(--k) 55%, var(--edge-hairline));
   box-shadow:
     inset 0 1px 0 #ffffff2e,
     inset 0 -1px 0 #0000008c,
     0 0 0 1px var(--k),
-    0 0 10px color-mix(in srgb, var(--k) 32%, transparent),
     0 3px 7px #0000008c;
+}
+
+:global([data-high-contrast="true"]) .module::before,
+:global([data-high-contrast="true"]) .module::after {
+  background: var(--pulse-color-surface-control, #111111);
+  box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #ffffff);
 }
 
 /* The identity strip closes with a hairline and a lit edge, so the plate reads
@@ -163,7 +208,7 @@
   cursor: default;
 }
 
-/* An engaged key fills with the module colour and loses the dimming, so the
+/* An engaged key fills with the module color and loses the dimming, so the
    change is a brightness step as well as a hue. */
 .action[data-active="true"] {
   color: var(--accent-ink);
@@ -234,8 +279,14 @@
 
 .controls :global([data-component="knob"] [role="slider"]),
 .controls :global([data-component="knob"] [role="slider"] svg) {
-  inline-size: 34px;
-  block-size: 34px;
+  inline-size: 38px;
+  block-size: 38px;
+}
+
+/* Rack arcs use a bright module color so value rings stay readable. */
+.controls :global([data-component="knob"] [data-part="value"]) {
+  stroke: color-mix(in srgb, var(--k) 82%, #cade6a);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--k) 75%, transparent));
 }
 
 /* Control captions sit at the 10px floor from spec-001 section 11.3. */
@@ -309,8 +360,8 @@
      The transparent inset above still carries the full 24px target. */
   .controls :global([data-component="knob"] [role="slider"]),
   .controls :global([data-component="knob"] [role="slider"] svg) {
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: 30px;
+    block-size: 30px;
   }
 
   .controls :global([data-component="knob"] > span) {

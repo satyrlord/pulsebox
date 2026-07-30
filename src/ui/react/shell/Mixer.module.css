@@ -28,13 +28,22 @@
 }
 
 .emptyStrip {
-  flex-basis: 33px;
   color: var(--pulse-color-disabled, #7b858d);
   opacity: 0.72;
 }
 
+.strip,
+.emptyStrip {
+  flex: 1 1 48px;
+  min-inline-size: 48px;
+  padding-inline: 0;
+}
+
 .master {
-  flex-basis: 39px;
+  /* The master travel line is neutral because the master has no module accent. */
+  --module-accent: var(--pulse-color-border-default, #6d7881);
+
+  flex: 0 0 39px;
 }
 
 .strip[data-silenced="true"] {
@@ -47,8 +56,7 @@
     inset 0 0 0 1px var(--k);
 }
 
-/* The mock names channels in bare accent type on the chassis, not on a lit
-   chip. The engaged name adds an underline, so selection is not colour alone. */
+/* Channel names use bare accent type. An underline marks selection. */
 .channelName {
   inline-size: 100%;
   min-block-size: 24px;
@@ -72,12 +80,6 @@
   text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
-.emptyStrip > strong,
-.emptyText {
-  color: var(--pulse-color-text-muted, #919ba3);
-  text-shadow: 0 1px 0 var(--text-engraved-lo);
-}
-
 .channelName[aria-pressed="true"] {
   background: none;
   box-shadow: none;
@@ -85,27 +87,23 @@
   text-underline-offset: 3px;
 }
 
+/* The slot number wears the channel-tag voice, muted, so an empty strip reads
+   as a channel awaiting a name rather than a different kind of column. */
 .emptyStrip > strong {
-  min-block-size: 24px;
-  font:
-    11px/24px ui-monospace,
-    monospace;
-}
-
-/* The word has to stay inside its own narrow column, so it clips at the strip
-   boundary rather than reading as one run of text across two empty channels. */
-.emptyText {
   inline-size: 100%;
+  min-block-size: 24px;
   overflow: hidden;
   text-align: center;
   font-family: var(--type-display);
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: normal;
-  text-transform: uppercase;
+  font-size: var(--pulse-type-12, 12px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 24px;
+  color: var(--pulse-color-text-muted, #919ba3);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
-/* The pan ring keeps its engraved caption, as the mock's strips do. The value
-   itself stays on the hover readout so the strip does not grow a second row. */
+/* The pan ring keeps its engraved caption. The hover readout shows the value. */
 .panControl {
   block-size: 44px;
 }
@@ -127,7 +125,7 @@
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
-/* Pan rings wear the channel colour all the way around, muted, so the ring
+/* Pan rings use the muted channel color around the complete ring, so the ring
    reads as a legend rather than as a lit value. */
 .panControl :global([data-component="knob"] path) {
   stroke: color-mix(in srgb, var(--k) 78%, #0a0c0d);
@@ -137,15 +135,18 @@
 
 /*
  * One deep channel well per strip: the fader slot and the LED ladder live
- * together inside a single near-black recess. The well hugs the control it
- * holds and takes the strip's spare height as margin, so a tall studio column
- * never leaves an empty black shaft below the cap.
+ * together inside a single near-black recess. The well takes the strip's whole
+ * spare height, and the fader inside stretches its travel to match.
  */
 .faderWell {
-  flex: 0 1 auto;
-  margin-block: auto;
+  flex: 1 1 auto;
+  margin-block-end: 12px;
   min-block-size: 0;
-  inline-size: 30px;
+  /* The well clips, so the fader's 24px pointer target has to fit inside it:
+     24px of target, a 1px gap, the 6px ladder, and 3px of padding each side.
+     A narrower well would hide part of the target behind the clip and leave the
+     control with roughly the width of its visible travel line. */
+  inline-size: 37px;
   display: flex;
   justify-content: center;
   gap: 1px;
@@ -158,14 +159,16 @@
     0 1px 0 var(--edge-highlight);
 }
 
+/* The fader claims the full target width so its transparent inset stays inside
+   the clip. The visible travel line stays 11px and centers within that column. */
 .faderWell :global([data-component="fader"]) {
-  min-inline-size: 18px;
+  flex: 0 0 var(--pulse-target-min, 24px);
   padding: 0;
   gap: 0;
 }
 
-.faderWell :global([data-component="fader"] svg) {
-  inline-size: 24px;
+.faderWell :global([data-component="level-meter"]) {
+  flex: 0 0 auto;
 }
 
 .faderWell :global([data-component="fader"] > span),
@@ -177,38 +180,30 @@
   clip-path: inset(50%);
 }
 
+/* An empty channel keeps the same well and disabled shared controls. */
 .emptyFader {
-  flex: 0 1 auto;
-  margin-block: auto;
-  block-size: 128px;
-  inline-size: 28px;
-  display: grid;
-  place-items: center;
-  background: var(--pulse-color-surface-inset, #080a0c);
-  border-radius: var(--pulse-radius-control, 4px);
-}
-
-.emptyFader i {
-  inline-size: 4px;
-  block-size: 70%;
-  background: var(--pulse-color-control-track, #6f7b84);
-  opacity: 0.35;
+  opacity: 0.18;
 }
 
 .sendGrid {
-  inline-size: min(33px, 100%);
+  inline-size: 48px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 2px;
-  margin-block: 6px;
+  grid-template-columns: repeat(2, 24px);
+  gap: 2px 0;
+  /* The tall gutters keep the grid clear of the pan ring and the well. */
+  margin-block: 14px 17px;
 }
 
-/* Send chips are dark wells with a lit letter inside a hairline frame. The
-   frame carries the channel colour, so all four read as one group. */
+/* Each send has a separate 24px target. A centered 16px face keeps the compact
+   target appearance without overlap between adjacent controls. */
 .sendGrid button {
   position: relative;
-  min-inline-size: 0;
-  block-size: 16px;
+  isolation: isolate;
+  inline-size: 24px;
+  min-inline-size: 24px;
+  block-size: 24px;
+  min-block-size: 24px;
+  padding: 0;
   display: grid;
   place-items: center;
   font-family: var(--type-display);
@@ -217,6 +212,19 @@
   letter-spacing: normal;
   color: color-mix(in srgb, var(--k) 62%, var(--pulse-color-text-primary, #f3f5f6));
   text-shadow: 0 0 4px color-mix(in srgb, var(--k) 30%, transparent);
+  background: none;
+  box-shadow: none;
+}
+
+.sendGrid button::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  inline-size: 16px;
+  block-size: 16px;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--k) 18%, var(--surface-plate-bot)),
@@ -229,34 +237,34 @@
     0 1px 2px #00000080;
 }
 
-.sendGrid button::before {
-  content: "";
-  position: absolute;
-  inset: 50% auto auto 50%;
-  inline-size: 100%;
-  min-inline-size: 24px;
-  block-size: 24px;
-  transform: translate(-50%, -50%);
+.sendGrid button > [data-part="send-label"] {
+  position: relative;
+  z-index: 1;
 }
 
 .sendGrid button:disabled {
   color: var(--pulse-color-text-muted, #919ba3);
   text-shadow: none;
   background: none;
+  box-shadow: none;
+  opacity: 0.3;
+}
+
+.sendGrid button:disabled::before {
+  background: none;
   box-shadow:
     inset 0 0 0 1px #ffffff0f,
     0 1px 2px #00000080;
-  opacity: 0.3;
 }
 
 .muteSolo {
   display: flex;
-  gap: 4px;
+  gap: 0;
 }
 
 .muteSolo :global(button) {
-  min-inline-size: 17px;
-  inline-size: 17px;
+  min-inline-size: 24px;
+  inline-size: 24px;
   block-size: 24px;
   padding-inline: 0;
   border-radius: 3px;
@@ -267,48 +275,16 @@
     0 1px 2px #00000080;
 }
 
-.muteSolo i {
-  display: grid;
-  place-items: center;
-  inline-size: 14px;
-  block-size: 24px;
-  font:
-    var(--pulse-type-10, 10px)/1.2 ui-monospace,
-    monospace;
-}
-
 @media (max-width: 1439px) {
-  /* Nine columns, two pixels of gap, and the panel's own padding all have to
-     fit inside the narrow studio column, so each strip gives up a few pixels
-     rather than the row overflowing its panel. */
+  /* The narrow layout keeps eight 48px strips and one compact master strip. */
   .mixer {
     gap: 0;
     padding-inline: 3px;
   }
 
-  .strip {
-    flex-basis: 36px;
-  }
-
-  .emptyStrip {
-    flex-basis: 27px;
-  }
-
+  /* The master strip stays wide enough for the channel well, so its fader keeps
+     the same pointer target as an instrument fader. */
   .master {
-    flex-basis: 29px;
-  }
-
-  .muteSolo {
-    gap: 3px;
-  }
-
-  .muteSolo :global(button) {
-    min-inline-size: 14px;
-    inline-size: 14px;
-  }
-
-  .sendGrid {
-    inline-size: min(29px, 100%);
-    gap: 8px 2px;
+    flex-basis: 39px;
   }
 }

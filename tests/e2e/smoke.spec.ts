@@ -260,7 +260,7 @@ test("high contrast repaints the rack controls, not only the page behind them", 
    * The overlay flips palette tokens, so a control that consumes a token no
    * theme declares keeps its literal fallback and stays dark on the black
    * overlay. Asserting the attribute or the target size cannot see that: the
-   * control has to be sampled before and after, and its colour has to move.
+   * control has to be sampled before and after, and its color has to change.
    */
   const sample = async () =>
     page.evaluate(() => {
@@ -268,16 +268,43 @@ test("high contrast repaints the rack controls, not only the page behind them", 
         const element = document.querySelector(selector);
         return element === null ? "" : getComputedStyle(element).getPropertyValue(property).trim();
       };
+      const readPseudo = (selector: string, pseudo: string, property: string): string => {
+        const element = document.querySelector(selector);
+        return element === null
+          ? ""
+          : getComputedStyle(element, pseudo).getPropertyValue(property).trim();
+      };
       return {
         page: getComputedStyle(document.body).backgroundColor,
+        appBackground: read('[data-component="pulse-app"]', "background-image"),
         knobCap: read('[data-component="knob"] circle', "fill"),
         knobEdge: read('[data-component="knob"] circle', "stroke"),
+        knobEdgeWidth: read('[data-component="knob"] circle', "stroke-width"),
+        knobEdgeOpacity: read('[data-component="knob"] circle', "stroke-opacity"),
+        knobShade: read('[data-component="knob"] circle:nth-of-type(2)', "display"),
+        knobSkirtBackground: readPseudo(
+          '[data-component="knob"] [role="slider"]',
+          "::before",
+          "background-image",
+        ),
+        knobSkirtShadow: readPseudo(
+          '[data-component="knob"] [role="slider"]',
+          "::before",
+          "box-shadow",
+        ),
         knobValue: read('[data-component="knob"] input', "color"),
-        faderSlot: read('[data-component="fader"] rect', "fill"),
+        faderSlot: read('[data-component="fader"] [data-part="track"]', "background-color"),
+        faderOutline: read('[data-component="fader"] [role="slider"]', "outline-width"),
+        pianoNatural: read('[aria-label="C4 piano key audition"]', "background-image"),
+        pianoSharp: read('[aria-label="A#3 piano key audition"]', "background-image"),
       };
     });
 
   const beforeOverlay = await sample();
+  const idleMeter = page.locator('[data-component="level-meter"]').first();
+  const meterBeforeOverlay = await idleMeter.evaluate((element) =>
+    (element as HTMLCanvasElement).toDataURL(),
+  );
 
   await page.getByRole("button", { name: "Settings" }).click();
   await page
@@ -295,6 +322,18 @@ test("high contrast repaints the rack controls, not only the page behind them", 
   // The overlay drives borders to pure white, which is what makes a control
   // edge readable against the black page.
   expect(afterOverlay.knobEdge).toBe("rgb(255, 255, 255)");
+  expect(afterOverlay.appBackground).toBe("none");
+  expect(afterOverlay.knobEdgeWidth).toBe("2px");
+  expect(afterOverlay.knobEdgeOpacity).toBe("1");
+  expect(afterOverlay.knobShade).toBe("none");
+  expect(afterOverlay.knobSkirtBackground).toBe("none");
+  expect(afterOverlay.knobSkirtShadow).toBe("rgb(255, 255, 255) 0px 0px 0px 2px inset");
+  expect(afterOverlay.faderOutline).toBe("2px");
+  expect(afterOverlay.pianoNatural).toContain("rgb(255, 255, 255)");
+  expect(afterOverlay.pianoSharp).toBe("none");
+  await expect
+    .poll(() => idleMeter.evaluate((element) => (element as HTMLCanvasElement).toDataURL()))
+    .not.toBe(meterBeforeOverlay);
 });
 
 test("Escape closes Settings and returns focus to the button that opened it", async ({ page }) => {
@@ -559,6 +598,36 @@ test("a mixer fader moves by keyboard and persists across a reload", async ({ pa
       await page.getByRole("slider", { name: "Acid Bass level" }).getAttribute("aria-valuenow"),
     ),
   ).toBeCloseTo(after, 2);
+});
+
+/**
+ * The mixer well is shorter than the fader's pointer-resolution floor. Mapping
+ * drag one-to-one onto that short travel would make a small drag cross most of
+ * a 60 dB range, so the floor has to hold whatever height the layout grants.
+ */
+test("a short mixer well keeps the fader's pointer resolution", async ({ page }) => {
+  await page.getByRole("tab", { name: "Mixer" }).click();
+  const fader = page.getByRole("slider", { name: "Acid Bass level" });
+  const surface = await fader.boundingBox();
+  if (surface === null) throw new Error("Expected the channel fader to be laid out.");
+  // The repair only matters while the well is shorter than the 120px floor.
+  expect(surface.height).toBeLessThan(120);
+
+  const startValue = Number(await fader.getAttribute("aria-valuenow"));
+  const travel = 30;
+  await page.mouse.move(surface.x + surface.width / 2, surface.y + surface.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    surface.x + surface.width / 2,
+    surface.y + surface.height / 2 - travel,
+    { steps: 10 },
+  );
+  const moved = Number(await fader.getAttribute("aria-valuenow"));
+  await page.mouse.up();
+
+  // 30 pixels over a 0-to-1 range at the 120px floor is 0.25, not the 0.37 a
+  // raw one-to-one mapping onto the measured well would produce.
+  expect(moved - startValue).toBeCloseTo(travel / 120, 2);
 });
 
 test("song mode chains Patterns and reports the chain length", async ({ page }) => {

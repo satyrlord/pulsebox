@@ -84,6 +84,14 @@ poking at things.
 4. **Density is earned, never decorative.** Compact panels expose what fast sound
    design needs; expanded editors go deeper without replacing the underlying
    state. Anything on screen that is not doing work is removed.
+
+   Work is not only state change. Visual detail is doing work when it shows that
+   a control is grabbable, marks where one part ends and the next begins, tells
+   the user which machine they are touching, or confirms that an action landed.
+   Raised caps, recessed bays, inset readouts, edges, and the response of a
+   control under the pointer are structural, not ornamental. Remove the detail
+   that carries none of these — not the detail that makes the panel readable and
+   tactile.
 5. **Recovery instead of confirmation.** Destructive edits apply immediately,
    retain full recovery data, and produce a non-blocking Undo notice. The product
    ships no confirmation dialogs.

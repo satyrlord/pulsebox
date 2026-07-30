@@ -38,9 +38,8 @@
 }
 
 /*
- * Direct numeric entry lives in this chip, hidden until the knob is hovered or
- * holds keyboard focus, as the approved composition target draws it. It stays
- * in the DOM throughout, so assistive technology always finds the field.
+ * Direct numeric entry lives in this chip and stays in the DOM. It appears when
+ * the knob is hovered or has keyboard focus.
  */
 .value {
   opacity: 0;
@@ -102,7 +101,11 @@
   inset: 18%;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 34% 26%, #ffffff21 0 8%, transparent 34%),
+    radial-gradient(
+      circle at 34% 26%,
+      color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 13%, transparent) 0 8%,
+      transparent 34%
+    ),
     radial-gradient(circle at 50% 44%, var(--metal-cap-top) 0 62%, transparent 63%),
     repeating-conic-gradient(
       from 0deg,
@@ -112,13 +115,18 @@
     linear-gradient(180deg, var(--metal-cap-top), var(--metal-cap-bot));
   box-shadow:
     inset 0 1px 1px var(--edge-highlight),
-    inset 0 -2px 3px #00000099,
-    0 3px 5px #00000099;
+    inset 0 -2px 3px color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 60%, transparent),
+    0 3px 5px color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 60%, transparent);
   transition: scale var(--pulse-duration-fast, 80ms) linear;
 }
 
 .dragging::before {
   scale: 1.06;
+}
+
+:global([data-high-contrast="true"]) .dial::before {
+  background: var(--pulse-color-surface-control, #111111);
+  box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #ffffff);
 }
 
 /* The cap is an absolutely positioned pseudo-element, so it paints above
@@ -133,13 +141,13 @@
   overflow: visible;
 }
 
-/* Engraved travel marks sit outside the arc, the way a panel legend does. */
+/* Engraved travel marks sit outside the arc and stay faint. */
 .ticks line {
-  stroke: #ffffff59;
-  stroke-width: 1.4;
+  stroke: #ffffff42;
+  stroke-width: 1.1;
 }
 
-/* The unlit travel is a groove cut into the plate, so the contract track colour
+/* The unlit travel is a groove cut into the plate, so the contract track color
    is carried down toward the recess rather than drawn as a light ring. A light
    full ring would read as a filled value at every setting. */
 .track {
@@ -166,14 +174,35 @@
 }
 
 /*
- * The domed inner face sitting inside the knurled skirt. Both of its colours
+ * The domed inner face sits inside the knurled skirt. Both of its colors
  * are contract tokens, so a theme change or the high-contrast overlay repaints
  * the control itself and not only the panel behind it.
  */
 .cap {
-  fill: var(--pulse-color-surface-control, #242a30);
+  /* The token keeps the dark face current after a theme or contrast change. */
+  fill: color-mix(in srgb, var(--pulse-color-surface-control, #242a30) 46%, #0a0c0e);
   stroke: var(--pulse-color-border-default, #6d7881);
   stroke-width: 0.8;
+  /* The rim stays the border token, so high contrast drives it to pure white.
+     Opacity alone dims it in the rack theme without changing that paint. */
+  stroke-opacity: 0.45;
+}
+
+/* Decorative dome shading over the cap: one upper-left glint falling to a
+   darker base. It is a separate overlay so the cap itself keeps a flat token
+   fill that theme and contrast changes can reach. */
+.capShade {
+  pointer-events: none;
+}
+
+:global([data-high-contrast="true"]) .cap {
+  fill: var(--pulse-color-surface-control, #111111);
+  stroke-width: 2;
+  stroke-opacity: 1;
+}
+
+:global([data-high-contrast="true"]) .capShade {
+  display: none;
 }
 
 /* A fine machined indicator line running across the cap face. */

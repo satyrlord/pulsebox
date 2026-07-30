@@ -57,27 +57,9 @@ The rack remains the central sound-design surface. The studio column stays
 compact so mixer routing remains immediately available without taking visual
 priority from the rack.
 
-For the shell surfaces covered by this specification,
-[`docs/design/claude-mock-up.html`](../design/claude-mock-up.html) is the single
-approved composition target. It owns the semantic structure and interactive
-behavior. It also owns visual proportion, placement, density, materials,
-typography scale, and control size. Do not use a separate image reference. A
-second target in another medium creates two conflicting sources.
-
-The product specifications continue to own behavior, state, accessibility, audio
-routing, and responsive acceptance. If the composition target and a product
-specification disagree, the specification controls. Correct the target. Other
-files under `docs/design/` remain non-normative visual evidence.
-
-Per decision `D80`, the target displays only true or specification-owned state.
-It renders the default project defined in
-[rack and instruments](spec-005-rack-and-instruments.md) section 9.1 in its real
-stopped state. Include structural content because this file owns density. Do not
-stage runtime state. No control can show a value that the product cannot produce.
-
 Parameter readouts must track their values. Meters show no signal while the
-transport is stopped. Do not seed history. A fixture is defective if it shows
-state that the product cannot reach.
+transport is stopped. Do not seed history. No control can show a value that the
+product cannot produce.
 
 ### 8.3 Pattern and Song transport modes
 

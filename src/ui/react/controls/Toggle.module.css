@@ -48,11 +48,12 @@
     0 1px 2px #00000080;
 }
 
+/* An engaged mute is a lit neutral cap. Solo uses the warning color. */
 .neutral.pressed {
   background: linear-gradient(
     180deg,
-    var(--module-accent, #9be564),
-    color-mix(in srgb, var(--module-accent, #9be564) 70%, #000000)
+    var(--signal-mute, #e1e6e9),
+    color-mix(in srgb, var(--signal-mute, #e1e6e9) 70%, #000000)
   );
 }
 

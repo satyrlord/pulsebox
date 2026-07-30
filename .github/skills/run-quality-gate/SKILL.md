@@ -28,9 +28,6 @@ explicit approval.
 4. Mark each required check as configured, blocked, or not available.
    Completion criterion: Every requirement has one current status.
 
-Do not treat Prettier or `format:check` as gate checks. If the user requests
-formatting separately, run it.
-
 Read [REFERENCE.md](REFERENCE.md) for applicability and stop conditions.
 
 ## 3. Run applicable checks

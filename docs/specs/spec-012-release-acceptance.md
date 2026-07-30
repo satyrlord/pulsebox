@@ -18,10 +18,9 @@ The merged MVP is complete only when:
    shell, rack, mixer, effects, and editors.
 3. **AC-003.** Its dependency tree contains no unused or undeclared runtime
    dependency.
-4. **AC-004.** Its 1536 × 1024 composition follows
-   `docs/design/claude-mock-up.html`. The rack remains dominant. The compact
-   right studio column provides mutually exclusive Mixer, Effects, and Master
-   views. It has no duplicate effects region.
+4. **AC-004.** At 1536 × 1024, the rack remains dominant. The compact right
+   studio column provides mutually exclusive Mixer, Effects, and Master views.
+   It has no duplicate effects region.
 5. **AC-005.** It remains usable without overlap at 1280 × 720 and at larger supported
    sizes. Below either minimum dimension, the approved notice appears. The
    limited Save, portable Export, autosave, and read-only summary behavior works.
@@ -162,20 +161,24 @@ The merged MVP is complete only when:
     exposed to assistive technology.
 66. **AC-066.** Nonessential visual animation pauses when hidden.
 67. **AC-067.** CSS token, spacing, radius, scrollbar, and supported-viewport rules are
-    followed. The semantic composition follows the approved composition target's
-    major row and column geometry. It also follows its density, materials, typography scale, and
-    control sizing. Semantic controls do not become raster artwork.
+    followed. The UI follows the documented major row and column geometry,
+    density, materials, typography scale, and control sizing. Semantic controls
+    do not become raster artwork.
 68. **AC-068.** The visible mixer uses fixed compact strips. Every instrument
     strip keeps its A–D sends visible as a 2 × 2 button grid. Channel selection
     or detail editing does not resize the mixer. Empty strips remain
     visible under their two-digit slot numbers, and the master strip carries no
     A–D send or return grid.
 69. **AC-069.** One module-aware Piano Roll switches between monophonic pitched
-    rows and named drum-voice rows. Its header has no local Play, pen, or erase
-    buttons. Monophonic notes create, delete, move, resize, and slide without
-    overlapping sounding notes. Drum triggers add or paint as fixed one-cell
-    events, delete by right-click or keyboard, allow simultaneous voices, and do
-    not resize. Pattern playback uses global Play.
+    rows and named drum-voice rows. Pitched mode has a vertically scrollable
+    ivory-and-black chromatic keybed. Each 24-pixel-high key aligns with its grid
+    row and auditions that exact pitch while held. Release, lost capture, or
+    lost focus stops audition without project data, transport, or Undo changes.
+    Its header has no local Play, pen, or erase buttons. Monophonic notes create,
+    delete, move, resize, and slide without overlapping sounding notes. Drum
+    triggers add or paint as fixed one-cell events, delete by right-click or
+    keyboard, allow simultaneous voices, and do not resize. Pattern playback
+    uses global Play.
 70. **AC-070.** Step automation contains no line or curve segments.
 71. **AC-071.** The engine, state, and UI remain slot-count agnostic for the explicit
     sixteen-slot post-MVP target without enabling more than eight slots in the

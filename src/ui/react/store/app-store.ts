@@ -130,7 +130,7 @@ export interface AppState {
   readonly selectModule: (moduleId: ModuleInstanceId | undefined) => void;
   readonly toggleCollapse: (moduleId: ModuleInstanceId) => void;
   readonly selectVoice: (moduleId: ModuleInstanceId, voiceId: string) => void;
-  readonly startAudition: (moduleId: ModuleInstanceId) => void;
+  readonly startAudition: (moduleId: ModuleInstanceId, note?: number) => void;
   readonly stopAudition: (moduleId: ModuleInstanceId) => void;
   readonly undo: () => void;
   readonly redo: () => void;
@@ -322,7 +322,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       }));
     },
 
-    startAudition: (moduleId) => {
+    startAudition: (moduleId, requestedNote) => {
       const state = get();
       const module = state.project.project.modules[moduleId];
       if (module === undefined) return;
@@ -334,7 +334,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       const selectedVoice =
         state.selectedVoiceByModule[moduleId] ??
         (manifest?.kind === "instrument" ? manifest.voices[0]?.id : undefined);
-      const note = dependencies.auditionNoteFor(module.pluginId, selectedVoice);
+      const note = requestedNote ?? dependencies.auditionNoteFor(module.pluginId, selectedVoice);
       void audio.startAudition(moduleId, note).catch(() => {
         set({
           audioUnavailable: true,

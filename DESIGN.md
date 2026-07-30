@@ -323,10 +323,27 @@ label; a keyboard-reachable numeric field carries the exact value.
 
 ### Faders
 
-A vertical SVG slot in Well Black with a filled region in the module's muted
-accent, a raised cap with a control-ring stroke, and a cap line in the full
-accent. The operable target is the surface plus 4px inline padding, meeting the
-24px minimum. A monospace readout sits below in an inset well.
+A vertical travel line cut into the shared channel well, in the module's muted
+accent, with the traveled range made brighter. A machined silver cap with
+a center groove rides the line. The control stretches to the height its well
+grants, and the 24px operable target is the surface width. A monospace readout
+sits below in an inset well.
+
+### Level meters
+
+A canvas ladder of LED cells: 2px cells on a 3px pitch vertically, 4px cells on
+a 6px pitch horizontally. Unlit cells stay faintly visible, so an idle meter
+reads as a physical ladder rather than an empty slot. Lit cells ramp low, mid,
+high, then danger across the top of the ladder, and one held cell in Text
+Primary marks the recent peak.
+
+### Piano keybed
+
+The pitched Piano Roll has a functional side-view keybed. Natural keys use an
+ivory face that reaches the grid edge. Sharp keys use a shorter black face.
+Each 24px row aligns with one chromatic grid row and auditions its exact pitch
+while held. A dark 15px name strip labels natural keys without reducing their
+target size. High contrast keeps the same natural and sharp geometry.
 
 ### LEDs
 
@@ -378,6 +395,9 @@ dense workspace, the presence of overflow is information.
 - **Do** keep transitions at 80–220ms and provide the reduced-motion path — meters,
   LEDs, and playheads must keep signaling when motion is reduced, not go dark.
 - **Do** keep every scrollbar visible.
+- **Do** keep the detail that makes a control read as grabbable, marks a panel
+  edge, or confirms an action. Affordance, legibility, orientation, and feedback
+  are work. Strip only the detail that carries none of them.
 
 ### Don't:
 

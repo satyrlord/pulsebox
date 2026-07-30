@@ -20,7 +20,7 @@ Pulsebox requirements:
 
 - Fully client-side.
 - Runnable at the canonical local origin `http://127.0.0.1:4173`.
-- A serious music-production application, not a static mockup.
+- A serious music-production application with working controls.
 - Built around a dense rack, an eight-channel studio mixer, a four-bus effects
   area, pattern editing, piano-roll editing, and song arrangement.
 - A new user can start the supplied loop within one minute.

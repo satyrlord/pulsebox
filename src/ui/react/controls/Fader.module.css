@@ -3,9 +3,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  align-self: stretch;
   gap: 0.25rem;
-  /* The 24 px operable target is the surface itself plus this padding. */
-  padding-inline: 0.25rem;
 }
 
 .tooltip {
@@ -21,21 +20,46 @@
   border-radius: var(--pulse-radius-control, 4px);
   box-shadow: var(--sink-1);
   font:
-    10px/1.4 ui-monospace,
+    12px/1.4 ui-monospace,
     monospace;
   pointer-events: none;
 }
 
+/*
+ * The visible surface stretches to the height its well grants. A transparent
+ * inset supplies the 24px pointer target.
+ */
 .surface {
-  display: block;
+  --fk: var(--module-accent-muted, var(--module-accent, var(--pulse-color-control-fill, #b0f2ca)));
+
+  position: relative;
+  flex: 1 1 auto;
+  min-block-size: 96px;
+  inline-size: 11px;
   cursor: ns-resize;
   touch-action: none;
   border-radius: var(--pulse-radius-control, 4px);
+  outline: var(--pulse-operational-outline);
+  outline-offset: -2px;
+}
+
+/* The visible travel line stays narrow. This inset gives the slider a 24px
+   target. A clipping ancestor must leave room for it: an overflow that cuts the
+   inset also cuts the pointer target down to the visible line. */
+.surface::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  inline-size: var(--pulse-target-min, 24px);
+  translate: -50% 0;
 }
 
 .surface:focus-visible {
   outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--pulse-color-focus-outer, #000000);
 }
 
 .dragging {
@@ -43,42 +67,70 @@
 }
 
 /*
- * The slot is cut into the panel, so it is the darkest part of the control. It
- * takes the recessed contract surface rather than a channel tint: a module
- * accent is outside the palette, and a slot painted from one would ignore the
- * high-contrast overlay.
+ * The travel line is cut into the well. The channel color extends toward
+ * the recessed contract surface, so a theme change or the high-contrast overlay
+ * repaints the groove itself.
  */
-.slot {
-  fill: var(--pulse-color-surface-inset, #080a0c);
-  stroke: none;
+.track {
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-start: 50%;
+  inline-size: 2px;
+  margin-inline-start: -1px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--fk) 26%, var(--pulse-color-surface-inset, #080a0c));
+  box-shadow: inset 0 1px 2px #000000cc;
 }
 
-/* The travelled range burns in the channel colour over the contract fill. */
-.filled {
-  fill: var(--module-accent-muted, var(--pulse-color-control-fill, #b0f2ca));
+/* The traveled range uses the channel color. */
+.fill {
+  position: absolute;
+  inset-block-end: 4px;
+  inset-inline-start: 50%;
+  inline-size: 3px;
+  margin-inline-start: -1.5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--fk) 62%, #000000);
   opacity: 0.85;
 }
 
 /*
- * A tall machined block with a deep centre groove. Its vertical shading comes
- * from a scoped gradient in the markup, so this rule must not set `fill` on the
- * ordinary cap: a CSS declaration would defeat the paint server.
+ * The cap is a tall machined silver block with a deep center groove.
  */
 .cap {
-  stroke: #000000cc;
-  stroke-width: 1;
+  position: absolute;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  inline-size: 19px;
+  block-size: 28px;
+  border-radius: 2.5px;
+  filter: brightness(0.75);
+  background: linear-gradient(
+    180deg,
+    var(--cap-hi) 0%,
+    var(--cap-hi) 22%,
+    var(--cap-lo) 58%,
+    var(--metal-cap-bot) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 #ffffffe6,
+    inset 0 -1px 1px #0000008c,
+    0 0 0 1px #000000cc,
+    0 3px 5px #000000bf;
 }
 
+/* The darker center groove crosses the cap face. */
 .capGroove {
-  fill: var(--metal-cap-bot);
-  stroke: none;
-}
-
-.capLine {
-  stroke: var(--cap-hi);
-  stroke-width: 1;
-  stroke-linecap: butt;
-  opacity: 0.55;
+  position: absolute;
+  inset-inline: 1px;
+  inset-block-start: 50%;
+  block-size: 4px;
+  margin-block-start: -2px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #0e1113, #23272b);
+  box-shadow:
+    inset 0 1px 2px #000000e6,
+    0 1px 0 #ffffff80;
 }
 
 .label {
@@ -104,25 +156,17 @@
 
 /* A disabled fader keeps its shape so the strip does not reflow, but loses the
    lit travel and the grab cursor. The dimmed cap is paired with `aria-disabled`
-   and removal from the tab sequence, so the state never rests on colour alone. */
+   and removal from the tab sequence, so the state never rests on color alone. */
 .fader[data-disabled="true"] .surface {
   cursor: default;
 }
 
-.fader[data-disabled="true"] .filled {
-  fill: var(--pulse-color-disabled, #7b858d);
-  opacity: 0.35;
+.fader[data-disabled="true"] .fill {
+  opacity: 0;
 }
 
 .fader[data-disabled="true"] .cap {
-  fill: var(--pulse-color-disabled, #7b858d);
-  opacity: 0.5;
-}
-
-.fader[data-disabled="true"] .capGroove,
-.fader[data-disabled="true"] .capLine {
-  fill: var(--pulse-color-surface-inset, #080a0c);
-  stroke: var(--pulse-color-surface-inset, #080a0c);
+  opacity: 0.18;
 }
 
 .fader[data-disabled="true"] .label,

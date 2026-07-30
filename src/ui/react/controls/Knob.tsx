@@ -90,6 +90,8 @@ export function Knob(props: KnobProps) {
     onCommit: props.onCommit,
   });
   const readoutId = useId();
+  /** Scoped so several knobs on one plate cannot share a paint server. */
+  const domeId = useId();
 
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const angle = START_ANGLE + fraction * SWEEP;
@@ -104,7 +106,7 @@ export function Knob(props: KnobProps) {
       data-adjusting={adjusting}
     >
       <div
-        ref={wheelRef}
+        ref={disabled === true ? undefined : wheelRef}
         role="slider"
         tabIndex={disabled === true ? -1 : 0}
         aria-label={label}
@@ -132,11 +134,45 @@ export function Knob(props: KnobProps) {
             ))}
           </g>
           <path className={styles.track} d={arcPath(START_ANGLE, START_ANGLE + SWEEP)} />
-          {fraction > 0 ? <path className={styles.fill} d={arcPath(START_ANGLE, angle)} /> : null}
+          {fraction > 0 ? (
+            <path className={styles.fill} data-part="value" d={arcPath(START_ANGLE, angle)} />
+          ) : null}
           {/* The inner cap face. It carries contract surface and border tokens,
               which is what lets the high-contrast overlay reach the control
-              rather than stopping at the page behind it. */}
+              rather than stopping at the page behind it. It stays the first
+              circle in the SVG: the theme checks sample it by position. */}
           <circle className={styles.cap} cx={CENTRE} cy={CENTRE} r={9.5} />
+          <defs>
+            <radialGradient id={domeId} cx="38%" cy="30%" r="78%">
+              <stop
+                offset="0%"
+                stopColor="var(--pulse-color-text-primary, #f3f5f6)"
+                stopOpacity="0.16"
+              />
+              <stop
+                offset="34%"
+                stopColor="var(--pulse-color-text-primary, #f3f5f6)"
+                stopOpacity="0.03"
+              />
+              <stop
+                offset="72%"
+                stopColor="var(--pulse-color-surface-inset, #080a0c)"
+                stopOpacity="0.2"
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--pulse-color-surface-inset, #080a0c)"
+                stopOpacity="0.45"
+              />
+            </radialGradient>
+          </defs>
+          <circle
+            className={styles.capShade}
+            cx={CENTRE}
+            cy={CENTRE}
+            r={9.5}
+            fill={`url(#${domeId})`}
+          />
           <line
             className={styles.pointer}
             x1={pointer.from.x.toFixed(2)}

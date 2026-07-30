@@ -59,7 +59,24 @@ export function Mixer() {
               data-empty="true"
             >
               <strong>{slotNumber}</strong>
-              <span className={styles.emptyText}>Empty</span>
+              {/* The empty channel keeps the loaded strip's silhouette. Each
+                  visible control is disabled until the user loads a module. */}
+              <div className={styles.panControl}>
+                <Knob
+                  controlId="pan"
+                  label={`Rack slot ${slotNumber} pan`}
+                  caption="Pan"
+                  value={0}
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  defaultValue={0}
+                  precision={2}
+                  disabled
+                  onInput={() => undefined}
+                  onCommit={() => undefined}
+                />
+              </div>
               <div className={styles.sendGrid} aria-label={`Rack slot ${slotNumber} sends`}>
                 {SENDS.map((send) => (
                   <button
@@ -69,19 +86,57 @@ export function Mixer() {
                     aria-label={`Send ${send}, rack slot ${slotNumber}, no module loaded`}
                     title={`Send ${send} is unavailable. Rack slot ${slotNumber} has no module.`}
                   >
-                    {send}
+                    <span data-part="send-label" aria-hidden="true">
+                      {send}
+                    </span>
                   </button>
                 ))}
               </div>
-              <div className={styles.emptyFader} aria-hidden="true">
-                <i />
+              <div className={`${styles.faderWell} ${styles.emptyFader}`}>
+                <Fader
+                  label={`Rack slot ${slotNumber} level`}
+                  value={DEFAULT_MODULE_LEVEL}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={DEFAULT_MODULE_LEVEL}
+                  unit="dB"
+                  precision={1}
+                  formatValue={gainToDecibels}
+                  parseValue={decibelsToGain}
+                  displayMin={MINIMUM_FADER_DB}
+                  displayMax={0}
+                  displayStep={0.1}
+                  disabled
+                  onInput={() => undefined}
+                  onCommit={() => undefined}
+                />
+                <LevelMeter
+                  label={`Rack slot ${slotNumber} output`}
+                  level={0}
+                  width={6}
+                  stretch
+                  inert
+                  hiddenFromAssistiveTechnology
+                />
               </div>
-              {/* An empty channel has nothing to mute or solo. The placeholders
-                  are marked decorative so assistive technology is not offered
-                  two controls that do not exist. */}
-              <div className={styles.muteSolo} aria-hidden="true">
-                <i>M</i>
-                <i>S</i>
+              <div className={styles.muteSolo}>
+                <Toggle
+                  label={`Solo rack slot ${slotNumber}, no module loaded`}
+                  caption="S"
+                  tone="warn"
+                  pressed={false}
+                  disabled
+                  onToggle={() => undefined}
+                />
+                <Toggle
+                  label={`Mute rack slot ${slotNumber}, no module loaded`}
+                  caption="M"
+                  tone="neutral"
+                  pressed={false}
+                  disabled
+                  onToggle={() => undefined}
+                />
               </div>
             </article>
           );
@@ -132,7 +187,9 @@ export function Mixer() {
                   title={`Open send ${send} for ${name}.`}
                   onClick={() => openSend(send)}
                 >
-                  {send}
+                  <span data-part="send-label" aria-hidden="true">
+                    {send}
+                  </span>
                 </button>
               ))}
             </div>
@@ -158,23 +215,24 @@ export function Mixer() {
                 label={`${name} output`}
                 level={meterLevels[module.id] ?? 0}
                 width={6}
-                height={120}
+                stretch
               />
             </div>
+            {/* Solo leads and mute follows. Solo uses warning. Mute uses a neutral cap. */}
             <div className={styles.muteSolo}>
-              <Toggle
-                label={`Mute ${name}`}
-                caption="M"
-                tone="warn"
-                pressed={module.muted}
-                onToggle={() => toggleMute(module.id)}
-              />
               <Toggle
                 label={`Solo ${name}`}
                 caption="S"
-                tone="accent"
+                tone="warn"
                 pressed={module.solo}
                 onToggle={() => toggleSolo(module.id)}
+              />
+              <Toggle
+                label={`Mute ${name}`}
+                caption="M"
+                tone="neutral"
+                pressed={module.muted}
+                onToggle={() => toggleMute(module.id)}
               />
             </div>
           </article>
@@ -209,7 +267,7 @@ export function Mixer() {
             onInput={previewMasterLevel}
             onCommit={(value, gestureId) => setMasterLevel(value, gestureId)}
           />
-          <LevelMeter label="Master output" level={masterMeter} width={6} height={164} />
+          <LevelMeter label="Master output" level={masterMeter} width={6} stretch />
         </div>
       </article>
     </section>

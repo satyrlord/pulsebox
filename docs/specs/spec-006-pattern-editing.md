@@ -155,7 +155,14 @@ the selected note for keyboard users.
 
 Monophonic pitched mode:
 
-- Shows piano-key pitch rows.
+- Shows a vertically scrollable ivory-and-black piano keybed. Each chromatic key
+  aligns with one pitch row in the grid.
+- Each key is a momentary pitch audition control. Pointer or Space and Enter
+  hold the exact pitch. Release, lost capture, or lost focus stops it.
+- Key audition changes no Pattern data, project state, transport position, or
+  Undo history. It uses the selected module's current sound and routing.
+- Natural and sharp keys use geometry and labels as well as color. Each visible
+  key target is at least 24 by 24 CSS pixels.
 - Prevents overlapping sounding notes in the module part.
 - Left-click creates a note.
 - Right-click deletes a note with Undo available.

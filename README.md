@@ -67,7 +67,6 @@ npm run test:e2e
 npm run lint
 npm run typecheck
 npm run dead-code
-npm run format
 npm run lint:md
 npm run ci
 ```
@@ -79,8 +78,6 @@ typescript-eslint does not support TypeScript 7 yet. The alias installs its
 compiler as `tsc6`, so the two compilers use different binary names.
 Dependency versions are pinned exactly, so a fresh install cannot pull a
 compiler or lint-tool change that fails `npm run ci` without a source edit.
-`npm run format` remains available as an optional tool and is not part of the
-quality gate.
 
 `npm run dev` and `npm run start` both use the canonical origin with strict-port
 behavior. `npm run start` serves only the built static client and exposes no
@@ -154,9 +151,8 @@ The shortcut reference will expand when later editors add commands.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
 - Files under `design/` are normally non-normative prototypes, not production
-  evidence. `docs/design/claude-mock-up.html` is the specification-approved
-  visual composition target. Behavioral and release evidence still comes from
-  the owning specifications and production checks.
+  evidence. Behavioral and release evidence comes from the owning
+  specifications and production checks.
 - Named historical research remains isolated under non-shipping `research/`.
 
 ## Adding an instrument

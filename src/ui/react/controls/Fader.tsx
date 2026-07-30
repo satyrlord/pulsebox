@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
@@ -24,13 +24,24 @@ export interface FaderProps {
   readonly onCommit: (value: number, gestureId: GestureId) => void;
 }
 
-const TRACK_HEIGHT = 120;
-const CAP_HEIGHT = 18;
+/** The machined fader cap height in CSS pixels. */
+const CAP_HEIGHT = 28;
+/**
+ * Pointer resolution floor, in CSS pixels for the full range. A mixer well is
+ * shorter than this, so a raw one-to-one mapping would make a small drag cross
+ * most of a 60 dB fader. The cap then leads the pointer inside a short well,
+ * which is the correct trade: a level a user cannot set finely is worse than a
+ * cap that travels faster than the hand.
+ */
+const MINIMUM_DRAG_RANGE = 120;
 
 /**
  * A vertical fader. Shares the whole gesture contract with the knob — drag,
  * wheel, arrows, Home/End, double-click reset, Escape cancel, and one commit per
  * gesture — so both controls produce exactly one undo entry per movement.
+ *
+ * The control stretches to the height of its well. Fraction positions the
+ * travel line and cap. Measured travel sets the pointer-drag resolution floor.
  */
 export function Fader({
   label,
@@ -50,6 +61,7 @@ export function Fader({
   onInput,
   onCommit,
 }: FaderProps) {
+  const [dragRange, setDragRange] = useState(120);
   const {
     displayValue,
     dragging,
@@ -72,21 +84,40 @@ export function Fader({
     defaultValue,
     onInput: onInput ?? (() => undefined),
     onCommit,
-    dragRange: TRACK_HEIGHT,
+    dragRange,
   });
-  /** Scoped so several faders in one strip cannot share a paint server. */
-  const capGradientId = useId();
+
+  // The surface is measured so a taller well lengthens the drag rather than
+  // making the pointer outrun the cap. A well shorter than the resolution floor
+  // keeps the floor. The observer disconnects with the control, leaving no live
+  // resource behind.
+  const observerRef = useRef<ResizeObserver | undefined>(undefined);
+  useEffect(() => () => observerRef.current?.disconnect(), []);
+  const surfaceRef = useCallback(
+    (element: HTMLElement | null) => {
+      wheelRef(disabled ? null : element);
+      observerRef.current?.disconnect();
+      observerRef.current = undefined;
+      if (element === null) return;
+      const observer = new ResizeObserver((entries) => {
+        const measured = entries[0]?.contentRect.height ?? 0;
+        setDragRange(Math.max(MINIMUM_DRAG_RANGE, Math.round(measured - CAP_HEIGHT)));
+      });
+      observer.observe(element);
+      observerRef.current = observer;
+    },
+    [disabled, wheelRef],
+  );
 
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
-  const travel = TRACK_HEIGHT - CAP_HEIGHT;
-  const capY = travel - fraction * travel;
   const formatted = formatValue(displayValue).toFixed(precision);
   const text = `${formatted}${unit === undefined ? "" : ` ${unit}`}`;
+  const capOffset = `calc(${fraction.toFixed(4)} * (100% - ${String(CAP_HEIGHT)}px))`;
 
   return (
     <div className={styles.fader} data-component="fader" data-disabled={disabled}>
       <div
-        ref={wheelRef}
+        ref={surfaceRef}
         className={cx(styles.surface, dragging && styles.dragging)}
         role="slider"
         tabIndex={disabled ? -1 : 0}
@@ -107,59 +138,17 @@ export function Fader({
         onBlur={onBlur}
         onDoubleClick={disabled ? undefined : onDoubleClick}
       >
-        <svg
-          viewBox={`0 0 32 ${String(TRACK_HEIGHT)}`}
-          width={32}
-          height={TRACK_HEIGHT}
+        {/* The well behind the fader is the surface. The control carries only
+            the recessed travel line, the lit travelled range, and the cap. */}
+        <span className={styles.track} data-part="track" aria-hidden="true" />
+        <span
+          className={styles.fill}
           aria-hidden="true"
-          focusable="false"
-        >
-          {/* The machined silver block is the strongest highlight on the strip,
-              so its shading is a real paint server rather than a flat fill. */}
-          <defs>
-            <linearGradient id={capGradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--cap-hi)" />
-              <stop offset="22%" stopColor="var(--cap-hi)" />
-              <stop offset="58%" stopColor="var(--cap-lo)" />
-              <stop offset="100%" stopColor="var(--metal-cap-bot)" />
-            </linearGradient>
-          </defs>
-          <rect className={styles.slot} x={14} y={2} width={4} height={TRACK_HEIGHT - 4} rx={2} />
-          <rect
-            className={styles.filled}
-            x={14}
-            y={capY + CAP_HEIGHT / 2}
-            width={4}
-            height={Math.max(0, TRACK_HEIGHT - 2 - (capY + CAP_HEIGHT / 2))}
-            rx={2}
-          />
-          <g transform={`translate(0 ${String(capY)})`}>
-            <rect
-              className={styles.cap}
-              x={4}
-              y={0}
-              width={24}
-              height={CAP_HEIGHT}
-              rx={2.5}
-              fill={`url(#${capGradientId})`}
-            />
-            <rect
-              className={styles.capGroove}
-              x={5}
-              y={CAP_HEIGHT / 2 - 2}
-              width={22}
-              height={4}
-              rx={1}
-            />
-            <line
-              className={styles.capLine}
-              x1={7}
-              y1={CAP_HEIGHT / 2}
-              x2={25}
-              y2={CAP_HEIGHT / 2}
-            />
-          </g>
-        </svg>
+          style={{ blockSize: `calc(${capOffset} + ${String(CAP_HEIGHT / 2 - 4)}px)` }}
+        />
+        <span className={styles.cap} aria-hidden="true" style={{ insetBlockEnd: capOffset }}>
+          <span className={styles.capGroove} />
+        </span>
       </div>
       <span className={styles.label}>{label}</span>
       {adjusting ? (

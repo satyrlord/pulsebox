@@ -24,6 +24,13 @@ creating mixer banks or channels beyond eight. Empty rack slots retain disabled
 visible strips identified by their two-digit slot number. Their accessible name
 and state report that the slot is empty.
 
+An empty strip carries the same controls as a loaded strip in their disabled
+state. This keeps one strip geometry across the row, so loading a module changes
+the state of a channel rather than its shape. Each control reports the empty
+slot in its accessible name, stays out of the tab sequence, and changes nothing.
+An empty strip meter reads zero and is hidden from assistive technology, because
+an empty slot has no signal to report.
+
 The active audio-path identity follows the module ID. Slot identity controls
 placement and the corresponding strip position.
 

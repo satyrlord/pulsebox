@@ -236,8 +236,7 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
         </div>
       )}
 
-      {/* The trailing bay holds the voice selector, the audition pad, and the
-          unit's output ladder, the way the mock closes each faceplate. */}
+      {/* The trailing bay holds the voice selector, audition pad, and output ladder. */}
       <div className={styles.side}>
         {voices.length > 1 && !collapsed ? (
           <label className={styles.voiceSelector}>

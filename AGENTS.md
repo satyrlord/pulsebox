@@ -70,10 +70,7 @@ AudioWorklet. No server product component, no MIDI.
   conflict and obtain a product decision when the current repository cannot
   resolve it.
 - Files under docs/design/ are prototypes and visual evidence. They are not
-  normative unless the specification or user explicitly makes them so. This
-  includes `docs/design/claude-mock-up.html`, which spec-003 section 8.2 makes
-  the single approved composition target. Do not reintroduce a second design
-  target in another medium. It would drift from the HTML and contradict it.
+  normative unless the specification or user explicitly makes them so.
 
 Owning contract documents:
 
@@ -294,8 +291,16 @@ limited to 100 entries and 64 MiB in total. One entry is limited to 17 MiB.
   follow docs/THEMING.md.
 - Do not add glassmorphism, floating translucent cards, excessive glow, generic
   dashboard styling, mobile-style pills, or decorative fake controls.
+- This bans fake controls and the listed idioms. It does not ban visual richness.
+  Keep raised caps, recessed bays, inset readouts, edges, and pointer response:
+  detail that shows affordance, structure, identity, or feedback is doing work.
 - Every visible operational control must change state, sound, navigation, or a
   documented preference.
+- An empty rack slot or channel may show the loaded silhouette with the real
+  controls in their disabled state. Give each one `disabled`, an accessible name
+  that reports the empty state, and no operable target. This is not a fake
+  control: it is the same control before its module exists. Do not use it to
+  show a control the product does not have.
 - Make every interactive feature keyboard-operable. Prefer native semantics, use
   ARIA only when needed, preserve visible focus, restore modal focus, and never
   rely on color alone.

@@ -20,6 +20,27 @@ function separated(left: { x: number; width: number }, right: { x: number }): bo
   return left.x + left.width <= right.x;
 }
 
+function targetsDoNotOverlap(
+  first: { x: number; y: number; width: number; height: number },
+  second: { x: number; y: number; width: number; height: number },
+): boolean {
+  return (
+    first.x + first.width <= second.x ||
+    second.x + second.width <= first.x ||
+    first.y + first.height <= second.y ||
+    second.y + second.height <= first.y
+  );
+}
+
+async function buttonLabelAt(page: Page, x: number, y: number): Promise<string | null> {
+  return page.evaluate(
+    ([pointX, pointY]) =>
+      document.elementFromPoint(pointX, pointY)?.closest("button")?.getAttribute("aria-label") ??
+      null,
+    [x, y] as const,
+  );
+}
+
 async function measureRasterDifference(page: Page, first: Buffer, second: Buffer) {
   return page.evaluate(
     async ([firstBase64, secondBase64]) => {
@@ -90,6 +111,106 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     expect(separated(rack, studio)).toBe(true);
     expect(rack.width).toBeGreaterThan(studio.width);
 
+    const firstStrip = page
+      .locator('[data-component="channel-strip"]:not([data-empty="true"])')
+      .first();
+    const instrumentStripWidths = await page
+      .locator('[data-component="channel-strip"]')
+      .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
+    expect(
+      Math.max(...instrumentStripWidths) - Math.min(...instrumentStripWidths),
+    ).toBeLessThanOrEqual(1);
+    const fader = firstStrip.locator('[data-component="fader"] [role="slider"]');
+    const meter = firstStrip.locator('[data-component="level-meter"]');
+    const firstStripBox = await box(firstStrip);
+    const faderBox = await box(fader);
+    const meterBox = await box(meter);
+    expect(separated(faderBox, meterBox)).toBe(true);
+    expect(faderBox.x).toBeGreaterThanOrEqual(firstStripBox.x);
+    expect(meterBox.x + meterBox.width).toBeLessThanOrEqual(firstStripBox.x + firstStripBox.width);
+    /*
+     * The fader's target is a transparent inset wider than its visible travel
+     * line, so declaring 24px is not enough: a clipping ancestor can cut the
+     * inset back to the line without changing any computed style. Hit-test both
+     * edges to measure what the pointer can actually reach.
+     */
+    const faderTarget = await fader.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element, "::after");
+      const width = Number.parseFloat(style.width);
+      const center = Number.parseFloat(style.insetInlineStart);
+      const left = rect.x + center - width / 2;
+      const middle = rect.y + rect.height / 2;
+      const reaches = (x: number) =>
+        document.elementFromPoint(x, middle)?.closest('[role="slider"]') === element;
+      return {
+        width,
+        left,
+        right: left + width,
+        reachesLeftEdge: reaches(left + 1),
+        reachesRightEdge: reaches(left + width - 1),
+      };
+    });
+    expect(faderTarget.width).toBeGreaterThanOrEqual(24);
+    expect(faderTarget.left).toBeGreaterThanOrEqual(firstStripBox.x);
+    expect(faderTarget.right).toBeLessThanOrEqual(meterBox.x);
+    expect(faderTarget.reachesLeftEdge).toBe(true);
+    expect(faderTarget.reachesRightEdge).toBe(true);
+
+    const mixerButtons = [
+      ...(await firstStrip.getByRole("button", { name: /^Open send/ }).all()),
+      firstStrip.getByRole("button", { name: /^Solo / }),
+      firstStrip.getByRole("button", { name: /^Mute / }),
+    ];
+    const sendLabels = firstStrip.locator('[data-part="send-label"]');
+    await expect(sendLabels).toHaveCount(4);
+    for (const sendLabel of await sendLabels.all()) {
+      const stacking = await sendLabel.evaluate((element) => {
+        const button = element.closest("button");
+        if (button === null) throw new Error("The send label has no button owner.");
+        return {
+          face: Number.parseInt(getComputedStyle(button, "::before").zIndex, 10),
+          label: Number.parseInt(getComputedStyle(element).zIndex, 10),
+          color: getComputedStyle(element).color,
+        };
+      });
+      expect(stacking.label).toBeGreaterThan(stacking.face);
+      expect(stacking.color).not.toBe("rgba(0, 0, 0, 0)");
+    }
+    const mixerButtonBoxes = [];
+    for (const button of mixerButtons) {
+      const buttonBox = await box(button);
+      const label = await button.getAttribute("aria-label");
+      expect(label).not.toBeNull();
+      expect(buttonBox.width).toBeGreaterThanOrEqual(24);
+      expect(buttonBox.height).toBeGreaterThanOrEqual(24);
+      const hitPoints = [
+        [buttonBox.x + 1, buttonBox.y + buttonBox.height / 2],
+        [buttonBox.x + buttonBox.width - 1, buttonBox.y + buttonBox.height / 2],
+        [buttonBox.x + buttonBox.width / 2, buttonBox.y + 1],
+        [buttonBox.x + buttonBox.width / 2, buttonBox.y + buttonBox.height - 1],
+      ] as const;
+      for (const [x, y] of hitPoints) expect(await buttonLabelAt(page, x, y)).toBe(label);
+      mixerButtonBoxes.push(buttonBox);
+    }
+    for (const [index, firstBox] of mixerButtonBoxes.entries()) {
+      for (const secondBox of mixerButtonBoxes.slice(index + 1)) {
+        expect(targetsDoNotOverlap(firstBox, secondBox)).toBe(true);
+      }
+    }
+
+    await expect
+      .poll(() =>
+        meter.evaluate((element) => {
+          const canvas = element as HTMLCanvasElement;
+          return {
+            widthMatches: canvas.width === Math.round(canvas.clientWidth * devicePixelRatio),
+            heightMatches: canvas.height === Math.round(canvas.clientHeight * devicePixelRatio),
+          };
+        }),
+      )
+      .toEqual({ widthMatches: true, heightMatches: true });
+
     if (viewport.width >= 1440) {
       // The seeded project loads six of the eight slots. The height band below
       // describes a loaded faceplate, so empty slots are excluded here.
@@ -110,6 +231,29 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     const playlist = await box(page.locator('[data-component="playlist-summary"]'));
     expect(separated(inspector, roll)).toBe(true);
     expect(separated(roll, playlist)).toBe(true);
+
+    const keybed = page.getByRole("group", { name: "Piano keyboard" });
+    await expect(keybed.getByRole("button")).toHaveCount(13);
+    const naturalKey = keybed.getByRole("button", { name: "C4 piano key audition" });
+    const sharpKey = keybed.getByRole("button", { name: "A#3 piano key audition" });
+    const naturalBox = await box(naturalKey);
+    const sharpBox = await box(sharpKey);
+    expect(naturalBox.height).toBeGreaterThanOrEqual(24);
+    expect(sharpBox.width).toBeGreaterThanOrEqual(24);
+    expect(sharpBox.height).toBeGreaterThanOrEqual(24);
+    const keyStyles = await Promise.all([
+      naturalKey.evaluate((element) => getComputedStyle(element).backgroundImage),
+      sharpKey.evaluate((element) => getComputedStyle(element).backgroundImage),
+    ]);
+    expect(keyStyles[0]).not.toBe(keyStyles[1]);
+    const rollScroll = page.locator('[data-component="piano-roll-scroll"]');
+    const scrollState = await rollScroll.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(scrollState.overflowY).toBe("auto");
+    expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
 
     const viewportState = await page.evaluate(() => ({
       innerWidth,
@@ -146,9 +290,38 @@ test("keeps all mixer strips visible and studio panes mutually exclusive", async
   await expect(empty.nth(0)).toContainText("07");
   await expect(empty.nth(1)).toContainText("08");
   for (const strip of await empty.all()) {
-    const sends = strip.getByRole("button");
+    const sends = strip.getByRole("button", { name: /^Send/ });
     await expect(sends).toHaveCount(4);
     for (const send of await sends.all()) await expect(send).toBeDisabled();
+    await expect(strip.getByRole("slider", { name: / pan$/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await expect(strip.getByRole("slider", { name: / level$/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await expect(strip.getByRole("button", { name: /^Solo rack slot/ })).toBeDisabled();
+    await expect(strip.getByRole("button", { name: /^Mute rack slot/ })).toBeDisabled();
+    // The empty ladder still draws its unlit cells, so the strip keeps the
+    // loaded silhouette rather than showing a blank canvas.
+    const ladder = strip.locator('[data-component="level-meter"]');
+    await expect(ladder).toHaveAttribute("aria-hidden", "true");
+    await expect
+      .poll(() =>
+        ladder.evaluate((element) => {
+          const canvas = element as HTMLCanvasElement;
+          const context = canvas.getContext("2d");
+          if (context === null || canvas.width === 0) return 0;
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          let painted = 0;
+          for (let index = 3; index < pixels.length; index += 4) {
+            if (pixels[index] !== 0) painted += 1;
+          }
+          return painted;
+        }),
+      )
+      .toBeGreaterThan(0);
   }
 
   await studio.getByRole("tab", { name: "Effects" }).click();
@@ -159,6 +332,80 @@ test("keeps all mixer strips visible and studio panes mutually exclusive", async
   await studio.getByRole("tab", { name: "Master" }).click();
   await expect(studio.locator('[data-component="effects-bank"]')).toHaveCount(0);
   await expect(studio.locator('[data-component="master-panel"]')).toBeVisible();
+});
+
+/**
+ * An empty channel reports no level, so its ladder must not hold the theme
+ * observer, the wake path, or the visibility handler a live meter needs. Two
+ * empty strips would otherwise each watch the document element for a canvas
+ * that can never change.
+ */
+test("an empty strip meter installs no document-level observer", async ({ page }) => {
+  /*
+   * A live ladder watches the document element so a theme change repaints it.
+   * The meter's filter is distinctive, so counting only observers that ask for
+   * it isolates ladders from every other document observer in the shell.
+   */
+  await page.addInitScript(() => {
+    const counter = { meterObservers: 0 };
+    (window as unknown as { __meterProbe: typeof counter }).__meterProbe = counter;
+    const RealMutationObserver = window.MutationObserver;
+    class CountingMutationObserver extends RealMutationObserver {
+      override observe(target: Node, options?: MutationObserverInit): void {
+        if (
+          target === document.documentElement &&
+          options?.attributeFilter?.includes("data-high-contrast") === true
+        ) {
+          counter.meterObservers += 1;
+        }
+        super.observe(target, options);
+      }
+    }
+    window.MutationObserver = CountingMutationObserver;
+  });
+  await page.goto("/");
+
+  const studio = page.locator('[data-component="studio-panel"]');
+  const emptyStrips = studio.locator('[data-empty="true"]');
+  await expect(emptyStrips).toHaveCount(2);
+  const emptyLadders = await emptyStrips.locator('[data-component="level-meter"]').count();
+  const allLadders = await page.locator('[data-component="level-meter"]').count();
+  expect(emptyLadders).toBe(2);
+
+  const observers = await page.evaluate(
+    () =>
+      (window as unknown as { __meterProbe: { meterObservers: number } }).__meterProbe
+        .meterObservers,
+  );
+  // Every ladder that can report a level takes exactly one observer. The two
+  // empty ones take none, which is the whole point of the inert path.
+  expect(observers).toBe(allLadders - emptyLadders);
+});
+
+test("holds and releases a Piano Roll pitch key with pointer and keyboard input", async ({
+  page,
+}) => {
+  const key = page.getByRole("button", { name: "C4 piano key audition" });
+
+  await key.hover();
+  await page.mouse.down();
+  await expect(key).toHaveAttribute("data-active", "true");
+  await page.mouse.up();
+  await expect(key).toHaveAttribute("data-active", "false");
+
+  await key.focus();
+  await page.keyboard.down("Enter");
+  await expect(key).toHaveAttribute("data-active", "true");
+  await page.keyboard.up("Enter");
+  await expect(key).toHaveAttribute("data-active", "false");
+
+  await page.getByRole("combobox", { name: "Piano Roll module" }).selectOption({
+    label: "Drumline Six",
+  });
+  await expect(page.getByRole("group", { name: "Piano keyboard" })).toHaveCount(0);
+  const drumVoices = page.getByRole("group", { name: "Drum voices" });
+  await expect(drumVoices.getByRole("button")).toHaveCount(6);
+  await expect(drumVoices.getByRole("button", { name: "Kick voice audition" })).toBeVisible();
 });
 
 test("changes transport scope without stopping and toggles meter analysis without changing audio", async ({

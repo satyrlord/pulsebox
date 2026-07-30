@@ -5,12 +5,19 @@
   block-size: 100vh;
   min-height: 0;
   overflow: hidden;
-  background: var(--pulse-color-app, #0b0d0f);
   color: var(--pulse-color-text-primary, #f3f5f6);
+  /* A cool glow and fine speckle make the chassis bays read as mounted hardware. */
+  background-color: var(--pulse-color-app, #0b0d0f);
+  background-image:
+    radial-gradient(1200px 480px at 50% -8%, #ffffff07, transparent 60%), var(--mat-speckle);
 }
 
 .app[data-editor-expanded="false"] {
   grid-template-rows: 58px minmax(0, 1fr) 0 52px;
+}
+
+:global([data-high-contrast="true"]) .app {
+  background-image: none;
 }
 
 .app > [hidden] {

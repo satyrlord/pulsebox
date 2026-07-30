@@ -53,6 +53,22 @@ describe("EditorWorkspace", () => {
     );
   });
 
+  it("renders a chromatic keybed that auditions the exact held pitch", async () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const moduleId = firstModuleId(harness);
+    const keybed = screen.getByRole("group", { name: "Piano keyboard" });
+    const keys = within(keybed).getAllByRole("button");
+    const c4 = within(keybed).getByRole("button", { name: "C4 piano key audition" });
+
+    expect(keys).toHaveLength(13);
+    fireEvent.pointerDown(c4, { button: 0, pointerId: 9 });
+    await waitFor(() => expect(harness.audio.startAudition).toHaveBeenCalledWith(moduleId, 60));
+    fireEvent.pointerUp(c4, { button: 0, pointerId: 9 });
+    expect(harness.audio.stopAudition).toHaveBeenCalledWith(moduleId);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+  });
+
   it("adds the selected Pattern to the compact Playlist", () => {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
@@ -91,18 +107,36 @@ describe("Mixer", () => {
     expect(screen.getByRole("article", { name: "Master channel" })).toBeInTheDocument();
   });
 
-  it("keeps four sends visible and disables them on empty strips", () => {
+  it("keeps the empty strip controls visible and disabled", () => {
     const { container } = renderWithHarness(<Mixer />);
     const acid = screen.getByRole("article", { name: "Acid Bass channel" });
     expect(within(acid).getAllByRole("button", { name: /Open send/ })).toHaveLength(4);
 
     const empty = container.querySelector('[data-empty="true"]');
     expect(empty).not.toBeNull();
-    expect(within(empty as HTMLElement).getAllByRole("button")).toHaveLength(4);
-    for (const button of within(empty as HTMLElement).getAllByRole("button")) {
+    const emptyStrip = within(empty as HTMLElement);
+    expect(emptyStrip.getAllByRole("button", { name: /^Send/ })).toHaveLength(4);
+    expect(emptyStrip.getByRole("slider", { name: "Rack slot 02 pan" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(emptyStrip.getByRole("slider", { name: "Rack slot 02 level" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(emptyStrip.queryByRole("meter")).not.toBeInTheDocument();
+    const pan = emptyStrip.getByRole("slider", { name: "Rack slot 02 pan" });
+    const level = emptyStrip.getByRole("slider", { name: "Rack slot 02 level" });
+    fireEvent.wheel(pan, { deltaY: -100 });
+    fireEvent.wheel(level, { deltaY: -100 });
+    expect(pan).toHaveAttribute("aria-valuenow", "0");
+    expect(level).toHaveAttribute("aria-valuenow", "0.4");
+    expect(emptyStrip.queryByRole("tooltip")).not.toBeInTheDocument();
+    for (const button of emptyStrip.getAllByRole("button")) {
       expect(button).toBeDisabled();
     }
   });
+
 
   it("mutes a channel through a typed command", () => {
     const harness = createHarness();
@@ -141,10 +175,7 @@ describe("Mixer", () => {
     fireEvent.keyDown(mixerFader, { key: "ArrowUp" });
     fireEvent.keyUp(mixerFader, { key: "ArrowUp" });
     fireEvent.doubleClick(mixerFader);
-    expect(mixerHarness.domain.getState().project.masterLevel).toBeCloseTo(
-      DEFAULT_MASTER_LEVEL,
-      5,
-    );
+    expect(mixerHarness.domain.getState().project.masterLevel).toBeCloseTo(DEFAULT_MASTER_LEVEL, 5);
     mixer.unmount();
 
     const panelHarness = createHarness();
@@ -153,10 +184,7 @@ describe("Mixer", () => {
     fireEvent.keyDown(panelFader, { key: "ArrowUp" });
     fireEvent.keyUp(panelFader, { key: "ArrowUp" });
     fireEvent.doubleClick(panelFader);
-    expect(panelHarness.domain.getState().project.masterLevel).toBeCloseTo(
-      DEFAULT_MASTER_LEVEL,
-      5,
-    );
+    expect(panelHarness.domain.getState().project.masterLevel).toBeCloseTo(DEFAULT_MASTER_LEVEL, 5);
   });
 });
 

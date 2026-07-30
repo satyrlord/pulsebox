@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 export interface AuditionButtonProps {
   readonly label: string;
   readonly className?: string | undefined;
+  readonly children?: ReactNode;
+  readonly disabled?: boolean;
   readonly onStart: () => void;
   readonly onStop: () => void;
 }
 
 /** Momentary press-and-hold control shared by pointer and keyboard input. */
-export function AuditionButton({ label, className, onStart, onStop }: AuditionButtonProps) {
+export function AuditionButton({
+  label,
+  className,
+  children,
+  disabled = false,
+  onStart,
+  onStop,
+}: AuditionButtonProps) {
   const held = useRef(false);
   const [active, setActive] = useState(false);
 
@@ -34,12 +43,17 @@ export function AuditionButton({ label, className, onStart, onStop }: AuditionBu
     };
   }, [stop]);
 
+  useEffect(() => {
+    if (disabled) stop();
+  }, [disabled, stop]);
+
   return (
     <button
       type="button"
       className={className}
       aria-label={`${label} audition`}
       data-active={active}
+      disabled={disabled}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         event.preventDefault();
@@ -75,7 +89,7 @@ export function AuditionButton({ label, className, onStart, onStop }: AuditionBu
     >
       {/* The engraved pad is short so the faceplate stays dense. The visible
           word is still contained in the accessible name above. */}
-      Aud
+      {children === undefined ? "Aud" : children}
     </button>
   );
 }

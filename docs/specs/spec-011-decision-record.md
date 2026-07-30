@@ -161,8 +161,7 @@ contains the normative requirements. This table is the traceability record.
 - **D61.** Song is an ordered list of named-Pattern references with repeat
   counts. The MVP has no lane timeline, clip transforms, tempo timeline, or
   time-signature timeline.
-- **D62.** `docs/design/claude-mock-up.html` is the approved shell composition
-  target. Its compact right studio column uses mutually exclusive Mixer,
+- **D62.** The compact right studio column uses mutually exclusive Mixer,
   Effects, and Master views. The application never duplicates Effects beside or
   below the mixer. Every instrument strip shows A–D send buttons in a 2 × 2
   grid.
@@ -243,10 +242,9 @@ contains the normative requirements. This table is the traceability record.
   specifications own responsive and accessible behavior. Design artifacts do
   not own that behavior.
 
-  `D75` supersedes and removes the master strip's A–D grid. `D77` supersedes and
-  withdraws the separate 1568 × 1003 raster
-  reference. It leaves `docs/design/claude-mock-up.html` as the single
-  composition target.
+  `D75` supersedes and removes the master strip's A–D grid. `D77` withdraws the
+  separate 1568 × 1003 raster reference. The specifications retain its durable
+  product rules.
 - **D68.** Numbered phases remain the dependency and completion order. A narrow
   foundation from a later phase can follow its owner and all earlier
   dependencies. A foundation slice never completes its parent phase or a
@@ -301,11 +299,9 @@ contains the normative requirements. This table is the traceability record.
   React to preserve the literal event names. That design adds indirection with
   no behavior change and weakens static checking.
 - **D72.** The rack faceplate has no Edit button and the master strip has no pan
-  control. Both appeared only in `docs/design/claude-mock-up.html` and were
-  removed from it rather than adopted. A faceplate Edit button duplicates an
-  existing selection path to a module part. The user can select the module in
-  the rack overview or the Piano Roll's module selector. `D65` already fixed the
-  faceplate contents.
+  control. A faceplate Edit button duplicates an existing selection path to a
+  module part. The user can select the module in the rack overview or the Piano
+  Roll's module selector. `D65` already fixed the faceplate contents.
 
   They are the output-only activity indicator and the hold-to-sound audition
   control. Under section 6.2, a master pan control would
@@ -331,17 +327,14 @@ contains the normative requirements. This table is the traceability record.
   surface. That design leaves the MVP with a required feature and no reachable
   control. Another rejected alternative put it in both places. That design
   duplicates the displayed state without added capability.
-- **D74.** The approved composition target already showed four contract values.
-  The MVP Pattern scale choices are Chromatic, Minor, Dorian, Phrygian, and
+- **D74.** The specifications define four contract values. The MVP Pattern scale
+  choices are Chromatic, Minor, Dorian, Phrygian, and
   Pentatonic (section 16.0). The limiter's compact controls are Ceiling, Gain,
   and Release (section 20.7). The default project sets each occupied instrument
   channel near -8 dB. The master stays near -6 dB (section 9.1).
 
-  The mock's remaining unspecified numbers stay unspecified. Section 12
-  transport work will choose and record its 960-ticks-per-beat clock resolution
-  in the same change. Separately, the mock showed lit channel and master meters
-  while stopped. This fixture matched the raster reference frame. `D80`
-  withdraws that allowance and removes the fixture.
+  Other unspecified numbers stay unspecified. Section 12 transport work will
+  choose and record its 960-ticks-per-beat clock resolution in the same change.
 
   Section 21.7 governs the product. Meters read silence while the transport is
   stopped.
@@ -386,24 +379,10 @@ contains the normative requirements. This table is the traceability record.
   They share one strip of equal-width controls. The earlier unequal widths
   encoded no meaning. Section 19.2 owns the master strip geometry. Section 8.5
   owns the tab strip.
-- **D77.** The 1568 × 1003 raster reference is withdrawn, and
-  `docs/design/claude-mock-up.html` is the single approved composition target.
-  This supersedes that part of `D67`. Two approved targets in different media
-  cannot stay identical. Maintainers correct the HTML target when a product
-  decision changes the composition. They cannot edit a raster image in the same
-  way. Thus, the raster image can become incorrect.
-
-  An implementer who measures an incorrect raster can reproduce reversed
-  decisions. The HTML target therefore owns proportion, placement, density,
-  materials, typography scale, and control sizing. It also owns semantics and
-  interaction. The repository removes the raster file. `D67` and the owning
-  specifications retain the durable rules from the raster.
-
-  One rejected alternative kept the image as non-normative historical evidence.
-  An agent could still find and follow the incorrect artifact. Another rejected
-  alternative regenerated the raster to match the current HTML. The next
-  composition decision would create the same problem. `AC-067` now gates against
-  the composition target rather than a raster.
+- **D77.** The 1568 × 1003 raster reference is withdrawn. This supersedes that
+  part of `D67`. The owning specifications retain the durable rules from the
+  raster. `AC-067` gates the documented geometry, density, materials,
+  typography scale, and control sizing.
 - **D78.** Rack faceplates carry no Pattern activity indicator. The faceplate
   contents that `D65` and `D72` fixed have a short label and metadata. They also
   have the Pattern selector, fast controls, audition control, and module state
@@ -444,32 +423,12 @@ contains the normative requirements. This table is the traceability record.
   Removing the theme system would discard the token architecture. User themes
   and post-MVP theme packs rely on that architecture. `AC-039` and `AC-040` gate
   the reduced scope.
-- **D80.** The composition target displays only true or specification-owned
-  state. It renders the section 9.1 default project in its real stopped state,
-  and no element may show a value that the product cannot produce. This
-  supersedes the meter-fixture allowance in `D74`. The target owns proportion,
-  placement, density, materials, typography scale, and control sizing.
-
-  The structural content stays. It includes six loaded modules, two empty slots,
-  five named Patterns, and a populated Piano Roll. This content provides the
-  density evidence that section 8.2 requires. The specification prohibits
-  fabricated runtime state. An implementer cannot identify staged pixels when
-  this file owns the composition.
-
-  The change removes four fixtures. Uniform rack-knob pointer and arc values
-  misreport each parameter. Lit channel meters while transport is stopped
-  conflict with section 21.7. A seeded undo entry conflicts with `D06` because
-  it makes project opening an undoable edit. Piano Roll notes from the withdrawn
-  raster study conflict with section 9.1 copied-note restrictions.
-
-  The file's grid, scale, and pitch model generate replacement content. Thus,
-  the content stays deterministic and original. One rejected alternative marked
-  each fixture non-normative with an attribute or banner. That design leaves
-  incorrect content visible and depends on each reader finding the disclaimer.
-
-  Another rejected alternative removed all structural content. That design
-  removes the density evidence that made this file normative. It would require
-  a new decision about section 8.2. `AC-059` and `AC-067` gate the result.
+- **D80.** The product UI displays only true or specification-owned state. No
+  element may show a value that the product cannot produce. Uniform rack-knob
+  pointer and arc values misreport each parameter. Lit channel meters while
+  transport is stopped conflict with section 21.7. A seeded undo entry conflicts
+  with `D06` because it makes project opening an undoable edit. `AC-059` and
+  `AC-067` gate the result.
 - **D81.** The rack-ear pull handles are a rack module's reorder drag
   affordance. Dragging a module by either handle moves it up or down the rack.
   The gesture uses pointer capture and shows an insertion marker at the landing
