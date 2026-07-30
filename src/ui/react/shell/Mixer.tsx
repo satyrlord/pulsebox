@@ -60,9 +60,6 @@ export function Mixer() {
             >
               <strong>{slotNumber}</strong>
               <span className={styles.emptyText}>Empty</span>
-              <div className={styles.emptyFader} aria-hidden="true">
-                <i />
-              </div>
               <div className={styles.sendGrid} aria-label={`Rack slot ${slotNumber} sends`}>
                 {SENDS.map((send) => (
                   <button
@@ -75,6 +72,9 @@ export function Mixer() {
                     {send}
                   </button>
                 ))}
+              </div>
+              <div className={styles.emptyFader} aria-hidden="true">
+                <i />
               </div>
               {/* An empty channel has nothing to mute or solo. The placeholders
                   are marked decorative so assistive technology is not offered
@@ -112,6 +112,7 @@ export function Mixer() {
               <Knob
                 controlId="pan"
                 label={`${name} pan`}
+                caption="Pan"
                 value={module.pan}
                 min={-1}
                 max={1}
@@ -121,6 +122,19 @@ export function Mixer() {
                 onInput={(value) => previewChannelMix(module.id, "pan", value)}
                 onCommit={(value, gestureId) => setChannelPan(module.id, value, gestureId)}
               />
+            </div>
+            <div className={styles.sendGrid} aria-label={`${name} sends`}>
+              {SENDS.map((send) => (
+                <button
+                  key={send}
+                  type="button"
+                  aria-label={`Open send ${send} for ${name}`}
+                  title={`Open send ${send} for ${name}.`}
+                  onClick={() => openSend(send)}
+                >
+                  {send}
+                </button>
+              ))}
             </div>
             <div className={styles.faderWell}>
               <Fader
@@ -146,19 +160,6 @@ export function Mixer() {
                 width={6}
                 height={120}
               />
-            </div>
-            <div className={styles.sendGrid} aria-label={`${name} sends`}>
-              {SENDS.map((send) => (
-                <button
-                  key={send}
-                  type="button"
-                  aria-label={`Open send ${send} for ${name}`}
-                  title={`Open send ${send} for ${name}.`}
-                  onClick={() => openSend(send)}
-                >
-                  {send}
-                </button>
-              ))}
             </div>
             <div className={styles.muteSolo}>
               <Toggle

@@ -74,10 +74,12 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
         data-label="Empty"
         aria-label={`Rack slot ${String(slotNumber).padStart(2, "0")}, empty`}
       >
-        <header className={styles.header}>
-          <span className={styles.slot}>{String(slotNumber).padStart(2, "0")}</span>
-          <span className={styles.title}>Empty</span>
-        </header>
+        <div className={styles.nameBlock}>
+          <header className={styles.header}>
+            <span className={styles.slot}>{String(slotNumber).padStart(2, "0")}</span>
+            <span className={styles.title}>Empty</span>
+          </header>
+        </div>
         <div className={styles.addRow}>
           {addablePluginIds.map((pluginId) => {
             const candidate = manifestFor(pluginId);
@@ -117,152 +119,163 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
       data-collapsed={collapsed}
       aria-label={`Rack slot ${String(slotNumber).padStart(2, "0")}, ${manifest.productName}`}
     >
-      <header className={styles.header}>
-        <span className={styles.slot}>{String(slotNumber).padStart(2, "0")}</span>
-        <span className={styles.title}>{manifest.productName}</span>
-        <AuditionButton
-          label={manifest.productName}
-          className={styles.action}
-          onStart={() => {
-            startAudition(module.id);
-          }}
-          onStop={() => {
-            stopAudition(module.id);
-          }}
-        />
-        <LevelMeter
-          label={`${manifest.productName} output level`}
-          level={level}
-          width={6}
-          height={18}
-        />
-      </header>
+      {/* The name block is the faceplate's identity strip: slot, engraved name,
+          product name, and the unit's own keys, all held at the leading edge
+          so the plate itself carries the control bank. */}
+      <div className={styles.nameBlock}>
+        <header className={styles.header}>
+          <span className={styles.slot}>{String(slotNumber).padStart(2, "0")}</span>
+          <span className={styles.title}>{manifest.shortLabel ?? manifest.productName}</span>
+        </header>
+        <span className={styles.subtitle}>{manifest.productName}</span>
 
-      <div className={styles.actions} role="group" aria-label={`${manifest.productName} actions`}>
-        <button
-          type="button"
-          className={styles.action}
-          aria-label="Select module"
-          disabled={selected}
-          onClick={() => {
-            selectModule(module.id);
-          }}
-        >
-          Select
-        </button>
-        <button
-          type="button"
-          className={styles.action}
-          aria-label="Move left"
-          disabled={!props.canMoveLeft || props.previousSlotId === undefined}
-          onClick={() => {
-            if (props.previousSlotId !== undefined) moveModule(module.id, props.previousSlotId);
-          }}
-        >
-          &#8592;
-        </button>
-        <button
-          type="button"
-          className={styles.action}
-          aria-label="Move right"
-          disabled={!props.canMoveRight || props.nextSlotId === undefined}
-          onClick={() => {
-            if (props.nextSlotId !== undefined) moveModule(module.id, props.nextSlotId);
-          }}
-        >
-          &#8594;
-        </button>
-        <button
-          type="button"
-          className={styles.action}
-          aria-label="Duplicate module"
-          disabled={!props.hasEmptySlot || props.firstEmptySlotId === undefined}
-          onClick={() => {
-            if (props.firstEmptySlotId !== undefined) {
-              duplicateModule(module.id, props.firstEmptySlotId);
-            }
-          }}
-        >
-          Dup
-        </button>
-        <button
-          type="button"
-          className={styles.action}
-          aria-label={collapsed ? "Expand module" : "Collapse module"}
-          aria-expanded={!collapsed}
-          onClick={() => {
-            toggleCollapse(module.id);
-          }}
-        >
-          {collapsed ? "Expand" : "Collapse"}
-        </button>
-        <button
-          type="button"
-          className={styles.action}
-          aria-label="Remove module"
-          onClick={() => {
-            removeModule(module.id);
-          }}
-        >
-          Remove
-        </button>
+        <div className={styles.actions} role="group" aria-label={`${manifest.productName} actions`}>
+          <button
+            type="button"
+            className={styles.action}
+            aria-label="Select module"
+            disabled={selected}
+            onClick={() => {
+              selectModule(module.id);
+            }}
+          >
+            Sel
+          </button>
+          <button
+            type="button"
+            className={styles.action}
+            aria-label="Move left"
+            disabled={!props.canMoveLeft || props.previousSlotId === undefined}
+            onClick={() => {
+              if (props.previousSlotId !== undefined) moveModule(module.id, props.previousSlotId);
+            }}
+          >
+            &#8592;
+          </button>
+          <button
+            type="button"
+            className={styles.action}
+            aria-label="Move right"
+            disabled={!props.canMoveRight || props.nextSlotId === undefined}
+            onClick={() => {
+              if (props.nextSlotId !== undefined) moveModule(module.id, props.nextSlotId);
+            }}
+          >
+            &#8594;
+          </button>
+          <button
+            type="button"
+            className={styles.action}
+            aria-label="Duplicate module"
+            disabled={!props.hasEmptySlot || props.firstEmptySlotId === undefined}
+            onClick={() => {
+              if (props.firstEmptySlotId !== undefined) {
+                duplicateModule(module.id, props.firstEmptySlotId);
+              }
+            }}
+          >
+            Dup
+          </button>
+          <button
+            type="button"
+            className={styles.action}
+            aria-label={collapsed ? "Expand module" : "Collapse module"}
+            aria-expanded={!collapsed}
+            onClick={() => {
+              toggleCollapse(module.id);
+            }}
+          >
+            {collapsed ? "Open" : "Fold"}
+          </button>
+          <button
+            type="button"
+            className={styles.action}
+            aria-label="Remove module"
+            onClick={() => {
+              removeModule(module.id);
+            }}
+          >
+            Del
+          </button>
+        </div>
       </div>
 
       {collapsed ? null : (
-        <>
-          {voices.length > 1 ? (
-            <label className={styles.voiceSelector}>
-              <span>Voice</span>
-              <select
-                aria-label={`${manifest.productName} voice`}
-                value={selectedVoiceId}
-                onChange={(event) => {
-                  selectVoice(module.id, event.currentTarget.value);
+        <div className={styles.controls}>
+          {compact.map((descriptor) => {
+            const raw = module.parameters[descriptor.id];
+            if (
+              descriptor.minimum === undefined ||
+              descriptor.maximum === undefined ||
+              descriptor.step === undefined
+            ) {
+              return null;
+            }
+            const value = typeof raw === "number" ? raw : Number(descriptor.defaultValue);
+            return (
+              <Knob
+                key={descriptor.id}
+                controlId={descriptor.id}
+                label={descriptor.shortLabel ?? descriptor.name}
+                value={value}
+                min={descriptor.minimum}
+                max={descriptor.maximum}
+                step={descriptor.step}
+                defaultValue={Number(descriptor.resetValue)}
+                unit={descriptor.unit === "none" ? undefined : descriptor.unit}
+                precision={descriptor.displayPrecision}
+                onInput={(next) => {
+                  previewParameter(module.id, descriptor.id, next);
                 }}
-              >
-                {voices.map((voice) => (
-                  <option key={voice.id} value={voice.id}>
-                    {voice.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <div className={styles.controls}>
-            {compact.map((descriptor) => {
-              const raw = module.parameters[descriptor.id];
-              if (
-                descriptor.minimum === undefined ||
-                descriptor.maximum === undefined ||
-                descriptor.step === undefined
-              ) {
-                return null;
-              }
-              const value = typeof raw === "number" ? raw : Number(descriptor.defaultValue);
-              return (
-                <Knob
-                  key={descriptor.id}
-                  controlId={descriptor.id}
-                  label={descriptor.shortLabel ?? descriptor.name}
-                  value={value}
-                  min={descriptor.minimum}
-                  max={descriptor.maximum}
-                  step={descriptor.step}
-                  defaultValue={Number(descriptor.resetValue)}
-                  unit={descriptor.unit === "none" ? undefined : descriptor.unit}
-                  precision={descriptor.displayPrecision}
-                  onInput={(next) => {
-                    previewParameter(module.id, descriptor.id, next);
-                  }}
-                  onCommit={(next, gestureId) => {
-                    commitParameter(module.id, descriptor.id, next, gestureId);
-                  }}
-                />
-              );
-            })}
-          </div>
-        </>
+                onCommit={(next, gestureId) => {
+                  commitParameter(module.id, descriptor.id, next, gestureId);
+                }}
+              />
+            );
+          })}
+        </div>
       )}
+
+      {/* The trailing bay holds the voice selector, the audition pad, and the
+          unit's output ladder, the way the mock closes each faceplate. */}
+      <div className={styles.side}>
+        {voices.length > 1 && !collapsed ? (
+          <label className={styles.voiceSelector}>
+            <span>Voice</span>
+            <select
+              aria-label={`${manifest.productName} voice`}
+              value={selectedVoiceId}
+              onChange={(event) => {
+                selectVoice(module.id, event.currentTarget.value);
+              }}
+            >
+              {voices.map((voice) => (
+                <option key={voice.id} value={voice.id}>
+                  {voice.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <div className={styles.sideKeys}>
+          <AuditionButton
+            label={manifest.productName}
+            className={styles.action}
+            onStart={() => {
+              startAudition(module.id);
+            }}
+            onStop={() => {
+              stopAudition(module.id);
+            }}
+          />
+          <LevelMeter
+            label={`${manifest.productName} output level`}
+            level={level}
+            width={6}
+            height={34}
+          />
+        </div>
+      </div>
     </section>
   );
 });

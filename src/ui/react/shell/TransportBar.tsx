@@ -58,6 +58,30 @@ function TransportIcon(props: { readonly kind: "play" | "pause" | "stop" | "reco
   );
 }
 
+function MetronomeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3">
+      <path d="M6 2h4l3 12H3z" />
+      <path d="M8 12 11 4" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.05"
+    >
+      <circle cx="8" cy="8" r="2.6" />
+      <path d="M2.5 7.4l1.4-.3.4-1-.8-1.2 1.3-1.3 1.2.8 1-.4.3-1.4h1.9l.3 1.4 1 .4 1.2-.8 1.3 1.3-.8 1.2.4 1 1.4.3v1.9l-1.4.3-.4 1 .8 1.2-1.3 1.3-1.2-.8-1 .4-.3 1.4H7.3l-.3-1.4-1-.4-1.2.8-1.3-1.3.8-1.2-.4-1-1.4-.3z" />
+    </svg>
+  );
+}
+
 export function TransportBar() {
   const status = useAppStore((state) => state.project.transport.status);
   const recordArmed = useAppStore((state) => state.project.transport.recordArmed);
@@ -94,7 +118,9 @@ export function TransportBar() {
   const commitTempo = () => {
     const next = Number(tempoDraft);
     if (tempoDraft.trim() === "" || !Number.isFinite(next)) {
-      setTempoError(`Enter a tempo between ${String(TEMPO_MINIMUM)} and ${String(TEMPO_MAXIMUM)} BPM.`);
+      setTempoError(
+        `Enter a tempo between ${String(TEMPO_MINIMUM)} and ${String(TEMPO_MAXIMUM)} BPM.`,
+      );
       return;
     }
     if (next < TEMPO_MINIMUM || next > TEMPO_MAXIMUM) {
@@ -225,7 +251,7 @@ export function TransportBar() {
           title="Metronome."
           onClick={toggleMetronome}
         >
-          MET
+          <MetronomeIcon />
         </button>
         <button
           type="button"
@@ -269,7 +295,7 @@ export function TransportBar() {
           title="Settings."
           onClick={() => setSettingsOpen(true)}
         >
-          SET
+          <SettingsIcon />
         </button>
       </div>
     </header>

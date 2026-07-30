@@ -15,89 +15,187 @@
   cursor: ns-resize;
 }
 
-.tooltip {
+/* The tooltip and the entry chip share one bubble geometry above the dial, so
+   swapping one for the other during a gesture does not move anything. */
+.tooltip,
+.value {
   position: absolute;
-  z-index: 4;
-  inset-block-start: -20px;
+  z-index: 6;
+  inset-block-start: -16px;
   inset-inline-start: 50%;
   translate: -50% 0;
   min-inline-size: max-content;
-  padding: 3px 5px;
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-surface-inset, #080a0c);
-  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
+  padding: 1px 5px;
+  color: var(--lcd-ink);
+  background: var(--surface-well);
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
   font:
-    10px/1 ui-monospace,
+    var(--pulse-type-12, 12px)/1.4 ui-monospace,
     monospace;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
+}
+
+/*
+ * Direct numeric entry lives in this chip, hidden until the knob is hovered or
+ * holds keyboard focus, as the approved composition target draws it. It stays
+ * in the DOM throughout, so assistive technology always finds the field.
+ */
+.value {
+  opacity: 0;
+  transition: opacity var(--pulse-duration-fast, 80ms) linear;
+}
+
+.knob:hover .value,
+.knob:focus-within .value {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* While a gesture runs the tooltip is the one visible bubble. */
+.knob[data-adjusting="true"] .value {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The value is an operational reading: 12px minimum per spec-001 section 11.3.
+   The chip is the surface, so the field itself sits bare on the glass. */
+.value input {
+  inline-size: 56px;
+  min-block-size: 24px;
+  padding: 0;
+  font: inherit;
+  text-align: center;
+  color: var(--lcd-ink);
+  background: none;
+  box-shadow: none;
+}
+
+/* The chip is 56px wide; Chrome's spin buttons would cover the digits. */
+.value input::-webkit-outer-spin-button,
+.value input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .knob:focus-visible {
   outline: none;
 }
 
+/*
+ * The dial is a machined cap: a knurled skirt under a domed face with one
+ * upper-left glint. The cap is drawn by the element, and the arc, ticks, and
+ * pointer are drawn by the SVG above it, so the value stays vector-crisp at
+ * every size the rack and mixer scale the control to.
+ */
 .dial {
+  position: relative;
   display: block;
   width: 2.75rem;
   height: 2.75rem;
 }
 
-.track {
-  fill: none;
-  stroke: var(--pulse-color-control-track, #2b2b2f);
-  stroke-width: 4;
-  stroke-linecap: round;
+.dial::before {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 26%, #ffffff21 0 8%, transparent 34%),
+    radial-gradient(circle at 50% 44%, var(--metal-cap-top) 0 62%, transparent 63%),
+    repeating-conic-gradient(
+      from 0deg,
+      var(--metal-skirt-a) 0deg 4deg,
+      var(--metal-skirt-b) 4deg 8deg
+    ),
+    linear-gradient(180deg, var(--metal-cap-top), var(--metal-cap-bot));
+  box-shadow:
+    inset 0 1px 1px var(--edge-highlight),
+    inset 0 -2px 3px #00000099,
+    0 3px 5px #00000099;
+  transition: scale var(--pulse-duration-fast, 80ms) linear;
 }
 
+.dragging::before {
+  scale: 1.06;
+}
+
+/* The cap is an absolutely positioned pseudo-element, so it paints above
+   ordinary flow content. The face is lifted into the same positioned layer,
+   after it, or the arc and the pointer would be buried under the cap. */
+.face {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Engraved travel marks sit outside the arc, the way a panel legend does. */
+.ticks line {
+  stroke: #ffffff59;
+  stroke-width: 1.4;
+}
+
+/* The unlit travel is a groove cut into the plate, so the contract track colour
+   is carried down toward the recess rather than drawn as a light ring. A light
+   full ring would read as a filled value at every setting. */
+.track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--pulse-color-control-track, #2b2b2f) 22%, var(--surface-well));
+  stroke-width: 2.2;
+  stroke-linecap: butt;
+}
+
+/* The lit value arc is a thin ring hugging the cap: bright, not fat. */
 .fill {
   fill: none;
   stroke: var(--module-control-ring, var(--pulse-color-accent, #9be564));
-  stroke-width: 4;
-  stroke-linecap: round;
+  stroke-width: 3.2;
+  stroke-linecap: butt;
+  filter: drop-shadow(
+    0 0 3.5px
+      color-mix(
+        in srgb,
+        var(--module-control-ring, var(--pulse-color-accent, #9be564)) 60%,
+        transparent
+      )
+  );
 }
 
-/* The cap is a raised control face over the panel, so it takes the control
-   surface and the default border. Both are contract tokens, which is what lets
-   the high-contrast overlay reach this shape. */
+/*
+ * The domed inner face sitting inside the knurled skirt. Both of its colours
+ * are contract tokens, so a theme change or the high-contrast overlay repaints
+ * the control itself and not only the panel behind it.
+ */
 .cap {
   fill: var(--pulse-color-surface-control, #242a30);
   stroke: var(--pulse-color-border-default, #6d7881);
-  stroke-width: 1;
+  stroke-width: 0.8;
 }
 
+/* A fine machined indicator line running across the cap face. */
 .pointer {
-  stroke: var(--module-led, var(--pulse-color-accent, #b8ff7a));
-  stroke-width: 2.5;
-  stroke-linecap: round;
-}
-
-.knob:focus-visible .cap {
-  stroke: var(--pulse-color-focus-inner, #ffffff);
+  stroke: var(--pulse-color-control-thumb, #e1e6e9);
   stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px #ffffff80);
 }
 
+/* The caption is engraved above the dial, as on a panel legend. It wraps to a
+   second line rather than shrinking below the 10px floor. */
 .label {
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--pulse-color-text-muted, #9a9aa2);
-}
-
-/* An operational value: 12px minimum per spec-001 section 11.3, in a recessed
-   well. */
-.numeric {
-  width: 4.25rem;
-  font: inherit;
-  font-size: var(--pulse-type-12, 12px);
-  font-variant-numeric: tabular-nums;
+  order: -1;
+  max-block-size: 24px;
+  overflow: hidden;
   text-align: center;
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-surface-inset, #080a0c);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-control, 4px);
-}
-
-.dragging .cap {
-  stroke: var(--module-accent, var(--pulse-color-accent, #9be564));
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  line-height: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }

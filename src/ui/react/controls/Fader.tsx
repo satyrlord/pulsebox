@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
 import { useRangeGesture } from "./use-range-gesture";
@@ -72,6 +74,8 @@ export function Fader({
     onCommit,
     dragRange: TRACK_HEIGHT,
   });
+  /** Scoped so several faders in one strip cannot share a paint server. */
+  const capGradientId = useId();
 
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const travel = TRACK_HEIGHT - CAP_HEIGHT;
@@ -110,6 +114,16 @@ export function Fader({
           aria-hidden="true"
           focusable="false"
         >
+          {/* The machined silver block is the strongest highlight on the strip,
+              so its shading is a real paint server rather than a flat fill. */}
+          <defs>
+            <linearGradient id={capGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--cap-hi)" />
+              <stop offset="22%" stopColor="var(--cap-hi)" />
+              <stop offset="58%" stopColor="var(--cap-lo)" />
+              <stop offset="100%" stopColor="var(--metal-cap-bot)" />
+            </linearGradient>
+          </defs>
           <rect className={styles.slot} x={14} y={2} width={4} height={TRACK_HEIGHT - 4} rx={2} />
           <rect
             className={styles.filled}
@@ -120,7 +134,23 @@ export function Fader({
             rx={2}
           />
           <g transform={`translate(0 ${String(capY)})`}>
-            <rect className={styles.cap} x={4} y={0} width={24} height={CAP_HEIGHT} rx={3} />
+            <rect
+              className={styles.cap}
+              x={4}
+              y={0}
+              width={24}
+              height={CAP_HEIGHT}
+              rx={2.5}
+              fill={`url(#${capGradientId})`}
+            />
+            <rect
+              className={styles.capGroove}
+              x={5}
+              y={CAP_HEIGHT / 2 - 2}
+              width={22}
+              height={4}
+              rx={1}
+            />
             <line
               className={styles.capLine}
               x1={7}

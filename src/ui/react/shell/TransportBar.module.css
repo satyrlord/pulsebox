@@ -1,21 +1,22 @@
+/* The transport is the machine's front plate: brushed metal under a lit top
+   edge, throwing a shadow onto the workspace below it. */
 .bar {
   min-inline-size: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 168px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding-inline: 10px;
+  padding: 0 12px 0 10px;
+  /* The tempo objection floats below the bar, so the plate must not clip it. */
   overflow: visible;
   color: var(--pulse-color-text-primary, #f3f5f6);
-  background:
-    radial-gradient(circle at 20% 20%, rgb(255 255 255 / 3%) 0 1px, transparent 1px),
-    linear-gradient(
-      180deg,
-      var(--pulse-color-surface-control, #242a30),
-      var(--pulse-color-surface-panel, #15191d)
-    );
-  border-block-end: 1px solid var(--pulse-color-border-default, #6d7881);
-  box-shadow: var(--pulse-shadow-panel, 0 4px 12px #00000099);
+  background-color: var(--surface-plate-top);
+  background-image:
+    var(--mat-speckle), linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  border-block-end: 1px solid var(--edge-hairline);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 4px 8px #00000099;
   z-index: 40;
 }
 
@@ -24,7 +25,7 @@
   min-inline-size: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 /* Anchors the tempo validation message, which sits out of flow so it cannot
@@ -37,98 +38,189 @@
   justify-content: flex-end;
 }
 
+/* Plain engraved type on the plate, optically centred in the fixed middle
+   column. The negative end margin cancels the trailing letter-space that
+   tracking adds after the final glyph. */
 .mark {
   justify-self: center;
-  font-size: 24px;
-  font-weight: 700;
+  inline-size: 168px;
+  margin-inline-end: -0.17em;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-20, 20px);
+  font-weight: 600;
   letter-spacing: 0.17em;
+  text-align: center;
   white-space: nowrap;
   color: var(--pulse-color-text-primary, #f3f5f6);
-  text-shadow: 0 1px 2px #000000;
+  text-shadow:
+    0 1px 2px #000000d9,
+    0 0 14px #ffffff12;
 }
 
+/* Grouped keys sit inside a recessed channel. The channel is what gives the
+   bar its substance. */
 .modeToggle,
 .transport {
   block-size: 40px;
+  flex: none;
   display: flex;
   gap: 2px;
   padding: 3px;
-  background: var(--pulse-color-surface-inset, #080a0c);
-  border-radius: var(--pulse-radius-panel, 8px);
-  box-shadow: inset 0 2px 4px #00000099;
+  background: var(--surface-well);
+  border-radius: var(--pulse-radius-dialog, 8px);
+  box-shadow:
+    var(--sink-1),
+    0 1px 0 var(--edge-highlight);
 }
 
 .modeToggle {
-  inline-size: 116px;
+  inline-size: 120px;
 }
 
 .modeToggle button {
   flex: 1;
   min-inline-size: 0;
+  block-size: 34px;
+  padding-inline: 6px;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #919ba3);
+  background: none;
+  box-shadow: none;
+}
+
+.modeToggle button:hover {
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 .modeToggle button[aria-pressed="true"] {
-  color: var(--pulse-color-accent, #7ed9a3);
-  border-block-end: 2px solid currentColor;
+  color: var(--accent-lamp);
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface-plate-bot));
+  box-shadow:
+    inset 0 -2px 0 var(--accent-lamp),
+    inset 0 1px 0 var(--edge-highlight),
+    0 1px 2px #00000080;
 }
 
 .transport {
-  inline-size: 126px;
+  inline-size: 131px;
+  gap: 1px;
+  padding: 2px;
 }
 
+/* Transport keys are generous square caps seated together in the channel, each
+   glyph carrying its own signal colour so Play and Record stay identifiable at
+   rest without being lit. */
 .transport button {
-  flex: 1;
+  flex: 1 1 0;
+  block-size: 36px;
+  padding: 0;
   display: grid;
   place-items: center;
+  border-radius: var(--pulse-radius-panel, 6px);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #ffffff0f, transparent 62%),
+    linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    inset 0 -1px 2px #00000073,
+    0 1px 2px #0000008c;
 }
 
 .transport svg {
-  inline-size: 19px;
-  block-size: 19px;
+  inline-size: 21px;
+  block-size: 21px;
   fill: currentColor;
 }
 
 .play {
-  color: var(--pulse-color-status-success, #62d28a);
+  color: var(--signal-play);
+}
+
+.play svg {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--signal-play) 65%, transparent));
 }
 
 .record {
-  color: var(--pulse-color-status-danger, #ff8178);
+  color: var(--signal-rec);
 }
 
-.transport button[aria-pressed="true"] {
-  color: var(--pulse-color-on-accent, #07110b);
-  background: var(--pulse-color-accent, #7ed9a3);
-  box-shadow: inset 0 0 0 2px var(--pulse-color-border-strong, #aab4bc);
+.record svg {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--signal-rec) 55%, transparent));
 }
 
+/* The engaged key is a filled cap, not merely a coloured glyph. */
+.transport .play[aria-pressed="true"] {
+  color: var(--accent-ink);
+  background: linear-gradient(
+    180deg,
+    var(--signal-play),
+    color-mix(in srgb, var(--signal-play) 68%, #000000)
+  );
+  box-shadow:
+    var(--lift-1),
+    0 0 14px var(--signal-play);
+}
+
+.transport .play[aria-pressed="true"] svg,
+.transport .record[aria-pressed="true"] svg {
+  filter: none;
+}
+
+.transport .record[aria-pressed="true"] {
+  color: var(--pulse-color-focus-inner, #ffffff);
+  background: linear-gradient(
+    180deg,
+    var(--signal-rec),
+    color-mix(in srgb, var(--signal-rec) 68%, #000000)
+  );
+  box-shadow:
+    var(--lift-1),
+    0 0 12px var(--signal-rec);
+}
+
+/* Readout glass: a dark pane in a deep recess with a single diagonal sheen.
+   The ink follows the theme so it stays legible in an imported light theme. */
 .tempo,
 .position {
-  block-size: 40px;
+  position: relative;
+  overflow: hidden;
+  block-size: 42px;
+  flex: none;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-inline: 8px;
-  background: var(--pulse-color-surface-inset, #080a0c);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-control, 4px);
-  box-shadow: inset 0 2px 4px #00000099;
+  padding: 2px 8px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--scope-glass) 88%, #000000),
+    var(--scope-glass)
+  );
+  border-radius: 7px;
+  box-shadow: var(--sink-2);
+}
+
+.tempo::after,
+.position::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, #ffffff09 0 40%, transparent 40%);
 }
 
 .tempo {
-  inline-size: 68px;
+  inline-size: 70px;
 }
 
 /* A rejected value is marked on the field itself as well as in the message, so
    the objection does not depend on reading the text alone. */
 .tempo:has(input[aria-invalid="true"]) {
-  border-color: var(--pulse-color-status-danger, #ff8178);
   box-shadow:
-    inset 0 2px 4px #00000099,
+    var(--sink-2),
     0 0 0 1px var(--pulse-color-status-danger, #ff8178);
 }
 
@@ -154,62 +246,133 @@
 }
 
 .tempo input {
-  inline-size: 52px;
+  position: relative;
+  z-index: 1;
+  inline-size: 54px;
+  min-block-size: 24px;
   padding: 0;
   font:
-    14px/1 ui-monospace,
+    var(--pulse-type-14, 14px)/1.1 ui-monospace,
     monospace;
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: transparent;
-  border: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--lcd-ink);
+  background: none;
+  box-shadow: none;
 }
 
 .tempo > span:last-child,
 .position span {
-  font:
-    var(--pulse-type-10, 10px)/1.2 ui-monospace,
-    monospace;
-  color: var(--pulse-color-text-muted, #919ba3);
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 .position {
-  inline-size: 126px;
+  inline-size: 132px;
   font-variant-numeric: tabular-nums;
+}
+
+.position span {
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  text-transform: none;
 }
 
 .position strong {
   font:
-    13px/1 ui-monospace,
+    var(--pulse-type-14, 14px)/1.1 ui-monospace,
     monospace;
+  font-weight: 400;
+  color: var(--lcd-ink);
 }
 
-.iconButton,
-.meterMode {
+/* Bar-mounted keys: a small machined cap with a radial key light. */
+.iconButton {
+  inline-size: 42px;
   block-size: 40px;
-  min-inline-size: 38px;
-  padding: 0 5px;
-  font-size: var(--pulse-type-10, 10px);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  flex: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background:
+    radial-gradient(120% 80% at 50% 0%, #ffffff0f, transparent 62%),
+    linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    inset 0 -2px 3px #00000073,
+    0 2px 4px #0000008c,
+    0 0 0 1px var(--edge-hairline);
+}
+
+.iconButton svg {
+  inline-size: 17px;
+  block-size: 17px;
 }
 
 .iconButton[aria-pressed="true"] {
-  color: var(--pulse-color-on-accent, #07110b);
-  background: var(--pulse-color-accent, #7ed9a3);
+  color: var(--accent-lamp);
+  background:
+    radial-gradient(120% 80% at 50% 0%, #ffffff0f, transparent 62%),
+    linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    inset 0 -2px 3px #00000073,
+    0 2px 4px #0000008c,
+    0 0 0 1px var(--pulse-color-border-strong, #aab4bc);
+  font-weight: inherit;
 }
 
+.iconButton[aria-pressed="true"] svg {
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+
+/* The meter mode is a bare label on the plate, not a key. */
+.meterMode {
+  inline-size: 41px;
+  block-size: 40px;
+  flex: none;
+  padding: 0;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-12, 12px);
+  letter-spacing: 0.04em;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: none;
+  box-shadow: none;
+}
+
+.meterMode[aria-pressed="true"] {
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: none;
+  box-shadow: inset 0 -2px 0 var(--accent-lamp);
+}
+
+/* The channel letters read at the 10px floor. The ladders keep their slim bars,
+   centred in the taller row. */
 .masterMeters {
+  flex: none;
   display: grid;
   grid-template-columns: 12px 116px;
-  gap: 2px 4px;
+  gap: 3px 4px;
   align-items: center;
 }
 
 .masterMeters > span {
   font:
-    var(--pulse-type-10, 10px)/1.2 ui-monospace,
+    var(--pulse-type-10, 10px)/1 ui-monospace,
     monospace;
-  color: var(--pulse-color-text-muted, #919ba3);
+  color: var(--pulse-color-text-secondary, #bac2c8);
+}
+
+.masterMeters canvas {
+  align-self: center;
+  background: var(--surface-well);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
 }
 
 .audioStatus,
@@ -223,14 +386,6 @@
 
 .bar button {
   min-block-size: 24px;
-  color: var(--pulse-color-text-secondary, #bac2c8);
-  background: linear-gradient(
-    180deg,
-    var(--pulse-color-surface-control, #242a30),
-    var(--pulse-color-surface-panel, #15191d)
-  );
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-control, 4px);
   cursor: pointer;
 }
 
@@ -257,12 +412,27 @@
     font-size: 19px;
   }
 
+  /* The grouped keys narrow evenly. Tracking is what overflows first at this
+     width, so the engraved letter-space closes before the key does. */
   .modeToggle {
-    inline-size: 94px;
+    inline-size: 104px;
+  }
+
+  .modeToggle button {
+    padding-inline: 2px;
+    letter-spacing: 0.02em;
   }
 
   .transport {
-    inline-size: 106px;
+    inline-size: 112px;
+  }
+
+  .iconButton {
+    inline-size: 34px;
+  }
+
+  .meterMode {
+    inline-size: 34px;
   }
 
   .tempo {

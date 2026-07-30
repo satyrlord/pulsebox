@@ -8,6 +8,11 @@ import { useRangeGesture } from "./use-range-gesture";
 export interface KnobProps {
   readonly controlId: string;
   readonly label: string;
+  /**
+   * Engraved caption when the accessible name is too long for the panel, as on
+   * a mixer strip where the name must still say which channel it belongs to.
+   */
+  readonly caption?: string;
   readonly value: number;
   readonly min: number;
   readonly max: number;
@@ -25,11 +30,32 @@ const SWEEP = 270;
 const START_ANGLE = -135;
 const RADIUS = 16;
 const CENTRE = 22;
+/** Engraved travel marks outside the value arc, as on a panel knob. */
+const TICK_COUNT = 9;
+const TICK_INNER = 18.5;
+const TICK_OUTER = 20.5;
 
 function polar(angleDegrees: number, radius: number): { x: number; y: number } {
   const radians = ((angleDegrees - 90) * Math.PI) / 180;
   return { x: CENTRE + radius * Math.cos(radians), y: CENTRE + radius * Math.sin(radians) };
 }
+
+/**
+ * The tick ring is fixed geometry, so it is built once rather than on every
+ * value change.
+ */
+const TICKS = Array.from({ length: TICK_COUNT }, (_, index) => {
+  const angle = START_ANGLE + (index / (TICK_COUNT - 1)) * SWEEP;
+  const inner = polar(angle, TICK_INNER);
+  const outer = polar(angle, TICK_OUTER);
+  return {
+    key: index,
+    x1: inner.x.toFixed(2),
+    y1: inner.y.toFixed(2),
+    x2: outer.x.toFixed(2),
+    y2: outer.y.toFixed(2),
+  };
+});
 
 function arcPath(fromDegrees: number, toDegrees: number): string {
   const start = polar(fromDegrees, RADIUS);
@@ -67,11 +93,16 @@ export function Knob(props: KnobProps) {
 
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const angle = START_ANGLE + fraction * SWEEP;
-  const pointer = useMemo(() => polar(angle, RADIUS - 4), [angle]);
+  const pointer = useMemo(() => ({ from: polar(angle, 3), to: polar(angle, RADIUS - 4) }), [angle]);
   const formatted = displayValue.toFixed(precision);
 
   return (
-    <div className={styles.knob} data-parameter={controlId} data-component="knob">
+    <div
+      className={styles.knob}
+      data-parameter={controlId}
+      data-component="knob"
+      data-adjusting={adjusting}
+    >
       <div
         ref={wheelRef}
         role="slider"
@@ -94,52 +125,68 @@ export function Knob(props: KnobProps) {
         onBlur={onBlur}
         onDoubleClick={disabled === true ? undefined : onDoubleClick}
       >
-        <svg viewBox="0 0 44 44" aria-hidden="true" focusable="false" className={styles.dial}>
+        <svg viewBox="0 0 44 44" aria-hidden="true" focusable="false" className={styles.face}>
+          <g className={styles.ticks}>
+            {TICKS.map((tick) => (
+              <line key={tick.key} x1={tick.x1} y1={tick.y1} x2={tick.x2} y2={tick.y2} />
+            ))}
+          </g>
           <path className={styles.track} d={arcPath(START_ANGLE, START_ANGLE + SWEEP)} />
           {fraction > 0 ? <path className={styles.fill} d={arcPath(START_ANGLE, angle)} /> : null}
-          <circle className={styles.cap} cx={CENTRE} cy={CENTRE} r={RADIUS - 5} />
+          {/* The inner cap face. It carries contract surface and border tokens,
+              which is what lets the high-contrast overlay reach the control
+              rather than stopping at the page behind it. */}
+          <circle className={styles.cap} cx={CENTRE} cy={CENTRE} r={9.5} />
           <line
             className={styles.pointer}
-            x1={CENTRE}
-            y1={CENTRE}
-            x2={pointer.x.toFixed(2)}
-            y2={pointer.y.toFixed(2)}
+            x1={pointer.from.x.toFixed(2)}
+            y1={pointer.from.y.toFixed(2)}
+            x2={pointer.to.x.toFixed(2)}
+            y2={pointer.to.y.toFixed(2)}
           />
         </svg>
       </div>
-      <span className={styles.label}>{label}</span>
+      <span className={styles.label}>{props.caption ?? label}</span>
       {adjusting ? (
         <output className={styles.tooltip} role="tooltip">
           {unit === undefined ? formatted : `${formatted} ${unit}`}
         </output>
       ) : null}
-      <input
-        key={formatted}
-        id={readoutId}
-        className={styles.numeric}
-        type="number"
-        aria-label={`${label} value`}
-        defaultValue={formatted}
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        inputMode="decimal"
-        onBlur={(event) => {
-          setFromNumeric(event.currentTarget.valueAsNumber);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.currentTarget.value = formatted;
-            event.currentTarget.blur();
-          }
-        }}
-      />
+      {/*
+       * Direct numeric entry, spec-003 section 22.1. The approved composition
+       * target draws this as a chip floating above the dial that appears on
+       * hover or keyboard focus rather than as a fixed box on the faceplate.
+       * The chip yields to the adjustment tooltip above, so one bubble shows
+       * at a time.
+       */}
+      <div className={styles.value}>
+        <input
+          key={formatted}
+          id={readoutId}
+          type="number"
+          aria-label={`${label} value`}
+          defaultValue={formatted}
+          min={min}
+          max={max}
+          step={step}
+          disabled={disabled}
+          inputMode="decimal"
+          onBlur={(event) => {
+            setFromNumeric(event.currentTarget.valueAsNumber);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.currentTarget.value = formatted;
+              event.currentTarget.blur();
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }

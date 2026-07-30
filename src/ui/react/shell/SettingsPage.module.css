@@ -1,19 +1,37 @@
+/*
+ * Settings overlays the workspace rather than taking a row in the shell grid.
+ * Playback continues underneath, so the panel never unmounts the shell or
+ * interrupts the audio graph.
+ */
 .panel {
+  position: fixed;
+  z-index: 70;
+  inset-block-start: var(--pulse-space-6, 24px);
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  inline-size: min(560px, calc(100vw - var(--pulse-space-8, 32px)));
+  max-block-size: calc(100vh - var(--pulse-space-10, 40px) - var(--pulse-space-6, 24px));
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  background: var(--pulse-color-surface-panel, #15191d);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: 0.1875rem;
+  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-panel, 6px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 6px 18px #00000099;
 }
 
 .heading {
   margin: 0;
-  font-size: 0.875rem;
-  letter-spacing: 0.06em;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-20, 20px);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--pulse-color-text-primary, #f3f5f6);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
 .heading:focus-visible {
@@ -33,13 +51,11 @@
 
 .close {
   align-self: flex-start;
-  min-height: 1.5rem;
+  min-height: 2rem;
   padding: 0.25rem 0.75rem;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-surface-control, #242a30);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: 0.125rem;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
 }

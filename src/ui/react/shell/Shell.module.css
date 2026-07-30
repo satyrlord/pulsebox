@@ -18,6 +18,8 @@
   padding-block: 2px var(--pulse-space-1, 4px);
 }
 
+/* Each panel is a chassis bay: a speckled matte face inside a black hairline,
+   with one lit top edge and a short drop shadow seating it on the app floor. */
 .moduleBrowser,
 .rackOverview,
 .studioPanel,
@@ -28,30 +30,37 @@
   min-block-size: 0;
   overflow: hidden;
   color: var(--pulse-color-text-primary, #f3f5f6);
-  background:
-    radial-gradient(circle at 25% 15%, rgb(255 255 255 / 2%) 0 1px, transparent 1px),
-    var(--pulse-color-surface-panel, #15191d);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-panel, 8px);
-  box-shadow: var(--pulse-shadow-panel, 0 4px 12px #00000099);
+  background-color: var(--surface-chassis);
+  background-image: var(--mat-speckle);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-panel, 6px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 4px 10px #0000006b;
 }
 
 .panelHeader {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--pulse-space-2, 8px);
   min-block-size: 28px;
   padding-inline: var(--pulse-space-2, 8px);
-  border-block-end: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-block-end: 1px solid var(--edge-hairline);
+  box-shadow: 0 1px 0 var(--edge-highlight);
 }
 
+/* Panel names are engraved into the plate: condensed, tracked, and cut with a
+   dark shadow below the glyph. */
 .panelHeader h2 {
   margin: 0;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--pulse-color-text-secondary, #bac2c8);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
 .statusLamp {
@@ -93,22 +102,33 @@
   padding: 4px;
 }
 
+/* A browser entry is a raised plate. The short label and the tinted thumbnail
+   already name the module, so the item takes a full accent-tinted perimeter
+   rather than a one-sided stripe. */
 .moduleChoice {
+  --k: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 8px;
-  min-block-size: 70px;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 9px;
+  min-block-size: 74px;
   align-items: center;
-  padding: 6px;
+  padding: 7px 5px 7px 9px;
   position: relative;
-  background: linear-gradient(
-    180deg,
-    var(--pulse-color-surface-control, #242a30),
-    var(--pulse-color-surface-inset, #080a0c)
-  );
-  border-inline-start: 2px solid var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  border: 1px solid color-mix(in srgb, var(--k) 32%, var(--edge-hairline));
   border-radius: var(--pulse-radius-control, 4px);
-  box-shadow: var(--pulse-shadow-control, 0 1px 3px #00000080);
+  box-shadow: var(--lift-1);
+  transition:
+    box-shadow var(--pulse-duration-fast, 80ms) linear,
+    border-color var(--pulse-duration-fast, 80ms) linear;
+}
+
+.moduleChoice:hover {
+  border-color: color-mix(in srgb, var(--k) 55%, var(--edge-hairline));
+  box-shadow:
+    var(--lift-1),
+    0 0 0 1px color-mix(in srgb, var(--k) 45%, transparent);
 }
 
 .moduleChoice > button {
@@ -117,24 +137,54 @@
   inset-inline-end: 4px;
   min-inline-size: 32px;
   min-block-size: 24px;
+  font-size: var(--pulse-type-10, 10px);
 }
 
+/* The thumbnail reads as a miniature faceplate: a brushed tinted plate under an
+   accent top edge, with two stud knobs and a lit pip. */
 .moduleThumbnail {
-  block-size: 34px;
+  position: relative;
+  /* The grid column owns the width, so a narrow desktop cannot push the entry's
+     text out of its own panel. */
+  inline-size: 100%;
+  block-size: 38px;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-evenly;
-  border-block-start: 4px solid var(--module-accent, var(--pulse-color-accent, #7ed9a3));
   border-radius: 3px;
-  background: var(--pulse-color-surface-inset, #080a0c);
+  background:
+    var(--mat-brush),
+    linear-gradient(180deg, color-mix(in srgb, var(--k) 85%, #000000) 0 5px, transparent 5px),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--k) 10%, var(--surface-plate-top)),
+      var(--surface-well)
+    );
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    inset 0 -4px 8px #00000080,
+    0 1px 2px var(--edge-shadow);
 }
 
 .moduleThumbnail i {
-  inline-size: 8px;
-  block-size: 8px;
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  inline-size: 7px;
+  block-size: 7px;
+  margin-block-start: 5px;
   border-radius: 50%;
-  background: var(--pulse-color-surface-control, #242a30);
+  background: radial-gradient(circle at 38% 28%, var(--metal-screw-top), var(--metal-cap-bot) 74%);
+  box-shadow:
+    inset 0 0 0 1px var(--edge-highlight),
+    0 0 3px color-mix(in srgb, var(--k) 30%, transparent),
+    0 1px 1px #000000b3;
+}
+
+.moduleThumbnail i:last-child {
+  inline-size: 3px;
+  block-size: 2px;
+  border-radius: 1px;
+  background: var(--k);
+  box-shadow: 0 0 3px color-mix(in srgb, var(--k) 45%, transparent);
 }
 
 .moduleChoiceText {
@@ -144,8 +194,11 @@
 }
 
 .moduleChoiceText strong {
-  color: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
-  letter-spacing: 0.1em;
+  font-family: var(--type-display);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: color-mix(in srgb, var(--k) 62%, var(--pulse-color-text-primary, #f3f5f6));
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
 .moduleChoiceText span,
@@ -153,6 +206,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The Add key floats over the lower corner of the entry, so the kind line keeps
+   its own gutter instead of running underneath the key. */
+.moduleChoiceText small {
+  padding-inline-end: 40px;
 }
 
 .moduleChoiceText span {
@@ -168,53 +227,89 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   margin: 0;
-  padding: 12px 4px;
+  padding: 17px 4px 4px;
   list-style: none;
 }
 
 .slotList li {
+  --k: var(--module-accent, var(--pulse-color-border-default, #6d7881));
+
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 19px minmax(0, 1fr);
   gap: 5px;
   align-items: center;
   font:
-    10px/1 ui-monospace,
+    var(--pulse-type-10, 10px)/1 ui-monospace,
     monospace;
-  color: var(--pulse-color-text-muted, #919ba3);
+  color: var(--pulse-color-text-secondary, #bac2c8);
+}
+
+.slotList li > span:first-child {
+  text-align: end;
 }
 
 .occupiedSlot,
 .emptySlot {
-  min-block-size: 32px;
+  block-size: 34px;
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* A loaded slot is a tinted plate. The perimeter completes the module identity
+   without a one-sided marker. */
 .occupiedSlot {
-  font-weight: 800;
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-12, 12px);
+  font-weight: 700;
   letter-spacing: 0.1em;
-  color: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
-  border-inline-start: 2px solid currentColor;
+  color: color-mix(in srgb, var(--k) 62%, var(--pulse-color-text-primary, #f3f5f6));
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--k) 9%, var(--surface-plate-top)),
+    var(--surface-plate-bot)
+  );
+  border: 1px solid color-mix(in srgb, var(--k) 38%, var(--edge-hairline));
+  box-shadow: var(--lift-1);
 }
 
+/* The selected slot adds a lit ring and a halo. It is paired with
+   `aria-pressed`, so the selection never rests on colour alone. */
 .occupiedSlot[aria-pressed="true"] {
-  box-shadow: inset 0 0 0 2px var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+  box-shadow:
+    var(--lift-1),
+    0 0 0 1px var(--k),
+    0 0 9px color-mix(in srgb, var(--k) 40%, transparent);
 }
 
 .emptySlot {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 8px;
   font-size: var(--pulse-type-10, 10px);
   color: var(--pulse-color-text-muted, #919ba3);
-  background: transparent;
-  border: 1px dashed var(--pulse-color-border-default, #6d7881);
+  background: none;
+  border: 1.4px dashed var(--pulse-color-text-muted, #919ba3);
+  box-shadow: none;
 }
 
+.emptySlot:hover {
+  color: var(--accent-lamp);
+  border-color: var(--accent-lamp);
+}
+
+/* Three peer views, so three equal tabs seated in their own recess. The
+   selected tab rises out of it and lights its lower edge. */
 .studioTabs {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
@@ -223,16 +318,26 @@
 
 .studioTabs button {
   block-size: 30px;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #919ba3);
+  background: var(--surface-well);
+  box-shadow: var(--sink-1);
+}
+
+.studioTabs button:hover {
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 .studioTabs button[aria-selected="true"] {
   color: var(--pulse-color-text-primary, #f3f5f6);
-  border-block-end: 2px solid var(--pulse-color-accent, #7ed9a3);
-  box-shadow: inset 0 0 0 1px var(--pulse-color-border-strong, #aab4bc);
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface-plate-bot));
+  box-shadow:
+    var(--lift-1),
+    inset 0 -2px 0 var(--accent-lamp);
 }
 
 .studioPane {
@@ -247,18 +352,17 @@
   padding: 8px;
 }
 
+/* A send row and a master card are both raised plates on the chassis. The lit
+   slot letter is the row's identity, so the plate keeps a plain perimeter. */
 .effectCard,
 .masterPanel article {
   display: grid;
   gap: 6px;
   padding: 8px;
-  background: linear-gradient(
-    180deg,
-    var(--pulse-color-surface-control, #242a30),
-    var(--pulse-color-surface-inset, #080a0c)
-  );
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  background: var(--mat-plate);
+  border: 1px solid var(--edge-hairline);
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--lift-1);
 }
 
 .effectCard {
@@ -267,7 +371,10 @@
 }
 
 .effectCard[data-selected="true"] {
-  box-shadow: inset 0 0 0 1px var(--pulse-color-accent, #7ed9a3);
+  border-color: color-mix(in srgb, var(--accent-lamp) 34%, var(--edge-hairline));
+  box-shadow:
+    var(--lift-1),
+    inset 0 0 0 1px var(--accent-lamp);
 }
 
 .sendBadge {
@@ -275,18 +382,30 @@
   place-items: center;
   inline-size: 24px;
   block-size: 24px;
-  font-weight: 800;
-  color: var(--pulse-color-on-accent, #07110b);
-  background: var(--pulse-color-accent, #7ed9a3);
+  font-family: var(--type-display);
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-lamp) 88%, #ffffff) 0%,
+    var(--accent-lamp) 45%,
+    color-mix(in srgb, var(--accent-lamp) 96%, #000000) 100%
+  );
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow:
+    inset 0 1px 0 #ffffff4d,
+    0 0 7px color-mix(in srgb, var(--accent-lamp) 35%, transparent);
 }
 
 .effectCard h3,
 .masterPanel h3 {
   margin: 0;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-12, 12px);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
 .effectCard p,
@@ -314,7 +433,10 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
@@ -339,8 +461,9 @@
   justify-content: space-between;
   gap: 8px;
   padding: 6px;
-  background: var(--pulse-color-surface-inset, #080a0c);
+  background: var(--surface-well);
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
 }
 
 .patternInspector dt,
@@ -360,12 +483,14 @@
 }
 
 .rollTools {
+  flex: none;
   min-block-size: 38px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding-inline: 8px;
-  border-block-end: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-block-end: 1px solid var(--edge-hairline);
+  box-shadow: 0 1px 0 var(--edge-highlight);
 }
 
 .rollTools > label {
@@ -386,8 +511,10 @@
 
 .gridReadout {
   padding: 5px;
-  background: var(--pulse-color-surface-inset, #080a0c);
+  color: var(--pulse-color-text-muted, #919ba3);
+  background: var(--surface-well);
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
 }
 
 .moduleSelector {
@@ -399,10 +526,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
   font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--pulse-color-text-secondary, #bac2c8);
+  color: color-mix(
+    in srgb,
+    var(--module-accent, var(--pulse-color-accent, #7ed9a3)) 55%,
+    var(--pulse-color-text-primary, #f3f5f6)
+  );
 }
 
 .rollBody {
@@ -412,10 +545,13 @@
   grid-template-columns: 78px minmax(0, 1fr);
 }
 
+/* The pitch gutter reads as a keybed seen side-on: a dark name strip, then a
+   raised key face for each row. */
 .pitchLabels {
   display: grid;
   grid-template-rows: repeat(6, 1fr);
-  background: var(--pulse-color-surface-inset, #080a0c);
+  background: linear-gradient(180deg, var(--surface-recess), var(--surface-well));
+  box-shadow: inset -1px 0 2px var(--edge-shadow);
 }
 
 .pitchLabels span {
@@ -426,10 +562,13 @@
     var(--pulse-type-10, 10px)/1.2 ui-monospace,
     monospace;
   color: var(--pulse-color-text-secondary, #bac2c8);
-  border-block-end: 1px solid
-    color-mix(in srgb, var(--pulse-color-border-default, #6d7881) 35%, transparent);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
+  background: linear-gradient(90deg, var(--surface-raised), var(--surface-plate-bot));
+  border-block-end: 1px solid var(--edge-hairline);
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
 }
 
+/* The grid is black glass behind the plate, so the notes read as lit. */
 .noteGrid {
   position: relative;
   display: grid;
@@ -442,23 +581,33 @@
     repeating-linear-gradient(
       0deg,
       transparent 0 calc(16.666% - 1px),
-      color-mix(in srgb, var(--pulse-color-border-default, #6d7881) 22%, transparent)
-        calc(16.666% - 1px) 16.666%
+      #ffffff09 calc(16.666% - 1px) 16.666%
     ),
-    var(--pulse-color-surface-inset, #080a0c);
+    var(--surface-well);
+  box-shadow: var(--sink-2);
 }
 
 .noteGrid > i {
   block-size: 20%;
   min-block-size: 12px;
-  border: 1px solid color-mix(in srgb, var(--pulse-color-border-default, #6d7881) 35%, transparent);
-  border-radius: 2px;
+  border: 1px solid #ffffff0f;
+  border-radius: 3px;
 }
 
 .noteGrid > i[data-active="true"] {
-  background: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
-  border-color: var(--pulse-color-text-primary, #f3f5f6);
-  box-shadow: 0 0 5px color-mix(in srgb, var(--pulse-color-accent, #7ed9a3) 45%, transparent);
+  --k: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--k) 75%, #ffffff) 0%,
+    var(--k) 45%,
+    color-mix(in srgb, var(--k) 68%, #000000) 100%
+  );
+  border-color: color-mix(in srgb, var(--k) 40%, var(--pulse-color-text-primary, #f3f5f6));
+  box-shadow:
+    inset 0 1px 0 #ffffff52,
+    0 0 4px color-mix(in srgb, var(--k) 34%, transparent),
+    0 1px 2px var(--edge-shadow);
 }
 
 .playhead {
@@ -467,6 +616,8 @@
   inset-inline-start: 0;
   inline-size: 2px;
   background: var(--pulse-color-text-primary, #f3f5f6);
+  box-shadow: 0 0 6px #ffffff66;
+  opacity: 0.85;
   transform: translateX(0);
 }
 
@@ -474,28 +625,45 @@
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
   min-block-size: 48px;
-  border-block-start: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-block-start: 1px solid var(--edge-hairline);
+  box-shadow: 0 -1px 0 var(--edge-highlight);
 }
 
 .velocityLane > span {
   display: grid;
   place-items: center;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 .velocityLane > div {
   display: grid;
   grid-template-columns: repeat(16, 1fr);
   align-items: end;
+  justify-items: center;
   gap: 2px;
   padding: 4px;
-  background: var(--pulse-color-surface-inset, #080a0c);
+  background: var(--surface-well);
+  box-shadow: var(--sink-1);
 }
 
+/* Slim stems, as on the mock's lane. A full-width block would read as a filled
+   region rather than as one value per step. */
 .velocityLane i {
+  --k: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+
+  inline-size: 4px;
   min-block-size: 2px;
-  background: var(--pulse-color-accent, #7ed9a3);
+  border-radius: 1px 1px 0 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--k) 70%, #ffffff),
+    color-mix(in srgb, var(--k) 88%, #000000)
+  );
+  box-shadow: 0 0 2px color-mix(in srgb, var(--k) 32%, transparent);
 }
 
 .playlist ol {
@@ -514,16 +682,33 @@
   gap: 3px;
 }
 
+/* A playlist row is a raised plate. The engaged row lights its perimeter and
+   its ink, so the state is not carried by colour alone. */
 .playlist li > button:first-child {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
+  min-block-size: 35px;
+  padding-inline: var(--pulse-space-2, 8px);
+  font-family: var(--pulse-font-ui);
+  font-size: var(--pulse-type-12, 12px);
+  letter-spacing: normal;
+  text-transform: none;
   text-align: start;
+  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  box-shadow:
+    var(--lift-1),
+    0 0 0 1px var(--edge-hairline);
 }
 
 .playlist li > button:first-child[aria-pressed="true"] {
-  box-shadow: inset 0 0 0 2px var(--pulse-color-accent, #7ed9a3);
+  color: color-mix(in srgb, var(--accent-lamp) 55%, var(--pulse-color-text-primary, #f3f5f6));
+  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  box-shadow:
+    var(--lift-1),
+    inset 0 0 0 1px var(--accent-lamp),
+    0 0 9px var(--accent-dim);
 }
 
 .playlist small,
@@ -532,35 +717,83 @@
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
+/* An add affordance is a dashed outline, never a raised key: it invites rather
+   than claims to be a switch. */
 .addPattern {
-  min-block-size: 34px;
+  min-block-size: 46px;
   margin: 0 8px 8px;
-  border-style: dashed;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #919ba3);
+  background: none;
+  border: 1.4px dashed var(--pulse-color-text-muted, #919ba3);
+  box-shadow: none;
 }
 
+.addPattern:hover:not(:disabled) {
+  color: var(--accent-lamp);
+  border-color: var(--accent-lamp);
+}
+
+/* The bottom bar is the chassis plate that closes the cabinet. Its keys are
+   flush text keys divided by hairlines, not raised caps. */
 .workspaceBar {
   min-inline-size: 0;
   min-block-size: 52px;
   display: flex;
   align-items: stretch;
-  border-block-start: 1px solid var(--pulse-color-border-default, #6d7881);
-  background: linear-gradient(
-    180deg,
-    var(--pulse-color-surface-panel, #15191d),
-    var(--pulse-color-app, #0b0d0f)
-  );
+  border-block-start: 1px solid var(--edge-hairline);
+  background-color: var(--surface-plate-top);
+  background-image:
+    var(--mat-speckle), linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
 }
 
 .workspaceBar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   min-inline-size: 112px;
-  border: 0;
-  border-inline-start: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: 0;
-  background: transparent;
+  background: none;
+  box-shadow:
+    inset 1px 0 0 var(--edge-highlight),
+    inset -1px 0 0 var(--edge-hairline);
+  font-family: var(--pulse-font-ui);
+  letter-spacing: normal;
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
+.workspaceBar button:hover:not(:disabled) {
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--surface-plate-bot);
+}
+
+.workspaceBar button:active:not(:disabled) {
+  box-shadow: inset 1px 0 0 var(--edge-highlight);
+}
+
+.workspaceBar button:disabled {
+  background: none;
+  box-shadow: inset 1px 0 0 var(--edge-highlight);
+  opacity: 0.35;
+}
+
+/* The collapse key is the bar's primary action, so it keeps full-strength ink
+   and sits flush at the leading edge. */
 .workspaceBar button:first-child {
-  border-inline-start: 0;
+  margin-inline-start: 16px;
+  min-inline-size: 0;
+  padding-inline: var(--pulse-space-2, 8px);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  box-shadow: none;
+}
+
+.workspaceBar svg {
+  transition: rotate var(--pulse-duration-standard, 140ms) linear;
 }
 
 .barSpacer {
@@ -574,17 +807,12 @@ input {
 }
 
 .moduleChoice button,
-.occupiedSlot,
-.studioTabs button,
 .effectCard button,
 .inspectorActions button,
-.playlist button,
-.workspaceBar button,
-.emptySlot {
-  color: var(--pulse-color-text-secondary, #bac2c8);
-  background: var(--pulse-color-surface-control, #242a30);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-control, 4px);
+.playlist button {
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
@@ -594,12 +822,6 @@ input:focus-visible {
   outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--pulse-color-focus-outer, #000000);
-}
-
-button:disabled {
-  color: var(--pulse-color-disabled, #7b858d);
-  cursor: default;
-  opacity: 0.65;
 }
 
 @media (max-width: 1439px) {
@@ -613,11 +835,16 @@ button:disabled {
 
   .moduleChoice {
     grid-template-columns: 42px minmax(0, 1fr);
-    gap: 5px;
+    gap: 6px;
+    padding-inline: 6px 4px;
   }
 
   .moduleThumbnail {
     block-size: 30px;
+  }
+
+  .moduleChoiceText small {
+    padding-inline-end: 34px;
   }
 
   .rollContext {

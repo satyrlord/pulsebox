@@ -15,13 +15,13 @@
   inset-inline-start: 50%;
   translate: -50% 0;
   min-inline-size: max-content;
-  padding: 3px 5px;
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-surface-inset, #080a0c);
-  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
+  padding: 1px 5px;
+  color: var(--module-control-ring, var(--pulse-color-accent, #9be564));
+  background: var(--surface-well);
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
   font:
-    10px/1 ui-monospace,
+    10px/1.4 ui-monospace,
     monospace;
   pointer-events: none;
 }
@@ -42,43 +42,64 @@
   cursor: grabbing;
 }
 
+/*
+ * The slot is cut into the panel, so it is the darkest part of the control. It
+ * takes the recessed contract surface rather than a channel tint: a module
+ * accent is outside the palette, and a slot painted from one would ignore the
+ * high-contrast overlay.
+ */
 .slot {
   fill: var(--pulse-color-surface-inset, #080a0c);
-  stroke: var(--pulse-color-border-default, #6d7881);
-  stroke-width: 1;
+  stroke: none;
 }
 
+/* The travelled range burns in the channel colour over the contract fill. */
 .filled {
-  fill: var(--module-accent-muted, var(--pulse-color-selection, #244d38));
+  fill: var(--module-accent-muted, var(--pulse-color-control-fill, #b0f2ca));
+  opacity: 0.85;
 }
 
+/*
+ * A tall machined block with a deep centre groove. Its vertical shading comes
+ * from a scoped gradient in the markup, so this rule must not set `fill` on the
+ * ordinary cap: a CSS declaration would defeat the paint server.
+ */
 .cap {
-  fill: var(--pulse-color-control-thumb, #e1e6e9);
-  stroke: var(--module-control-ring, var(--pulse-color-border-strong, #aab4bc));
+  stroke: #000000cc;
   stroke-width: 1;
+}
+
+.capGroove {
+  fill: var(--metal-cap-bot);
+  stroke: none;
 }
 
 .capLine {
-  stroke: var(--module-accent, var(--pulse-color-accent, #9be564));
-  stroke-width: 2;
-  stroke-linecap: round;
+  stroke: var(--cap-hi);
+  stroke-width: 1;
+  stroke-linecap: butt;
+  opacity: 0.55;
 }
 
 .label {
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--pulse-color-text-muted, #98a0ab);
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
 .readout {
   inline-size: 4.5rem;
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  background: var(--pulse-color-surface-inset, #080a0c);
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
   font-variant-numeric: tabular-nums;
   font-size: var(--pulse-type-12, 12px);
   text-align: center;
-  color: var(--pulse-color-text-primary, #f3f5f6);
+  color: var(--lcd-ink);
+  background: var(--surface-well);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
 }
 
 /* A disabled fader keeps its shape so the strip does not reflow, but loses the
@@ -98,7 +119,9 @@
   opacity: 0.5;
 }
 
+.fader[data-disabled="true"] .capGroove,
 .fader[data-disabled="true"] .capLine {
+  fill: var(--pulse-color-surface-inset, #080a0c);
   stroke: var(--pulse-color-surface-inset, #080a0c);
 }
 

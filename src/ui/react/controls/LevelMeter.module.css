@@ -1,5 +1,12 @@
+/*
+ * The ladder sits in a shallow recess so the lit bar reads as an LED column
+ * behind glass. The frame is a border, never a shadow: this canvas repaints
+ * every frame while the transport runs, and a blurred shadow would be
+ * re-rasterized with it sixty times a second.
+ */
 .meter {
   display: block;
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-control, 4px);
+  border: 1px solid var(--edge-hairline);
+  border-radius: 2px;
+  background: var(--surface-well);
 }

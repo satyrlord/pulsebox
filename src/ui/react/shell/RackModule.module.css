@@ -1,99 +1,218 @@
+/*
+ * A rack unit is a brushed faceplate mounted in the rack: a lit top edge, a
+ * dark base line, and a short shadow that seats it on the chassis. The plate
+ * carries a trace of the module accent so each unit is identifiable before its
+ * label is read.
+ */
 .module {
+  --k: var(--module-accent, var(--pulse-color-accent, #9be564));
+  --plate-top: color-mix(in srgb, var(--k) var(--mod-tint), var(--surface-plate-top));
+  --plate-bot: color-mix(in srgb, var(--k) calc(var(--mod-tint) - 3%), var(--surface-plate-bot));
+
   flex: 0 0 94px;
   min-block-size: 86px;
   max-block-size: 98px;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  grid-template-rows: 26px minmax(0, 1fr);
-  gap: 4px 8px;
-  padding: 4px 8px;
+  grid-template-columns: 128px minmax(0, 1fr) auto;
+  align-items: center;
   overflow: visible;
-  background: var(--pulse-color-surface-panel, #15191d);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: 0.1875rem;
+  background: var(--mat-plate);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-panel, 6px);
+  box-shadow:
+    inset 0 1px 0 #ffffff2e,
+    inset 0 -1px 0 #0000008c,
+    0 3px 7px #0000008c,
+    0 1px 2px #00000099;
   /* The faceplate is a fixed plate: it must not reflow as values change. */
   container-type: inline-size;
 }
 
+/* Selection lights the plate perimeter. It is paired with `data-selected` and
+   the disabled Select key, so it never rests on colour alone. */
 .selected {
-  border-color: var(--module-accent, var(--pulse-color-accent, #9be564));
+  border-color: color-mix(in srgb, var(--k) 55%, var(--edge-hairline));
+  box-shadow:
+    inset 0 1px 0 #ffffff2e,
+    inset 0 -1px 0 #0000008c,
+    0 0 0 1px var(--k),
+    0 0 10px color-mix(in srgb, var(--k) 32%, transparent),
+    0 3px 7px #0000008c;
+}
+
+/* The identity strip closes with a hairline and a lit edge, so the plate reads
+   as two milled sections rather than one flat surface. */
+.nameBlock {
+  grid-column: 1;
+  align-self: stretch;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 var(--pulse-space-2, 8px);
+  border-inline-end: 1px solid var(--edge-hairline);
+  box-shadow: 1px 0 0 var(--edge-highlight);
 }
 
 .header {
-  grid-column: 1;
-  grid-row: 1;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
-  position: relative;
-  z-index: 2;
+  min-inline-size: 0;
+}
+
+.subtitle {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--pulse-type-10, 10px);
+  line-height: 12px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
 .slot {
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
   font-variant-numeric: tabular-nums;
-  font-size: var(--pulse-type-12, 12px);
-  color: var(--pulse-color-text-muted, #9a9aa2);
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
+/* The unit name is engraved into the plate in the condensed technical face and
+   lit with the module accent, the way a silkscreened panel name reads. */
 .title {
   flex: 1 1 auto;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--pulse-color-text-primary, #f3f5f6);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-20, 20px);
+  line-height: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--k);
+  text-shadow:
+    0 1px 0 var(--text-engraved-lo),
+    0 0 5px color-mix(in srgb, var(--k) 20%, transparent);
 }
 
-.actions,
 .addRow {
+  grid-column: 2;
   display: flex;
   flex-wrap: nowrap;
   gap: 0.25rem;
+  padding-inline: var(--pulse-space-2, 8px);
 }
 
+/* Six keys in a fixed three-by-two block. A fixed grid keeps every faceplate's
+   key rows aligned down the rack, whatever the key words are. */
 .actions {
-  grid-column: 2;
-  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  margin-block-start: 3px;
   position: relative;
   z-index: 2;
 }
 
+/* Faceplate keys are small raised caps inside a hairline frame, dimmer than the
+   plate until they engage. The 24px target is carried by the transparent inset
+   below rather than by visual bulk. */
 .action {
-  min-height: 24px;
+  position: relative;
+  min-height: 18px;
   min-width: 24px;
-  padding: 2px 6px;
-  font: inherit;
-  font-size: var(--pulse-type-12, 12px);
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-surface-control, #242a30);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: 0.125rem;
+  padding: 2px 4px;
+  text-align: center;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 0 0 1px var(--edge-hairline),
+    0 1px 2px #00000080;
+  filter: brightness(0.75);
   cursor: pointer;
 }
 
+.action::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 50%;
+  block-size: 24px;
+  translate: 0 -50%;
+}
+
+.action:hover:not(:disabled) {
+  color: var(--pulse-color-text-primary, #f3f5f6);
+}
+
 .action:disabled {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--edge-hairline);
   opacity: 0.45;
   cursor: default;
 }
 
+/* An engaged key fills with the module colour and loses the dimming, so the
+   change is a brightness step as well as a hue. */
 .action[data-active="true"] {
-  color: var(--pulse-color-surface-panel, #15191d);
-  background: var(--module-accent, var(--pulse-color-accent, #9be564));
+  color: var(--accent-ink);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--k) 72%, #ffffff),
+    color-mix(in srgb, var(--k) 96%, #000000) 55%,
+    color-mix(in srgb, var(--k) 90%, #000000)
+  );
+  box-shadow:
+    inset 0 1px 0 #ffffff2e,
+    0 1px 2px #00000080;
+  filter: none;
 }
 
+/* The knob bank owns the full plate height, so the dials keep a readable face
+   at rack density instead of being squeezed under a row of keys. */
 .controls {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-column: 2;
+  align-self: center;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: space-evenly;
   gap: 4px;
   min-inline-size: 0;
+  padding-inline: 12px;
 }
 
 .controls :global([data-component="knob"]) {
-  min-inline-size: 40px;
+  min-inline-size: 42px;
   gap: 1px;
+}
+
+/* The trailing bay: voice, audition, and the unit's output ladder. */
+.side {
+  grid-column: 3;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-inline: var(--pulse-space-2, 8px);
+}
+
+.sideKeys {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* The rack is dense, so the dial keeps a compact face. The operable area is
@@ -115,20 +234,8 @@
 
 .controls :global([data-component="knob"] [role="slider"]),
 .controls :global([data-component="knob"] [role="slider"] svg) {
-  inline-size: 24px;
-  block-size: 24px;
-}
-
-/* Operational values stay at the 12px floor. The field is sized for the value
-   rather than the value shrunk to fit the field, so the box has to clear the
-   full line box: 12px text needs more than 12px of height or the digits clip. */
-.controls :global([data-component="knob"] input) {
-  inline-size: 46px;
-  block-size: auto;
-  min-block-size: 18px;
-  padding-block: 0;
-  line-height: 1.25;
-  font-size: var(--pulse-type-12, 12px);
+  inline-size: 34px;
+  block-size: 34px;
 }
 
 /* Control captions sit at the 10px floor from spec-001 section 11.3. */
@@ -137,9 +244,6 @@
 }
 
 .voiceSelector {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
   position: relative;
   z-index: 2;
   display: flex;
@@ -150,17 +254,48 @@
   color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
+/* Inside the faceplate the selector is lit type on glass, not a raised chip
+   fighting the plate. */
 .voiceSelector select {
   min-height: 1.5rem;
-  color: inherit;
-  background: var(--pulse-color-surface-control, #242a30);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  font-family: var(--type-display);
+  letter-spacing: 0.06em;
+  color: var(--k);
+  background: var(--surface-well);
+  box-shadow: var(--sink-1);
 }
 
+.voiceSelector > span {
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+/* A folded unit keeps only its identity strip, so the rack can hold every slot
+   at once without the plate reflowing. */
 .module[data-collapsed="true"] {
-  flex-basis: 34px;
-  min-block-size: 34px;
-  grid-template-rows: 26px;
+  flex-basis: 38px;
+  min-block-size: 38px;
+  max-block-size: 38px;
+}
+
+.module[data-collapsed="true"] .nameBlock {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  border-inline-end: 0;
+  box-shadow: none;
+}
+
+.module[data-collapsed="true"] .subtitle {
+  flex: 1 1 auto;
+}
+
+.module[data-collapsed="true"] .actions {
+  margin-block-start: 0;
+  flex-wrap: nowrap;
 }
 
 @media (max-height: 900px) {
@@ -174,14 +309,8 @@
      The transparent inset above still carries the full 24px target. */
   .controls :global([data-component="knob"] [role="slider"]),
   .controls :global([data-component="knob"] [role="slider"] svg) {
-    inline-size: 22px;
-    block-size: 22px;
-  }
-
-  .controls :global([data-component="knob"] input) {
-    inline-size: 44px;
-    min-block-size: 17px;
-    font-size: var(--pulse-type-12, 12px);
+    inline-size: 28px;
+    block-size: 28px;
   }
 
   .controls :global([data-component="knob"] > span) {

@@ -3,23 +3,26 @@
   min-inline-size: 0;
 }
 
+/* The project picker is a raised plate on the transport, wide enough to hold
+   the complete name and its chevron. */
 .projectButton {
   inline-size: 176px;
   block-size: 40px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding-inline: 10px;
+  font-family: var(--pulse-font-ui);
+  letter-spacing: normal;
   color: var(--pulse-color-text-primary, #f3f5f6);
-  background: linear-gradient(
-    180deg,
-    var(--pulse-color-surface-control, #242a30),
-    var(--pulse-color-surface-panel, #15191d)
-  );
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-panel, 8px);
-  box-shadow: var(--pulse-shadow-control, 0 1px 3px #00000080);
+  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  border-radius: var(--pulse-radius-dialog, 8px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 0 0 1px var(--edge-hairline),
+    0 2px 4px #00000073;
 }
 
 .projectButton span:first-child {
@@ -44,32 +47,39 @@
   inline-size: 220px;
   max-block-size: min(420px, calc(100vh - 72px));
   overflow: auto;
-  padding: 6px;
-  background: var(--pulse-color-overlay, #101317);
-  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
-  border-radius: var(--pulse-radius-panel, 8px);
-  box-shadow: var(--pulse-shadow-panel, 0 4px 12px #00000099);
+  padding: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--lift-2);
 }
 
 .popover > button,
 .entry {
   inline-size: 100%;
   min-block-size: 28px;
+  padding-inline: 9px;
+  font-family: var(--pulse-font-ui);
+  font-size: var(--pulse-type-12, 12px);
+  letter-spacing: normal;
   text-align: start;
+  text-transform: none;
   color: var(--pulse-color-text-primary, #f3f5f6);
-  background: transparent;
-  border: 0;
+  background: none;
   border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: none;
 }
 
 .popover > button:hover,
 .entry:hover {
-  background: var(--pulse-color-selection, #244d38);
+  color: var(--accent-lamp);
+  background: var(--surface-plate-top);
 }
 
 .divider {
   margin-block: 5px;
-  border-block-start: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-block-start: 1px solid var(--edge-hairline);
+  box-shadow: 0 1px 0 var(--edge-highlight);
 }
 
 .popover p {
@@ -119,7 +129,9 @@
   white-space: nowrap;
   color: var(--pulse-color-text-primary, #f3f5f6);
   background: var(--pulse-color-overlay, #101317);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  border: 1px solid var(--pulse-color-status-warning, #f2c14e);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--lift-2);
 }
 
 @media (max-width: 1439px) {

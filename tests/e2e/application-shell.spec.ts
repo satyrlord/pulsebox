@@ -93,9 +93,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     if (viewport.width >= 1440) {
       // The seeded project loads six of the eight slots. The height band below
       // describes a loaded faceplate, so empty slots are excluded here.
-      const modules = page.locator(
-        '[data-component="rack-module"]:not([data-label="Empty"])',
-      );
+      const modules = page.locator('[data-component="rack-module"]:not([data-label="Empty"])');
       await expect(modules).toHaveCount(6);
       for (const module of await modules.all()) {
         const moduleBox = await box(module);
@@ -212,6 +210,11 @@ test("keeps the stopped shell deterministic for visual review", async ({ page })
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       }),
   );
+  // The first raster after a viewport change is discarded. It is taken while
+  // the compositor still holds tiles for the old size, so its anti-aliasing is
+  // not yet settled. The check is that two settled frames match, which is what
+  // proves nothing animates or ticks while the transport is stopped.
+  await page.screenshot({ animations: "disabled" });
   const first = await page.screenshot({ animations: "disabled" });
   const second = await page.screenshot({ animations: "disabled" });
   const difference = await measureRasterDifference(page, first, second);

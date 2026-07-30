@@ -7,9 +7,13 @@
   overflow: hidden;
 }
 
+/* Each channel is its own shallow column on the chassis, divided by a hairline
+   rather than by a drawn border. */
 .strip,
 .emptyStrip,
 .master {
+  --k: var(--module-accent, var(--pulse-color-border-default, #6d7881));
+
   flex: 0 1 43px;
   min-inline-size: 0;
   display: flex;
@@ -18,9 +22,9 @@
   gap: 4px;
   padding: 3px 1px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 45%);
-  border-inline-start: 1px solid
-    color-mix(in srgb, var(--pulse-color-border-default, #6d7881) 35%, transparent);
+  border-radius: var(--pulse-radius-control, 4px);
+  background: linear-gradient(180deg, #ffffff06, transparent 40%);
+  box-shadow: inset 1px 0 0 #ffffff09;
 }
 
 .emptyStrip {
@@ -38,22 +42,45 @@
 }
 
 .strip[data-selected="true"] {
-  box-shadow: inset 0 0 0 1px var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+  box-shadow:
+    inset 1px 0 0 #ffffff09,
+    inset 0 0 0 1px var(--k);
 }
 
+/* The mock names channels in bare accent type on the chassis, not on a lit
+   chip. The engaged name adds an underline, so selection is not colour alone. */
 .channelName {
   inline-size: 100%;
   min-block-size: 24px;
+  block-size: 17px;
+  padding: 0;
   overflow: hidden;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-12, 12px);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--module-accent, var(--pulse-color-text-primary, #f3f5f6));
-  background: transparent;
-  border: 0;
+  line-height: 17px;
+  color: var(--k);
+  text-shadow: 0 1px 0 #000000;
+  filter: brightness(0.95);
+  background: none;
+  box-shadow: none;
+}
+
+.master .channelName {
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
+}
+
+.emptyStrip > strong,
+.emptyText {
+  color: var(--pulse-color-text-muted, #919ba3);
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
 .channelName[aria-pressed="true"] {
+  background: none;
+  box-shadow: none;
   text-decoration: underline 2px;
   text-underline-offset: 3px;
 }
@@ -65,47 +92,70 @@
     monospace;
 }
 
+/* The word has to stay inside its own narrow column, so it clips at the strip
+   boundary rather than reading as one run of text across two empty channels. */
 .emptyText {
+  inline-size: 100%;
+  overflow: hidden;
+  text-align: center;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
+  letter-spacing: normal;
   text-transform: uppercase;
 }
 
+/* The pan ring keeps its engraved caption, as the mock's strips do. The value
+   itself stays on the hover readout so the strip does not grow a second row. */
 .panControl {
-  block-size: 38px;
+  block-size: 44px;
 }
 
 .panControl :global([data-component="knob"]) {
   min-inline-size: 30px;
-  gap: 0;
+  gap: 1px;
 }
 
-.panControl :global([data-component="knob"] > div),
-.panControl :global([data-component="knob"] svg) {
+.panControl :global([data-component="knob"] [role="slider"]),
+.panControl :global([data-component="knob"] [role="slider"] svg) {
   inline-size: 30px;
   block-size: 30px;
 }
 
-.panControl :global([data-component="knob"] > span),
-.panControl :global([data-component="knob"] > input) {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+.panControl :global([data-component="knob"] > span) {
+  font-size: var(--pulse-type-10, 10px);
+  line-height: 11px;
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
+/* Pan rings wear the channel colour all the way around, muted, so the ring
+   reads as a legend rather than as a lit value. */
+.panControl :global([data-component="knob"] path) {
+  stroke: color-mix(in srgb, var(--k) 78%, #0a0c0d);
+  stroke-width: 2;
+  filter: none;
+}
+
+/*
+ * One deep channel well per strip: the fader slot and the LED ladder live
+ * together inside a single near-black recess. The well hugs the control it
+ * holds and takes the strip's spare height as margin, so a tall studio column
+ * never leaves an empty black shaft below the cap.
+ */
 .faderWell {
-  flex: 1;
+  flex: 0 1 auto;
+  margin-block: auto;
   min-block-size: 0;
   inline-size: 30px;
   display: flex;
   justify-content: center;
   gap: 1px;
-  padding: 4px 2px;
+  padding: 4px 3px;
   overflow: hidden;
-  background: var(--pulse-color-surface-inset, #080a0c);
+  background: linear-gradient(180deg, var(--surface-recess), var(--surface-well));
   border-radius: var(--pulse-radius-control, 4px);
-  box-shadow: inset 0 2px 4px #00000099;
+  box-shadow:
+    var(--sink-2),
+    0 1px 0 var(--edge-highlight);
 }
 
 .faderWell :global([data-component="fader"]) {
@@ -128,7 +178,9 @@
 }
 
 .emptyFader {
-  flex: 1;
+  flex: 0 1 auto;
+  margin-block: auto;
+  block-size: 128px;
   inline-size: 28px;
   display: grid;
   place-items: center;
@@ -144,46 +196,75 @@
 }
 
 .sendGrid {
-  inline-size: min(34px, 100%);
+  inline-size: min(33px, 100%);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px 2px;
+  gap: 10px 2px;
+  margin-block: 6px;
 }
 
+/* Send chips are dark wells with a lit letter inside a hairline frame. The
+   frame carries the channel colour, so all four read as one group. */
 .sendGrid button {
   position: relative;
   min-inline-size: 0;
-  block-size: 18px;
+  block-size: 16px;
+  display: grid;
+  place-items: center;
+  font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
-  font-weight: 800;
-  color: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
-  background: var(--pulse-color-surface-control, #242a30);
-  border: 1px solid currentColor;
+  font-weight: 700;
+  letter-spacing: normal;
+  color: color-mix(in srgb, var(--k) 62%, var(--pulse-color-text-primary, #f3f5f6));
+  text-shadow: 0 0 4px color-mix(in srgb, var(--k) 30%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--k) 18%, var(--surface-plate-bot)),
+    color-mix(in srgb, var(--k) 12%, var(--surface-well))
+  );
   border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--k) 82%, transparent),
+    inset 0 1px 0 #ffffff14,
+    0 1px 2px #00000080;
 }
 
 .sendGrid button::before {
   content: "";
   position: absolute;
   inset: 50% auto auto 50%;
-  inline-size: 24px;
+  inline-size: 100%;
+  min-inline-size: 24px;
   block-size: 24px;
   transform: translate(-50%, -50%);
 }
 
 .sendGrid button:disabled {
-  color: var(--pulse-color-disabled, #7b858d);
-  opacity: 0.45;
+  color: var(--pulse-color-text-muted, #919ba3);
+  text-shadow: none;
+  background: none;
+  box-shadow:
+    inset 0 0 0 1px #ffffff0f,
+    0 1px 2px #00000080;
+  opacity: 0.3;
 }
 
 .muteSolo {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .muteSolo :global(button) {
-  min-inline-size: 24px;
-  padding-inline: 2px;
+  min-inline-size: 17px;
+  inline-size: 17px;
+  block-size: 24px;
+  padding-inline: 0;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 0 0 1px var(--edge-hairline),
+    0 1px 2px #00000080;
 }
 
 .muteSolo i {
@@ -194,24 +275,40 @@
   font:
     var(--pulse-type-10, 10px)/1.2 ui-monospace,
     monospace;
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
 }
 
 @media (max-width: 1439px) {
+  /* Nine columns, two pixels of gap, and the panel's own padding all have to
+     fit inside the narrow studio column, so each strip gives up a few pixels
+     rather than the row overflowing its panel. */
+  .mixer {
+    gap: 0;
+    padding-inline: 3px;
+  }
+
   .strip {
-    flex-basis: 37px;
+    flex-basis: 36px;
   }
 
   .emptyStrip {
-    flex-basis: 28px;
+    flex-basis: 27px;
   }
 
   .master {
-    flex-basis: 31px;
+    flex-basis: 29px;
+  }
+
+  .muteSolo {
+    gap: 3px;
   }
 
   .muteSolo :global(button) {
-    min-inline-size: 18px;
-    inline-size: 18px;
+    min-inline-size: 14px;
+    inline-size: 14px;
+  }
+
+  .sendGrid {
+    inline-size: min(29px, 100%);
+    gap: 8px 2px;
   }
 }

@@ -41,6 +41,181 @@
   --pulse-motion-distance: 4px;
 }
 
+/*
+ * Composition materials.
+ *
+ * docs/design/claude-mock-up.html is the approved composition target for the
+ * shell (spec-003 section 8.2). It owns proportion, density, and materials.
+ * Palette, type scale, spacing, radii, and motion stay with the `--pulse-`
+ * tokens in docs/THEMING.md, so these recipes derive every value from a
+ * contract token instead of declaring a second palette. A theme change or the
+ * high-contrast overlay therefore reaches the faceplates too.
+ *
+ * These names stay outside the `--pulse-` namespace. That namespace is the
+ * public theme vocabulary and the user-theme allowlist. A recipe is not a
+ * theme token and must not become user-authorable.
+ */
+:root {
+  /* Surface ramp: app floor, chassis, plate face, recess, well. */
+  --surface-app: var(--pulse-color-app, #0b0d0f);
+  --surface-rail: var(--pulse-color-overlay, #101317);
+  --surface-chassis: color-mix(
+    in srgb,
+    var(--pulse-color-surface-panel, #15191d) 80%,
+    var(--pulse-color-app, #0b0d0f)
+  );
+  --surface-plate-top: var(--pulse-color-surface-control, #242a30);
+  --surface-plate-bot: color-mix(
+    in srgb,
+    var(--pulse-color-surface-control, #242a30) 55%,
+    var(--pulse-color-surface-inset, #080a0c)
+  );
+  --surface-recess: color-mix(
+    in srgb,
+    var(--pulse-color-surface-inset, #080a0c) 60%,
+    var(--pulse-color-surface-panel, #15191d)
+  );
+  --surface-well: var(--pulse-color-surface-inset, #080a0c);
+  --surface-raised: color-mix(
+    in srgb,
+    var(--pulse-color-surface-control, #242a30) 90%,
+    var(--pulse-color-border-strong, #aab4bc)
+  );
+
+  /* Edges. A lit top edge over a black hairline is what seats a mounted part. */
+  --edge-highlight: #ffffff17;
+  --edge-shadow: #000000a6;
+  --edge-hairline: #000000c7;
+
+  /* Machined metal, drawn from the surface ramp. */
+  --metal-cap-top: var(--surface-raised);
+  --metal-cap-bot: color-mix(
+    in srgb,
+    var(--pulse-color-surface-inset, #080a0c) 72%,
+    var(--pulse-color-surface-control, #242a30)
+  );
+  --metal-skirt-a: color-mix(
+    in srgb,
+    var(--pulse-color-surface-control, #242a30) 92%,
+    var(--pulse-color-border-default, #6d7881)
+  );
+  --metal-skirt-b: color-mix(
+    in srgb,
+    var(--pulse-color-surface-inset, #080a0c) 50%,
+    var(--pulse-color-surface-control, #242a30)
+  );
+  --metal-screw-top: color-mix(
+    in srgb,
+    var(--pulse-color-border-default, #6d7881) 82%,
+    var(--pulse-color-surface-inset, #080a0c)
+  );
+  --metal-screw-bot: color-mix(
+    in srgb,
+    var(--pulse-color-surface-control, #242a30) 75%,
+    var(--pulse-color-surface-inset, #080a0c)
+  );
+  --metal-rail-a: color-mix(
+    in srgb,
+    var(--pulse-color-surface-control, #242a30) 90%,
+    var(--pulse-color-border-default, #6d7881)
+  );
+  --metal-rail-b: var(--surface-chassis);
+  --cap-hi: var(--pulse-color-control-thumb, #e1e6e9);
+  --cap-lo: color-mix(
+    in srgb,
+    var(--pulse-color-control-thumb, #e1e6e9) 35%,
+    var(--pulse-color-border-default, #6d7881)
+  );
+
+  /* Lamps and glass. */
+  --accent-lamp: var(--pulse-color-accent, #7ed9a3);
+  --accent-dim: color-mix(in srgb, var(--pulse-color-accent, #7ed9a3) 20%, transparent);
+  --accent-glow: color-mix(in srgb, var(--pulse-color-accent, #7ed9a3) 32%, transparent);
+  --accent-ink: var(--pulse-color-on-accent, #07110b);
+  --scope-glass: var(--pulse-color-surface-inset, #080a0c);
+  --scope-grid: #ffffff12;
+  --lcd-ink: color-mix(
+    in srgb,
+    var(--pulse-color-text-primary, #f3f5f6) 80%,
+    var(--pulse-color-border-default, #6d7881)
+  );
+
+  /* Engraved type. The condensed technical face carries panel labels. */
+  --type-display:
+    "Bahnschrift", "Eurostile", "DIN Alternate", "Arial Narrow", system-ui, sans-serif;
+  --text-engraved-lo: #000000bf;
+
+  /* Signals. Mute is a neutral cap, not a status. */
+  --signal-mute: var(--pulse-color-control-thumb, #e1e6e9);
+  --signal-solo: var(--pulse-color-status-warning, #f2c14e);
+  --signal-rec: var(--pulse-color-status-danger, #ff8178);
+  --signal-play: var(--pulse-color-status-success, #62d28a);
+
+  /* Fine speckle and vertical brushing over the plate gradient. */
+  --mat-speckle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='%23fff' opacity='.07'%3E%3Ccircle cx='5' cy='7' r='.45'/%3E%3Ccircle cx='31' cy='4' r='.35'/%3E%3Ccircle cx='18' cy='27' r='.4'/%3E%3Ccircle cx='43' cy='35' r='.45'/%3E%3Ccircle cx='9' cy='44' r='.3'/%3E%3C/g%3E%3Cg fill='%23000' opacity='.28'%3E%3Ccircle cx='22' cy='11' r='.5'/%3E%3Ccircle cx='39' cy='19' r='.4'/%3E%3Ccircle cx='3' cy='31' r='.45'/%3E%3Ccircle cx='28' cy='42' r='.35'/%3E%3C/g%3E%3C/svg%3E");
+  /*
+   * Hard-stop stripes, never an interpolated wash. Chrome dithers a near-flat
+   * gradient with noise that is not stable between two rasterizations, which
+   * would make the stopped shell fail its visual-determinism check.
+   */
+  --mat-brush:
+    repeating-linear-gradient(90deg, #ffffff08 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(90deg, #00000012 0 1px, transparent 1px 9px);
+  --mat-plate:
+    var(--mat-speckle), var(--mat-brush),
+    linear-gradient(
+      180deg,
+      var(--plate-top, var(--surface-plate-top)),
+      var(--plate-bot, var(--surface-plate-bot))
+    );
+
+  /* Depth. A raised cap lifts; a recessed bay sinks. */
+  --lift-1: inset 0 1px 0 var(--edge-highlight), 0 1px 2px var(--edge-shadow);
+  --lift-2: inset 0 1px 0 var(--edge-highlight), 0 2px 6px var(--edge-shadow);
+  --sink-1: inset 0 2px 4px #0000008c, inset 0 -1px 0 var(--edge-highlight);
+  --sink-2: inset 0 3px 8px #000000b8, inset 0 -1px 0 var(--edge-highlight);
+
+  /* Module accent tint carried into a faceplate gradient. */
+  --mod-tint: 4%;
+}
+
+/*
+ * High contrast is an overlay, so the material recipes flatten rather than
+ * fight it. Gradients, speckle, glow, and soft edges all collapse to the solid
+ * contract colors, and every boundary becomes a visible line.
+ */
+[data-high-contrast="true"] {
+  --surface-chassis: var(--pulse-color-surface-panel, #000000);
+  --surface-plate-top: var(--pulse-color-surface-control, #111111);
+  --surface-plate-bot: var(--pulse-color-surface-control, #111111);
+  --surface-recess: var(--pulse-color-surface-inset, #000000);
+  --surface-raised: var(--pulse-color-surface-control, #111111);
+  --edge-highlight: transparent;
+  --edge-shadow: transparent;
+  --edge-hairline: var(--pulse-color-border-default, #ffffff);
+  --metal-cap-top: var(--pulse-color-surface-control, #111111);
+  --metal-cap-bot: var(--pulse-color-surface-control, #111111);
+  --metal-skirt-a: var(--pulse-color-surface-control, #111111);
+  --metal-skirt-b: var(--pulse-color-surface-control, #111111);
+  --metal-rail-a: var(--pulse-color-surface-control, #111111);
+  --metal-rail-b: var(--pulse-color-surface-panel, #000000);
+  --metal-screw-top: var(--pulse-color-border-default, #ffffff);
+  --metal-screw-bot: var(--pulse-color-surface-inset, #000000);
+  --accent-dim: transparent;
+  --accent-glow: transparent;
+  --lcd-ink: var(--pulse-color-text-primary, #ffffff);
+  --text-engraved-lo: transparent;
+  --scope-grid: var(--pulse-color-border-default, #ffffff);
+  --mat-speckle: none;
+  --mat-brush: none;
+  --mat-plate: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  --lift-1: 0 0 0 1px var(--pulse-color-border-default, #ffffff);
+  --lift-2: 0 0 0 1px var(--pulse-color-border-default, #ffffff);
+  --sink-1: inset 0 0 0 1px var(--pulse-color-border-default, #ffffff);
+  --sink-2: inset 0 0 0 1px var(--pulse-color-border-default, #ffffff);
+  --mod-tint: 0%;
+}
+
 *,
 *::before,
 *::after {
@@ -55,62 +230,9 @@ body {
   overflow: hidden;
 }
 
-#app,
-.pulse-shell {
+#app {
   width: 100%;
   height: 100%;
-}
-
-.pulse-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.studio-grid {
-  display: grid;
-  min-height: 0;
-  grid-template-rows: minmax(300px, 1fr) auto;
-  gap: var(--pulse-space-2);
-  padding: var(--pulse-space-2);
-}
-
-.transport-controls,
-.history-controls,
-.module-actions,
-.compact-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--pulse-space-1);
-}
-
-/*
- * Grouped transport controls sit in a recessed bay, the way hardware groups
- * related switches. Depth is one inset boundary plus a modest inner shadow.
- */
-.transport-controls,
-.history-controls {
-  border: var(--pulse-border-thin) solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-panel);
-  padding: var(--pulse-space-1);
-  background: var(--pulse-color-surface-inset, #080a0c);
-  box-shadow: inset 0 1px 3px 0 #00000073;
-}
-
-.compact-controls {
-  min-width: 0;
-  overflow-x: auto;
-}
-
-.module-actions button {
-  min-width: var(--pulse-target-min);
-  padding: 2px 4px;
-  font-size: var(--pulse-type-10);
-}
-
-.module-actions {
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 .undo-notice {
@@ -127,26 +249,10 @@ body {
   border-radius: var(--pulse-radius-panel);
   color: var(--pulse-color-text-primary, #f3f5f6);
   background: var(--pulse-color-overlay, #101317);
-  box-shadow: var(--pulse-shadow-panel);
+  box-shadow: var(--lift-2);
 }
 
 .undo-notice[hidden] {
-  display: none;
-}
-
-/* The Settings page overlays the workspace. Playback continues underneath, so
-   the panel never unmounts the shell or interrupts the audio graph. */
-.settings-panel {
-  position: fixed;
-  z-index: 20;
-  inset-block: var(--pulse-space-6) calc(var(--pulse-space-10) + var(--pulse-space-3));
-  inset-inline: 50%;
-  width: min(560px, calc(100vw - var(--pulse-space-8)));
-  translate: -50% 0;
-  overflow: auto;
-}
-
-.settings-panel[hidden] {
   display: none;
 }
 
@@ -154,7 +260,7 @@ button,
 select,
 input {
   min-height: var(--pulse-target-min);
-  border: var(--pulse-border-thin) solid var(--pulse-color-border-default, #6d7881);
+  border: 0;
   border-radius: var(--pulse-radius-control);
   color: var(--pulse-color-text-primary, #f3f5f6);
   background: var(--pulse-color-surface-control, #242a30);
@@ -162,79 +268,81 @@ input {
   outline-offset: -2px;
 }
 
-/* Raised switch cap: a one-pixel top highlight over a modest drop shadow. */
+/* A typed value sits in a recessed well, the way a readout sits behind glass. */
+select,
+input {
+  padding-inline: var(--pulse-space-1);
+  background: var(--surface-well);
+  box-shadow: var(--sink-1);
+}
+
+/*
+ * Raised switch cap. The boundary is a black hairline drawn by the shadow
+ * rather than a light border, so a key reads as machined metal seated in the
+ * chassis instead of an outlined box.
+ */
 button {
   padding-inline: var(--pulse-space-2);
+  font-family: var(--type-display);
+  letter-spacing: 0.06em;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
   box-shadow:
-    inset 0 1px 0 0 #ffffff1a,
-    var(--pulse-shadow-control, 0 1px 3px #0008);
+    var(--lift-1),
+    0 0 0 1px var(--edge-hairline);
   cursor: pointer;
-  transition: background var(--pulse-duration-fast) linear;
+  transition:
+    color var(--pulse-duration-fast) linear,
+    box-shadow var(--pulse-duration-fast) linear;
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--pulse-color-border-strong, #aab4bc);
+  color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
-/* Pressed caps read as depressed: the highlight moves to an inner shadow. */
+/* Pressed caps read as depressed: the lit top edge becomes an inner shadow. */
 button:active:not(:disabled) {
-  box-shadow: inset 0 1px 3px 0 #00000080;
+  box-shadow:
+    var(--sink-1),
+    0 0 0 1px var(--edge-hairline);
 }
 
+/* An unavailable key loses the raised cap, so the state is not colour alone. */
 button:disabled {
   color: var(--pulse-color-disabled, #7b858d);
-  box-shadow: none;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--edge-hairline);
   cursor: default;
 }
 
-/* A lit switch. The accent fill is paired with the strong boundary so the
+/* A lit switch. The accent fill is paired with the lit boundary so the
    state never depends on colour alone. */
 button[aria-pressed="true"] {
   color: var(--pulse-color-on-accent, #07110b);
-  border-color: var(--pulse-color-border-strong, #aab4bc);
-  background: var(--pulse-color-accent, #7ed9a3);
+  background: linear-gradient(
+    180deg,
+    var(--pulse-color-accent, #7ed9a3),
+    color-mix(in srgb, var(--pulse-color-accent, #7ed9a3) 70%, #000000)
+  );
+  box-shadow:
+    var(--lift-1),
+    0 0 0 1px var(--pulse-color-border-strong, #aab4bc);
   font-weight: var(--pulse-weight-strong);
 }
 
-.tempo-label,
-.project-name,
-.phase-label,
-.mode-label,
-.audio-status,
-.position {
+.audio-status {
   color: var(--pulse-color-text-secondary, #bac2c8);
   white-space: nowrap;
 }
 
-/* Recessed value display, matching the transport readouts in the rack. */
-.position {
-  min-width: 76px;
-  border: var(--pulse-border-thin) solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-control);
-  padding: var(--pulse-space-1) var(--pulse-space-2);
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-surface-inset, #080a0c);
-  box-shadow: inset 0 1px 3px 0 #00000073;
-  font-family: var(--pulse-font-mono);
-  letter-spacing: 0.06em;
-  text-align: end;
-}
-
-.tempo-label input {
-  width: 64px;
-}
-
-.editor-copy {
-  margin: 0;
-  color: var(--pulse-color-text-secondary, #bac2c8);
-}
-
 body {
   color: var(--pulse-color-text-primary, #f3f5f6);
-  background: var(--pulse-color-app, #0b0d0f);
+  background-color: var(--surface-app);
+  background-image: var(--mat-speckle);
   font-family: var(--pulse-font-ui);
   font-size: var(--pulse-type-12);
   line-height: var(--pulse-line-normal);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,

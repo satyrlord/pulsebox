@@ -1,17 +1,20 @@
+/* The rack is the open bay the units mount into: a speckled chassis wall that
+   falls away toward the back, inside the same hairline the other panels use. */
 .rack {
   min-inline-size: 0;
   min-block-size: 0;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 2px 4px;
+  padding: 1px 1px 1px 4px;
   overflow: auto;
-  background:
-    radial-gradient(circle at 30% 20%, rgb(255 255 255 / 3%) 0 1px, transparent 1px),
-    var(--pulse-color-app, #0b0d0f);
-  border: 1px solid var(--pulse-color-border-default, #6d7881);
-  border-radius: var(--pulse-radius-panel, 8px);
-  box-shadow: inset 0 2px 8px #00000099;
+  background-color: var(--surface-chassis);
+  background-image: var(--mat-speckle);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-panel, 6px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    inset 0 2px 8px #00000099;
   scrollbar-color: var(--pulse-color-scrollbar-thumb, #6d7881)
     var(--pulse-color-scrollbar-track, #111519);
 }

@@ -73,7 +73,9 @@ export function AuditionButton({ label, className, onStart, onStop }: AuditionBu
       }}
       onBlur={stop}
     >
-      Audition
+      {/* The engraved pad is short so the faceplate stays dense. The visible
+          word is still contained in the accessible name above. */}
+      Aud
     </button>
   );
 }
