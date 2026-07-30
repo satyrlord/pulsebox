@@ -20,6 +20,7 @@ export interface RangeGestureHandles {
   /** Live value, which leads the committed value during a gesture. */
   readonly displayValue: number;
   readonly dragging: boolean;
+  readonly adjusting: boolean;
   readonly onPointerDown: (event: React.PointerEvent) => void;
   readonly onPointerMove: (event: React.PointerEvent) => void;
   readonly onPointerUp: (event: React.PointerEvent) => void;
@@ -77,6 +78,7 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
 
   const [displayValue, setDisplayValue] = useState(value);
   const [dragging, setDragging] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
 
   const live = useRef(value);
   const beforeGesture = useRef(value);
@@ -104,6 +106,7 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
     if (gestureId.current !== undefined) return;
     gestureId.current = createGestureId(browserIdFactory);
     beforeGesture.current = live.current;
+    setAdjusting(true);
   }, []);
 
   const emitInput = useCallback((next: number) => {
@@ -120,6 +123,7 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
     const id = gestureId.current;
     gestureId.current = undefined;
     if (id === undefined) return;
+    setAdjusting(false);
     if (commit) {
       // A gesture that moved nothing — a keypress at the limit, a drag that
       // returned to where it started — must not create an undo entry.
@@ -301,6 +305,7 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
   return {
     displayValue,
     dragging,
+    adjusting,
     onPointerDown,
     onPointerMove,
     onPointerUp: finishPointer,

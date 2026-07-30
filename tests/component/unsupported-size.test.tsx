@@ -39,7 +39,7 @@ describe("PulseApp below the editing boundary", () => {
     expect(screen.getByRole("heading", { name: "Window too small" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Autosave remains active");
     expect(screen.getByLabelText("Read-only project summary")).toHaveTextContent(
-      "ProjectPhase 1 session",
+      "ProjectNeon Basement",
     );
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
       "Save",

@@ -6,41 +6,134 @@
 <style>
 /* ==========================================================================
    PULSEBOX v4 is the approved rack-cockpit composition target.
-   This file owns proportion, placement, density, materials, type scale, and
-   control size. The product specifications own behavior.
+   This file owns proportion, placement, density, materials, and control size.
+   The product specifications own behavior.
    If this file conflicts with a specification, correct this file.
+   Palette, type scale, spacing, radii and motion are NOT owned here: they come
+   from the shipping `--pulse-*` tokens in docs/THEMING.md, so the composition
+   and the running product cannot drift apart. A change to those values is a
+   product-contract change, made in THEMING.md first.
    Decision D80 permits only true or specification-owned state.
    This file shows the spec-005 section 9.1 project in its stopped state.
    No element can show a value that the product cannot produce.
    ========================================================================== */
+/* --------------------------------------------------------------------------
+   TOKENS
+   Palette, type, spacing, radii and motion use the shipping `--pulse-*`
+   vocabulary owned by docs/THEMING.md. This file no longer declares a parallel
+   palette: the composition is drawn with the same values the product ships, so
+   the mock and the running app cannot drift apart.
+
+   Material recipes (metals, glass, speckle, brushing) stay local. THEMING.md
+   section 3 owns palette tokens, not the gradient recipes that turn a palette
+   into a faceplate. Those are composition data this file owns, and every one of
+   them is built from a `--pulse-*` value.
+   -------------------------------------------------------------------------- */
 :root, html[data-theme="rack"]{
-  --surface-app:#08090a; --surface-rail:#101214; --surface-chassis:#141618;
-  --surface-plate-top:#1d2022; --surface-plate-bot:#121517; --surface-plate-brush:rgba(255,255,255,.012);
-  --surface-recess:#0b0d0e; --surface-well:#060708; --surface-raised:#2e3236;
+  /* Palette — mirrors src/themes/themes.css, the `rack` built-in. */
+  --pulse-color-app:#0b0d0f;
+  --pulse-color-surface-panel:#15191d;
+  --pulse-color-surface-control:#242a30;
+  --pulse-color-surface-inset:#080a0c;
+  --pulse-color-text-primary:#f3f5f6;
+  --pulse-color-text-secondary:#bac2c8;
+  --pulse-color-border-default:#6d7881;
+  --pulse-color-border-strong:#aab4bc;
+  --pulse-color-accent:#7ed9a3;
+  --pulse-color-on-accent:#07110b;
+  --pulse-color-focus-inner:#ffffff;
+  --pulse-color-focus-outer:#000000;
+  --pulse-color-control-track:#6f7b84;
+  --pulse-color-control-fill:#b0f2ca;
+  --pulse-color-meter-low:#62d28a;
+  --pulse-color-meter-mid:#f2c14e;
+  --pulse-color-meter-high:#ff7667;
+  --pulse-color-status-danger:#ff8178;
+  --pulse-color-status-warning:#f2c14e;
+  --pulse-color-status-success:#62d28a;
+  --pulse-color-overlay:#101317;
+  --pulse-color-text-muted:#919ba3;
+  --pulse-color-selection:#244d38;
+  --pulse-color-control-thumb:#e1e6e9;
+  --pulse-color-meter-track:#20262b;
+  --pulse-color-status-info:#6bb8ff;
+  --pulse-color-disabled:#7b858d;
+  --pulse-color-scrollbar-track:#111519;
+  --pulse-color-scrollbar-thumb:#6d7881;
+  --pulse-shadow-control:0px 1px 3px 0px #00000080;
+  --pulse-shadow-panel:0px 4px 12px 0px #00000099;
+
+  /* Foundation — type, space, radius, motion. */
+  --pulse-font-ui:system-ui,sans-serif;
+  --pulse-font-mono:ui-monospace,monospace;
+  --pulse-type-10:10px; --pulse-type-12:12px; --pulse-type-14:14px;
+  --pulse-type-16:16px; --pulse-type-20:20px;
+  --pulse-space-1:4px; --pulse-space-2:8px; --pulse-space-3:12px;
+  --pulse-space-4:16px; --pulse-space-5:20px; --pulse-space-6:24px;
+  --pulse-radius-control:4px; --pulse-radius-panel:6px; --pulse-radius-dialog:8px;
+  --pulse-duration-fast:80ms; --pulse-duration-standard:140ms; --pulse-duration-slow:220ms;
+  --pulse-focus-width:2px; --pulse-focus-gap:1px;
+
+  /* Module accents — the section 3.4 table, verbatim. */
+  --pulse-mod-bass:#9BE564; --pulse-mod-six:#FFB44A; --pulse-mod-boom:#FF6B5F;
+  --pulse-mod-nine:#B890FF; --pulse-mod-sev:#5AAEFF; --pulse-mod-five:#4ADFC7;
+
+  /* ---- Composition data owned by this file ---- */
+  /* Surface ramp. Each step is a palette token; the chassis and rail read as
+     mounted layers between the app floor and the panel face. */
+  --surface-app:var(--pulse-color-app);
+  --surface-rail:var(--pulse-color-overlay);
+  --surface-chassis:#131619;
+  --surface-plate-top:var(--pulse-color-surface-control);
+  --surface-plate-bot:#171c21;
+  --surface-recess:#0d1013;
+  --surface-well:var(--pulse-color-surface-inset);
+  --surface-raised:#2f363d;
   --edge-highlight:rgba(255,255,255,.09); --edge-shadow:rgba(0,0,0,.65); --edge-hairline:rgba(0,0,0,.78);
-  --edge-radius-panel:8px; --edge-radius-ctl:6px; --edge-radius-chip:4px;
-  --metal-cap-top:#2c3034; --metal-cap-bot:#0e1113; --metal-skirt-a:#282c30; --metal-skirt-b:#15181a;
-  --metal-screw-top:#565b60; --metal-screw-bot:#1d2023;
-  --metal-rail-a:#2a2e31; --metal-rail-b:#121416;
-  --cap-hi:#d9dcdf; --cap-lo:#8e9499;
-  --accent-lamp:#78b943; --accent-dim:rgba(120,185,67,.2); --accent-glow:rgba(120,185,67,.32); --accent-ink:#0a1206;
-  /* accent-text is the accent tuned for use AS text. */
-  --accent-text:var(--accent-lamp);
-  --lcd-ink:#d6d9db;
-  --text-primary:#f3f5f6; --text-secondary:#c3cad0; --text-muted:#a3abb2;
+  --edge-radius-panel:var(--pulse-radius-panel);
+  --edge-radius-ctl:var(--pulse-radius-control);
+  --edge-radius-chip:var(--pulse-radius-control);
+  /* Machined metal. Cool graphite, drawn from the surface ramp. */
+  --metal-cap-top:#2f363d; --metal-cap-bot:#101316; --metal-skirt-a:#2a3138; --metal-skirt-b:#161a1e;
+  --metal-screw-top:#5a636b; --metal-screw-bot:#1e2328;
+  --metal-rail-a:#2c3339; --metal-rail-b:#131619;
+  --cap-hi:var(--pulse-color-control-thumb); --cap-lo:#949ca3;
+  /* The lamp is the product accent. Dim and glow are its transparencies. */
+  --accent-lamp:var(--pulse-color-accent);
+  --accent-dim:rgba(126,217,163,.2);
+  --accent-glow:rgba(126,217,163,.32);
+  --accent-ink:var(--pulse-color-on-accent);
+  --accent-text:var(--pulse-color-accent);
+  --lcd-ink:#d6dcdf;
+  --text-primary:var(--pulse-color-text-primary);
+  --text-secondary:var(--pulse-color-text-secondary);
+  --text-muted:var(--pulse-color-text-muted);
   --text-engraved-lo:rgba(0,0,0,.75); --text-engraved-hi:rgba(255,255,255,.06);
-  --signal-mute:#d8d8d8; --signal-solo:#ffd166; --signal-rec:#ff4d4d; --signal-play:#4ade44;
-  --meter-low:#5da117; --meter-mid:#b99d40; --meter-high:#c97735; --meter-peak:#cc4943;
-  --scope-glass:#070809; --scope-grid:rgba(255,255,255,.07);
+  /* Signals map to the status palette. Mute is a neutral cap, not a status. */
+  --signal-mute:var(--pulse-color-control-thumb);
+  --signal-solo:var(--pulse-color-status-warning);
+  --signal-rec:var(--pulse-color-status-danger);
+  --signal-play:var(--pulse-color-status-success);
+  --meter-low:var(--pulse-color-meter-low);
+  --meter-mid:var(--pulse-color-meter-mid);
+  --meter-high:var(--pulse-color-meter-high);
+  --meter-peak:var(--pulse-color-status-danger);
+  --scope-glass:var(--pulse-color-surface-inset); --scope-grid:rgba(255,255,255,.07);
+  /* Type. The display face is the condensed technical voice for engraved
+     labels; body and numerals use the shipping stacks. */
   --type-display:"Bahnschrift","Eurostile","DIN Alternate","Arial Narrow",system-ui,sans-serif;
-  --type-ui:ui-sans-serif,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --type-num:ui-monospace,"SF Mono","Roboto Mono","Consolas",monospace;
-  --size-1:10px; --size-2:11px; --size-3:13px; --size-4:15px; --size-5:19px; --size-6:26px;
-  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
-  --motion-fast:90ms; --motion-base:140ms; --motion-ease:cubic-bezier(.2,.7,.3,1);
-  --mod-bass:#79b83f; --mod-six:#d88927; --mod-boom:#d84c3e;
-  --mod-nine:#9d5ed0; --mod-sev:#4b7fd2; --mod-five:#39b3ac;
-  --mod-fx:#93999f;
+  --type-ui:var(--pulse-font-ui);
+  --type-num:var(--pulse-font-mono);
+  --size-1:var(--pulse-type-10); --size-2:var(--pulse-type-12); --size-3:var(--pulse-type-12);
+  --size-4:var(--pulse-type-14); --size-5:var(--pulse-type-20); --size-6:var(--pulse-type-20);
+  --space-1:var(--pulse-space-1); --space-2:var(--pulse-space-2);
+  --space-3:var(--pulse-space-3); --space-4:var(--pulse-space-4);
+  --motion-fast:var(--pulse-duration-fast); --motion-base:var(--pulse-duration-standard);
+  --motion-ease:cubic-bezier(.2,.7,.3,1);
+  --mod-bass:var(--pulse-mod-bass); --mod-six:var(--pulse-mod-six); --mod-boom:var(--pulse-mod-boom);
+  --mod-nine:var(--pulse-mod-nine); --mod-sev:var(--pulse-mod-sev); --mod-five:var(--pulse-mod-five);
+  /* Empty and effect slots take a neutral border, never a module identity. */
+  --mod-fx:var(--pulse-color-border-default);
   --mod-tint:4%;
 }
 
@@ -78,7 +171,13 @@ body.workspace-collapsed .botrow{display:none;}
 .num{font-family:var(--type-num);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
 button,input,select{font:inherit;color:inherit;}
 button{background:none;border:0;cursor:pointer;}
-:focus-visible{outline:2px solid var(--accent-lamp);outline-offset:2px;}
+/* The shipping double ring: a white inner outline with a black outer halo, so
+   focus stays visible on the near-black chassis and on lit accent fills alike. */
+:focus-visible{
+  outline:var(--pulse-focus-width) solid var(--pulse-color-focus-inner);
+  outline-offset:var(--pulse-focus-gap);
+  box-shadow:0 0 0 calc(var(--pulse-focus-width) * 2 + var(--pulse-focus-gap)) var(--pulse-color-focus-outer);
+}
 .gap{flex:1;}
 .panel{
   min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;
@@ -108,8 +207,9 @@ button{background:none;border:0;cursor:pointer;}
   background:var(--mat-plate);border-bottom:1px solid var(--edge-hairline);
   box-shadow:inset 0 1px 0 var(--edge-highlight),0 4px 8px rgba(0,0,0,.6);z-index:40;
 }
-html[data-theme="rack"] .topbar{
-  background-image:var(--mat-speckle),linear-gradient(180deg,#1d1e1f,#18191a);
+.topbar{
+  background-image:var(--mat-speckle),
+    linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
 }
 .header-left,.header-right{min-width:0;display:flex;align-items:center;gap:7px;transform:translateY(1.5px);}
 .header-right{justify-content:flex-end;}
@@ -197,22 +297,29 @@ html[data-theme="rack"] .topbar{
 }
 .lcd::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(160deg,rgba(255,255,255,.035) 0 40%,transparent 40%);}
-.lcd .lcdval{font-family:var(--type-num);font-variant-numeric:tabular-nums;font-size:var(--size-4);font-weight:400;
+.lcd .lcdval{min-width:0;font-family:var(--type-num);font-variant-numeric:tabular-nums;font-size:var(--size-4);font-weight:400;
   color:var(--lcd-ink,var(--accent-lamp));line-height:1.1;}
 .lcd .lcdlbl{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.16em;text-transform:uppercase;
   color:var(--text-secondary);}
 .lcd.tempo{width:70px;cursor:ns-resize;padding-inline:8px;}
-.lcd.tempo input{background:none;border:0;width:58px;min-height:24px;font:inherit;font-family:var(--type-num);
+/* The field fills the readout's content box rather than carrying a fixed width
+   that is wider than its parent. Four digits and a decimal is the widest legal
+   tempo, and tabular figures keep that width stable as the value changes. */
+.lcd.tempo input{background:none;border:0;width:100%;min-width:0;min-height:24px;font:inherit;font-family:var(--type-num);
   font-size:var(--size-4);color:var(--lcd-ink,var(--accent-lamp));}
 .lcd.clock{width:116px;}
-/* the mock sets the wordmark as plain type on the bar, no recessed plate */
+/* The mark is plain type on the bar, no recessed plate. It sits in the topbar's
+   fixed centre column, so it is optically centred on the window rather than
+   nudged: the negative inline-end margin cancels the trailing letter-space that
+   tracking adds after the final glyph, which is what would otherwise push the
+   word left of true centre. */
 .wordmark{
-  margin:0;height:34px;display:grid;place-items:center;font-family:var(--type-display);font-size:24px;font-weight:600;
+  margin:0 -.17em 0 0;height:34px;display:grid;place-items:center;
+  font-family:var(--type-display);font-size:var(--pulse-type-20);font-weight:600;
   text-transform:uppercase;letter-spacing:.17em;
   color:var(--text-primary);text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 14px rgba(255,255,255,.07);
-  width:168px;text-align:center;overflow:hidden;white-space:nowrap;transform:translate(36px,3px);
+  width:168px;text-align:center;overflow:hidden;white-space:nowrap;transform:translateY(3px);
 }
-html[data-theme="rack"] .wordmark{color:#d4d6d7;}
 .tapbtn{
   width:44px;height:42px;flex:none;border-radius:7px;
   font-family:var(--type-display);font-size:var(--size-3);letter-spacing:.1em;text-transform:uppercase;
@@ -238,9 +345,11 @@ html[data-theme="rack"] .wordmark{color:#d4d6d7;}
 .meter-mode{width:41px;height:40px;flex:none;border-radius:var(--edge-radius-ctl);
   font-family:var(--type-display);font-size:var(--size-2);color:#c3c9ce;background:none;box-shadow:none;}
 .mastermeter{flex:none;display:grid;grid-template-columns:180px 30px;align-items:center;gap:var(--space-2);margin-left:4px;}
-.meterpair{width:180px;display:grid;grid-template-columns:10px 1fr;grid-template-rows:1fr 1fr;gap:2px 4px;}
-.meterpair span{font-family:var(--type-num);font-size:8px;line-height:5px;color:var(--text-muted);}
-.meterpair canvas{width:166px;height:5px;background:var(--surface-well);border-radius:var(--edge-radius-chip);box-shadow:var(--sink-1);}
+/* The channel letters read at the 10px floor. The rows open to fit the glyph
+   and the ladders keep their slim 5px bars, centred in the taller row. */
+.meterpair{width:180px;display:grid;grid-template-columns:12px 1fr;grid-template-rows:1fr 1fr;gap:3px 4px;}
+.meterpair span{font-family:var(--type-num);font-size:var(--pulse-type-10);line-height:10px;color:var(--text-secondary);}
+.meterpair canvas{width:164px;height:5px;align-self:center;background:var(--surface-well);border-radius:var(--edge-radius-chip);box-shadow:var(--sink-1);}
 .mastermeter .mdb{width:30px;overflow:hidden;text-align:left;font-family:var(--type-num);font-size:var(--size-2);color:var(--text-secondary);}
 .header-right #btnMetro{width:37px;}
 .header-right #btnPower{width:41px;margin-left:-2px;}
@@ -321,16 +430,26 @@ html[data-theme="rack"] .wordmark{color:#d4d6d7;}
 .browser .bfilter i{width:5px;height:5px;border-radius:50%;background:var(--accent-lamp);
   box-shadow:0 0 5px var(--accent-glow);flex:none;}
 .blist{flex:1;min-height:0;overflow-y:auto;padding:0 1px var(--space-1) 2px;display:flex;flex-direction:column;gap:3px;}
+/* The short label and the tinted thumbnail already name the module, so the item
+   takes a full accent-tinted perimeter instead of a side stripe. */
 .bitem{
   --k:var(--mod-accent);display:flex;align-items:center;gap:15px;min-height:74px;padding:7px 5px 7px 9px;border-radius:var(--edge-radius-ctl);cursor:grab;
   background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
-  box-shadow:var(--lift-1);border-left:2px solid var(--k);
-  transition:box-shadow var(--motion-fast) var(--motion-ease);
+  box-shadow:var(--lift-1);
+  border:1px solid color-mix(in srgb,var(--k) 32%,var(--edge-hairline));
+  transition:box-shadow var(--motion-fast) var(--motion-ease),border-color var(--motion-fast) var(--motion-ease);
 }
-html[data-theme="rack"] .browser{background-color:#131517;}
-html[data-theme="rack"] .browser .bfilter{background:#0c0e10;}
-html[data-theme="rack"] .browser .bitem{background:linear-gradient(180deg,#25292c,#1c1f21);}
-.bitem:hover{box-shadow:var(--lift-1),0 0 0 1px color-mix(in srgb,var(--k) 45%,transparent);}
+.browser{background-color:var(--surface-chassis);}
+.browser .bfilter{background:var(--surface-well);}
+.browser .bitem{background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));}
+.bitem{width:100%;text-align:left;font:inherit;color:inherit;}
+.bitem:hover:not(:disabled){box-shadow:var(--lift-1),0 0 0 1px color-mix(in srgb,var(--k) 45%,transparent);
+  border-color:color-mix(in srgb,var(--k) 55%,var(--edge-hairline));}
+/* An entry already in the rack is not an action. It keeps its identity but
+   loses the raised cap, which is the non-colour cue that it cannot be used. */
+.bitem:disabled{cursor:default;box-shadow:none;
+  border-color:color-mix(in srgb,var(--k) 18%,var(--edge-hairline));}
+.bitem:disabled .bthumb,.bitem:disabled .bmeta{opacity:.55;}
 /* thumbnail reads as a miniature faceplate: tinted plate, accent top edge,
    tiny knob studs */
 .bthumb{
@@ -361,21 +480,24 @@ html[data-theme="rack"] .browser .bitem{background:linear-gradient(180deg,#25292
   max-height:26px;overflow:hidden;}
 
 /* ---------- slot column ---------- */
-html[data-theme="rack"] .slots{background-color:#16181a;}
+.slots{background-color:var(--surface-chassis);}
 .slots .slist{flex:1;min-height:0;overflow-y:auto;padding:17px var(--space-1) 4px;display:flex;flex-direction:column;gap:20px;}
 .slot{--k:var(--mod-accent,var(--mod-fx));display:flex;align-items:center;gap:5px;}
 .slot .snum{width:19px;flex:none;font-family:var(--type-num);font-size:var(--size-1);color:var(--text-secondary);text-align:right;}
+/* Loaded slots carry their short label and an accent-tinted plate. The
+   perimeter completes the identity without a one-sided marker. */
 .slot .scard{
   flex:1;min-width:0;height:34px;border-radius:var(--edge-radius-ctl);padding:3px 8px;cursor:pointer;
   display:flex;align-items:center;width:100%;text-align:left;font:inherit;
   background:linear-gradient(180deg,color-mix(in srgb,var(--k) 9%,var(--surface-plate-top)),var(--surface-plate-bot));
-  box-shadow:var(--lift-1);border-left:2px solid var(--k);position:relative;overflow:hidden;
+  box-shadow:var(--lift-1);position:relative;overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--k) 38%,var(--edge-hairline));
 }
 .slot.on .scard{box-shadow:var(--lift-1),0 0 0 1px var(--k),0 0 9px color-mix(in srgb,var(--k) 40%,transparent);}
 .slot .scard .sn{font-family:var(--type-display);font-size:12px;font-weight:700;letter-spacing:.1em;color:color-mix(in srgb,var(--k) 62%,var(--text-primary));
   text-shadow:0 1px 0 var(--text-engraved-lo);}
 .slot.empty .scard{
-  background:none;border:1.4px dashed var(--text-muted);border-left:1.4px dashed var(--text-muted);
+  background:none;border:1.4px dashed var(--text-muted);
   box-shadow:none;display:flex;align-items:center;justify-content:space-between;
   color:var(--text-muted);font-size:var(--size-1);}
 .slot.empty .scard:hover{border-color:var(--accent-lamp);color:var(--accent-text);}
@@ -422,12 +544,6 @@ html[data-theme="rack"] .slots{background-color:#16181a;}
 .unit[data-mod="six"],.unit[data-mod="nine"]{height:91px;}
 .unit[data-mod="nine"]{margin-top:1px;}
 .unit[data-mod="sev"],.unit[data-mod="five"]{height:88px;}
-html[data-theme="rack"] .unit{
-  background-image:
-    var(--mat-speckle),var(--mat-brush),
-    radial-gradient(130% 100% at 50% 0%,rgba(255,255,255,.038),transparent 55%),
-    linear-gradient(180deg,#1e2122,#1b1d1e);
-}
 /* Rack ear: a chunky pull handle standing off a recessed channel, bolted top
    and bottom. It is the tactile studio language spec-001 section 15 asks for —
    the rails are what make a unit read as rack-mounted hardware. They are also
@@ -445,12 +561,6 @@ html[data-theme="rack"] .unit{
     var(--mat-speckle),
     linear-gradient(270deg,var(--metal-rail-a),var(--metal-rail-b));
   box-shadow:inset 1px 0 0 var(--edge-hairline),inset -1px 0 0 var(--edge-highlight);}
-html[data-theme="rack"] .rail{
-  background:var(--mat-speckle),linear-gradient(90deg,#24282b,#101214);
-}
-html[data-theme="rack"] .rail.r{
-  background:var(--mat-speckle),linear-gradient(270deg,#24282b,#101214);
-}
 /* the recessed channel the pull stands off from — dark, so the bright handle
    in front of it reads as lifted metal */
 .rail::before{
@@ -514,7 +624,7 @@ body.rack-reordering .rail{cursor:grabbing;}
   width:115px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:0;
   padding:0 var(--space-2);border-right:1px solid var(--edge-hairline);box-shadow:1px 0 0 var(--edge-highlight);
 }
-.uname .un{font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;font-size:21px;line-height:22px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+.uname .un{font-family:"Bahnschrift Condensed","Arial Narrow",sans-serif;font-size:var(--pulse-type-20);line-height:22px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   transform:translateY(-4px) scaleX(.94);transform-origin:left center;
   color:var(--k);text-shadow:0 1px 0 var(--text-engraved-lo),0 0 5px color-mix(in srgb,var(--k) 20%,transparent);}
 .uname .ufull{font-family:"Segoe UI",sans-serif;font-size:10px;line-height:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;filter:brightness(.95);}
@@ -597,7 +707,20 @@ body.rack-reordering .rail{cursor:grabbing;}
   box-shadow:var(--sink-2),inset 0 0 0 1px var(--edge-highlight),0 1px 0 var(--edge-highlight);
   display:flex;flex-direction:column;gap:5px;
 }
-.useq .pattern-name{margin-left:auto;text-transform:none;color:var(--text-secondary);}
+/* The readout row is Pattern, voice selector, pattern name inside a fixed
+   185px window. The voice name reserves the width it needs for its longest
+   voice but yields the rest, so a short pattern name shows in full and a long
+   one truncates against the selector rather than colliding with its chevron.
+   The row gap alone holds the two apart, so no extra padding is taken from the
+   name's own measure. */
+.useq .pattern-name{
+  margin-left:auto;min-width:0;flex:0 1 auto;
+  text-transform:none;color:var(--text-secondary);
+}
+.useq .voicesel{flex:0 1 auto;min-width:0;}
+.useq .voicesel .vname{
+  min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;
+}
 .seqtop{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
 .seqtop .slbl,.uactlbl .slbl{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);}
 .seqtop>.slbl{text-transform:none;letter-spacing:.08em;}
@@ -635,7 +758,7 @@ body.rack-reordering .rail{cursor:grabbing;}
 /* ---------- right tabbed panel ---------- */
 .rightcol{min-width:0;min-height:0;display:flex;flex-direction:column;gap:5px;}
 .rightcol>.panel{background-color:var(--surface-rail);}
-html[data-theme="rack"] .rightcol>.panel{background-color:#181a1c;}
+.rightcol>.panel{background-color:var(--surface-chassis);}
 /* Three peer views, so three equal tabs. Nothing about Mixer, Effects or Master
    makes one of them wider than the others. */
 .rtabs{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:3px;}
@@ -646,8 +769,6 @@ html[data-theme="rack"] .rightcol>.panel{background-color:#181a1c;}
 .rtabs button.on{color:var(--text-primary);
   background:linear-gradient(180deg,var(--surface-raised),var(--surface-plate-bot));
   box-shadow:var(--lift-1),inset 0 -2px 0 var(--accent-lamp);}
-html[data-theme="rack"] .rtabs button{background:linear-gradient(180deg,#1b1d1f,#101214);}
-html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d2f,#17191b);}
 .rpane{flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden;}
 .rpane.on{display:flex;}
 /* mixer pane */
@@ -663,7 +784,7 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
 /* the mock names channels in bare accent type on the chassis, not on a lit chip */
 .mstrip .mtag{
   width:100%;height:17px;line-height:17px;text-align:center;overflow:hidden;
-  font-family:var(--type-display);font-size:13px;font-weight:700;letter-spacing:.04em;
+  font-family:var(--type-display);font-size:var(--pulse-type-12);font-weight:700;letter-spacing:.04em;
   color:var(--k);text-shadow:0 1px #000;filter:brightness(.95);
   background:none;box-shadow:none;}
 .mstrip.master .mtag{color:var(--text-primary);text-shadow:0 1px 0 var(--text-engraved-lo);}
@@ -751,9 +872,14 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
 .msbtn.solo.on{background:linear-gradient(180deg,var(--signal-solo),color-mix(in srgb,var(--signal-solo) 70%,black));color:#1a1508;}
 /* effects pane */
 .fxlist{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:5px;}
+/* The lit slot-letter chip is the row's identity, so the row itself takes a
+   full hairline perimeter rather than a side accent. A one-sided colored stripe
+   reads as a generic card marker and adds nothing the chip does not already
+   say. */
 .fxrow{
   --k:var(--fxk,var(--accent-lamp));display:flex;align-items:center;gap:var(--space-2);padding:6px var(--space-2);
-  border-radius:var(--edge-radius-ctl);border-left:3px solid var(--k);
+  border-radius:var(--edge-radius-ctl);
+  border:1px solid color-mix(in srgb,var(--k) 34%,var(--edge-hairline));
   background:var(--mat-plate);box-shadow:var(--lift-1);
 }
 .fxrow .fxmeta{width:96px;flex:none;display:flex;align-items:center;gap:6px;}
@@ -765,10 +891,17 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
 .fxrow .fxname{min-width:0;font-size:var(--size-1);color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fxrow .fxknobs{flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:2px;}
 .fxrow .fxknobs .knob{width:auto;min-width:0;}
-.fxrow .fxacts{width:40px;flex:none;display:flex;flex-direction:column;gap:3px;}
-.fxrow .fxacts button{height:20px;border-radius:var(--edge-radius-chip);font-family:var(--type-display);font-size:var(--size-1);
+.fxrow .fxacts{width:40px;flex:none;display:flex;flex-direction:column;gap:4px;}
+/* The keys keep their compact 20px face. A transparent inset carries the 24px
+   target, the same way the mixer and voice-selector keys do, so the row stays
+   dense without shrinking the operable area. */
+.fxrow .fxacts button{position:relative;height:20px;border-radius:var(--edge-radius-chip);
+  font-family:var(--type-display);font-size:var(--size-1);
   letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);
   background:linear-gradient(180deg,var(--metal-skirt-a),var(--metal-skirt-b));box-shadow:var(--lift-1);}
+.fxrow .fxacts button::after{content:"";position:absolute;left:50%;top:50%;
+  width:100%;min-width:24px;height:24px;transform:translate(-50%,-50%);}
+.fxrow .fxacts button:hover{color:var(--text-primary);}
 .fxrow .fxacts button.on{color:var(--accent-ink);background:linear-gradient(180deg,var(--k),color-mix(in srgb,var(--k) 96%,black));
   box-shadow:0 0 7px color-mix(in srgb,var(--k) 40%,transparent);}
 .addfx{
@@ -800,12 +933,12 @@ html[data-theme="rack"] .rtabs button.on{background:linear-gradient(180deg,#2a2d
   grid-template-columns:182px minmax(0,1fr) 292px;gap:5px;padding:2px 5px 5px;}
 /* pattern panel */
 .patpanel{background-color:var(--surface-rail);}
-html[data-theme="rack"] .patpanel{background-color:#151719;}
+.patpanel{background-color:var(--surface-chassis);}
 .patpanel .pbody{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:var(--space-2);}
 .pfield{display:flex;flex-direction:column;gap:3px;}
 .pfield label{font-family:var(--type-display);font-size:var(--size-1);letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);}
 .pstepper{display:flex;align-items:center;height:30px;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);}
-.pstepper button{width:24px;min-height:24px;height:100%;color:var(--text-muted);font-size:11px;}
+.pstepper button{width:24px;min-height:24px;height:100%;color:var(--text-secondary);font-size:var(--pulse-type-12);}
 .pstepper button:hover{color:var(--accent-text);}
 .pstepper .pv{flex:1;text-align:center;font-family:var(--type-num);font-size:var(--size-3);color:var(--text-primary);}
 .pfield select{height:30px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);box-shadow:var(--sink-1);
@@ -821,7 +954,7 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
 .gridstatus{height:20px;padding:0 6px;display:flex;align-items:center;gap:3px;border-radius:var(--edge-radius-ctl);
   font-family:var(--type-num);font-size:10px;color:var(--text-muted);background:var(--surface-well);box-shadow:var(--sink-1);}
 .timingctl{display:grid;grid-template-columns:auto 78px 30px;align-items:center;gap:4px;
-  font-family:var(--type-display);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
+  font-family:var(--type-display);font-size:var(--pulse-type-10);letter-spacing:.06em;text-transform:uppercase;color:var(--text-secondary);}
 /* the visual track stays slim. The control keeps a 24px grab height */
 .timingctl input{width:78px;height:24px;accent-color:var(--accent-lamp);appearance:none;-webkit-appearance:none;background:none;}
 .timingctl input::-webkit-slider-runnable-track{height:4px;border-radius:2px;
@@ -856,8 +989,12 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.55);}
 /* Each label sits in the dark name strip and centers on its row. It aligns with
    the key and the named grid row. */
+/* Only C and F are labelled, so each label has the vertical room to read at the
+   10px floor. The name strip is 15px wide and the glyph is centred on its row,
+   which keeps the label aligned with the pitch it names. */
 .pkl{position:absolute;left:1.5px;z-index:3;display:flex;align-items:center;
-  font-family:var(--type-num);font-size:8px;letter-spacing:.02em;color:#b9bdc2;}
+  font-family:var(--type-num);font-size:var(--pulse-type-10);line-height:1;letter-spacing:.01em;
+  color:var(--pulse-color-text-secondary);}
 /* Sharps span their own row like natural notes. They stop before the grid edge
    and stay dark. This makes the gutter look like a side view of a keyboard. */
 .pkb{position:absolute;left:15px;right:22px;z-index:2;border-radius:0 2px 2px 0;
@@ -872,7 +1009,6 @@ html[data-theme="rack"] .patpanel{background-color:#151719;}
   background:linear-gradient(90deg,var(--surface-raised),var(--surface-plate-bot));
   box-shadow:var(--lift-1);}
 .prgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-2);overflow:hidden;}
-html[data-theme="rack"] .prgrid{background:#141516;}
 .prgrid::before,.vellane .vgrid::before{content:"";position:absolute;z-index:1;top:0;bottom:0;left:0;width:1px;
   background:rgba(255,255,255,.24);box-shadow:0 0 3px rgba(255,255,255,.08);pointer-events:none;}
 .prgrid .gband{position:absolute;left:0;right:0;background:rgba(0,0,0,.18);}
@@ -900,26 +1036,24 @@ html[data-theme="rack"] .prgrid{background:#141516;}
 /* The closed control keeps the 78px gutter width and aligns with the piano-key
    column. The open list can be wider than the control. */
 .vellane .vlbl select{width:74px;height:24px;border:0;border-radius:var(--edge-radius-ctl);background:var(--surface-well);
-  color:var(--text-secondary);font-family:var(--type-display);font-size:9px;text-transform:uppercase;box-shadow:var(--sink-1);padding:0 4px;
-  text-overflow:ellipsis;}
+  color:var(--text-secondary);font-family:var(--type-display);font-size:var(--pulse-type-10);text-transform:uppercase;
+  box-shadow:var(--sink-1);padding:0 4px;text-overflow:ellipsis;}
 .vellane .vlbl select optgroup{background:var(--surface-raised);color:var(--text-secondary);
-  font-family:var(--type-display);font-size:9px;text-transform:uppercase;}
+  font-family:var(--type-display);font-size:var(--pulse-type-10);text-transform:uppercase;}
 .vellane .vlbl select option{background:var(--surface-raised);color:var(--text-primary);text-transform:none;}
 .vellane .vgrid{flex:1;min-width:0;position:relative;background:var(--surface-well);box-shadow:var(--sink-1);}
-html[data-theme="rack"] .vellane .vgrid{background:#141516;}
 .vellane .vbar{position:absolute;bottom:3px;width:4px;border-radius:1px 1px 0 0;
   background:linear-gradient(180deg,color-mix(in srgb,var(--mod-bass) 70%,#fff),color-mix(in srgb,var(--mod-bass) 88%,#000));
   box-shadow:0 0 2px color-mix(in srgb,var(--mod-bass) 32%,transparent);opacity:.92;}
 /* playlist */
 .playlist{background-color:var(--surface-rail);}
-html[data-theme="rack"] .playlist{background-color:#151719;}
+.playlist{background-color:var(--surface-chassis);}
 .playlist .plbody{flex:1;min-height:0;overflow-y:auto;padding:var(--space-2);display:flex;flex-direction:column;gap:3px;}
 .plrow{
   display:flex;align-items:center;gap:var(--space-2);height:35px;padding:0 var(--space-2);border-radius:var(--edge-radius-ctl);cursor:pointer;
   border:1px solid var(--edge-hairline);
   background:linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));box-shadow:var(--lift-1);
 }
-html[data-theme="rack"] .playlist .plrow{background:linear-gradient(180deg,#26292c,#181b1d);}
 .plrow.on{box-shadow:var(--lift-1),inset 0 0 0 1px var(--accent-lamp),0 0 9px var(--accent-dim);}
 .plrow.on .plname,.plrow.on .plbars{color:color-mix(in srgb,var(--accent-lamp) 55%,#e8f0e2);}
 .plrow .plnum{font-family:var(--type-num);font-size:var(--size-1);color:var(--text-secondary);width:14px;}
@@ -936,8 +1070,9 @@ html[data-theme="rack"] .playlist .plrow{background:linear-gradient(180deg,#2629
   background:var(--mat-plate);border-top:1px solid var(--edge-hairline);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
 }
-html[data-theme="rack"] .botbar{
-  background-image:var(--mat-speckle),linear-gradient(180deg,#191b1d,#131517);
+.botbar{
+  background-image:var(--mat-speckle),
+    linear-gradient(180deg,var(--surface-plate-top),var(--surface-plate-bot));
 }
 .botbar .txtbtn{
   height:24px;padding:0 var(--space-2);border-radius:var(--edge-radius-ctl);display:flex;align-items:center;gap:5px;
@@ -955,6 +1090,128 @@ html[data-theme="rack"] .botbar{
 .collapsebtn svg{transition:transform var(--motion-base) var(--motion-ease);}
 body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 
+/* ---------- controls the specification owns ----------
+   These keep their place in the composition but announce that they are not
+   operable here. aria-disabled rather than the disabled attribute, so they stay
+   reachable by keyboard and a screen-reader user can find out why instead of
+   meeting a control that silently skips. The cue is loss of the raised cap and
+   dimmer ink, never colour alone. */
+[aria-disabled="true"]{cursor:default;}
+.iconbtn[aria-disabled="true"],
+.projsel[aria-disabled="true"],
+.slotacts button[aria-disabled="true"],
+.pstepper button[aria-disabled="true"],
+.botbar .txtbtn[aria-disabled="true"]{
+  color:var(--pulse-color-disabled);
+}
+.iconbtn[aria-disabled="true"]{box-shadow:inset 0 0 0 1px rgba(0,0,0,.55);}
+.iconbtn[aria-disabled="true"]:hover,
+.projsel[aria-disabled="true"]:hover,
+.slotacts button[aria-disabled="true"]:hover,
+.pstepper button[aria-disabled="true"]:hover,
+.botbar .txtbtn[aria-disabled="true"]:hover{
+  color:var(--pulse-color-disabled);background:none;
+}
+.slotacts button[aria-disabled="true"]{background:none;box-shadow:inset 0 0 0 1px var(--edge-hairline);}
+/* The dashed add affordances read as unavailable rather than inviting. */
+.addfx[aria-disabled="true"],.addpat[aria-disabled="true"],.addpattern[aria-disabled="true"]{
+  border-style:dashed;border-color:color-mix(in srgb,var(--pulse-color-disabled) 55%,transparent);
+  color:var(--pulse-color-disabled);
+}
+.addfx[aria-disabled="true"]:hover,.addpat[aria-disabled="true"]:hover,.addpattern[aria-disabled="true"]:hover{
+  border-color:color-mix(in srgb,var(--pulse-color-disabled) 55%,transparent);
+  color:var(--pulse-color-disabled);
+}
+
+/* ---------- save state machine ----------
+   Save reports four states: clean, saving, saved and error. The composition
+   owns how each state looks; the owning specification owns when it occurs, so
+   this file only demonstrates the appearance. Every state pairs its colour with
+   a glyph and a word, so none of them depends on colour alone. */
+#btnSave .savelabel{min-width:52px;text-align:left;}
+#btnSave .savedot{
+  width:7px;height:7px;flex:none;border-radius:50%;
+  background:var(--pulse-color-text-muted);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5);
+}
+#btnSave[data-state="dirty"] .savedot{background:var(--pulse-color-status-warning);}
+#btnSave[data-state="saving"] .savedot{
+  background:var(--pulse-color-status-info);
+  animation:savepulse 900ms ease-in-out infinite;
+}
+#btnSave[data-state="saved"] .savedot{background:var(--pulse-color-status-success);}
+#btnSave[data-state="error"] .savedot{background:var(--pulse-color-status-danger);}
+#btnSave[data-state="saved"]{color:var(--pulse-color-status-success);}
+#btnSave[data-state="error"]{color:var(--pulse-color-status-danger);}
+@keyframes savepulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+/* The spinner and the pulse are the only decorative motion in the bar, so both
+   stop outright under reduced motion rather than merely shortening. */
+@media (prefers-reduced-motion:reduce){
+  #btnSave[data-state="saving"] .savedot{animation:none;}
+}
+
+/* ---------- empty states ----------
+   A panel with nothing in it explains what it holds and names the next action.
+   It never leaves bare chassis, which reads as a rendering fault rather than an
+   empty project. */
+.emptystate{
+  flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:var(--space-2);padding:var(--space-4) var(--space-3);text-align:center;
+}
+.emptystate .esicon{
+  width:34px;height:34px;flex:none;border-radius:var(--edge-radius-ctl);
+  display:grid;place-items:center;color:var(--pulse-color-text-muted);
+  background:var(--surface-well);box-shadow:var(--sink-1);
+}
+.emptystate .esicon svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.4;}
+.emptystate h3{
+  font-family:var(--type-display);font-size:var(--pulse-type-12);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--pulse-color-text-secondary);text-shadow:0 1px 0 var(--text-engraved-lo);
+}
+/* The explanation is prose, so it wraps and stays inside a readable measure
+   rather than stretching to the panel edge. */
+.emptystate p{
+  max-width:34ch;font-size:var(--pulse-type-12);line-height:1.45;
+  color:var(--pulse-color-text-muted);text-wrap:pretty;
+}
+
+/* ---------- user text resilience ----------
+   Project names, pattern names and playlist rows are the only free-text fields
+   in the product. Users paste long names, emoji, CJK and right-to-left script
+   into all three, so each one truncates at its own boundary instead of pushing
+   the layout. The full value stays reachable through the title attribute. */
+.projsel .pname,
+.useq .pattern-name,
+.plrow .plname,
+.pstepper .pv{
+  min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+/* CJK and emoji have taller ink than Latin at the same size. Fixed-height rows
+   clip them without this, so the affected rows centre their content and let the
+   glyph use the full line box. */
+.plrow .plname,.projsel .pname{line-height:1.5;}
+/* Right-to-left names must not reverse the surrounding chrome. Isolating each
+   field keeps the arrow, the bar count and the row number in place while the
+   name itself renders in its own direction. */
+.projsel .pname,.plrow .plname,.useq .pattern-name,.pstepper .pv{unicode-bidi:isolate;}
+
+/* ---------- numeric readouts ----------
+   Values are monospace with tabular figures, so a readout cannot change width
+   as its digits change. Each one reserves room for its widest legitimate value
+   rather than growing to fit, which is what would otherwise shift the controls
+   beside it. */
+.lcd.tempo input{text-align:center;}
+.mastermeter .mdb{
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  overflow:hidden;text-overflow:clip;
+}
+/* -Inf is wider than any dB value it replaces, so the field is sized for it. */
+.mastermeter{grid-template-columns:180px 38px;}
+.uactlbl .pos,.plrow .plbars,.timingctl output{font-variant-numeric:tabular-nums;}
+/* A pattern length can reach three digits plus its unit. The stepper value
+   holds that width so the two stepper keys never move. */
+.pstepper .pv{font-variant-numeric:tabular-nums;padding-inline:2px;}
+
 /* Narrow desktops: the step row drops to its own line inside the unit rather
    than squeezing to nothing. The rails still run the full height. */
 @media (max-width:1499px){
@@ -962,7 +1219,7 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
      keys, and a narrower wordmark column. Only the project name can use an
      ellipsis. */
   .topbar{grid-template-columns:minmax(0,1fr) 132px minmax(0,1fr);}
-  .wordmark{width:132px;font-size:19px;}
+  .wordmark{width:132px;font-size:var(--pulse-type-16);}
   .header-left,.header-right{gap:var(--space-1);}
   .projbox{flex:0 1 auto;}
   .projsel{font-size:var(--size-3);padding:0 4px 0 8px;}
@@ -1039,7 +1296,17 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 ::-webkit-scrollbar{height:8px;width:8px;}
 ::-webkit-scrollbar-thumb{background:var(--surface-raised);border-radius:var(--edge-radius-ctl);}
 ::-webkit-scrollbar-track{background:transparent;}
-@media (prefers-reduced-motion:reduce){*{transition-duration:1ms!important;}}
+/* The theme contract requires nonessential motion to stop, not merely shorten.
+   Meters, playheads and LEDs are driven by script rather than transitions, so
+   they keep signalling state under this rule. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    transition-duration:0ms!important;
+    animation-duration:0ms!important;
+    animation-iteration-count:1!important;
+    scroll-behavior:auto!important;
+  }
+}
 </style>
 </head>
 <body>
@@ -1058,6 +1325,11 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <symbol id="i-pin" viewBox="0 0 16 16"><path d="M5.2 2.2h5.6M6.2 2.2v3.9L4.4 8.3h7.2L9.8 6.1V2.2M8 8.3v5.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-shuffle" viewBox="0 0 16 16"><path d="M2 4h3l6 8h3M2 12h3l6-8h3M12 2l2 2-2 2M12 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <!-- Empty-state marks: an empty rack bay, a blank pattern grid, a bypassed
+       effect chain. Drawn to match the rack language rather than borrowed. -->
+  <symbol id="i-emptyrack" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5"/><path d="M6 4.5v15M18 4.5v15" stroke-dasharray="2 2"/></symbol>
+  <symbol id="i-emptygrid" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="1.5"/><path d="M8.2 5.5v13M15.8 5.5v13M2.5 12h19" stroke-dasharray="2 2"/></symbol>
+  <symbol id="i-emptyfx" viewBox="0 0 24 24"><path d="M2.5 12h5M16.5 12h5"/><rect x="7.5" y="7.5" width="9" height="9" rx="1.5" stroke-dasharray="2 2"/></symbol>
 </defs></svg>
 
 <!-- Below the supported editing size the workspace is replaced by a notice and
@@ -1083,15 +1355,21 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
 <!-- ============================ TOP BAR ============================ -->
 <header class="topbar">
   <div class="header-left">
-    <button class="iconbtn" title="Menu." aria-label="Menu"><svg aria-hidden="true"><use href="#i-menu"/></svg></button>
+    <!-- Menu, project switching, Pin and Settings are owned by their
+         specifications. They stay in the composition because they set the
+         header's proportion, and each one reports that it is not operable here
+         rather than accepting a click and doing nothing. -->
+    <button class="iconbtn" type="button" aria-disabled="true"
+      title="Menu. Not operable in this composition." aria-label="Menu, not operable in this composition"><svg aria-hidden="true"><use href="#i-menu"/></svg></button>
     <div class="projbox">
-      <button class="projsel" title="Switch project." aria-haspopup="listbox">
-        <span class="pname">Neon Basement</span>
+      <button class="projsel" type="button" aria-haspopup="listbox" aria-disabled="true"
+        title="Switch project. Not operable in this composition.">
+        <span class="pname" id="projectName">Neon Basement</span>
         <svg aria-hidden="true"><use href="#i-chev"/></svg>
       </button>
-      <button class="iconbtn ghost" type="button" aria-pressed="false"
-        title="Pin project. Keeps this project at the top of the project selector."
-        aria-label="Pin project"><svg aria-hidden="true"><use href="#i-pin"/></svg></button>
+      <button class="iconbtn ghost" type="button" aria-pressed="false" aria-disabled="true"
+        title="Pin project. Keeps this project at the top of the project selector. Not operable in this composition."
+        aria-label="Pin project, not operable in this composition"><svg aria-hidden="true"><use href="#i-pin"/></svg></button>
     </div>
     <div class="mode-toggle" id="transportMode" aria-label="Transport mode">
       <button class="on" type="button" data-mode="pattern" aria-pressed="true">Pattern</button>
@@ -1124,9 +1402,11 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
         <span id="meterLabelA">L</span><canvas id="masterMeterA" width="332" height="14" aria-hidden="true"></canvas>
         <span id="meterLabelB">R</span><canvas id="masterMeterB" width="332" height="14" aria-hidden="true"></canvas>
       </div>
-      <span class="mdb num" id="masterDb">&minus;6.1&thinsp;dB</span>
+      <span class="mdb num" id="masterDb">&minus;Inf</span>
     </div>
-    <button class="iconbtn" id="settingsButton" title="Settings. Appearance is chosen here." aria-label="Settings"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
+    <button class="iconbtn" id="settingsButton" type="button" aria-disabled="true"
+      title="Settings. Appearance is chosen here. Not operable in this composition."
+      aria-label="Settings, not operable in this composition"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
   </div>
 </header>
 
@@ -1142,31 +1422,50 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <aside class="panel slots" aria-label="Slots">
     <div class="slist" id="slist"></div>
     <div class="slotacts">
-      <button title="Duplicate the selected module.">Duplicate</button>
+      <button type="button" aria-disabled="true"
+        title="Duplicate the selected module. Not operable in this composition.">Duplicate</button>
     </div>
   </aside>
 
   <!-- rack -->
   <section class="panel rack" aria-label="Rack">
     <div class="rackscroll" id="rackscroll"></div>
+    <!-- Shown when every slot is empty. It names what the rack holds and points
+         at the browser beside it, so the panel is never bare chassis. -->
+    <div class="emptystate" id="rackEmpty" hidden>
+      <span class="esicon"><svg aria-hidden="true"><use href="#i-emptyrack"/></svg></span>
+      <h3>Empty rack</h3>
+      <p>Eight slots, no modules yet. Choose an instrument from the browser on the
+        left to load it into the first free slot.</p>
+    </div>
   </section>
 
   <!-- right column -->
   <div class="rightcol">
     <div class="panel" style="flex:1;min-height:0">
-      <div class="rtabs" role="tablist">
-        <button class="on" data-pane="mixer" role="tab">Mixer</button>
-        <button data-pane="effects" role="tab">Effects</button>
-        <button data-pane="master" role="tab">Master</button>
+      <div class="rtabs" role="tablist" aria-label="Studio views">
+        <button class="on" data-pane="mixer" role="tab" type="button"
+          id="tab-mixer" aria-controls="pane-mixer" aria-selected="true" tabindex="0">Mixer</button>
+        <button data-pane="effects" role="tab" type="button"
+          id="tab-effects" aria-controls="pane-effects" aria-selected="false" tabindex="-1">Effects</button>
+        <button data-pane="master" role="tab" type="button"
+          id="tab-master" aria-controls="pane-master" aria-selected="false" tabindex="-1">Master</button>
       </div>
-      <div class="rpane on" data-pane="mixer">
+      <div class="rpane on" data-pane="mixer" id="pane-mixer" role="tabpanel" aria-labelledby="tab-mixer" tabindex="0">
         <div class="mixstrips" id="mixstrips"></div>
       </div>
-      <div class="rpane" data-pane="effects">
+      <div class="rpane" data-pane="effects" id="pane-effects" role="tabpanel" aria-labelledby="tab-effects" tabindex="0">
         <div class="fxlist" id="fxlist"></div>
-        <button class="addfx">+ Add effect</button>
+        <div class="emptystate" id="fxEmpty" hidden>
+          <span class="esicon"><svg aria-hidden="true"><use href="#i-emptyfx"/></svg></span>
+          <h3>No effects</h3>
+          <p>The chain is running dry. Add an effect to place it in the first
+            insert slot for this channel.</p>
+        </div>
+        <button class="addfx" type="button" aria-disabled="true"
+          title="Add an effect. Not operable in this composition.">+ Add effect</button>
       </div>
-      <div class="rpane" data-pane="master">
+      <div class="rpane" data-pane="master" id="pane-master" role="tabpanel" aria-labelledby="tab-master" tabindex="0">
         <div class="masterpane">
           <div class="mcard">
             <h3>Equalizer</h3>
@@ -1216,14 +1515,19 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
         <div class="pstepper"><button id="patPrev" title="Previous pattern.">&lsaquo;</button>
           <span class="pv" id="patName">Verse</span>
           <button id="patNext" title="Next pattern.">&rsaquo;</button></div></div>
-      <div class="pfield"><label>Duration</label>
-        <div class="pstepper"><button title="Make the pattern shorter.">&minus;</button>
+      <div class="pfield"><label id="lblDuration">Duration</label>
+        <div class="pstepper" role="group" aria-labelledby="lblDuration">
+          <button type="button" aria-disabled="true"
+            title="Make the pattern shorter. Not operable in this composition." aria-label="Make the pattern shorter">&minus;</button>
           <span class="pv" id="patLen">16 bars</span>
-          <button title="Make the pattern longer.">+</button></div></div>
+          <button type="button" aria-disabled="true"
+            title="Make the pattern longer. Not operable in this composition." aria-label="Make the pattern longer">+</button></div></div>
       <div class="pfield"><label>Scale</label>
         <select title="Scale. Notes snap to this."><option>Chromatic</option><option>Minor</option>
           <option>Dorian</option><option>Phrygian</option><option>Pentatonic</option></select></div>
-      <button class="addpat" title="Add a new pattern." aria-label="Add a new pattern">+</button>
+      <button class="addpat" type="button" aria-disabled="true"
+        title="Add a new pattern. Not operable in this composition."
+        aria-label="Add a new pattern, not operable in this composition">+</button>
     </div>
   </aside>
 
@@ -1260,7 +1564,13 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <aside class="panel playlist" aria-label="Playlist">
     <div class="phead"><h2>Playlist</h2><span class="gap"></span></div>
     <div class="plbody" id="plbody"></div>
-    <button class="addpattern" title="Add a new pattern.">+ Add pattern</button>
+    <div class="emptystate" id="plEmpty" hidden>
+      <span class="esicon"><svg aria-hidden="true"><use href="#i-emptygrid"/></svg></span>
+      <h3>No patterns</h3>
+      <p>The playlist is empty. Add a pattern to start arranging the song.</p>
+    </div>
+    <button class="addpattern" type="button" aria-disabled="true"
+      title="Add a pattern to the playlist. Not operable in this composition.">+ Add pattern</button>
   </aside>
 </div>
 
@@ -1270,7 +1580,16 @@ body.workspace-collapsed .collapsebtn svg{transform:rotate(180deg);}
   <span class="gap"></span>
   <button class="txtbtn" id="btnUndo" disabled title="Nothing to undo yet"><svg aria-hidden="true"><use href="#i-undo"/></svg>Undo</button>
   <button class="txtbtn" id="btnRedo" disabled title="Nothing to redo"><svg aria-hidden="true"><use href="#i-redo"/></svg>Redo</button>
-  <button class="txtbtn" title="Save the project."><svg aria-hidden="true"><use href="#i-save"/></svg>Save</button>
+  <!-- Save reports its state. The specification owns when a save happens, so in
+       this composition the states are demonstrated rather than performed. -->
+  <button class="txtbtn" id="btnSave" type="button" data-state="clean" aria-disabled="true"
+    aria-describedby="saveState"
+    title="Save the project. Current state: saved. Not operable in this composition.">
+    <svg aria-hidden="true"><use href="#i-save"/></svg>
+    <span class="savedot" aria-hidden="true"></span>
+    <span class="savelabel">Saved</span>
+  </button>
+  <span class="sr-only" id="saveState" role="status">Project saved.</span>
 </footer>
 <div class="contextmenu" id="moduleMenu" role="menu" aria-label="Module actions" hidden>
   <button id="deleteModule" type="button" role="menuitem">Delete module</button>
@@ -1490,18 +1809,45 @@ const REF_VOICE0={
 MODS.forEach(m=>{ PATTERNS[m.id][0]=REF_VOICE0[m.id].map(Boolean); });
 
 /* ================= browser ================= */
+/* Each entry is a real button, so pointer and keyboard share one action: add
+   the module to its slot. Dragging remains available for pointer users, but no
+   workflow depends on it. An entry already in the rack reports itself as
+   unavailable rather than silently doing nothing. */
 const blist=$("#blist");
+const browserItems=new Map();
 MODS.forEach(m=>{
-  const d=document.createElement("div");
+  const d=document.createElement("button");
+  d.type="button";
   d.className="bitem"; d.style.setProperty("--mod-accent",`var(--mod-${m.id})`);
-  d.title=`${m.name} — ${m.type}. Drag into a slot.`;
+  d.dataset.mod=m.id;
   const dots=Array.from({length:5},(_,i)=>
     `<i class="led" style="left:${8+i*10}px;top:1.5px"></i><i style="left:${6+i*11}px;top:16px"></i>`).join("");
-  d.innerHTML=`<span class="bthumb">${dots}</span>
+  d.innerHTML=`<span class="bthumb" aria-hidden="true">${dots}</span>
     <span class="bmeta"><span class="bn">${m.label}</span><span class="bfull">${m.name}</span>
       <span class="bs">${m.type}</span></span>`;
+  d.addEventListener("click",()=>{
+    if(presentModules.has(m.id)) return;
+    setModulePresent(m.id,true);
+    pushUndo(`Add ${m.name}`,()=>setModulePresent(m.id,false),()=>setModulePresent(m.id,true));
+  });
+  browserItems.set(m.id,d);
   blist.appendChild(d);
 });
+/* One place decides how a browser entry reads, so the label and the disabled
+   state can never disagree with the rack. */
+function syncBrowserItem(mid){
+  const item=browserItems.get(mid), m=MODS.find(x=>x.id===mid);
+  if(!item||!m) return;
+  const racked=presentModules.has(mid);
+  item.disabled=racked;
+  item.setAttribute("aria-disabled",racked?"true":"false");
+  item.title=racked
+    ? `${m.name} — ${m.type}. Already in the rack.`
+    : `${m.name} — ${m.type}. Add to the rack, or drag into a slot.`;
+  item.setAttribute("aria-label",racked
+    ? `${m.name}, ${m.type}. Already in the rack.`
+    : `Add ${m.name}, ${m.type}, to the rack.`);
+}
 
 /* ================= slots ================= */
 const slist=$("#slist");
@@ -1642,6 +1988,7 @@ function setModulePresent(mid,present){
   /* a restore replaces card markup with its original slot number baked in, so
      the shared renumber pass runs to honor any reorder since then */
   syncRackOrder();
+  syncBrowserItem(mid);
   announce(present?`${m.name} added to slot ${index+1}.`:`${m.name} deleted from slot ${index+1}. Undo is available.`);
 }
 function bindModuleMenu(el,mid){
@@ -2074,11 +2421,36 @@ function drawComp(){
 drawEq(); drawComp();
 
 /* ================= right tabs ================= */
-$$(".rtabs button").forEach(b=>b.addEventListener("click",()=>{
-  $$(".rtabs button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
-  $$(".rpane").forEach(p=>p.classList.toggle("on",p.dataset.pane===b.dataset.pane));
-  if(b.dataset.pane==="master"){ drawEq(); drawComp(); }
-}));
+/* The full tab pattern: one stop in the tab sequence, arrow keys move between
+   tabs, Home and End jump to the ends, and each tab owns its panel through
+   aria-controls. Selection follows focus, which is the expected behaviour when
+   every panel is already in the document and switching is free. */
+const rtabs=$$(".rtabs button");
+function selectPane(tab,{focus=false}={}){
+  rtabs.forEach(t=>{
+    const on=t===tab;
+    t.classList.toggle("on",on);
+    t.setAttribute("aria-selected",on?"true":"false");
+    t.tabIndex=on?0:-1;
+  });
+  $$(".rpane").forEach(p=>p.classList.toggle("on",p.dataset.pane===tab.dataset.pane));
+  if(focus) tab.focus();
+  if(tab.dataset.pane==="master"){ drawEq(); drawComp(); }
+}
+rtabs.forEach((b,i)=>{
+  b.addEventListener("click",()=>selectPane(b));
+  b.addEventListener("keydown",e=>{
+    const last=rtabs.length-1;
+    let next=null;
+    if(e.key==="ArrowRight"||e.key==="ArrowDown") next=rtabs[i===last?0:i+1];
+    else if(e.key==="ArrowLeft"||e.key==="ArrowUp") next=rtabs[i===0?last:i-1];
+    else if(e.key==="Home") next=rtabs[0];
+    else if(e.key==="End") next=rtabs[last];
+    if(!next) return;
+    e.preventDefault();
+    selectPane(next,{focus:true});
+  });
+});
 
 /* ================= piano roll ================= */
 let activeEditorModule="bass";
@@ -2564,6 +2936,153 @@ function tick(now){
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+
+/* Every module starts racked, so the browser opens with each entry reporting
+   itself as already in the rack rather than looking available. */
+MODS.forEach(m=>syncBrowserItem(m.id));
+
+/* ================= state inspection =================
+   The composition shows one project in one state. These states are real parts
+   of the design that the default view cannot show at the same time: a Save that
+   has failed, a rack with nothing in it, a project name a user pasted from
+   somewhere else.
+
+   They are reachable through the query string so each one can be reviewed and
+   captured, and through `pulsebox.setState(...)` from the console. Nothing here
+   runs on a normal load, and none of it performs a product action: the states
+   are demonstrated, never carried out. The owning specifications implement the
+   behavior that would cause them.
+
+   ?save=saving|saved|error|dirty   Save reporting
+   ?empty=rack|effects|playlist|all Empty panels
+   ?text=long|emoji|cjk|rtl         Free-text resilience
+   ?numbers=extreme                 Boundary values in every readout
+*/
+const SAVE_STATES={
+  clean:{label:"Saved",  status:"Project saved."},
+  dirty:{label:"Unsaved",status:"Project has unsaved changes."},
+  saving:{label:"Saving",status:"Saving project."},
+  saved:{label:"Saved",  status:"Project saved."},
+  error:{label:"Failed", status:"Save failed. The project is still in the browser. Try again."},
+};
+const btnSave=$("#btnSave"), saveState=$("#saveState");
+function setSaveState(state){
+  const s=SAVE_STATES[state]; if(!s||!btnSave) return;
+  btnSave.dataset.state=state;
+  btnSave.querySelector(".savelabel").textContent=s.label;
+  saveState.textContent=s.status;
+  /* The failure explains where the work is and what to do, so the message is a
+     recovery path rather than a notice that something broke. */
+  btnSave.title=state==="error"
+    ? "Save failed. The project is still stored in this browser. Not operable in this composition."
+    : `Save the project. Current state: ${s.label.toLowerCase()}. Not operable in this composition.`;
+}
+
+/* Long, emoji, CJK and right-to-left samples for the three free-text fields.
+   These are the values users actually paste, not tidy placeholder strings. */
+const TEXT_SAMPLES={
+  long:{
+    project:"Basement session take fourteen before the mix down with the long room reverb",
+    pattern:"Extended breakdown section leading into the final chorus",
+    playlist:["Introduction and slow filter sweep","Verse with the sub bass doubled",
+      "Breakdown, drums out, pads only","Drop with every channel unmuted","Outro tail and fade"],
+  },
+  emoji:{
+    project:"🔊 neon basement 🌃 v4 🔥🔥",
+    pattern:"drop 🎛️🥁",
+    playlist:["🎹 intro","🔊 verse","🌒 break","🔥 drop","🌫️ outro"],
+  },
+  cjk:{
+    project:"ネオン・ベースメント 第四版 ミックス前",
+    pattern:"ドロップ",
+    playlist:["イントロ","ヴァース","ブレイク","ドロップ","アウトロ"],
+  },
+  rtl:{
+    project:"الطابق السفلي النيون - النسخة الرابعة",
+    pattern:"الانفجار",
+    playlist:["مقدمة","المقطع","استراحة","الذروة","الخاتمة"],
+  },
+};
+function applyTextSample(kind){
+  const s=TEXT_SAMPLES[kind]; if(!s) return;
+  const proj=$("#projectName");
+  if(proj){ proj.textContent=s.project; proj.closest(".projsel").title=s.project; }
+  const pat=$("#patName"); if(pat){ pat.textContent=s.pattern; pat.title=s.pattern; }
+  $$(".useq .pattern-name").forEach(el=>{ el.textContent=s.pattern; el.title=s.pattern; });
+  $$(".plrow .plname").forEach((el,i)=>{
+    const v=s.playlist[i%s.playlist.length]; el.textContent=v; el.title=v;
+  });
+}
+
+/* Boundary values: the widest and smallest each readout can legitimately show.
+   If a layout survives these it survives the real range. */
+function applyExtremeNumbers(){
+  const tempo=$("#tempoInput"); if(tempo) tempo.value="999.9";
+  const len=$("#patLen"); if(len) len.textContent="999 bars";
+  const db=$("#masterDb"); if(db) db.innerHTML="&minus;Inf";
+  const clock=$("#clockTime"); if(clock) clock.textContent="99:59.999";
+  const bbt=$("#clockBbt"); if(bbt) bbt.textContent="999 : 4 : 959";
+  $$(".plrow .plbars").forEach(el=>{ el.textContent="999 bars"; });
+  $$(".uactlbl .pos").forEach(el=>{ el.textContent="999.4"; });
+}
+
+function setEmpty(which){
+  const all=which==="all";
+  if(all||which==="rack"){
+    /* An empty rack is empty everywhere it is represented. Clearing only the
+       rack panel would leave the slot list, the mixer and the editor still
+       showing modules the project does not have, which is a worse demonstration
+       than none: every surface that mirrors the rack empties with it. */
+    const rack=$("#rackEmpty"), rs=$("#rackscroll");
+    if(rack){ rack.hidden=false; if(rs) rs.hidden=true; }
+    MODS.forEach(m=>{ presentModules.delete(m.id); syncBrowserItem(m.id); });
+    $$(".slot").forEach(slot=>{
+      const idx=[...slot.parentElement.children].indexOf(slot);
+      slot.classList.add("empty"); slot.classList.remove("on");
+      slot.innerHTML=`<span class="snum num">${String(idx+1).padStart(2,"0")}</span>
+        <button type="button" class="scard" aria-label="Empty slot ${idx+1}"
+          title="Empty slot ${idx+1}."><span>empty</span><span aria-hidden="true">+</span></button>`;
+    });
+    $$(".mstrip[data-mod]").forEach(s=>{
+      s.classList.add("empty");
+      const tag=s.querySelector(".mtag"); if(tag) tag.textContent="--";
+      s.querySelectorAll("button").forEach(b=>b.disabled=true);
+    });
+    /* No module means nothing to edit, so the roll clears rather than showing
+       notes for an instrument that is no longer racked. */
+    $$(".prgrid .note,.prgrid .trigger,.vellane .vbar").forEach(n=>n.remove());
+    const ctx=$(".rollctx"); if(ctx) ctx.textContent="No module selected";
+  }
+  const fx=$("#fxEmpty"), fl=$("#fxlist");
+  if(fx&&(all||which==="effects")){ fx.hidden=false; if(fl) fl.hidden=true; }
+  const pl=$("#plEmpty"), pb=$("#plbody");
+  if(pl&&(all||which==="playlist")){ pl.hidden=false; if(pb) pb.hidden=true; }
+  /* Effects live behind a tab, so the empty view is brought forward rather than
+     hidden behind the default Mixer pane. */
+  if(which==="effects"){ const t=$("#tab-effects"); if(t) selectPane(t); }
+}
+
+const pulsebox={
+  setState({save,empty,text,numbers}={}){
+    if(save) setSaveState(save);
+    if(empty) setEmpty(empty);
+    if(text) applyTextSample(text);
+    if(numbers==="extreme") applyExtremeNumbers();
+  },
+  saveStates:Object.keys(SAVE_STATES),
+  textSamples:Object.keys(TEXT_SAMPLES),
+};
+window.pulsebox=pulsebox;
+
+const params=new URLSearchParams(location.search);
+if([...params].length){
+  pulsebox.setState({
+    save:params.get("save"),
+    empty:params.get("empty"),
+    text:params.get("text"),
+    numbers:params.get("numbers"),
+  });
+}
 
 </script>
 </body>

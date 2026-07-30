@@ -36,7 +36,8 @@ export interface AudioControlPort {
   readonly setSwing?: (swing: number) => void;
 }
 
-export type WorkspaceView = "rack" | "mixer" | "song";
+export type StudioView = "mixer" | "effects" | "master";
+export type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
 
 export interface SavedProjectSummary {
   readonly id: string;
@@ -96,7 +97,12 @@ export interface AppState {
   readonly selectedVoiceByModule: Readonly<Record<string, string>>;
   /** Latest peak per module, pushed from the audio thread. */
   readonly meterLevels: Readonly<Record<string, number>>;
-  readonly workspaceView: WorkspaceView;
+  readonly studioView: StudioView;
+  readonly editorExpanded: boolean;
+  readonly meterMode: "lr" | "ms";
+  readonly metronomeEnabled: boolean;
+  readonly selectedSend: "A" | "B" | "C" | "D" | undefined;
+  readonly saveStatus: SaveStatus;
 
   readonly play: () => Promise<void>;
   readonly pause: () => void;
@@ -134,7 +140,11 @@ export interface AppState {
   readonly reportAudioStatus: (status: AudioStatus, message?: string) => void;
   readonly markAudioUnavailable: () => void;
   readonly dismissUndoNotice: () => void;
-  readonly setWorkspaceView: (view: WorkspaceView) => void;
+  readonly setStudioView: (view: StudioView) => void;
+  readonly setEditorExpanded: (expanded: boolean) => void;
+  readonly toggleMeterMode: () => void;
+  readonly toggleMetronome: () => void;
+  readonly openSend: (send: "A" | "B" | "C" | "D") => void;
 
   readonly selectPattern: (patternIndex: number) => void;
   readonly renamePattern: (patternIndex: number, name: string) => void;
@@ -192,7 +202,12 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     undoNotice: undefined,
     selectedVoiceByModule: {},
     meterLevels: {},
-    workspaceView: "rack",
+    studioView: "mixer",
+    editorExpanded: true,
+    meterMode: "lr",
+    metronomeEnabled: false,
+    selectedSend: undefined,
+    saveStatus: "clean",
 
     play: async () => {
       if (get().audioUnavailable) return;
@@ -366,8 +381,24 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       set({ undoNotice: undefined });
     },
 
-    setWorkspaceView: (workspaceView) => {
-      set({ workspaceView });
+    setStudioView: (studioView) => {
+      set({ studioView });
+    },
+
+    setEditorExpanded: (editorExpanded) => {
+      set({ editorExpanded });
+    },
+
+    toggleMeterMode: () => {
+      set((state) => ({ meterMode: state.meterMode === "lr" ? "ms" : "lr" }));
+    },
+
+    toggleMetronome: () => {
+      set((state) => ({ metronomeEnabled: !state.metronomeEnabled }));
+    },
+
+    openSend: (selectedSend) => {
+      set({ selectedSend, studioView: "effects" });
     },
 
     selectPattern: (patternIndex) => {
@@ -449,12 +480,19 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     saveProject: async () => {
       const projects = dependencies.projects;
       if (projects === undefined) return;
+      set({ saveStatus: "saving" });
       try {
         await projects.save();
-        set({ projectMessage: notice(`Saved ${get().project.project.name}.`).message });
+        set({
+          projectMessage: notice(`Saved ${get().project.project.name}.`).message,
+          saveStatus: "saved",
+        });
         await get().refreshSavedProjects();
       } catch {
-        set({ projectMessage: "Saving failed. This browser may be blocking storage." });
+        set({
+          projectMessage: "Saving failed. This browser may be blocking storage.",
+          saveStatus: "error",
+        });
       }
     },
 
@@ -473,7 +511,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (projects === undefined) return;
       try {
         await projects.open(id);
-        set({ projectMessage: "Project opened." });
+        set({ projectMessage: "Project opened.", saveStatus: "clean" });
       } catch {
         set({ projectMessage: "That project could not be opened." });
       }
@@ -483,6 +521,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       const projects = dependencies.projects;
       if (projects === undefined) return;
       const result = await projects.importPortable(bytes);
+      if (result.ok) await get().refreshSavedProjects();
       set({ projectMessage: result.ok ? "Project imported." : result.reason });
     },
 
@@ -505,10 +544,18 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
  */
 export function connectDomainStore(appStore: AppStore, store: AppStorePort): () => void {
   appStore.setState({ project: store.getState() });
+  let revision = store.getState().project.revision;
   return store.subscribe(
     (state) => state,
     (state) => {
-      appStore.setState({ project: state });
+      const changed =
+        state.project.revision.epoch !== revision.epoch ||
+        state.project.revision.counter !== revision.counter;
+      revision = state.project.revision;
+      appStore.setState((current) => ({
+        project: state,
+        saveStatus: changed && current.saveStatus !== "saving" ? "dirty" : current.saveStatus,
+      }));
     },
   );
 }

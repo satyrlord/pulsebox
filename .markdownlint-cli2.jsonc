@@ -5,6 +5,23 @@
       "line_length": 200,
     },
   },
+  // DESIGN.md follows the external DESIGN.md format spec, which fixes the six
+  // section names, the `**Creative North Star: "..."**` line, the repeated
+  // `### Named Rules` subheadings, and the `### Do:` / `### Don't:` headings.
+  // Parsing tools match those strings character-for-character, so the file
+  // cannot satisfy these five rules and stay valid.
+  "overrides": [
+    {
+      "filter": ["DESIGN.md"],
+      "combine": "merge",
+      "config": {
+        "MD024": false,
+        "MD025": false,
+        "MD026": false,
+        "MD036": false,
+      },
+    },
+  ],
   "globs": ["**/*.md"],
   "ignores": [
     "tmp/**",

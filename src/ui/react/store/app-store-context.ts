@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import { useStore } from "zustand";
 
-import type { AppState, AppStore, AppStoreDependencies, WorkspaceView } from "./app-store";
+import type { AppState, AppStore, AppStoreDependencies, StudioView } from "./app-store";
 
 interface AppContextValue {
   readonly store: AppStore;
@@ -27,4 +27,4 @@ export function useDependencies(): AppStoreDependencies {
   return useAppContext().dependencies;
 }
 
-export type { AppContextValue, WorkspaceView };
+export type { AppContextValue, StudioView };

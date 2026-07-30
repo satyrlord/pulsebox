@@ -3,18 +3,18 @@
   min-block-size: 24px;
   padding: 0.125rem 0.375rem;
   font: inherit;
-  font-size: 0.6875rem;
+  font-size: var(--pulse-type-12, 12px);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--pulse-color-text-muted, #98a0ab);
-  background: var(--pulse-color-cap, #23272e);
-  border: 1px solid var(--pulse-color-edge, #3a4048);
+  background: var(--pulse-color-surface-control, #242a30);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: var(--pulse-radius-control, 4px);
   cursor: pointer;
 }
 
 .toggle:focus-visible {
-  outline: 2px solid var(--pulse-color-focus, #ffffff);
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
   outline-offset: 2px;
 }
 
@@ -25,9 +25,9 @@
 
 /* Pressed adds an inset ring and heavier text, so state never rests on hue. */
 .pressed {
-  color: var(--pulse-color-text, #0d0f12);
+  color: var(--pulse-color-on-accent, #07110b);
   font-weight: 800;
-  box-shadow: inset 0 0 0 2px var(--pulse-color-edge-bright, #0d0f12);
+  box-shadow: inset 0 0 0 2px var(--pulse-color-on-accent, #07110b);
 }
 
 .neutral.pressed {
@@ -35,7 +35,7 @@
 }
 
 .warn.pressed {
-  background: var(--pulse-color-warn, #e5b25d);
+  background: var(--pulse-color-status-warning, #f2c14e);
 }
 
 .accent.pressed {

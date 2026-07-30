@@ -1,26 +1,31 @@
 .menu {
   position: relative;
+  min-inline-size: 0;
+}
+
+.projectButton {
+  inline-size: 176px;
+  block-size: 40px;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 10px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: linear-gradient(
+    180deg,
+    var(--pulse-color-surface-control, #242a30),
+    var(--pulse-color-surface-panel, #15191d)
+  );
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-panel, 8px);
+  box-shadow: var(--pulse-shadow-control, 0 1px 3px #00000080);
 }
 
-.action {
-  min-block-size: 24px;
-  padding: 0.25rem 0.625rem;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--pulse-color-text-muted, #98a0ab);
-  background: var(--pulse-color-cap, #23272e);
-  border: 1px solid var(--pulse-color-edge, #3a4048);
-  border-radius: var(--pulse-radius-control, 4px);
-  cursor: pointer;
-}
-
-.action:focus-visible,
-.entry:focus-visible {
-  outline: 2px solid var(--pulse-color-focus, #ffffff);
-  outline-offset: 2px;
+.projectButton span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file {
@@ -29,62 +34,96 @@
   block-size: 1px;
   overflow: hidden;
   clip-path: inset(50%);
-  white-space: nowrap;
+}
+
+.popover {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: 60;
+  inline-size: 220px;
+  max-block-size: min(420px, calc(100vh - 72px));
+  overflow: auto;
+  padding: 6px;
+  background: var(--pulse-color-overlay, #101317);
+  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
+  border-radius: var(--pulse-radius-panel, 8px);
+  box-shadow: var(--pulse-shadow-panel, 0 4px 12px #00000099);
+}
+
+.popover > button,
+.entry {
+  inline-size: 100%;
+  min-block-size: 28px;
+  text-align: start;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: transparent;
+  border: 0;
+  border-radius: var(--pulse-radius-control, 4px);
+}
+
+.popover > button:hover,
+.entry:hover {
+  background: var(--pulse-color-selection, #244d38);
+}
+
+.divider {
+  margin-block: 5px;
+  border-block-start: 1px solid var(--pulse-color-border-default, #6d7881);
+}
+
+.popover p {
+  margin: 4px;
+  font-size: var(--pulse-type-10, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
 .list {
-  position: absolute;
-  inset-block-start: calc(100% + 0.25rem);
-  inset-inline-end: 0;
-  z-index: 20;
-  min-inline-size: 14rem;
-  max-block-size: 16rem;
-  overflow-y: auto;
   margin: 0;
-  padding: 0.25rem;
+  padding: 0;
   list-style: none;
-  background: var(--pulse-color-panel, #1a1d22);
-  border: 1px solid var(--pulse-color-edge-bright, #545c66);
-  border-radius: var(--pulse-radius-panel, 6px);
 }
 
 .entry {
   display: flex;
-  inline-size: 100%;
-  gap: 0.5rem;
   justify-content: space-between;
-  min-block-size: 24px;
-  padding: 0.25rem 0.5rem;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--pulse-color-text, #e6e9ee);
-  background: none;
-  border: none;
-  border-radius: var(--pulse-radius-control, 4px);
-  cursor: pointer;
-  text-align: start;
+  gap: 8px;
+  padding-inline: 6px;
 }
 
-.entry:hover {
-  background: var(--pulse-color-cap, #23272e);
+.entryName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.entryDate {
-  font-variant-numeric: tabular-nums;
-  color: var(--pulse-color-text-muted, #98a0ab);
+.entryDate,
+.empty {
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
 .empty {
-  padding: 0.375rem 0.5rem;
-  font-size: 0.75rem;
-  color: var(--pulse-color-text-muted, #98a0ab);
+  padding: 8px;
 }
 
 .message {
   position: absolute;
-  inset-block-start: calc(100% + 0.25rem);
+  inset-block-start: calc(100% + 4px);
   inset-inline-start: 0;
+  z-index: 61;
   margin: 0;
-  font-size: 0.6875rem;
-  color: var(--pulse-color-text-muted, #98a0ab);
+  padding: 5px 8px;
+  white-space: nowrap;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-overlay, #101317);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+}
+
+@media (max-width: 1439px) {
+  .projectButton {
+    inline-size: 134px;
+  }
 }

@@ -2,9 +2,9 @@
   display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: 50%;
-  background: var(--pulse-color-step-off, #131317);
+  background: var(--pulse-color-surface-inset, #080a0c);
 }
 
 .led[data-lit="true"] {

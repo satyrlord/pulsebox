@@ -33,14 +33,14 @@ function harness() {
 }
 
 describe("pattern bank", () => {
-  it("seeds a full bank with the seed in slot one and silence elsewhere", () => {
+  it("seeds a full bank with the seed in Verse and silence elsewhere", () => {
     const { store, moduleId } = harness();
     const module = store.getState().project.modules[moduleId];
 
     expect(store.getState().project.patterns).toHaveLength(PATTERN_SLOT_COUNT);
     expect(module?.parts).toHaveLength(PATTERN_SLOT_COUNT);
-    expect(module?.parts[0]?.some((step) => step.active)).toBe(true);
-    expect(module?.parts[1]?.every((step) => !step.active)).toBe(true);
+    expect(module?.parts[0]?.every((step) => !step.active)).toBe(true);
+    expect(module?.parts[1]?.some((step) => step.active)).toBe(true);
   });
 
   it("edits only the selected Pattern", () => {
@@ -71,12 +71,12 @@ describe("pattern bank", () => {
 
   it("clears a Pattern without touching the others", () => {
     const { store, moduleId } = harness();
-    store.dispatch(store.createCommand("pattern-copy", { fromPatternIndex: 0, toPatternIndex: 1 }));
-    store.dispatch(store.createCommand("pattern-clear", { patternIndex: 1 }));
+    store.dispatch(store.createCommand("pattern-copy", { fromPatternIndex: 1, toPatternIndex: 0 }));
+    store.dispatch(store.createCommand("pattern-clear", { patternIndex: 0 }));
 
     const module = store.getState().project.modules[moduleId];
-    expect(module?.parts[1]?.every((step) => !step.active)).toBe(true);
-    expect(module?.parts[0]?.some((step) => step.active)).toBe(true);
+    expect(module?.parts[0]?.every((step) => !step.active)).toBe(true);
+    expect(module?.parts[1]?.some((step) => step.active)).toBe(true);
   });
 
   it("renames a Pattern and rejects an empty name", () => {
@@ -170,6 +170,6 @@ describe("mixer commands", () => {
     expect(store.getState().history.canUndo).toBe(true);
 
     store.undo();
-    expect(store.getState().project.masterLevel).toBe(0.8);
+    expect(store.getState().project.masterLevel).toBe(0.5);
   });
 });

@@ -22,6 +22,11 @@ export function useKeyboardShortcuts(): void {
 
       if ((event.ctrlKey || event.metaKey) && !event.altKey) {
         const key = event.key.toLowerCase();
+        if (key === "s") {
+          event.preventDefault();
+          void state.saveProject();
+          return;
+        }
         if (key === "z" || key === "y") {
           event.preventDefault();
           const redo = key === "y" || event.shiftKey;
@@ -29,6 +34,12 @@ export function useKeyboardShortcuts(): void {
           else state.undo();
           return;
         }
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        document.querySelector<HTMLButtonElement>('[data-action="toggle-editor"]')?.click();
+        return;
       }
 
       // An open Settings page owns Escape: closing it must not also stop playback.

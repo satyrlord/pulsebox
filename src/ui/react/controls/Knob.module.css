@@ -1,4 +1,5 @@
 .knob {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -12,6 +13,24 @@
   /* The interaction is vertical drag, so the browser must not claim the pointer. */
   touch-action: none;
   cursor: ns-resize;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: -20px;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  min-inline-size: max-content;
+  padding: 3px 5px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
+  border-radius: var(--pulse-radius-control, 4px);
+  font:
+    10px/1 ui-monospace,
+    monospace;
+  pointer-events: none;
 }
 
 .knob:focus-visible {
@@ -38,9 +57,12 @@
   stroke-linecap: round;
 }
 
+/* The cap is a raised control face over the panel, so it takes the control
+   surface and the default border. Both are contract tokens, which is what lets
+   the high-contrast overlay reach this shape. */
 .cap {
-  fill: var(--pulse-color-control-cap, #17171a);
-  stroke: var(--pulse-color-control-edge, #37373d);
+  fill: var(--pulse-color-surface-control, #242a30);
+  stroke: var(--pulse-color-border-default, #6d7881);
   stroke-width: 1;
 }
 
@@ -56,22 +78,24 @@
 }
 
 .label {
-  font-size: 0.625rem;
+  font-size: var(--pulse-type-10, 10px);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--pulse-color-text-muted, #9a9aa2);
 }
 
+/* An operational value: 12px minimum per spec-001 section 11.3, in a recessed
+   well. */
 .numeric {
-  width: 4rem;
+  width: 4.25rem;
   font: inherit;
-  font-size: 0.6875rem;
+  font-size: var(--pulse-type-12, 12px);
   font-variant-numeric: tabular-nums;
   text-align: center;
-  color: var(--pulse-color-text, #e6e6ea);
-  background: var(--pulse-color-field, #101013);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
-  border-radius: 0.125rem;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-control, 4px);
 }
 
 .dragging .cap {

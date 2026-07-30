@@ -1,10 +1,29 @@
 .fader {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
   /* The 24 px operable target is the surface itself plus this padding. */
   padding-inline: 0.25rem;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: -18px;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  min-inline-size: max-content;
+  padding: 3px 5px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
+  border-radius: var(--pulse-radius-control, 4px);
+  font:
+    10px/1 ui-monospace,
+    monospace;
+  pointer-events: none;
 }
 
 .surface {
@@ -15,7 +34,7 @@
 }
 
 .surface:focus-visible {
-  outline: 2px solid var(--pulse-color-focus, #ffffff);
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
   outline-offset: 2px;
 }
 
@@ -24,18 +43,18 @@
 }
 
 .slot {
-  fill: var(--pulse-color-slot, #14161a);
-  stroke: var(--pulse-color-edge, #33383f);
+  fill: var(--pulse-color-surface-inset, #080a0c);
+  stroke: var(--pulse-color-border-default, #6d7881);
   stroke-width: 1;
 }
 
 .filled {
-  fill: var(--module-accent-muted, var(--pulse-color-accent-muted, #496b36));
+  fill: var(--module-accent-muted, var(--pulse-color-selection, #244d38));
 }
 
 .cap {
-  fill: var(--pulse-color-cap, #2b3038);
-  stroke: var(--module-control-ring, var(--pulse-color-edge, #4a515a));
+  fill: var(--pulse-color-control-thumb, #e1e6e9);
+  stroke: var(--module-control-ring, var(--pulse-color-border-strong, #aab4bc));
   stroke-width: 1;
 }
 
@@ -46,14 +65,44 @@
 }
 
 .label {
-  font-size: 0.625rem;
+  font-size: var(--pulse-type-10, 10px);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--pulse-color-text-muted, #98a0ab);
 }
 
 .readout {
+  inline-size: 4.5rem;
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  background: var(--pulse-color-surface-inset, #080a0c);
   font-variant-numeric: tabular-nums;
-  font-size: 0.6875rem;
-  color: var(--pulse-color-text, #e6e9ee);
+  font-size: var(--pulse-type-12, 12px);
+  text-align: center;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+}
+
+/* A disabled fader keeps its shape so the strip does not reflow, but loses the
+   lit travel and the grab cursor. The dimmed cap is paired with `aria-disabled`
+   and removal from the tab sequence, so the state never rests on colour alone. */
+.fader[data-disabled="true"] .surface {
+  cursor: default;
+}
+
+.fader[data-disabled="true"] .filled {
+  fill: var(--pulse-color-disabled, #7b858d);
+  opacity: 0.35;
+}
+
+.fader[data-disabled="true"] .cap {
+  fill: var(--pulse-color-disabled, #7b858d);
+  opacity: 0.5;
+}
+
+.fader[data-disabled="true"] .capLine {
+  stroke: var(--pulse-color-surface-inset, #080a0c);
+}
+
+.fader[data-disabled="true"] .label,
+.fader[data-disabled="true"] .readout {
+  color: var(--pulse-color-disabled, #7b858d);
 }

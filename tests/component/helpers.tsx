@@ -112,7 +112,7 @@ export function createHarness(): Harness {
       pluginId === ACID_BASS_MANIFEST.pluginId ? ACID_BASS_MANIFEST : undefined,
     addablePluginIds: [ACID_BASS_MANIFEST.pluginId],
     auditionNoteFor: () => 36,
-    visibleSlotCount: 3,
+    visibleSlotCount: 8,
     projects,
   };
 

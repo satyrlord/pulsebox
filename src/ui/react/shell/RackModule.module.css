@@ -1,10 +1,15 @@
 .module {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.625rem;
-  background: var(--pulse-color-panel, #1a1a1e);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  flex: 0 0 94px;
+  min-block-size: 86px;
+  max-block-size: 98px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-rows: 26px minmax(0, 1fr);
+  gap: 4px 8px;
+  padding: 4px 8px;
+  overflow: visible;
+  background: var(--pulse-color-surface-panel, #15191d);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: 0.1875rem;
   /* The faceplate is a fixed plate: it must not reflow as values change. */
   container-type: inline-size;
@@ -15,14 +20,18 @@
 }
 
 .header {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 6px;
+  position: relative;
+  z-index: 2;
 }
 
 .slot {
   font-variant-numeric: tabular-nums;
-  font-size: 0.6875rem;
+  font-size: var(--pulse-type-12, 12px);
   color: var(--pulse-color-text-muted, #9a9aa2);
 }
 
@@ -31,25 +40,32 @@
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--pulse-color-text, #e6e6ea);
+  color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
 .actions,
 .addRow {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.25rem;
 }
 
+.actions {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 2;
+}
+
 .action {
-  min-height: 1.5rem;
-  min-width: 1.5rem;
-  padding: 0.1875rem 0.5rem;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 2px 6px;
   font: inherit;
-  font-size: 0.6875rem;
-  color: var(--pulse-color-text, #e6e6ea);
-  background: var(--pulse-color-control-cap, #24242a);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  font-size: var(--pulse-type-12, 12px);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-control, #242a30);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: 0.125rem;
   cursor: pointer;
 }
@@ -60,28 +76,115 @@
 }
 
 .action[data-active="true"] {
-  color: var(--pulse-color-panel, #1a1a1e);
+  color: var(--pulse-color-surface-panel, #15191d);
   background: var(--module-accent, var(--pulse-color-accent, #9be564));
 }
 
 .controls {
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.controls :global([data-component="knob"]) {
+  min-inline-size: 40px;
+  gap: 1px;
+}
+
+/* The rack is dense, so the dial keeps a compact face. The operable area is
+   carried by a transparent inset rather than by visual bulk, which is how the
+   24px minimum target is met without growing the faceplate. */
+.controls :global([data-component="knob"] [role="slider"]) {
+  position: relative;
+}
+
+.controls :global([data-component="knob"] [role="slider"])::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 50%;
+  inline-size: 24px;
+  block-size: 24px;
+  translate: -50% -50%;
+}
+
+.controls :global([data-component="knob"] [role="slider"]),
+.controls :global([data-component="knob"] [role="slider"] svg) {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+/* Operational values stay at the 12px floor. The field is sized for the value
+   rather than the value shrunk to fit the field, so the box has to clear the
+   full line box: 12px text needs more than 12px of height or the digits clip. */
+.controls :global([data-component="knob"] input) {
+  inline-size: 46px;
+  block-size: auto;
+  min-block-size: 18px;
+  padding-block: 0;
+  line-height: 1.25;
+  font-size: var(--pulse-type-12, 12px);
+}
+
+/* Control captions sit at the 10px floor from spec-001 section 11.3. */
+.controls :global([data-component="knob"] > span) {
+  font-size: var(--pulse-type-10, 10px);
 }
 
 .voiceSelector {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 0.375rem;
   width: fit-content;
-  font-size: 0.6875rem;
-  color: var(--pulse-color-text, #e6e6ea);
+  font-size: var(--pulse-type-12, 12px);
+  color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
 .voiceSelector select {
   min-height: 1.5rem;
   color: inherit;
-  background: var(--pulse-color-control-cap, #24242a);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  background: var(--pulse-color-surface-control, #242a30);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+}
+
+.module[data-collapsed="true"] {
+  flex-basis: 34px;
+  min-block-size: 34px;
+  grid-template-rows: 26px;
+}
+
+@media (max-height: 900px) {
+  .module:not([data-collapsed="true"]) {
+    flex-basis: 80px;
+    min-block-size: 80px;
+    max-block-size: 80px;
+  }
+
+  /* The short row shrinks the drawn dial, never the operable area or the text.
+     The transparent inset above still carries the full 24px target. */
+  .controls :global([data-component="knob"] [role="slider"]),
+  .controls :global([data-component="knob"] [role="slider"] svg) {
+    inline-size: 22px;
+    block-size: 22px;
+  }
+
+  .controls :global([data-component="knob"] input) {
+    inline-size: 44px;
+    min-block-size: 17px;
+    font-size: var(--pulse-type-12, 12px);
+  }
+
+  .controls :global([data-component="knob"] > span) {
+    font-size: var(--pulse-type-10, 10px);
+  }
 }

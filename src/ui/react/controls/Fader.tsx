@@ -12,6 +12,12 @@ export interface FaderProps {
   readonly defaultValue: number;
   readonly unit?: string;
   readonly precision?: number;
+  readonly formatValue?: (value: number) => number;
+  readonly parseValue?: (value: number) => number;
+  readonly displayMin?: number;
+  readonly displayMax?: number;
+  readonly displayStep?: number;
+  readonly disabled?: boolean;
   readonly onInput?: (value: number) => void;
   readonly onCommit: (value: number, gestureId: GestureId) => void;
 }
@@ -33,12 +39,19 @@ export function Fader({
   defaultValue,
   unit,
   precision = 2,
+  formatValue = (next) => next,
+  parseValue = (next) => next,
+  displayMin = min,
+  displayMax = max,
+  displayStep = step,
+  disabled = false,
   onInput,
   onCommit,
 }: FaderProps) {
   const {
     displayValue,
     dragging,
+    adjusting,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -47,6 +60,7 @@ export function Fader({
     onKeyUp,
     onBlur,
     onDoubleClick,
+    setFromNumeric,
     wheelRef,
   } = useRangeGesture({
     value,
@@ -62,29 +76,32 @@ export function Fader({
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const travel = TRACK_HEIGHT - CAP_HEIGHT;
   const capY = travel - fraction * travel;
-  const text = `${displayValue.toFixed(precision)}${unit === undefined ? "" : ` ${unit}`}`;
+  const formatted = formatValue(displayValue).toFixed(precision);
+  const text = `${formatted}${unit === undefined ? "" : ` ${unit}`}`;
 
   return (
-    <div className={styles.fader} data-component="fader">
+    <div className={styles.fader} data-component="fader" data-disabled={disabled}>
       <div
         ref={wheelRef}
         className={cx(styles.surface, dragging && styles.dragging)}
         role="slider"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
         aria-label={label}
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={displayValue}
         aria-valuetext={text}
         aria-orientation="vertical"
-        onPointerDown={onPointerDown}
+        aria-disabled={disabled ? true : undefined}
+        title={text}
+        onPointerDown={disabled ? undefined : onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        onKeyDown={onKeyDown}
+        onKeyDown={disabled ? undefined : onKeyDown}
         onKeyUp={onKeyUp}
         onBlur={onBlur}
-        onDoubleClick={onDoubleClick}
+        onDoubleClick={disabled ? undefined : onDoubleClick}
       >
         <svg
           viewBox={`0 0 32 ${String(TRACK_HEIGHT)}`}
@@ -115,7 +132,37 @@ export function Fader({
         </svg>
       </div>
       <span className={styles.label}>{label}</span>
-      <output className={styles.readout}>{text}</output>
+      {adjusting ? (
+        <output className={styles.tooltip} role="tooltip">
+          {text}
+        </output>
+      ) : null}
+      <input
+        key={formatted}
+        className={styles.readout}
+        type="number"
+        aria-label={`${label} value`}
+        defaultValue={formatted}
+        min={displayMin}
+        max={displayMax}
+        step={displayStep}
+        disabled={disabled}
+        inputMode="decimal"
+        onBlur={(event) => {
+          setFromNumeric(parseValue(event.currentTarget.valueAsNumber));
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.currentTarget.value = formatted;
+            event.currentTarget.blur();
+          }
+        }}
+      />
     </div>
   );
 }

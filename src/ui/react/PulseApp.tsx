@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { PulseThemeService } from "../../themes";
 import { downloadPortableProject } from "./download-project";
@@ -6,16 +6,13 @@ import { useAudioPosition } from "./hooks/use-audio-position";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
 import { cx } from "./class-names";
 import styles from "./PulseApp.module.css";
-import { Mixer } from "./shell/Mixer";
-import { PatternBank } from "./shell/PatternBank";
-import { ProjectMenu } from "./shell/ProjectMenu";
-import { Rack } from "./shell/Rack";
+import { EditorWorkspace } from "./shell/EditorWorkspace";
+import { MainWorkspace } from "./shell/MainWorkspace";
 import { SettingsPage } from "./shell/SettingsPage";
-import { SongView } from "./shell/SongView";
 import { TransportBar } from "./shell/TransportBar";
 import { UnsupportedSize } from "./shell/UnsupportedSize";
 import { useUnsupportedViewport } from "./shell/useUnsupportedViewport";
-import { WorkspaceTabs } from "./shell/WorkspaceTabs";
+import { WorkspaceBar } from "./shell/WorkspaceBar";
 import { useAppStore, useDependencies } from "./store/app-store-context";
 
 export interface PulseAppProps {
@@ -27,10 +24,13 @@ function EditablePulseApp(props: PulseAppProps) {
   useKeyboardShortcuts();
 
   const settingsOpen = useAppStore((state) => state.settingsOpen);
-  const workspaceView = useAppStore((state) => state.workspaceView);
+  const editorExpanded = useAppStore((state) => state.editorExpanded);
+  const setEditorExpanded = useAppStore((state) => state.setEditorExpanded);
   const undoNotice = useAppStore((state) => state.undoNotice);
   const dismissUndoNotice = useAppStore((state) => state.dismissUndoNotice);
   const undo = useAppStore((state) => state.undo);
+  const editor = useRef<HTMLDivElement>(null);
+  const editorFocus = useRef<HTMLElement | null>(null);
   // The notice is non-blocking: it announces and then clears itself.
   useEffect(() => {
     if (undoNotice === undefined) return;
@@ -40,20 +40,36 @@ function EditablePulseApp(props: PulseAppProps) {
     };
   }, [dismissUndoNotice, undoNotice]);
 
+  const toggleEditor = useCallback(() => {
+    if (editorExpanded) {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && editor.current?.contains(active) === true) {
+        editorFocus.current = active;
+      }
+      setEditorExpanded(false);
+      return;
+    }
+    setEditorExpanded(true);
+    requestAnimationFrame(() => {
+      if (editorFocus.current?.isConnected === true) editorFocus.current.focus();
+    });
+  }, [editorExpanded, setEditorExpanded]);
+
   return (
-    <div className={styles.app} data-component="pulse-app">
+    <div className={styles.app} data-component="pulse-app" data-editor-expanded={editorExpanded}>
       <TransportBar />
-      <PatternBank />
-      <div className={styles.workspaceHeader}>
-        <WorkspaceTabs />
-        <ProjectMenu />
+      <MainWorkspace />
+      <div
+        id="lower-editor"
+        hidden={!editorExpanded}
+        onFocusCapture={(event) => {
+          editorFocus.current = event.target;
+        }}
+      >
+        <EditorWorkspace ref={editor} />
       </div>
-      <main className={styles.workspace}>
-        {workspaceView === "rack" ? <Rack /> : null}
-        {workspaceView === "mixer" ? <Mixer /> : null}
-        {workspaceView === "song" ? <SongView /> : null}
-        {settingsOpen ? <SettingsPage themeService={props.themeService} /> : null}
-      </main>
+      <WorkspaceBar onToggleEditor={toggleEditor} />
+      {settingsOpen ? <SettingsPage themeService={props.themeService} /> : null}
 
       {undoNotice === undefined ? null : (
         <div className={cx(styles.notice, "undo-notice")} role="status" aria-live="polite">

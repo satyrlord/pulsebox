@@ -48,6 +48,28 @@ describe("Knob", () => {
     expect(dial).toHaveAttribute("aria-valuenow", "500");
   });
 
+  it("commits direct numeric input only when the field loses focus", () => {
+    const { recorded } = renderKnob();
+    const input = screen.getByRole("spinbutton", { name: "Cutoff value" });
+
+    fireEvent.change(input, { target: { value: "640" } });
+    expect(recorded.inputs).toEqual([]);
+    expect(recorded.commits).toEqual([]);
+
+    fireEvent.blur(input);
+    expect(recorded.inputs).toEqual([640]);
+    expect(recorded.commits[0]?.value).toBe(640);
+  });
+
+  it("shows the current value in a tooltip during adjustment", () => {
+    const { dial } = renderKnob({ unit: "Hz" });
+
+    fireEvent.keyDown(dial, { key: "ArrowUp" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("510 Hz");
+    fireEvent.keyUp(dial, { key: "ArrowUp" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("steps with the arrow keys and commits once on release", () => {
     const { recorded, dial } = renderKnob();
 

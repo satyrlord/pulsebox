@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PulseApp } from "../../src/ui/react/PulseApp";
 import { Rack } from "../../src/ui/react/shell/Rack";
+import { ModuleBrowser } from "../../src/ui/react/shell/ModuleBrowser";
 import { TransportBar } from "../../src/ui/react/shell/TransportBar";
 import {
   createPulseThemeService,
@@ -44,7 +45,7 @@ describe("TransportBar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /play/i }));
     await waitFor(() => {
-      expect(harness.audio.play).toHaveBeenCalledWith(130);
+      expect(harness.audio.play).toHaveBeenCalledWith(128);
     });
     expect(harness.domain.getState().transport.status).toBe("playing");
 
@@ -73,8 +74,34 @@ describe("TransportBar", () => {
     fireEvent.change(tempo, { target: { value: "900" } });
     fireEvent.keyDown(tempo, { key: "Enter" });
     expect(harness.domain.getState().project.tempo).toBe(146);
-    // The field falls back to the committed value rather than keeping 900.
-    expect(tempo.value).toBe("146");
+    // A rejected tempo states the accepted range and keeps the typed value, so
+    // the user corrects it rather than retypes it. Silently reverting would
+    // leave a rejection indistinguishable from a value that simply took effect.
+    expect(tempo.value).toBe("900");
+    expect(tempo).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Tempo must be between 40 and 240 BPM.",
+    );
+
+    // Correcting the value withdraws the objection.
+    fireEvent.change(tempo, { target: { value: "128" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.keyDown(tempo, { key: "Enter" });
+    expect(harness.domain.getState().project.tempo).toBe(128);
+  });
+
+  it("restores the committed tempo when a rejected edit is abandoned", () => {
+    const harness = createHarness();
+    renderWithHarness(<TransportBar />, harness);
+    const tempo = screen.getByLabelText<HTMLInputElement>("Tempo");
+
+    fireEvent.change(tempo, { target: { value: "900" } });
+    fireEvent.keyDown(tempo, { key: "Enter" });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    fireEvent.keyDown(tempo, { key: "Escape" });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(tempo.value).toBe(String(harness.domain.getState().project.tempo));
   });
 
   it("keeps a half-typed tempo out of the transport", () => {
@@ -83,85 +110,48 @@ describe("TransportBar", () => {
     const tempo = screen.getByLabelText<HTMLInputElement>("Tempo");
 
     fireEvent.change(tempo, { target: { value: "1" } });
-    expect(harness.domain.getState().project.tempo).toBe(130);
+    expect(harness.domain.getState().project.tempo).toBe(128);
   });
 
-  it("disables Undo and Redo until there is history", () => {
+  it("changes transport scope without stopping playback", async () => {
     const harness = createHarness();
     renderWithHarness(<TransportBar />, harness);
-    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Redo" })).toBeDisabled();
-
-    act(() => {
-      makeHistory(harness, 1);
-    });
-    expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await waitFor(() => expect(harness.domain.getState().transport.status).toBe("playing"));
+    fireEvent.click(screen.getByRole("button", { name: "Song" }));
+    expect(harness.domain.getState().project.song.enabled).toBe(true);
+    expect(harness.domain.getState().transport.status).toBe("playing");
   });
 
-  it("records swing as undoable project data", () => {
+  it("keeps metronome and meter analysis mode as UI preferences", () => {
     const harness = createHarness();
     renderWithHarness(<TransportBar />, harness);
-
-    fireEvent.change(screen.getByLabelText("Swing"), { target: { value: "50" } });
-
-    // Swing changes the rendered rhythm, so it belongs to the project and to
-    // history rather than being a transient view preference.
-    expect(harness.domain.getState().project.swing).toBeCloseTo(0.5);
-    expect(harness.domain.getState().history.canUndo).toBe(true);
-
-    act(() => {
-      harness.store.getState().undo();
-    });
-    expect(screen.getByLabelText<HTMLInputElement>("Swing").value).toBe("0");
-  });
-
-  it("collapses one swing drag into a single undo entry", () => {
-    const harness = createHarness();
-    renderWithHarness(<TransportBar />, harness);
-    const slider = screen.getByLabelText("Swing");
-
-    // A range input emits one change per step, so a drag across the control
-    // produces dozens of commands. They share one gesture, so they must produce
-    // one history entry, not one entry per step.
-    fireEvent.pointerDown(slider);
-    for (let percent = 1; percent <= 30; percent += 1) {
-      fireEvent.change(slider, { target: { value: String(percent) } });
-    }
-    fireEvent.pointerUp(slider);
-
-    expect(harness.domain.getState().project.swing).toBeCloseTo(0.3);
-
-    act(() => {
-      harness.store.getState().undo();
-    });
-    expect(harness.domain.getState().project.swing).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Metronome" }));
+    fireEvent.click(screen.getByRole("button", { name: "Master meter mode: left and right" }));
+    expect(harness.store.getState().metronomeEnabled).toBe(true);
+    expect(harness.store.getState().meterMode).toBe("ms");
     expect(harness.domain.getState().history.canUndo).toBe(false);
-  });
-
-  it("keeps two separate swing drags separately undoable", () => {
-    const harness = createHarness();
-    renderWithHarness(<TransportBar />, harness);
-    const slider = screen.getByLabelText("Swing");
-
-    fireEvent.pointerDown(slider);
-    fireEvent.change(slider, { target: { value: "10" } });
-    fireEvent.pointerUp(slider);
-    fireEvent.pointerDown(slider);
-    fireEvent.change(slider, { target: { value: "40" } });
-    fireEvent.pointerUp(slider);
-
-    act(() => {
-      harness.store.getState().undo();
-    });
-    expect(harness.domain.getState().project.swing).toBeCloseTo(0.1);
   });
 });
 
 describe("Rack", () => {
-  it("shows every visible slot and marks the empty ones", () => {
+  // spec-005 section 13.2 and section 14: every visible slot keeps a position,
+  // and each empty slot carries the only visible Add action in the rack.
+  it("keeps every visible slot and offers Add in each empty one", () => {
     const { container } = renderWithHarness(<Rack />);
-    expect(container.querySelectorAll('[data-component="rack-module"]')).toHaveLength(3);
-    expect(screen.getAllByRole("button", { name: "Add Acid Bass" })).toHaveLength(2);
+    expect(container.querySelectorAll('[data-component="rack-module"]')).toHaveLength(8);
+    expect(container.querySelectorAll('[data-label="Empty"]')).toHaveLength(7);
+    expect(screen.getAllByRole("button", { name: "Add Acid Bass" })).toHaveLength(7);
+  });
+
+  it("adds a module through an empty slot's Add control", () => {
+    const harness = createHarness();
+    renderWithHarness(<Rack />, harness);
+    const add = screen.getAllByRole("button", { name: "Add Acid Bass" })[0];
+    if (add === undefined) throw new Error("Expected an empty-slot Add control.");
+
+    fireEvent.click(add);
+    expect(Object.keys(harness.domain.getState().project.modules)).toHaveLength(2);
   });
 
   it("renders no activity indicator and no faceplate step editing", () => {
@@ -211,9 +201,10 @@ describe("Rack", () => {
 
   it("adds a module into an empty slot", () => {
     const harness = createHarness();
-    renderWithHarness(<Rack />, harness);
-    const [add] = screen.getAllByRole("button", { name: "Add Acid Bass" });
-    if (add === undefined) throw new Error("Expected an empty slot.");
+    renderWithHarness(<ModuleBrowser />, harness);
+    const add = screen.getByRole("button", {
+      name: "Add Acid Bass to the first empty rack slot",
+    });
     fireEvent.click(add);
     expect(Object.keys(harness.domain.getState().project.modules)).toHaveLength(2);
   });

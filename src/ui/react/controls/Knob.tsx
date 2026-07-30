@@ -43,6 +43,7 @@ export function Knob(props: KnobProps) {
   const {
     displayValue,
     dragging,
+    adjusting,
     wheelRef,
     onPointerDown,
     onPointerMove,
@@ -82,6 +83,7 @@ export function Knob(props: KnobProps) {
         aria-valuetext={unit === undefined ? formatted : `${formatted} ${unit}`}
         aria-describedby={readoutId}
         aria-disabled={disabled === true ? true : undefined}
+        title={unit === undefined ? formatted : `${formatted} ${unit}`}
         className={cx(styles.dial, dragging && styles.dragging)}
         onPointerDown={disabled === true ? undefined : onPointerDown}
         onPointerMove={onPointerMove}
@@ -106,18 +108,36 @@ export function Knob(props: KnobProps) {
         </svg>
       </div>
       <span className={styles.label}>{label}</span>
+      {adjusting ? (
+        <output className={styles.tooltip} role="tooltip">
+          {unit === undefined ? formatted : `${formatted} ${unit}`}
+        </output>
+      ) : null}
       <input
+        key={formatted}
         id={readoutId}
         className={styles.numeric}
         type="number"
         aria-label={`${label} value`}
-        value={formatted}
+        defaultValue={formatted}
         min={min}
         max={max}
         step={step}
         disabled={disabled}
-        onChange={(event) => {
+        inputMode="decimal"
+        onBlur={(event) => {
           setFromNumeric(event.currentTarget.valueAsNumber);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.currentTarget.value = formatted;
+            event.currentTarget.blur();
+          }
         }}
       />
     </div>

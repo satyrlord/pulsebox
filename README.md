@@ -2,13 +2,15 @@
 
 Pulsebox is a desktop-first modular groove workstation for current Chrome. It
 is a fully client-side browser application. The Phase 1 foundation is runnable.
-It includes a React interface, transport, a four-Pattern bank, and basic
-Playlist transport. It also includes channel mixing, appearance Settings, and
-browser project persistence.
+The specification 003 application shell and shared controls are also runnable.
+The shell has four fixed rows and the approved rack, studio, and lower-editor
+columns. It includes five named Patterns, basic Playlist transport, channel
+mixing, appearance Settings, and browser project persistence.
 
-Narrow later-phase foundations include the AudioWorklet Acid Bass and Drumline
-Six paths. These slices do not mark their parent phases complete. Three rack
-slots are currently exposed.
+Narrow later-phase foundations include six instrument modules and the
+AudioWorklet Acid Bass and Drumline Six paths. These slices do not mark their
+parent phases complete. The rack exposes all eight slots. The Mixer exposes all
+eight instrument strips and one master strip.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications
@@ -27,11 +29,12 @@ are arranged in normative build order.
 
 ## Current status
 
-Phase 0 contracts and the Phase 1 foundation are complete. Later-phase
-foundation slices are present only where this README names them. Run `npm run
-lint`, `npm run typecheck`, `npm run dead-code`, `npm test`, and `npm run
-test:e2e` for current check results. Phases 2 through 7 and their final
-acceptance criteria remain incomplete.
+Phase 0 contracts and the Phase 1 foundation are complete. The specification
+003 shell and shared-control slice is present. Later-phase foundation slices
+are present only where this README names them. Run `npm run lint`, `npm run
+typecheck`, `npm run dead-code`, `npm test`, and `npm run test:e2e` for current
+check results. The later product phases and final release acceptance remain
+incomplete.
 
 Current owners:
 
@@ -131,20 +134,21 @@ conformance below its documented 1280 × 720 editing boundary.
 
 ## Keyboard shortcuts
 
-The specification owns the approved shortcuts. Phase 1 implements Space for
-play or pause, Escape for Stop, and platform-standard undo and redo. The future
-shortcut reference will expand with the Phase 3 editor commands so it does not
-claim unimplemented behavior.
+The specification owns the approved shortcuts. The current shell implements
+Space for play or pause and Escape for Stop. It also implements platform-standard
+undo, redo, and Save shortcuts. Ctrl+Alt+E collapses or expands the lower editor.
+The shortcut reference will expand when later editors add commands.
 
 ## Known limitations
 
-- Asset packs, the full eight-slot rack, the four remaining instruments,
-  effects, advanced editors, and rendered-audio export belong to later roadmap
-  phases.
-- The Pattern bank holds four named Patterns. The module-aware Piano Roll and
-  complete note, trigger, and automation editing surface remain planned.
-- The mixer covers level, pan, mute, solo, and master level. Sends, inserts, and
-  the master chain remain planned.
+- Asset packs, effect processing, advanced editors, and rendered-audio export
+  belong to later roadmap phases.
+- The Pattern bank holds five named Patterns and selects Verse by default. The
+  lower editor shows the selected module events. Complete note, trigger,
+  Humanize, and automation editing remain planned.
+- The mixer covers level, pan, mute, solo, and master level. Send buttons open
+  the applicable empty send-chain summary. Send routing, inserts, master-effects
+  bypass, and the master chain remain planned.
 - Acid Bass and Drumline Six implement their Phase 1 sound and compact-rack
   foundation. Their expanded editors remain planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the

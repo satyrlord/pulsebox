@@ -1,87 +1,283 @@
 .bar {
-  display: flex;
-  flex-wrap: nowrap;
+  min-inline-size: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 168px minmax(0, 1fr);
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--pulse-color-panel, #1a1a1e);
-  border-bottom: 1px solid var(--pulse-color-control-edge, #37373d);
+  gap: 8px;
+  padding-inline: 10px;
+  overflow: visible;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background:
+    radial-gradient(circle at 20% 20%, rgb(255 255 255 / 3%) 0 1px, transparent 1px),
+    linear-gradient(
+      180deg,
+      var(--pulse-color-surface-control, #242a30),
+      var(--pulse-color-surface-panel, #15191d)
+    );
+  border-block-end: 1px solid var(--pulse-color-border-default, #6d7881);
+  box-shadow: var(--pulse-shadow-panel, 0 4px 12px #00000099);
+  z-index: 40;
+}
+
+.left,
+.right {
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Anchors the tempo validation message, which sits out of flow so it cannot
+   move the transport controls. */
+.left {
+  position: relative;
+}
+
+.right {
+  justify-content: flex-end;
 }
 
 .mark {
+  justify-self: center;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: 0.18em;
-  color: var(--pulse-color-text, #e6e6ea);
+  letter-spacing: 0.17em;
+  white-space: nowrap;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  text-shadow: 0 1px 2px #000000;
 }
 
-.group {
+.modeToggle,
+.transport {
+  block-size: 40px;
   display: flex;
-  align-items: center;
-  gap: 0.375rem;
+  gap: 2px;
+  padding: 3px;
+  background: var(--pulse-color-surface-inset, #080a0c);
+  border-radius: var(--pulse-radius-panel, 8px);
+  box-shadow: inset 0 2px 4px #00000099;
 }
 
-.button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-height: 1.5rem;
-  padding: 0.25rem 0.625rem;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--pulse-color-text, #e6e6ea);
-  background: var(--pulse-color-control-cap, #24242a);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
-  border-radius: 0.125rem;
-  cursor: pointer;
+.modeToggle {
+  inline-size: 116px;
 }
 
-.button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.button[aria-pressed="true"] {
-  border-color: var(--pulse-color-accent, #9be564);
-}
-
-.field {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.6875rem;
-}
-
-.fieldLabel {
-  text-transform: uppercase;
+.modeToggle button {
+  flex: 1;
+  min-inline-size: 0;
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--pulse-color-text-muted, #9a9aa2);
+  text-transform: uppercase;
 }
 
-.field input[type="number"] {
-  width: 4rem;
-  min-height: 1.5rem;
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  color: var(--pulse-color-text, #e6e6ea);
-  background: var(--pulse-color-field, #101013);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
-  border-radius: 0.125rem;
+.modeToggle button[aria-pressed="true"] {
+  color: var(--pulse-color-accent, #7ed9a3);
+  border-block-end: 2px solid currentColor;
 }
 
-.field input[type="range"] {
-  width: 6rem;
-  min-height: 1.5rem;
+.transport {
+  inline-size: 126px;
+}
+
+.transport button {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.transport svg {
+  inline-size: 19px;
+  block-size: 19px;
+  fill: currentColor;
+}
+
+.play {
+  color: var(--pulse-color-status-success, #62d28a);
+}
+
+.record {
+  color: var(--pulse-color-status-danger, #ff8178);
+}
+
+.transport button[aria-pressed="true"] {
+  color: var(--pulse-color-on-accent, #07110b);
+  background: var(--pulse-color-accent, #7ed9a3);
+  box-shadow: inset 0 0 0 2px var(--pulse-color-border-strong, #aab4bc);
+}
+
+.tempo,
+.position {
+  block-size: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-inline: 8px;
+  background: var(--pulse-color-surface-inset, #080a0c);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: inset 0 2px 4px #00000099;
+}
+
+.tempo {
+  inline-size: 68px;
+}
+
+/* A rejected value is marked on the field itself as well as in the message, so
+   the objection does not depend on reading the text alone. */
+.tempo:has(input[aria-invalid="true"]) {
+  border-color: var(--pulse-color-status-danger, #ff8178);
+  box-shadow:
+    inset 0 2px 4px #00000099,
+    0 0 0 1px var(--pulse-color-status-danger, #ff8178);
+}
+
+/* The message floats out of flow. The transport bar is a fixed-height row, so a
+   validation error must not move the controls beside it. */
+.fieldError {
+  position: absolute;
+  z-index: 30;
+  inset-block-start: calc(100% - 6px);
+  inset-inline-start: 0;
+  inline-size: max-content;
+  max-inline-size: 240px;
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-overlay, #101317);
+  border: 1px solid var(--pulse-color-status-danger, #ff8178);
+  border-radius: var(--pulse-radius-panel, 6px);
+  box-shadow: var(--pulse-shadow-panel, 0 4px 12px #00000099);
+  font-size: var(--pulse-type-12, 12px);
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.tempo input {
+  inline-size: 52px;
+  padding: 0;
+  font:
+    14px/1 ui-monospace,
+    monospace;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: transparent;
+  border: 0;
+}
+
+.tempo > span:last-child,
+.position span {
+  font:
+    var(--pulse-type-10, 10px)/1.2 ui-monospace,
+    monospace;
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
 .position {
+  inline-size: 126px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
-  color: var(--pulse-color-accent, #9be564);
 }
 
-.status {
-  margin-inline-start: auto;
-  font-size: 0.6875rem;
-  color: var(--pulse-color-text-muted, #9a9aa2);
+.position strong {
+  font:
+    13px/1 ui-monospace,
+    monospace;
+}
+
+.iconButton,
+.meterMode {
+  block-size: 40px;
+  min-inline-size: 38px;
+  padding: 0 5px;
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.iconButton[aria-pressed="true"] {
+  color: var(--pulse-color-on-accent, #07110b);
+  background: var(--pulse-color-accent, #7ed9a3);
+}
+
+.masterMeters {
+  display: grid;
+  grid-template-columns: 12px 116px;
+  gap: 2px 4px;
+  align-items: center;
+}
+
+.masterMeters > span {
+  font:
+    var(--pulse-type-10, 10px)/1.2 ui-monospace,
+    monospace;
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.audioStatus,
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.bar button {
+  min-block-size: 24px;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: linear-gradient(
+    180deg,
+    var(--pulse-color-surface-control, #242a30),
+    var(--pulse-color-surface-panel, #15191d)
+  );
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-control, 4px);
+  cursor: pointer;
+}
+
+.bar button:focus-visible,
+.bar input:focus-visible {
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--pulse-color-focus-outer, #000000);
+}
+
+@media (max-width: 1439px) {
+  .bar {
+    grid-template-columns: minmax(0, 1fr) 130px minmax(0, 1fr);
+    gap: 4px;
+    padding-inline: 6px;
+  }
+
+  .left,
+  .right {
+    gap: 3px;
+  }
+
+  .mark {
+    font-size: 19px;
+  }
+
+  .modeToggle {
+    inline-size: 94px;
+  }
+
+  .transport {
+    inline-size: 106px;
+  }
+
+  .tempo {
+    inline-size: 60px;
+  }
+
+  .position {
+    inline-size: 108px;
+  }
+
+  .masterMeters {
+    grid-template-columns: 12px 80px;
+  }
+
+  .masterMeters canvas {
+    inline-size: 80px !important;
+  }
 }

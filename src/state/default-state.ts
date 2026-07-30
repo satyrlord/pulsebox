@@ -18,10 +18,12 @@ export interface ModuleSeed {
 }
 
 /** Size of the project Pattern bank. */
-export const PATTERN_SLOT_COUNT = 4;
+export const PATTERN_SLOT_COUNT = 5;
 export const PATTERN_STEP_COUNT = 16;
-export const DEFAULT_MODULE_LEVEL = 0.8;
-export const DEFAULT_MASTER_LEVEL = 0.8;
+export const DEFAULT_MODULE_LEVEL = 0.4;
+export const DEFAULT_MASTER_LEVEL = 0.5;
+
+const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as const;
 
 export function createSilentSteps(length = PATTERN_STEP_COUNT): readonly PatternStep[] {
   return Object.freeze(
@@ -49,9 +51,9 @@ export function createDefaultState(
       id: projectId,
       lineageId,
       revision: Object.freeze({ epoch, counter: 0 }),
-      name: "Phase 1 session",
-      tempo: 130,
-      swing: 0,
+      name: "Neon Basement",
+      tempo: 128,
+      swing: 0.54,
       masterLevel: DEFAULT_MASTER_LEVEL,
       rackSlots: Object.freeze(
         RACK_SLOT_IDS.map((id, index) => {
@@ -64,12 +66,12 @@ export function createDefaultState(
         Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) =>
           Object.freeze({
             id: createPatternId(idFactory),
-            name: `Pattern ${String(index + 1)}`,
+            name: DEFAULT_PATTERN_NAMES[index] ?? `Pattern ${String(index + 1)}`,
             length: PATTERN_STEP_COUNT,
           }),
         ),
       ),
-      activePatternIndex: 0,
+      activePatternIndex: 1,
       song: Object.freeze({ enabled: false, entries: Object.freeze([]) }),
     }),
     transport: Object.freeze({
@@ -99,12 +101,12 @@ export function createModule(
   seed: ModuleSeed,
   source?: RackModuleState,
 ): RackModuleState {
-  // A duplicated module carries its whole Pattern bank; a fresh one seeds slot
-  // one and leaves the rest silent so every slot is immediately playable.
+  // A duplicated module carries its whole Pattern bank. A fresh module seeds
+  // the default Verse and leaves the other Patterns silent.
   const parts: readonly (readonly PatternStep[])[] =
     source?.parts ??
     Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) =>
-      index === 0 ? seed.steps : createSilentSteps(),
+      index === 1 ? seed.steps : createSilentSteps(),
     );
   return Object.freeze({
     id: createModuleInstanceId(idFactory),

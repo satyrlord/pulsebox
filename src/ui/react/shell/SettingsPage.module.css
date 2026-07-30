@@ -3,8 +3,8 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  background: var(--pulse-color-panel, #1a1a1e);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  background: var(--pulse-color-surface-panel, #15191d);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: 0.1875rem;
 }
 
@@ -13,7 +13,7 @@
   font-size: 0.875rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--pulse-color-text, #e6e6ea);
+  color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
 .heading:focus-visible {
@@ -27,7 +27,7 @@
   /* The 24 pixel target is met by the label, not by the input alone. */
   min-height: 1.5rem;
   font-size: 0.75rem;
-  color: var(--pulse-color-text, #e6e6ea);
+  color: var(--pulse-color-text-primary, #f3f5f6);
   cursor: pointer;
 }
 
@@ -37,9 +37,9 @@
   padding: 0.25rem 0.75rem;
   font: inherit;
   font-size: 0.75rem;
-  color: var(--pulse-color-text, #e6e6ea);
-  background: var(--pulse-color-control-cap, #24242a);
-  border: 1px solid var(--pulse-color-control-edge, #37373d);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-surface-control, #242a30);
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: 0.125rem;
   cursor: pointer;
 }

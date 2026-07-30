@@ -128,7 +128,7 @@ describe("PulseStore", () => {
     const deltas = vi.fn();
     const store = createStore(ids, deltas);
 
-    expect(store.getState().project.tempo).toBe(130);
+    expect(store.getState().project.tempo).toBe(128);
     expect(
       store.dispatch(store.createCommand("transport-tempo-set", { tempo: 146 })),
     ).toMatchObject({
@@ -141,7 +141,7 @@ describe("PulseStore", () => {
     );
 
     expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.tempo).toBe(130);
+    expect(store.getState().project.tempo).toBe(128);
     expect(store.redo()).toMatchObject({ status: "accepted", changed: true });
     expect(store.getState().project.tempo).toBe(146);
   });
@@ -266,7 +266,7 @@ describe("PulseStore", () => {
     );
     expect(listener).not.toHaveBeenCalled();
     store.dispatch(store.createCommand("transport-tempo-set", { tempo: 132 }));
-    expect(listener).toHaveBeenCalledWith(132, 130);
+    expect(listener).toHaveBeenCalledWith(132, 128);
   });
 
   it("preserves module identity while moving and restores removal through undo", () => {

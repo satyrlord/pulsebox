@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -67,17 +67,44 @@ const MODULE_TOKENS = new Set([
   "--module-control-ring",
 ]);
 
+/**
+ * Every shipped stylesheet, including the CSS Modules that style components.
+ * Those modules are where most token references live, so omitting them would
+ * let a component consume a token no theme declares: the value would silently
+ * fall back to its literal and stop responding to a theme or contrast change.
+ */
 function readShippedStyleText(): { path: string; text: string }[] {
   const files = ["src/styles/global.css", "src/themes/themes.css"].map((path) => ({
     path,
     text: readFileSync(join(process.cwd(), path), "utf8"),
   }));
+  for (const path of listModuleStylesheets(join(process.cwd(), "src"))) {
+    files.push({
+      path: relative(process.cwd(), path).replaceAll("\\", "/"),
+      text: readFileSync(path, "utf8"),
+    });
+  }
   for (const unit of readCurrentSourceUnits()) {
     if (unit.path.startsWith("src/") && unit.path.endsWith(".ts")) {
       files.push({ path: unit.path, text: unit.source });
     }
   }
   return files;
+}
+
+function listModuleStylesheets(directory: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...listModuleStylesheets(full));
+      continue;
+    }
+    if (entry.name.endsWith(".css") && entry.name !== "themes.css" && entry.name !== "global.css") {
+      found.push(full);
+    }
+  }
+  return found;
 }
 
 function referencedTokens(text: string): readonly string[] {

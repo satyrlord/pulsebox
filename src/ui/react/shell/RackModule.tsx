@@ -114,6 +114,7 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
       data-component="rack-module"
       data-label={manifest.productName}
       data-selected={selected}
+      data-collapsed={collapsed}
       aria-label={`Rack slot ${String(slotNumber).padStart(2, "0")}, ${manifest.productName}`}
     >
       <header className={styles.header}>

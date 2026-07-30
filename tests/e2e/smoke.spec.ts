@@ -10,6 +10,8 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 const RACK_MODULE = '[data-component="rack-module"]';
+/** Loaded faceplates only. Empty slots share the hook but carry `data-label="Empty"`. */
+const LOADED_RACK_MODULE = `${RACK_MODULE}:not([data-label="Empty"])`;
 const KNOB = '[data-component="knob"]';
 
 test.beforeEach(async ({ page }) => {
@@ -42,18 +44,16 @@ const FIRST_EMPTY_SLOT = SEEDED_RACK.indexOf("Empty");
 test("boots the production shell with the seeded rack", async ({ page }) => {
   await expect(page).toHaveTitle("PULSEBOX");
   await expect(page.locator('[data-component="transport-bar"]')).toBeVisible();
+  // Every slot keeps a position: six loaded faceplates and two empty ones.
   await expect(page.locator(RACK_MODULE)).toHaveCount(SEEDED_RACK.length);
+  await expect(page.locator(LOADED_RACK_MODULE)).toHaveCount(FIRST_EMPTY_SLOT);
   for (const [index, label] of SEEDED_RACK.entries()) {
     await expect(page.locator(RACK_MODULE).nth(index)).toHaveAttribute("data-label", label);
   }
 });
 
 test("adds an instrument into an empty slot", async ({ page }) => {
-  await page
-    .locator(RACK_MODULE)
-    .nth(FIRST_EMPTY_SLOT)
-    .getByRole("button", { name: "Add Acid Bass" })
-    .click();
+  await page.getByRole("button", { name: "Add Acid Bass to the first empty rack slot" }).click();
   await expect(page.locator(`${RACK_MODULE}[data-label='Acid Bass']`)).toHaveCount(2);
   // Faceplates carry no playback-position output; the Piano Roll and transport
   // clock own that feedback.
@@ -61,8 +61,7 @@ test("adds an instrument into an empty slot", async ({ page }) => {
 });
 
 test("adds the selected Drumline plugin", async ({ page }) => {
-  const empty = page.locator(RACK_MODULE).nth(FIRST_EMPTY_SLOT);
-  await empty.getByRole("button", { name: "Add Drumline Six" }).click();
+  await page.getByRole("button", { name: "Add Drumline Six to the first empty rack slot" }).click();
   await expect(page.locator(`${RACK_MODULE}[data-label='Drumline Six']`)).toHaveCount(2);
 });
 
@@ -169,14 +168,14 @@ test("the playhead advances from the audio clock", async ({ page }) => {
 });
 
 test("a pattern rename survives a transport cycle", async ({ page }) => {
-  await page.getByRole("radio", { name: "Pattern 1" }).dblclick();
-  const rename = page.getByRole("textbox", { name: "Rename Pattern 1" });
+  await page.getByRole("combobox", { name: "Selected Pattern" }).selectOption({ label: "Intro" });
+  const rename = page.getByRole("textbox", { name: "Pattern name" });
   await rename.fill("Drive");
   await rename.press("Enter");
 
   await startPlayback(page);
   await page.getByRole("button", { name: "Stop" }).click();
-  await expect(page.getByRole("radio", { name: "Drive" })).toBeVisible();
+  await expect(rename).toHaveValue("Drive");
 });
 
 test("a knob responds to real pointer drag and commits one undo entry", async ({ page }) => {
@@ -254,6 +253,50 @@ test("the rack theme and high contrast apply and keep operational targets at lea
   }
 });
 
+test("high contrast repaints the rack controls, not only the page behind them", async ({
+  page,
+}) => {
+  /**
+   * The overlay flips palette tokens, so a control that consumes a token no
+   * theme declares keeps its literal fallback and stays dark on the black
+   * overlay. Asserting the attribute or the target size cannot see that: the
+   * control has to be sampled before and after, and its colour has to move.
+   */
+  const sample = async () =>
+    page.evaluate(() => {
+      const read = (selector: string, property: string): string => {
+        const element = document.querySelector(selector);
+        return element === null ? "" : getComputedStyle(element).getPropertyValue(property).trim();
+      };
+      return {
+        page: getComputedStyle(document.body).backgroundColor,
+        knobCap: read('[data-component="knob"] circle', "fill"),
+        knobEdge: read('[data-component="knob"] circle', "stroke"),
+        knobValue: read('[data-component="knob"] input', "color"),
+        faderSlot: read('[data-component="fader"] rect', "fill"),
+      };
+    });
+
+  const beforeOverlay = await sample();
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page
+    .locator('[data-component="settings-page"]')
+    .getByRole("checkbox", { name: "High contrast" })
+    .check();
+  await expect(page.locator("html")).toHaveAttribute("data-high-contrast", "true");
+
+  const afterOverlay = await sample();
+  for (const surface of Object.keys(beforeOverlay) as (keyof typeof beforeOverlay)[]) {
+    expect(afterOverlay[surface], `${surface} must repaint under high contrast`).not.toBe(
+      beforeOverlay[surface],
+    );
+  }
+  // The overlay drives borders to pure white, which is what makes a control
+  // edge readable against the black page.
+  expect(afterOverlay.knobEdge).toBe("rgb(255, 255, 255)");
+});
+
 test("Escape closes Settings and returns focus to the button that opened it", async ({ page }) => {
   const settingsButton = page.getByRole("button", { name: "Settings" });
   await settingsButton.click();
@@ -327,8 +370,8 @@ test("shows the unsupported-size notice below the editing boundary", async ({ pa
 });
 
 test("a pattern rename is autosaved and restored after a reload", async ({ page }) => {
-  await page.getByRole("radio", { name: "Pattern 1" }).dblclick();
-  const rename = page.getByRole("textbox", { name: "Rename Pattern 1" });
+  await page.getByRole("combobox", { name: "Selected Pattern" }).selectOption({ label: "Intro" });
+  const rename = page.getByRole("textbox", { name: "Pattern name" });
   await rename.fill("Autosaved Pattern");
   await rename.press("Enter");
 
@@ -336,7 +379,9 @@ test("a pattern rename is autosaved and restored after a reload", async ({ page 
   await page.waitForTimeout(1_500);
   await page.reload();
 
-  await expect(page.getByRole("radio", { name: "Autosaved Pattern" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Pattern name" })).toHaveValue(
+    "Autosaved Pattern",
+  );
 });
 
 test("a tempo change is autosaved and restored after a reload", async ({ page }) => {
@@ -465,26 +510,21 @@ test("a knob drag during playback never recreates engine nodes", async ({ page }
 });
 
 test("each Pattern keeps its own name and selection across reload", async ({ page }) => {
-  await page.getByRole("radio", { name: "Pattern 2" }).dblclick();
-  const rename = page.getByRole("textbox", { name: "Rename Pattern 2" });
+  const pattern = page.getByRole("combobox", { name: "Selected Pattern" });
+  await pattern.selectOption({ label: "Verse" });
+  const rename = page.getByRole("textbox", { name: "Pattern name" });
   await rename.fill("Breakbeat");
   await rename.press("Enter");
 
-  await page.getByRole("radio", { name: "Pattern 1" }).click();
-  await expect(page.getByRole("radio", { name: "Pattern 1" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await expect(page.getByRole("radio", { name: "Breakbeat" })).toBeVisible();
+  await pattern.selectOption({ label: "Intro" });
+  await expect(pattern).toHaveValue("0");
+  await expect(page.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 
   await page.waitForTimeout(1_500);
   await page.reload();
 
-  await expect(page.getByRole("radio", { name: "Pattern 1" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await expect(page.getByRole("radio", { name: "Breakbeat" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Selected Pattern" })).toHaveValue("0");
+  await expect(page.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 });
 
 test("the mixer mutes a channel without stopping the transport", async ({ page }) => {
@@ -522,15 +562,13 @@ test("a mixer fader moves by keyboard and persists across a reload", async ({ pa
 });
 
 test("song mode chains Patterns and reports the chain length", async ({ page }) => {
-  await page.getByRole("tab", { name: "Song" }).click();
-  const songStatus = page.locator('[data-component="song"]').getByRole("status");
-  await expect(songStatus).toContainText("Empty chain");
+  const playlist = page.locator('[data-component="playlist-summary"]');
+  await expect(playlist).toContainText("The Playlist is empty.");
+  await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
+  await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
+  await expect(playlist.locator("ol > li")).toHaveCount(2);
 
-  await page.locator('[data-component="song"]').getByRole("button", { name: "Pattern 1" }).click();
-  await page.locator('[data-component="song"]').getByRole("button", { name: "Pattern 2" }).click();
-  await expect(songStatus).toContainText("2 steps, 32 sixteenths.");
-
-  const songMode = page.getByRole("button", { name: "Song mode" });
+  const songMode = page.getByRole("button", { name: "Song" });
   await songMode.click();
   await expect(songMode).toHaveAttribute("aria-pressed", "true");
 
@@ -544,14 +582,14 @@ test("a saved project reopens from the Open menu", async ({ page }) => {
   await tempo.press("Enter");
 
   const projectMenu = page.locator('[data-component="project-menu"]');
-  await projectMenu.getByRole("button", { name: "Save" }).click();
+  await projectMenu.getByRole("button", { name: /Neon Basement/ }).click();
+  await projectMenu.getByRole("menuitem", { name: "Save" }).click();
   await expect(projectMenu.getByRole("status")).toContainText("Saved");
 
   await tempo.fill("100");
   await tempo.press("Enter");
   await expect(tempo).toHaveValue("100");
 
-  await projectMenu.getByRole("button", { name: "Open" }).click();
   await page.getByRole("list", { name: "Stored projects" }).getByRole("button").first().click();
 
   await expect(page.locator('[data-field="tempo"]')).toHaveValue("144");
@@ -561,9 +599,10 @@ test("portable export produces a ZIP that imports through the validated archive 
   page,
 }) => {
   const projectMenu = page.locator('[data-component="project-menu"]');
+  await projectMenu.getByRole("button", { name: /Neon Basement/ }).click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    projectMenu.getByRole("button", { name: "Export" }).click(),
+    projectMenu.getByRole("menuitem", { name: "Export" }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/\.pulsebox$/);
   const path = await download.path();
@@ -573,8 +612,7 @@ test("portable export produces a ZIP that imports through the validated archive 
   await page.getByLabel("Import project file").setInputFiles(path);
   await expect(projectMenu.getByRole("status")).toContainText("Project imported");
 
-  await projectMenu.getByRole("button", { name: "Open" }).click();
   await expect(
     page.getByRole("list", { name: "Stored projects" }).getByRole("button").first(),
-  ).toContainText("Phase 1 session");
+  ).toContainText("Neon Basement");
 });
