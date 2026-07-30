@@ -14,6 +14,8 @@ export interface SettingsPageProps {
 export function SettingsPage(props: SettingsPageProps) {
   const { themeService } = props;
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
+  const launchQuantizationSteps = useAppStore((state) => state.launchQuantizationSteps);
+  const setLaunchQuantization = useAppStore((state) => state.setLaunchQuantization);
   const panelRef = useRef<HTMLElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const [importReport, setImportReport] = useState<UserThemeReport | undefined>(undefined);
@@ -166,6 +168,24 @@ export function SettingsPage(props: SettingsPageProps) {
         >
           Delete user theme
         </button>
+      </fieldset>
+
+      <fieldset className={styles.userTheme}>
+        <legend>Playback</legend>
+        <label className={styles.importField}>
+          <span>Pattern launch boundary</span>
+          <select
+            aria-label="Pattern launch boundary"
+            value={launchQuantizationSteps}
+            onChange={(event) => {
+              setLaunchQuantization(Number(event.currentTarget.value));
+            }}
+          >
+            <option value={16}>One bar</option>
+            <option value={8}>Half bar</option>
+            <option value={4}>One beat</option>
+          </select>
+        </label>
       </fieldset>
 
       <div className={styles.report} role="status" aria-live="polite">

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { Led } from "../controls/Led";
 import { LevelMeter } from "../controls/LevelMeter";
 import { SegmentDisplay } from "../controls/SegmentDisplay";
+import { useContinuousGesture } from "../controls/use-gesture-id";
 import { useAppStore } from "../store/app-store-context";
-import { masterMeterLevel } from "./master-meter";
 import { ProjectMenu } from "./ProjectMenu";
 import styles from "./TransportBar.module.css";
 
@@ -14,6 +14,12 @@ const STEPS_PER_BAR = 16;
 /** The accepted tempo range. The field, its validation and its message share it. */
 const TEMPO_MINIMUM = 40;
 const TEMPO_MAXIMUM = 240;
+/** Rolling tap set: taps older than this fall out; at most this many are kept. */
+const TAP_WINDOW_MILLISECONDS = 3_000;
+const TAP_MAXIMUM_COUNT = 8;
+/** Vertical pixels per BPM while dragging the tempo readout. */
+const TEMPO_DRAG_PIXELS_PER_BPM = 4;
+const TEMPO_DRAG_THRESHOLD_PIXELS = 4;
 
 function formatPosition(ticks: number): string {
   const bar = Math.floor(ticks / (TICKS_PER_STEP * STEPS_PER_BAR)) + 1;
@@ -28,6 +34,13 @@ function formatElapsed(ticks: number, tempo: number): string {
   const seconds = Math.floor((totalMilliseconds % 60_000) / 1_000);
   const milliseconds = totalMilliseconds % 1_000;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
+}
+
+/** Fixed-width dB text so the readout never shifts the layout. */
+function formatMasterDb(peak: number): string {
+  if (peak <= 0.000_01) return "-inf";
+  const decibels = Math.max(-96, 20 * Math.log10(peak));
+  return `${decibels >= 0 ? "+" : ""}${decibels.toFixed(1)}`;
 }
 
 function TransportIcon(props: { readonly kind: "play" | "pause" | "stop" | "record" }) {
@@ -68,6 +81,15 @@ function MetronomeIcon() {
   );
 }
 
+function PowerIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M8 2v6" />
+      <path d="M4.4 4.4a5.2 5.2 0 1 0 7.2 0" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg
@@ -87,13 +109,14 @@ export function TransportBar() {
   const status = useAppStore((state) => state.project.transport.status);
   const recordArmed = useAppStore((state) => state.project.transport.recordArmed);
   const tempo = useAppStore((state) => state.project.project.tempo);
-  const masterLevel = useAppStore((state) => state.project.project.masterLevel);
   const songEnabled = useAppStore((state) => state.project.project.song.enabled);
   const positionTicks = useAppStore((state) => state.positionTicks);
   const audioStatus = useAppStore((state) => state.audioStatus);
   const audioMessage = useAppStore((state) => state.audioMessage);
   const audioUnavailable = useAppStore((state) => state.audioUnavailable);
-  const meterLevels = useAppStore((state) => state.meterLevels);
+  const audioRuntimeState = useAppStore((state) => state.audioRuntimeState);
+  const masterMeter = useAppStore((state) => state.masterMeter);
+  const peakHeld = useAppStore((state) => state.masterPeakHeld);
   const meterMode = useAppStore((state) => state.meterMode);
   const metronomeEnabled = useAppStore((state) => state.metronomeEnabled);
   const play = useAppStore((state) => state.play);
@@ -104,12 +127,25 @@ export function TransportBar() {
   const toggleSongMode = useAppStore((state) => state.toggleSongMode);
   const toggleMeterMode = useAppStore((state) => state.toggleMeterMode);
   const toggleMetronome = useAppStore((state) => state.toggleMetronome);
+  const togglePower = useAppStore((state) => state.togglePower);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const [tempoError, setTempoError] = useState<string | undefined>(undefined);
+  const tapTimes = useRef<number[]>([]);
+  const tempoDrag = useRef<
+    | {
+        pointerId: number;
+        startY: number;
+        startTempo: number;
+        dragging: boolean;
+      }
+    | undefined
+  >(undefined);
+  const tempoGesture = useContinuousGesture();
   const tempoDraft = draft ?? String(tempo);
   const playing = status === "playing";
-  const meter = playing ? masterMeterLevel(meterLevels, masterLevel) : 0;
+  const channelOne = playing ? (meterMode === "lr" ? masterMeter.left : masterMeter.mid) : 0;
+  const channelTwo = playing ? (meterMode === "lr" ? masterMeter.right : masterMeter.side) : 0;
 
   /**
    * A rejected tempo says what was wrong and what will work, and the field keeps
@@ -135,15 +171,74 @@ export function TransportBar() {
     setTempo(Math.round(next));
   };
 
+  /** Tap tempo averages the rolling set of recent taps. */
+  const onTapTempo = () => {
+    const now = performance.now();
+    const taps = tapTimes.current.filter((time) => now - time < TAP_WINDOW_MILLISECONDS);
+    taps.push(now);
+    tapTimes.current = taps.slice(-TAP_MAXIMUM_COUNT);
+    if (tapTimes.current.length < 2) return;
+    let intervalSum = 0;
+    for (let index = 1; index < tapTimes.current.length; index += 1) {
+      intervalSum += (tapTimes.current[index] ?? 0) - (tapTimes.current[index - 1] ?? 0);
+    }
+    const meanInterval = intervalSum / (tapTimes.current.length - 1);
+    const tapped = Math.round(60_000 / meanInterval);
+    setDraft(undefined);
+    setTempoError(undefined);
+    setTempo(Math.min(TEMPO_MAXIMUM, Math.max(TEMPO_MINIMUM, tapped)));
+  };
+
+  // Pointer adjustment on the tempo readout: a vertical drag past a small
+  // threshold adjusts BPM; a plain click still focuses the field for typing.
+  const onTempoPointerDown = (event: ReactPointerEvent<HTMLInputElement>) => {
+    if (event.button !== 0) return;
+    tempoDrag.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startTempo: tempo,
+      dragging: false,
+    };
+  };
+  const onTempoPointerMove = (event: ReactPointerEvent<HTMLInputElement>) => {
+    const drag = tempoDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    const delta = drag.startY - event.clientY;
+    if (!drag.dragging) {
+      if (Math.abs(delta) < TEMPO_DRAG_THRESHOLD_PIXELS) return;
+      drag.dragging = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    const fine = event.shiftKey ? 4 : 1;
+    const next = Math.round(
+      Math.min(
+        TEMPO_MAXIMUM,
+        Math.max(TEMPO_MINIMUM, drag.startTempo + delta / (TEMPO_DRAG_PIXELS_PER_BPM * fine)),
+      ),
+    );
+    setDraft(undefined);
+    setTempoError(undefined);
+    setTempo(next, tempoGesture.current());
+  };
+  const onTempoPointerEnd = (event: ReactPointerEvent<HTMLInputElement>) => {
+    if (tempoDrag.current?.pointerId !== event.pointerId) return;
+    tempoDrag.current = undefined;
+  };
+
   const statusText = audioUnavailable
     ? "Audio unavailable"
     : audioStatus === "faulted"
       ? (audioMessage ?? "Audio faulted")
       : audioStatus === "recovering"
         ? "Audio recovering"
-        : playing
-          ? "Audio active"
-          : "Audio idle";
+        : audioRuntimeState === "locked"
+          ? "Audio locked"
+          : audioRuntimeState === "suspended"
+            ? "Audio suspended"
+            : audioRuntimeState === "unavailable"
+              ? "Audio unavailable"
+              : "Audio active";
 
   return (
     <header className={styles.bar} data-component="transport-bar">
@@ -197,7 +292,7 @@ export function TransportBar() {
             <TransportIcon kind="record" />
           </button>
         </div>
-        <label className={styles.tempo} title="Tempo in beats per minute.">
+        <label className={styles.tempo} title="Tempo in beats per minute. Drag or type.">
           <span className={styles.srOnly}>Tempo</span>
           <input
             data-field="tempo"
@@ -216,6 +311,10 @@ export function TransportBar() {
               if (tempoError !== undefined) setTempoError(undefined);
             }}
             onBlur={commitTempo}
+            onPointerDown={onTempoPointerDown}
+            onPointerMove={onTempoPointerMove}
+            onPointerUp={onTempoPointerEnd}
+            onPointerCancel={onTempoPointerEnd}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
@@ -230,6 +329,15 @@ export function TransportBar() {
           />
           <span>BPM</span>
         </label>
+        <button
+          type="button"
+          className={styles.tapTempo}
+          aria-label="Tap tempo"
+          title="Tap tempo. Tap on the beat."
+          onClick={onTapTempo}
+        >
+          Tap
+        </button>
         {tempoError === undefined ? null : (
           <p className={styles.fieldError} id="tempo-error" role="alert">
             {tempoError}
@@ -259,6 +367,17 @@ export function TransportBar() {
         </button>
         <button
           type="button"
+          className={styles.iconButton}
+          aria-label="Audio engine power"
+          aria-pressed={audioRuntimeState === "active"}
+          disabled={audioUnavailable}
+          title="Audio engine power."
+          onClick={() => void togglePower()}
+        >
+          <PowerIcon />
+        </button>
+        <button
+          type="button"
           className={styles.meterMode}
           aria-label={
             meterMode === "lr"
@@ -274,7 +393,7 @@ export function TransportBar() {
           <span>{meterMode === "lr" ? "L" : "M"}</span>
           <LevelMeter
             label="Master meter channel one"
-            level={meter}
+            level={channelOne}
             width={116}
             height={6}
             orientation="horizontal"
@@ -282,14 +401,22 @@ export function TransportBar() {
           <span>{meterMode === "lr" ? "R" : "S"}</span>
           <LevelMeter
             label="Master meter channel two"
-            level={meter}
+            level={channelTwo}
             width={116}
             height={6}
             orientation="horizontal"
           />
         </div>
+        <div className={styles.peak} data-lit={peakHeld}>
+          <Led label="Master peak" lit={peakHeld} />
+          <span aria-hidden="true">Peak</span>
+        </div>
+        <output className={styles.masterDb} aria-label="Master level in decibels">
+          {formatMasterDb(playing ? Math.max(masterMeter.left, masterMeter.right) : 0)}
+          <span> dB</span>
+        </output>
         <output className={`${styles.audioStatus} audio-status`} aria-live="polite">
-          <Led label="Audio engine" lit={playing} decorative />
+          <Led label="Audio engine" lit={audioRuntimeState === "active"} decorative />
           {statusText}
         </output>
         <button

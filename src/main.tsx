@@ -224,6 +224,9 @@ function createAudioRuntime(): TransportRuntime {
     onMeter: (moduleId, level) => {
       if (runtime === audio) appReference.current?.reportMeter(moduleId, level);
     },
+    onStateChange: (state) => {
+      if (runtime === audio) appReference.current?.reportAudioRuntimeState(state);
+    },
   });
   return runtime;
 }
@@ -262,11 +265,14 @@ let committedMetadata: {
   createdAt: string;
   modifiedAt: string;
   revision: ProjectRevision;
+  pinned: boolean;
 } = {
   createdAt: initialProjectTimestamp,
   modifiedAt: initialProjectTimestamp,
   revision: nextProjectRevision(undefined, browserIdFactory),
+  pinned: false,
 };
+
 
 const app = mountPulseboxApp({
   host,
@@ -294,6 +300,22 @@ const app = mountPulseboxApp({
     setSwing: (swing) => {
       audio.setSwing(swing);
     },
+    getMasterMeter: () => audio.getMasterMeter(),
+    setMetronomeEnabled: (enabled) => {
+      audio.setMetronomeEnabled(enabled);
+    },
+    setPower: async (on) => {
+      if (on) await audio.activate();
+      else await audio.powerOff();
+    },
+    setLaunchQuantization: (steps) => {
+      audio.setLaunchQuantization(steps);
+    },
+  },
+  createPatternSeed: () => {
+    const seed = new Uint32Array(1);
+    crypto.getRandomValues(seed);
+    return seed[0] ?? 0;
   },
   manifestFor: (pluginId) => registry.get(pluginId)?.manifest,
   store,
@@ -311,6 +333,7 @@ const app = mountPulseboxApp({
             createdAt: committedMetadata.createdAt,
             modifiedAt: now,
             projectRevision: committedMetadata.revision,
+            pinned: committedMetadata.pinned,
           }),
         },
         browserIdFactory,
@@ -319,13 +342,23 @@ const app = mountPulseboxApp({
         createdAt: committed.document.project.createdAt,
         modifiedAt: committed.document.project.modifiedAt,
         revision: projectRevisionFromMetadata(committed.document.project),
+        pinned: committed.document.project.pinned,
       };
     },
     list: async () => {
       const stored = await repository.list();
       return stored
-        .map((one) => ({ id: one.id, name: one.name, modifiedAt: one.modifiedAt }))
-        .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
+        .map((one) => ({
+          id: one.id,
+          name: one.name,
+          modifiedAt: one.modifiedAt,
+          pinned: one.document.project.pinned,
+        }))
+        .sort(
+          (left, right) =>
+            Number(right.pinned) - Number(left.pinned) ||
+            right.modifiedAt.localeCompare(left.modifiedAt),
+        );
     },
     open: async (id) => {
       const stored = await repository.load(id);
@@ -338,6 +371,7 @@ const app = mountPulseboxApp({
         createdAt: parsed.value.document.project.createdAt,
         modifiedAt: parsed.value.document.project.modifiedAt,
         revision: projectRevisionFromMetadata(parsed.value.document.project),
+        pinned: parsed.value.document.project.pinned,
       };
       audioProjectionQueue = replaceAudioProjection(store.getState());
     },
@@ -347,6 +381,7 @@ const app = mountPulseboxApp({
           createdAt: committedMetadata.createdAt,
           modifiedAt: committedMetadata.modifiedAt,
           projectRevision: committedMetadata.revision,
+          pinned: committedMetadata.pinned,
         }),
       ),
     importPortable: async (bytes) => {
@@ -362,9 +397,47 @@ const app = mountPulseboxApp({
         createdAt: result.committed.document.project.createdAt,
         modifiedAt: result.committed.document.project.modifiedAt,
         revision: projectRevisionFromMetadata(result.committed.document.project),
+        pinned: result.committed.document.project.pinned,
       };
       return { ok: true };
     },
+    setPinned: async (pinned) => {
+      if (pinned === committedMetadata.pinned) return;
+      // The pin persists as project metadata. When a committed head exists, the
+      // flag flips on that head so unsaved working edits are not committed as a
+      // side effect. A never-saved project cannot appear in the selector, so
+      // pinning it saves it once.
+      const state = store.getState();
+      const stored = await repository.load(state.project.id);
+      const now = new Date().toISOString();
+      const candidate =
+        stored === undefined
+          ? {
+              id: state.project.id,
+              name: state.project.name,
+              modifiedAt: now,
+              document: serializeProject(state, {
+                createdAt: committedMetadata.createdAt,
+                modifiedAt: now,
+                projectRevision: committedMetadata.revision,
+                pinned,
+              }),
+            }
+          : {
+              ...stored,
+              document: {
+                ...stored.document,
+                project: { ...stored.document.project, pinned },
+              },
+            };
+      const committed = await repository.save(candidate, browserIdFactory);
+      committedMetadata = {
+        ...committedMetadata,
+        revision: projectRevisionFromMetadata(committed.document.project),
+        pinned: committed.document.project.pinned,
+      };
+    },
+    getPinned: () => committedMetadata.pinned,
   },
 });
 appReference.current = app;
@@ -376,6 +449,7 @@ const autosave = createAutosave({
   now: () => new Date().toISOString(),
   createdAt: () => committedMetadata.createdAt,
   projectRevision: () => committedMetadata.revision,
+  pinned: () => committedMetadata.pinned,
 });
 
 store.subscribe(
@@ -395,6 +469,7 @@ void restoreAutosave(store.getState(), { repository, parseOptions }).then(async 
       createdAt: parsedAutosave.value.document.project.createdAt,
       modifiedAt: parsedAutosave.value.document.project.modifiedAt,
       revision: projectRevisionFromMetadata(parsedAutosave.value.document.project),
+      pinned: parsedAutosave.value.document.project.pinned,
     };
   }
   store.loadProject(restored.project);
@@ -425,6 +500,20 @@ function queueAudioDelta(delta: PulseEngineDelta): void {
   const fullProjection =
     delta.kind === "project-replace" ? toAudioModules(acceptedState) : undefined;
 
+  // Undo, redo, and loads arrive as one project replacement. The module list
+  // alone does not carry the arrangement, Pattern timing, Swing, or master
+  // level, so those projections travel with the replacement.
+  if (delta.kind === "project-replace") {
+    audio.setArrangement({
+      activePatternIndex: acceptedState.project.activePatternIndex,
+      songEnabled: acceptedState.project.song.enabled,
+      songEntries: acceptedState.project.song.entries,
+    });
+    audio.setPatternTiming(toPatternTiming(acceptedState));
+    audio.setSwing(acceptedState.project.swing);
+    audio.setMasterLevel(acceptedState.project.masterLevel);
+  }
+
   audioProjectionQueue = audioProjectionQueue
     .then(() => audio.project(delta, moduleProjection, fullProjection))
     .catch(() => replaceAudioProjection(store.getState()));
@@ -441,6 +530,7 @@ async function prepareImportedProject(
       songEnabled: candidate.project.song.enabled,
       songEntries: candidate.project.song.entries,
     });
+    candidateAudio.setPatternTiming(toPatternTiming(candidate));
     candidateAudio.setSwing(candidate.project.swing);
     candidateAudio.setMasterLevel(candidate.project.masterLevel);
     await candidateAudio.replaceFromCurrentState(
@@ -484,6 +574,7 @@ async function replaceAudioProjection(state: Readonly<PulseState>): Promise<void
       songEnabled: state.project.song.enabled,
       songEntries: state.project.song.entries,
     });
+    audio.setPatternTiming(toPatternTiming(state));
     audio.setSwing(state.project.swing);
     audio.setMasterLevel(state.project.masterLevel);
     await audio.replaceFromCurrentState(toAudioModules(state), state.project.revision);
@@ -498,6 +589,13 @@ async function replaceAudioProjection(state: Readonly<PulseState>): Promise<void
 
 function toAudioModules(state: Readonly<PulseState>): readonly TransportModule[] {
   return Object.values(state.project.modules).map((module) => toAudioModule(module));
+}
+
+function toPatternTiming(state: Readonly<PulseState>) {
+  return state.project.patterns.map((pattern) => ({
+    humanize: pattern.humanize,
+    seed: pattern.seed,
+  }));
 }
 
 function toAudioModule(module: RackModuleState): TransportModule {

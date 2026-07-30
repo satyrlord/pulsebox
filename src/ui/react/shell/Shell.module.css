@@ -535,6 +535,15 @@
   box-shadow: var(--sink-1);
 }
 
+.variationButton {
+  flex: none;
+  min-block-size: 26px;
+  padding-inline: 8px;
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .moduleSelector {
   margin-inline-start: auto;
 }
@@ -669,6 +678,11 @@
   box-shadow: var(--sink-2);
 }
 
+.noteLayers {
+  position: absolute;
+  inset: 0;
+}
+
 .pitchRows,
 .stepNotes {
   position: absolute;
@@ -718,7 +732,19 @@
     0 1px 2px var(--edge-shadow);
 }
 
+/* The playhead element spans the grid, so a percentage translateX moves the
+   line by a fraction of the grid width. The line itself is the pseudo-element.
+   Transform only: position updates never trigger layout. */
 .playhead {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(0);
+  will-change: transform;
+}
+
+.playhead::before {
+  content: "";
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
@@ -726,7 +752,40 @@
   background: var(--pulse-color-text-primary, #f3f5f6);
   box-shadow: 0 0 6px #ffffff66;
   opacity: 0.85;
-  transform: translateX(0);
+}
+
+/* Transparent seek targets, one per step. Keyboard and pointer both position
+   the playhead through the same buttons. */
+.seekSteps {
+  position: absolute;
+  inset: 0;
+  inset-inline: 2px;
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: 1px;
+}
+
+.seekSteps > button {
+  min-inline-size: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.seekSteps > button:disabled {
+  cursor: default;
+}
+
+.seekSteps > button:hover:not(:disabled) {
+  background: #ffffff0a;
+}
+
+.seekSteps > button:focus-visible {
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: -2px;
 }
 
 .velocityLane {

@@ -25,6 +25,10 @@ export interface PatternSlotState {
   readonly id: PatternId;
   readonly name: string;
   readonly length: number;
+  /** Pattern-owned deterministic Humanize amount, 0 through 1. */
+  readonly humanize: number;
+  /** Stored Pattern seed. The same seed replays the same variation. */
+  readonly seed: number;
 }
 
 export interface RackModuleState {

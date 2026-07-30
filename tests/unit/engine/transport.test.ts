@@ -164,17 +164,20 @@ describe("schedulePatternWindow", () => {
 
   it("plays a chain of patterns in order and then repeats it", () => {
     const resolveStep = chainedStepResolver([
-      [step({ note: 1 }), step({ note: 2 })],
-      [step({ note: 3 })],
+      { steps: [step({ note: 1 }), step({ note: 2 })], patternIndex: 0 },
+      { steps: [step({ note: 3 })], patternIndex: 1 },
     ]);
 
-    expect([0, 1, 2, 3, 4, 5].map((index) => resolveStep(index)?.note)).toEqual([1, 2, 3, 1, 2, 3]);
+    expect([0, 1, 2, 3, 4, 5].map((index) => resolveStep(index)?.step.note)).toEqual([
+      1, 2, 3, 1, 2, 3,
+    ]);
+    expect([0, 1, 2].map((index) => resolveStep(index)?.patternIndex)).toEqual([0, 0, 1]);
   });
 
   it("treats an empty pattern and an empty chain as silence", () => {
     expect(loopingStepResolver([])(0)).toBeUndefined();
     expect(chainedStepResolver([])(0)).toBeUndefined();
-    expect(chainedStepResolver([[]])(0)).toBeUndefined();
+    expect(chainedStepResolver([{ steps: [], patternIndex: 0 }])(0)).toBeUndefined();
   });
 
   it("skips inactive steps without shifting the grid", () => {

@@ -5,6 +5,7 @@ import {
   chainedStepResolver,
   loopingStepResolver,
   schedulePatternWindow,
+  type PatternTiming,
   type StepResolver,
 } from "./pattern-scheduler";
 import type { PatternStepView } from "./scheduled-event";
@@ -48,6 +49,7 @@ export type TransportEngineDelta = EngineDelta<
   | "transport"
   | "pattern-select"
   | "pattern-rename"
+  | "pattern-timing-set"
   | "song-set"
   | "mixer-set",
   Readonly<Record<string, unknown>>
@@ -60,6 +62,29 @@ const DEFAULT_ARRANGEMENT: TransportArrangement = {
 };
 
 export type AudioRuntimeState = "locked" | "active" | "suspended" | "unavailable";
+
+/** Post-limiter master analysis for the header meters. Analysis only. */
+export interface MasterMeterFrame {
+  readonly left: number;
+  readonly right: number;
+  /** `M = (L + R) / 2` for displayed analysis. */
+  readonly mid: number;
+  /** `S = (L - R) / 2` for displayed analysis. */
+  readonly side: number;
+  /** True when the post-limiter peak reached the display threshold. */
+  readonly peak: boolean;
+}
+
+const SILENT_MASTER_METER: MasterMeterFrame = Object.freeze({
+  left: 0,
+  right: 0,
+  mid: 0,
+  side: 0,
+  peak: false,
+});
+
+/** Post-limiter level that lights the header peak indicator. */
+const PEAK_DISPLAY_THRESHOLD = 0.98;
 
 export type TransportRuntimeStatus =
   | {
@@ -86,16 +111,37 @@ const SCHEDULER_LEAD_SECONDS = 0.02;
 /** A sixteenth at 960 ticks per quarter. */
 const TICKS_PER_STEP = 240;
 
+/** One 4/4 bar of sixteenths: the default Pattern-launch boundary. */
+const DEFAULT_LAUNCH_QUANTIZATION_STEPS = 16;
+
+/** Metronome click length and levels. The bar click is higher and louder. */
+const CLICK_SECONDS = 0.03;
+const CLICK_ATTACK_SECONDS = 0.002;
+const CLICK_BEAT_HZ = 1319;
+const CLICK_BAR_HZ = 1760;
+const CLICK_BEAT_LEVEL = 0.3;
+const CLICK_BAR_LEVEL = 0.45;
+const STEPS_PER_BEAT = 4;
+const BEATS_PER_BAR = 4;
+
 export interface TransportRuntimeOptions {
   readonly createContext?: () => AudioContext;
   readonly adapterFactoryFor: (pluginId: PluginId) => VoiceAdapterFactory | undefined;
   readonly onStatus?: (status: TransportRuntimeStatus) => void;
   /** Peak output level per module, at the worklet protocol's frame rate. */
   readonly onMeter?: (moduleId: ModuleInstanceId, level: number) => void;
+  /** Reports every audio-runtime state change, for the header power control. */
+  readonly onStateChange?: (state: AudioRuntimeState) => void;
 }
 
 interface AuditionSession {
   adapter?: VoiceAdapterPort;
+}
+
+interface MetronomeVoice {
+  readonly frame: number;
+  readonly oscillator: OscillatorNode;
+  readonly gain: GainNode;
 }
 
 /**
@@ -109,6 +155,7 @@ export class TransportRuntime {
   readonly #adapterFactoryFor: (pluginId: PluginId) => VoiceAdapterFactory | undefined;
   readonly #onStatus: (status: TransportRuntimeStatus) => void;
   readonly #onMeter: (moduleId: ModuleInstanceId, level: number) => void;
+  readonly #onStateChange: (state: AudioRuntimeState) => void;
   readonly #modules = new Map<ModuleInstanceId, TransportModule>();
   readonly #adapters = new Map<ModuleInstanceId, VoiceAdapterPort>();
   readonly #auditions = new Map<ModuleInstanceId, AuditionSession>();
@@ -122,7 +169,15 @@ export class TransportRuntime {
     ModuleInstanceId,
     { readonly parts: TransportModule["parts"]; readonly resolve: StepResolver }
   >();
+  readonly #metronomeVoices = new Set<MetronomeVoice>();
   #master: GainNode | undefined;
+  #limiter: DynamicsCompressorNode | undefined;
+  #analyserLeft: AnalyserNode | undefined;
+  #analyserRight: AnalyserNode | undefined;
+  #analysisLeft: Float32Array<ArrayBuffer> | undefined;
+  #analysisRight: Float32Array<ArrayBuffer> | undefined;
+  #metronomeOutput: GainNode | undefined;
+  #metronomeEnabled = false;
   #masterLevel = 0.8;
   #context: AudioContext | undefined;
   #clock: TransportClock | undefined;
@@ -131,7 +186,13 @@ export class TransportRuntime {
   #patternStartFrame = 0;
   #nextScheduleFrame = 0;
   #swing = 0;
+  #patternTiming: readonly PatternTiming[] = [];
   #arrangement: TransportArrangement = DEFAULT_ARRANGEMENT;
+  /** A Pattern launch waiting for its quantization boundary. */
+  #pendingArrangement: TransportArrangement | undefined;
+  #launchQuantizationSteps = DEFAULT_LAUNCH_QUANTIZATION_STEPS;
+  /** The transport start marker, kept even before the clock exists. */
+  #seekTicks: number | undefined;
   #state: AudioRuntimeState = "locked";
 
   constructor(options: TransportRuntimeOptions) {
@@ -140,6 +201,7 @@ export class TransportRuntime {
     this.#adapterFactoryFor = options.adapterFactoryFor;
     this.#onStatus = options.onStatus ?? (() => undefined);
     this.#onMeter = options.onMeter ?? (() => undefined);
+    this.#onStateChange = options.onStateChange ?? (() => undefined);
   }
 
   get state(): AudioRuntimeState {
@@ -166,13 +228,16 @@ export class TransportRuntime {
     const { activePatternIndex, songEnabled, songEntries } = this.#arrangement;
     let resolve: StepResolver;
     if (!songEnabled || songEntries.length === 0) {
-      resolve = loopingStepResolver(module.parts[activePatternIndex] ?? []);
+      resolve = loopingStepResolver(module.parts[activePatternIndex] ?? [], activePatternIndex);
     } else {
-      const chain: (readonly PatternStepView[])[] = [];
+      const chain: { readonly steps: readonly PatternStepView[]; readonly patternIndex: number }[] =
+        [];
       for (const entry of songEntries) {
         const part = module.parts[entry.patternIndex];
         if (part === undefined) continue;
-        for (let repeat = 0; repeat < entry.repeats; repeat += 1) chain.push(part);
+        for (let repeat = 0; repeat < entry.repeats; repeat += 1) {
+          chain.push({ steps: part, patternIndex: entry.patternIndex });
+        }
       }
       resolve = chainedStepResolver(chain);
     }
@@ -181,20 +246,66 @@ export class TransportRuntime {
   }
 
   setArrangement(arrangement: TransportArrangement): void {
+    const current = this.#pendingArrangement ?? this.#arrangement;
     const changed =
-      arrangement.activePatternIndex !== this.#arrangement.activePatternIndex ||
-      arrangement.songEnabled !== this.#arrangement.songEnabled ||
-      arrangement.songEntries !== this.#arrangement.songEntries;
+      arrangement.activePatternIndex !== current.activePatternIndex ||
+      arrangement.songEnabled !== current.songEnabled ||
+      arrangement.songEntries !== current.songEntries;
+    if (!changed) {
+      // Same content: keep the newest object so later identity checks hold.
+      if (this.#pendingArrangement !== undefined) this.#pendingArrangement = arrangement;
+      else this.#arrangement = arrangement;
+      return;
+    }
+
+    const context = this.#context;
+    const clock = this.#clock;
+    const playing =
+      context !== undefined &&
+      clock?.getSnapshot(this.#currentFrame(context)).status === "playing";
+
+    // While a Pattern loops, a Pattern launch waits for its quantization
+    // boundary. Every other arrangement change applies from the next scheduled
+    // note, so a mode switch never stops playback.
+    const patternLaunchOnly =
+      playing &&
+      !arrangement.songEnabled &&
+      !current.songEnabled &&
+      arrangement.songEntries === current.songEntries &&
+      arrangement.activePatternIndex !== current.activePatternIndex;
+    if (patternLaunchOnly) {
+      this.#pendingArrangement = arrangement;
+      return;
+    }
+
+    this.#applyArrangementNow(arrangement);
+    if (playing) {
+      const frame = this.#currentFrame(context);
+      this.#reanchor(context, clock, frame, clock.getSnapshot(frame).positionTicks);
+    }
+  }
+
+  #applyArrangementNow(arrangement: TransportArrangement): void {
+    this.#pendingArrangement = undefined;
     this.#arrangement = arrangement;
-    if (!changed) return;
     // Every cached resolver was built for the previous arrangement.
     this.#resolvers.clear();
+  }
+
+  /** The quantized Pattern-launch boundary, in sixteenth steps. */
+  setLaunchQuantization(steps: number): void {
+    if (!Number.isSafeInteger(steps) || steps < 1) return;
+    this.#launchQuantizationSteps = steps;
+  }
+
+  /** Pattern-owned Humanize and seed, by bank index. */
+  setPatternTiming(timing: readonly PatternTiming[]): void {
+    this.#patternTiming = timing;
     const context = this.#context;
     const clock = this.#clock;
     if (context === undefined || clock === undefined) return;
     const frame = this.#currentFrame(context);
     const snapshot = clock.getSnapshot(frame);
-    // A Pattern switch takes effect from the next scheduled note, not mid-note.
     if (snapshot.status === "playing")
       this.#reanchor(context, clock, frame, snapshot.positionTicks);
   }
@@ -227,8 +338,53 @@ export class TransportRuntime {
   /** The UI reads its playhead from here. The audio clock is always the source. */
   getPositionTicks(): number {
     const context = this.#context;
-    if (context === undefined) return 0;
+    if (context === undefined) return this.#seekTicks ?? 0;
     return this.#clock?.getSnapshot(this.#currentFrame(context)).positionTicks ?? 0;
+  }
+
+  /**
+   * Post-limiter master analysis. `L/R` and `M/S` are both derived from one
+   * non-audible analysis branch, so switching the display mode never touches
+   * the audible path.
+   */
+  getMasterMeter(): MasterMeterFrame {
+    const left = this.#analyserLeft;
+    const right = this.#analyserRight;
+    const leftData = this.#analysisLeft;
+    const rightData = this.#analysisRight;
+    if (
+      left === undefined ||
+      right === undefined ||
+      leftData === undefined ||
+      rightData === undefined
+    ) {
+      return SILENT_MASTER_METER;
+    }
+    left.getFloatTimeDomainData(leftData);
+    right.getFloatTimeDomainData(rightData);
+    let leftPeak = 0;
+    let rightPeak = 0;
+    let midPeak = 0;
+    let sidePeak = 0;
+    for (let index = 0; index < leftData.length; index += 1) {
+      const sampleLeft = leftData[index] ?? 0;
+      const sampleRight = rightData[index] ?? 0;
+      const absLeft = Math.abs(sampleLeft);
+      const absRight = Math.abs(sampleRight);
+      if (absLeft > leftPeak) leftPeak = absLeft;
+      if (absRight > rightPeak) rightPeak = absRight;
+      const mid = Math.abs((sampleLeft + sampleRight) / 2);
+      const side = Math.abs((sampleLeft - sampleRight) / 2);
+      if (mid > midPeak) midPeak = mid;
+      if (side > sidePeak) sidePeak = side;
+    }
+    return {
+      left: leftPeak,
+      right: rightPeak,
+      mid: midPeak,
+      side: sidePeak,
+      peak: Math.max(leftPeak, rightPeak) >= PEAK_DISPLAY_THRESHOLD,
+    };
   }
 
   async activate(): Promise<void> {
@@ -241,11 +397,14 @@ export class TransportRuntime {
           this.#handleContextStateChange,
         );
         this.#clock = new TransportClock(this.#context.sampleRate);
+        if (this.#seekTicks !== undefined) {
+          this.#clock.seekWhileStopped(this.#seekTicks, this.#currentFrame(this.#context));
+        }
         await Promise.all([this.#context.resume(), this.#syncFullProjection()]);
       } else {
         await this.#context.resume();
       }
-      this.#state = "active";
+      this.#setState("active");
     } catch (error) {
       for (const adapter of this.#adapters.values()) adapter.dispose();
       this.#adapters.clear();
@@ -259,9 +418,23 @@ export class TransportRuntime {
       void this.#context?.close();
       this.#context = undefined;
       this.#clock = undefined;
-      this.#state = "unavailable";
+      this.#setState("unavailable");
       throw error;
     }
+  }
+
+  /**
+   * The header power control. Powering off halts the transport and suspends the
+   * context; editing stays available. Powering back on is `activate()`, which
+   * requires a direct user gesture.
+   */
+  async powerOff(): Promise<void> {
+    this.stop();
+    this.#stopAllAuditions();
+    const context = this.#context;
+    if (context === undefined) return;
+    await context.suspend();
+    this.#setState("suspended");
   }
 
   async replaceFromCurrentState(
@@ -364,14 +537,32 @@ export class TransportRuntime {
         this.#setRevision(delta.projectRevision);
         const patternIndex = delta.payload.patternIndex;
         if (typeof patternIndex !== "number" || !Number.isInteger(patternIndex)) return;
-        this.setArrangement({ ...this.#arrangement, activePatternIndex: patternIndex });
+        const base = this.#pendingArrangement ?? this.#arrangement;
+        this.setArrangement({ ...base, activePatternIndex: patternIndex });
+        return;
+      }
+      case "pattern-timing-set": {
+        this.#setRevision(delta.projectRevision);
+        const patternIndex = delta.payload.patternIndex;
+        if (typeof patternIndex !== "number" || !Number.isInteger(patternIndex)) return;
+        const next = [...this.#patternTiming];
+        const current = next[patternIndex] ?? { humanize: 0, seed: 0 };
+        next[patternIndex] = {
+          humanize:
+            typeof delta.payload.humanize === "number"
+              ? delta.payload.humanize
+              : current.humanize,
+          seed: typeof delta.payload.seed === "number" ? delta.payload.seed : current.seed,
+        };
+        this.setPatternTiming(next);
         return;
       }
       case "song-set": {
         this.#setRevision(delta.projectRevision);
         const entries = delta.payload.entries;
+        const base = this.#pendingArrangement ?? this.#arrangement;
         this.setArrangement({
-          ...this.#arrangement,
+          ...base,
           songEnabled: delta.payload.enabled === true,
           songEntries: Array.isArray(entries)
             ? (entries as TransportArrangement["songEntries"])
@@ -398,6 +589,11 @@ export class TransportRuntime {
           this.setTempo(delta.payload.tempo);
         }
         if (typeof delta.payload.swing === "number") this.setSwing(delta.payload.swing);
+        // A pause also carries positionTicks, so the start marker key is the
+        // seek discriminator.
+        if (typeof delta.payload.startMarkerTicks === "number") {
+          this.seek(delta.payload.startMarkerTicks);
+        }
         return;
     }
   }
@@ -524,6 +720,33 @@ export class TransportRuntime {
       this.#reanchor(context, clock, frame, snapshot.positionTicks);
   }
 
+  setMetronomeEnabled(enabled: boolean): void {
+    if (enabled === this.#metronomeEnabled) return;
+    this.#metronomeEnabled = enabled;
+    if (!enabled) this.#stopScheduledClicks(0);
+  }
+
+  /**
+   * Positions the playhead and the transport start marker while the transport
+   * is not playing. The marker survives even before the first activation: the
+   * clock applies it as soon as it exists.
+   */
+  seek(positionTicks: number): void {
+    if (!Number.isSafeInteger(positionTicks) || positionTicks < 0) return;
+    const context = this.#context;
+    const clock = this.#clock;
+    if (context !== undefined && clock !== undefined) {
+      const frame = this.#currentFrame(context);
+      // A playing seek changes nothing, so the runtime copy must not diverge
+      // from the clock's marker either.
+      if (clock.getSnapshot(frame).status === "playing") return;
+      this.#seekTicks = positionTicks;
+      clock.seekWhileStopped(positionTicks, frame);
+      return;
+    }
+    this.#seekTicks = positionTicks;
+  }
+
   async play(tempo: number): Promise<void> {
     await this.activate();
     const context = this.#requiredContext();
@@ -532,7 +755,9 @@ export class TransportRuntime {
     const frame = this.#currentFrame(context) + this.#leadFrames(context);
     const positionTicks = clock.getSnapshot(frame).positionTicks;
     clock.setTempo(tempo, frame);
-    clock.play(frame);
+    // A second Play while already playing must not rewind the schedule window:
+    // that would re-emit onsets the adapters already hold and double the notes.
+    if (!clock.play(frame)) return;
     for (const adapter of this.#adapters.values()) adapter.resume();
     this.#patternStartFrame = frame - clock.ticksToFrames(positionTicks);
     this.#nextScheduleFrame = frame;
@@ -545,27 +770,40 @@ export class TransportRuntime {
     const frame = this.#currentFrame(context);
     this.#clock?.pause(frame);
     this.#stopScheduler();
+    this.#stopScheduledClicks(frame);
+    this.#applyPendingArrangement();
     for (const adapter of this.#adapters.values()) adapter.suspend();
-    this.#state = "suspended";
     return this.#clock?.getSnapshot(frame).positionTicks ?? 0;
   }
 
   stop(): void {
     const context = this.#context;
     if (context === undefined) return;
-    this.#clock?.stop(this.#currentFrame(context));
+    const frame = this.#currentFrame(context);
+    this.#clock?.stop(frame);
     this.#stopScheduler();
+    this.#stopScheduledClicks(frame);
+    this.#applyPendingArrangement();
     for (const adapter of this.#adapters.values()) adapter.suspend();
   }
 
   dispose(): void {
     this.#stopScheduler();
+    this.#stopScheduledClicks(0);
     this.#stopAllAuditions();
     for (const adapter of this.#adapters.values()) adapter.dispose();
     this.#adapters.clear();
     for (const moduleId of [...this.#channels.keys()]) this.#disposeChannel(moduleId);
     this.#master?.disconnect();
     this.#master = undefined;
+    this.#limiter?.disconnect();
+    this.#limiter = undefined;
+    this.#analyserLeft = undefined;
+    this.#analyserRight = undefined;
+    this.#analysisLeft = undefined;
+    this.#analysisRight = undefined;
+    this.#metronomeOutput?.disconnect();
+    this.#metronomeOutput = undefined;
     if (this.#context !== undefined) {
       audioContextEvents(this.#context).removeEventListener?.(
         "statechange",
@@ -575,7 +813,7 @@ export class TransportRuntime {
     void this.#context?.close();
     this.#context = undefined;
     this.#clock = undefined;
-    this.#state = "locked";
+    this.#setState("locked");
   }
 
   readonly #handleContextStateChange = (): void => {
@@ -583,7 +821,27 @@ export class TransportRuntime {
     if (state === "closed" || state === "interrupted" || state === "suspended") {
       this.#stopAllAuditions();
     }
+    // The context is the authority for suspension: a browser-side suspension or
+    // interruption shows as suspended even when Pulsebox did not request it. A
+    // browser-side resume restores active, but only from suspended: during the
+    // first activation the projection is still building, and `activate()` owns
+    // that report, so "active" never appears before the voices exist.
+    if ((state === "suspended" || state === "interrupted") && this.#state === "active") {
+      this.#setState("suspended");
+    }
+    if (state === "running" && this.#state === "suspended") this.#setState("active");
   };
+
+  #setState(state: AudioRuntimeState): void {
+    if (state === this.#state) return;
+    this.#state = state;
+    this.#onStateChange(state);
+  }
+
+  #applyPendingArrangement(): void {
+    const pending = this.#pendingArrangement;
+    if (pending !== undefined) this.#applyArrangementNow(pending);
+  }
 
   #stopAllAuditions(): void {
     for (const moduleId of [...this.#auditions.keys()]) this.stopAudition(moduleId);
@@ -601,6 +859,11 @@ export class TransportRuntime {
    * Re-pins the pattern grid to the musical position the clock reports now and
    * drops anything already queued past the playhead, so a tempo or swing change
    * takes effect without a doubled or dropped step.
+   *
+   * Clearing the queue also discards the note-off that belonged to a note whose
+   * onset already played, and the rebuilt window never re-emits it. Each voice
+   * therefore gets one explicit release at the re-anchor point; a note-off with
+   * no sounding note is harmless.
    */
   #reanchor(
     context: AudioContext,
@@ -608,9 +871,14 @@ export class TransportRuntime {
     frame: number,
     positionTicks: number,
   ): void {
-    for (const adapter of this.#adapters.values()) adapter.clearScheduledEvents();
+    const releaseFrame = frame + this.#leadFrames(context);
+    for (const adapter of this.#adapters.values()) {
+      adapter.clearScheduledEvents();
+      adapter.schedule([{ atFrame: releaseFrame, type: "note-off" }]);
+    }
+    this.#stopScheduledClicks(frame);
     this.#patternStartFrame = frame - clock.ticksToFrames(positionTicks);
-    this.#nextScheduleFrame = frame + this.#leadFrames(context);
+    this.#nextScheduleFrame = releaseFrame;
     this.#schedule();
   }
 
@@ -671,13 +939,49 @@ export class TransportRuntime {
     return adapter;
   }
 
+  /**
+   * Builds the master chain once: master gain, then the always-on protective
+   * limiter, then the physical destination. The header meters observe the
+   * post-limiter signal through a non-audible splitter and two analysers.
+   */
   #ensureMaster(context: AudioContext): GainNode {
     let master = this.#master;
     if (master === undefined) {
       master = context.createGain();
       master.gain.value = this.#masterLevel;
-      master.connect(context.destination);
+      const limiter = context.createDynamicsCompressor();
+      limiter.threshold.value = -1;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.05;
+      master.connect(limiter);
+      limiter.connect(context.destination);
+
+      const splitter = context.createChannelSplitter(2);
+      limiter.connect(splitter);
+      const analyserLeft = context.createAnalyser();
+      const analyserRight = context.createAnalyser();
+      for (const analyser of [analyserLeft, analyserRight]) {
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0;
+      }
+      splitter.connect(analyserLeft, 0);
+      splitter.connect(analyserRight, 1);
+
+      // The metronome bypasses the master fader but keeps limiter protection,
+      // so pulling the mix down never silences the click the user asked for.
+      const metronomeOutput = context.createGain();
+      metronomeOutput.gain.value = 1;
+      metronomeOutput.connect(limiter);
+
       this.#master = master;
+      this.#limiter = limiter;
+      this.#analyserLeft = analyserLeft;
+      this.#analyserRight = analyserRight;
+      this.#analysisLeft = new Float32Array(analyserLeft.fftSize);
+      this.#analysisRight = new Float32Array(analyserRight.fftSize);
+      this.#metronomeOutput = metronomeOutput;
     }
     return master;
   }
@@ -726,7 +1030,29 @@ export class TransportRuntime {
     const windowStart = Math.max(this.#nextScheduleFrame, currentFrame + this.#leadFrames(context));
     const windowEnd = currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS);
     if (windowStart >= windowEnd) return;
-    this.#scheduleWindow(clock, windowStart, windowEnd);
+
+    const pending = this.#pendingArrangement;
+    if (pending === undefined) {
+      this.#scheduleWindow(clock, windowStart, windowEnd);
+    } else {
+      // A queued Pattern launch applies exactly at its quantization boundary:
+      // the old arrangement fills the window up to the boundary, the new one
+      // fills the rest. The grid anchor never moves, so the launched Pattern
+      // starts at the boundary step.
+      const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
+      const quantFrames = stepFrames * this.#launchQuantizationSteps;
+      const sinceStart = windowStart - this.#patternStartFrame;
+      const boundary =
+        this.#patternStartFrame + Math.ceil(sinceStart / quantFrames) * quantFrames;
+      if (boundary >= windowEnd) {
+        this.#scheduleWindow(clock, windowStart, windowEnd);
+      } else {
+        if (boundary > windowStart) this.#scheduleWindow(clock, windowStart, boundary);
+        this.#applyArrangementNow(pending);
+        this.#scheduleWindow(clock, boundary, windowEnd);
+      }
+    }
+    this.#scheduleMetronome(context, clock, windowStart, windowEnd);
     this.#nextScheduleFrame = windowEnd;
   }
 
@@ -740,11 +1066,80 @@ export class TransportRuntime {
           resolveStep: this.#resolverFor(module),
           stepFrames,
           swing: this.#swing,
+          patternTiming: this.#patternTiming,
+          voiceSalt: voiceSaltFor(module.id),
           windowStartFrame: windowStart,
           windowEndFrame: windowEnd,
           patternStartFrame: this.#patternStartFrame,
         }),
       );
+    }
+  }
+
+  /** Schedules the metronome clicks whose beats land inside the window. */
+  #scheduleMetronome(
+    context: AudioContext,
+    clock: TransportClock,
+    windowStart: number,
+    windowEnd: number,
+  ): void {
+    if (!this.#metronomeEnabled) return;
+    // An empty rack builds no mixer channel, so the master chain the click
+    // needs may not exist yet.
+    if (this.#metronomeOutput === undefined) this.#ensureMaster(context);
+    const output = this.#metronomeOutput;
+    if (output === undefined) return;
+    const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
+    const beatFrames = stepFrames * STEPS_PER_BEAT;
+    const firstBeat = Math.max(0, Math.ceil((windowStart - this.#patternStartFrame) / beatFrames));
+    for (let beat = firstBeat; ; beat += 1) {
+      const frame = this.#patternStartFrame + beat * beatFrames;
+      if (frame >= windowEnd) break;
+      if (frame < windowStart) continue;
+      this.#scheduleClick(context, output, frame, beat % BEATS_PER_BAR === 0);
+    }
+  }
+
+  #scheduleClick(
+    context: AudioContext,
+    output: GainNode,
+    frame: number,
+    barStart: boolean,
+  ): void {
+    const time = frame / context.sampleRate;
+    const oscillator = context.createOscillator();
+    oscillator.frequency.value = barStart ? CLICK_BAR_HZ : CLICK_BEAT_HZ;
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(
+      barStart ? CLICK_BAR_LEVEL : CLICK_BEAT_LEVEL,
+      time + CLICK_ATTACK_SECONDS,
+    );
+    gain.gain.linearRampToValueAtTime(0, time + CLICK_SECONDS);
+    oscillator.connect(gain);
+    gain.connect(output);
+    const voice: MetronomeVoice = { frame, oscillator, gain };
+    this.#metronomeVoices.add(voice);
+    oscillator.onended = () => {
+      gain.disconnect();
+      this.#metronomeVoices.delete(voice);
+    };
+    oscillator.start(time);
+    oscillator.stop(time + CLICK_SECONDS + 0.005);
+  }
+
+  /** Silences clicks scheduled at or past `fromFrame`, for stop and reanchor. */
+  #stopScheduledClicks(fromFrame: number): void {
+    for (const voice of [...this.#metronomeVoices]) {
+      if (voice.frame < fromFrame) continue;
+      try {
+        voice.oscillator.onended = null;
+        voice.oscillator.stop();
+      } catch {
+        // A voice that already ended cannot be stopped again.
+      }
+      voice.gain.disconnect();
+      this.#metronomeVoices.delete(voice);
     }
   }
 
@@ -786,13 +1181,24 @@ export class TransportRuntime {
     const currentFrame = this.#currentFrame(context);
     if (clock.getSnapshot(currentFrame).status !== "playing") return;
     const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
+    // The refill ends where the shared window already ended. Running past
+    // `#nextScheduleFrame` would overlap the next tick's window and double the
+    // recovered voice's steps.
+    const windowStart = currentFrame + this.#leadFrames(context);
+    const windowEnd = Math.min(
+      this.#nextScheduleFrame,
+      currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS),
+    );
+    if (windowStart >= windowEnd) return;
     adapter.schedule(
       schedulePatternWindow({
         resolveStep: this.#resolverFor(module),
         stepFrames,
         swing: this.#swing,
-        windowStartFrame: currentFrame + this.#leadFrames(context),
-        windowEndFrame: currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS),
+        patternTiming: this.#patternTiming,
+        voiceSalt: voiceSaltFor(module.id),
+        windowStartFrame: windowStart,
+        windowEndFrame: windowEnd,
         patternStartFrame: this.#patternStartFrame,
       }),
     );
@@ -859,6 +1265,15 @@ interface MixerChannel {
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
+}
+
+/** Deterministic 32-bit salt from a stable module ID string. */
+function voiceSaltFor(moduleId: string): number {
+  let hash = 0;
+  for (let index = 0; index < moduleId.length; index += 1) {
+    hash = (Math.imul(hash, 31) + moduleId.charCodeAt(index)) | 0;
+  }
+  return hash | 0;
 }
 
 function audioContextEvents(context: AudioContext): Partial<EventTarget> {

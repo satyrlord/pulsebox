@@ -254,6 +254,88 @@
   color: var(--lcd-ink);
   background: none;
   box-shadow: none;
+  /* A vertical drag on the readout adjusts BPM; the browser must not pan. */
+  touch-action: none;
+  cursor: ns-resize;
+}
+
+/* The tap key matches the small machined caps beside it. */
+.tapTempo {
+  inline-size: 40px;
+  block-size: 40px;
+  flex: none;
+  padding: 0;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  border-radius: 7px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #ffffff0f, transparent 62%),
+    linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    inset 0 -2px 3px #00000073,
+    0 2px 4px #0000008c,
+    0 0 0 1px var(--edge-hairline);
+}
+
+.tapTempo:active {
+  color: var(--accent-lamp);
+  box-shadow:
+    inset 0 2px 3px #00000073,
+    0 0 0 1px var(--edge-hairline);
+}
+
+/* The peak lamp and its engraved label. */
+.peak {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.peak > span {
+  font:
+    var(--pulse-type-10, 10px) / 1 var(--type-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.peak[data-lit="true"] > span {
+  color: var(--pulse-color-status-danger, #ff8178);
+}
+
+/* Master dB on readout glass, fixed width so decay never shifts the layout. */
+.masterDb {
+  flex: none;
+  inline-size: 64px;
+  block-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font:
+    var(--pulse-type-12, 12px) / 1 var(--pulse-font-mono, ui-monospace),
+    monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--lcd-ink);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--scope-glass) 88%, #000000),
+    var(--scope-glass)
+  );
+  border-radius: 7px;
+  box-shadow: var(--sink-2);
+}
+
+.masterDb > span {
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 .tempo > span:last-child {
@@ -429,5 +511,13 @@
 
   .masterMeters canvas {
     inline-size: 80px !important;
+  }
+
+  .tapTempo {
+    inline-size: 34px;
+  }
+
+  .masterDb {
+    inline-size: 56px;
   }
 }

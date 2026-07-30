@@ -80,6 +80,52 @@ describe("EditorWorkspace", () => {
     ]);
     expect(screen.getByRole("button", { name: /Verse/ })).toBeInTheDocument();
   });
+
+  it("edits the active Pattern's Humanize through the header slider", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const slider = screen.getByRole("slider", { name: "Pattern Humanize" });
+    expect(slider).toHaveValue("12");
+
+    fireEvent.change(slider, { target: { value: "40" } });
+
+    expect(harness.domain.getState().project.patterns[1]?.humanize).toBeCloseTo(0.4, 6);
+    // Humanize is Pattern-owned: the other Patterns keep their own value.
+    expect(harness.domain.getState().project.patterns[0]?.humanize).toBeCloseTo(0.12, 6);
+  });
+
+  it("stores a new deterministic seed through the variation button", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const before = harness.domain.getState().project.patterns[1]?.seed;
+
+    fireEvent.click(screen.getByRole("button", { name: "New variation" }));
+
+    const after = harness.domain.getState().project.patterns[1]?.seed;
+    expect(after).not.toBe(before);
+    expect(Number.isSafeInteger(after)).toBe(true);
+  });
+
+  it("positions the playhead and start marker from a step target while stopped", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+
+    fireEvent.click(screen.getByRole("button", { name: "Set the start marker to step 5" }));
+
+    expect(harness.domain.getState().transport.positionTicks).toBe(960);
+    expect(harness.domain.getState().transport.startMarkerTicks).toBe(960);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+  });
+
+  it("disables the seek targets while the transport is playing", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    act(() => {
+      harness.domain.dispatch(harness.domain.createCommand("transport-play", {}));
+    });
+
+    expect(screen.getByRole("button", { name: "Set the start marker to step 5" })).toBeDisabled();
+  });
 });
 
 describe("Mixer", () => {
@@ -326,10 +372,10 @@ describe("ProjectMenu", () => {
     expect(harness.store.getState().savedProjects[0]?.name).toBe("Saved session");
   });
 
-  it("opens the compact menu and saves through the injected project service", async () => {
+  it("saves through the project actions menu and the injected service", async () => {
     const harness = createHarness();
     renderWithHarness(<ProjectMenu />, harness);
-    fireEvent.click(screen.getByRole("button", { name: "Neon Basement" }));
+    fireEvent.click(screen.getByRole("button", { name: "Project actions" }));
 
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitem", { name: "Save" }));
@@ -339,10 +385,10 @@ describe("ProjectMenu", () => {
     expect(harness.projects.save).toHaveBeenCalled();
   });
 
-  it("lists and opens stored projects inside the viewport-bound menu", async () => {
+  it("lists and opens stored projects inside the viewport-bound selector", async () => {
     const harness = createHarness();
     renderWithHarness(<ProjectMenu />, harness);
-    fireEvent.click(screen.getByRole("button", { name: "Neon Basement" }));
+    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
 
     await waitFor(() => {
       expect(screen.getByRole("list", { name: "Stored projects" })).toBeInTheDocument();
@@ -353,6 +399,24 @@ describe("ProjectMenu", () => {
     });
 
     expect(harness.projects.open).toHaveBeenCalledWith("stored-1");
+  });
+
+  it("pins the project with an aria-pressed toggle through the service", async () => {
+    const harness = createHarness();
+    renderWithHarness(<ProjectMenu />, harness);
+    const pin = screen.getByRole("button", { name: "Pin project" });
+    expect(pin).toHaveAttribute("aria-pressed", "false");
+
+    await act(async () => {
+      fireEvent.click(pin);
+      await Promise.resolve();
+    });
+
+    expect(harness.projects.setPinned).toHaveBeenCalledWith(true);
+    expect(screen.getByRole("button", { name: "Pin project" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("reports a rejected import without changing the project", async () => {

@@ -8,9 +8,13 @@ columns. It includes five named Patterns, basic Playlist transport, channel
 mixing, appearance Settings, and browser project persistence.
 
 Narrow later-phase foundations include six instrument modules and the
-AudioWorklet Acid Bass and Drumline Six paths. These slices do not mark their
-parent phases complete. The rack exposes all eight slots. The Mixer exposes all
-eight instrument strips and one master strip.
+AudioWorklet Acid Bass and Drumline Six paths. The specification 004 transport
+and timing slice is also runnable. It covers tap tempo, tempo drag, the
+transport start marker, bar-quantized Pattern launches, deterministic Pattern
+Humanize with stored seeds, the metronome click, the audio-engine power control,
+the default master limiter, and post-limiter `L/R` and `M/S` header metering.
+These slices do not mark their parent phases complete. The rack exposes all
+eight slots. The Mixer exposes all eight instrument strips and one master strip.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications
@@ -48,6 +52,8 @@ Current owners:
   verification.
 - [docs/instruments/acid-bass.md](docs/instruments/acid-bass.md): Acid Bass
   identity, parameters, behavior, and verification boundary.
+- [docs/instruments/voice-behavior.md](docs/instruments/voice-behavior.md):
+  per-instrument voice limits, steal priority, release, choke, and retrigger.
 - [docs/user-sample-policy.md](docs/user-sample-policy.md): accepted samples,
   ownership, privacy, and user-facing failure behavior.
 - [docs/audits/naming-originality-audit.md](docs/audits/naming-originality-audit.md):
@@ -106,9 +112,12 @@ project data.
 
 Custom synthesis runs in AudioWorklet processors. Suitable
 native Web Audio nodes remain behind engine-owned adapters. The processor
-accepts the host frame count and never assumes a 128-frame quantum. The bundled
-WAV, AIFF, and FLAC decoder foundation is present. Sample-import UI and
-cross-browser format fixtures remain later work.
+accepts the host frame count and never assumes a 128-frame quantum. The master
+chain runs through a limiter that is enabled by default. The header meters read
+a non-audible post-limiter analysis branch in `L/R` or `M/S` mode. Playback
+applies the global Swing and the Pattern-owned deterministic Humanize with its
+stored seed. The bundled WAV, AIFF, and FLAC decoder foundation is present.
+Sample-import UI and cross-browser format fixtures remain later work.
 
 ## Persistence
 
@@ -141,8 +150,10 @@ The shortcut reference will expand when later editors add commands.
 - Asset packs, effect processing, advanced editors, and rendered-audio export
   belong to later roadmap phases.
 - The Pattern bank holds five named Patterns and selects Verse by default. The
-  lower editor shows the selected module events. Complete note, trigger,
-  Humanize, and automation editing remain planned.
+  lower editor shows the selected module events with Swing and Humanize
+  controls. Complete note, trigger, and automation editing remain planned.
+- Record arms and disarms only. Live recording and its count-in settings belong
+  to the specification 006 phase.
 - The mixer covers level, pan, mute, solo, and master level. Send buttons open
   the applicable empty send-chain summary. Send routing, inserts, master-effects
   bypass, and the master chain remain planned.

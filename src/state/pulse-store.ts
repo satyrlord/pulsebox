@@ -15,7 +15,7 @@ import {
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
 import type { PulseCommand } from "./commands";
-import { createModule, type ModuleSeed } from "./default-state";
+import { createModule, MAXIMUM_PATTERN_SEED, type ModuleSeed } from "./default-state";
 import type { PatternStep, ProjectState, PulseState, RackModuleState } from "./model";
 
 const MAX_SONG_ENTRIES = 128;
@@ -51,6 +51,7 @@ export type PulseEngineDelta = EngineDelta<
   | "transport"
   | "pattern-select"
   | "pattern-rename"
+  | "pattern-timing-set"
   | "song-set"
   | "mixer-set",
   Readonly<Record<string, unknown>>
@@ -275,6 +276,36 @@ export class PulseStore {
         });
       case "transport-record-toggle":
         return this.#transport({ recordArmed: !this.#state.transport.recordArmed });
+      case "transport-seek": {
+        const ticks = command.payload.positionTicks;
+        if (!Number.isSafeInteger(ticks) || ticks < 0) {
+          return {
+            error: rejected(
+              "payload.positionTicks",
+              "Position must be a non-negative safe integer.",
+              "Choose a position inside the Pattern.",
+            ),
+          };
+        }
+        if (this.#state.transport.status === "playing") {
+          return {
+            error: rejected(
+              "payload.positionTicks",
+              "The transport is playing.",
+              "Stop or pause before positioning the playhead.",
+            ),
+          };
+        }
+        if (
+          this.#state.transport.positionTicks === ticks &&
+          this.#state.transport.startMarkerTicks === ticks
+        ) {
+          return { state: this.#state, projectChanged: false };
+        }
+        // The start marker follows a deliberate playhead position, so the next
+        // Stop returns here. The marker key doubles as the engine seek signal.
+        return this.#transport({ positionTicks: ticks, startMarkerTicks: ticks });
+      }
       case "transport-tempo-set":
         if (
           !Number.isFinite(command.payload.tempo) ||
@@ -341,6 +372,10 @@ export class PulseStore {
         return this.#toggleStep(command.payload.moduleId, command.payload.step);
       case "transport-swing-set":
         return this.#setSwing(command.payload.swing);
+      case "pattern-humanize-set":
+        return this.#setPatternHumanize(command.payload.patternIndex, command.payload.humanize);
+      case "pattern-seed-set":
+        return this.#setPatternSeed(command.payload.patternIndex, command.payload.seed);
       case "pattern-select":
         return this.#selectPattern(command.payload.patternIndex);
       case "pattern-rename":
@@ -386,6 +421,65 @@ export class PulseStore {
     if (swing === this.#state.project.swing)
       return { state: this.#state, projectChanged: false as const };
     return this.#projectTransition({ ...this.#state.project, swing }, "transport", [], { swing });
+  }
+
+  #setPatternHumanize(patternIndex: number, rawHumanize: number) {
+    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
+    if (indexError !== undefined) return { error: indexError };
+    if (!Number.isFinite(rawHumanize) || rawHumanize < 0 || rawHumanize > 1) {
+      return {
+        error: rejected(
+          "payload.humanize",
+          "Humanize must be between 0 and 1.",
+          "Choose a Humanize amount.",
+        ),
+      };
+    }
+    // The document stores whole percent, so the accepted value snaps to the
+    // same grid. Otherwise a saved project would replay a different variation.
+    const humanize = Math.round(rawHumanize * 100) / 100;
+    if (humanize === this.#state.project.patterns[patternIndex]?.humanize) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        patterns: this.#state.project.patterns.map((slot, index) =>
+          index === patternIndex ? { ...slot, humanize } : slot,
+        ),
+      },
+      "pattern-timing-set",
+      [],
+      { patternIndex, humanize },
+    );
+  }
+
+  #setPatternSeed(patternIndex: number, seed: number) {
+    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
+    if (indexError !== undefined) return { error: indexError };
+    if (!Number.isSafeInteger(seed) || seed < 0 || seed > MAXIMUM_PATTERN_SEED) {
+      return {
+        error: rejected(
+          "payload.seed",
+          "A Pattern seed must be an unsigned 32-bit integer.",
+          "Request a new variation to generate a valid seed.",
+        ),
+      };
+    }
+    if (seed === this.#state.project.patterns[patternIndex]?.seed) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        patterns: this.#state.project.patterns.map((slot, index) =>
+          index === patternIndex ? { ...slot, seed } : slot,
+        ),
+      },
+      "pattern-timing-set",
+      [],
+      { patternIndex, seed },
+    );
   }
 
   #requirePatternIndex(field: string, index: number) {

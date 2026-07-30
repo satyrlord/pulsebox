@@ -72,6 +72,14 @@ export interface PatternDocument {
   readonly length: number;
   /** Index into the project Pattern bank. Absent in format 1 documents. */
   readonly patternIndex?: number;
+  /**
+   * Pattern-owned Humanize, 0 through 100 percent. Absent in documents written
+   * before deterministic humanization. An absent value plays mechanically, so an
+   * old document keeps its old playback.
+   */
+  readonly humanize?: number;
+  /** Stored Pattern seed, an unsigned 32-bit integer. Absent in old documents. */
+  readonly seed?: number;
   readonly steps: readonly PatternStep[];
 }
 
@@ -210,6 +218,10 @@ export function serializeProject(
           patternIndex,
           name: slot?.name ?? `Pattern ${String(patternIndex + 1)}`,
           length: slot?.length ?? steps.length,
+          // State keeps Humanize as a 0-to-1 ratio; the format stores percent,
+          // the unit the specification and the interface both speak in.
+          humanize: Math.round((slot?.humanize ?? 0) * 100),
+          seed: slot?.seed ?? 0,
           steps: steps.map((step) => ({ ...step })),
         };
       }),
@@ -284,7 +296,16 @@ const RACK_KEYS = new Set([
   "level",
   "pan",
 ]);
-const PATTERN_KEYS = new Set(["id", "moduleId", "name", "length", "patternIndex", "steps"]);
+const PATTERN_KEYS = new Set([
+  "id",
+  "moduleId",
+  "name",
+  "length",
+  "patternIndex",
+  "humanize",
+  "seed",
+  "steps",
+]);
 const STEP_KEYS = new Set(["active", "note", "velocity", "accent", "slide"]);
 const SONG_KEYS = new Set(["patternIndex", "repeats"]);
 
@@ -642,6 +663,15 @@ export function parseProjectDocument(
           `${path}.patternIndex`,
           `Pattern index must be from 0 through ${String(PATTERN_SLOT_COUNT - 1)}.`,
         );
+      if (pattern.humanize !== undefined && !finiteNumber(pattern.humanize, 0, 100))
+        collector.add(`${path}.humanize`, "Humanize must be between 0 and 100 percent.");
+      if (
+        pattern.seed !== undefined &&
+        (!Number.isSafeInteger(pattern.seed) ||
+          Number(pattern.seed) < 0 ||
+          Number(pattern.seed) > 0xffff_ffff)
+      )
+        collector.add(`${path}.seed`, "A Pattern seed must be an unsigned 32-bit integer.");
       if (!Array.isArray(pattern.steps)) {
         collector.add(`${path}.steps`, "A pattern needs a step list.");
         continue;
@@ -998,6 +1028,17 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
             id: existing?.id ?? (`${document.project.id}-pattern-${String(index)}` as PatternId),
             name: record?.name ?? existing?.name ?? `Pattern ${String(index + 1)}`,
             length: record?.length ?? existing?.length ?? PATTERN_STEP_COUNT,
+            // An old document has no Humanize record: it keeps playing
+            // mechanically instead of adopting the new-project default.
+            humanize: clampUnit(
+              typeof record?.humanize === "number" ? record.humanize / 100 : undefined,
+              0,
+              0,
+            ),
+            seed:
+              typeof record?.seed === "number" && Number.isSafeInteger(record.seed)
+                ? record.seed
+                : Math.imul(index + 1, 0x9e3779b1) >>> 0,
           });
         }),
       ),

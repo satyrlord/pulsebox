@@ -22,5 +22,33 @@ export function stubMixerNodes() {
       connect: vi.fn(),
       disconnect: vi.fn(),
     })),
+    // The master chain: protective limiter plus the non-audible analysis branch.
+    createDynamicsCompressor: vi.fn(() => ({
+      threshold: stubAudioParam(),
+      knee: stubAudioParam(),
+      ratio: stubAudioParam(),
+      attack: stubAudioParam(),
+      release: stubAudioParam(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    })),
+    createChannelSplitter: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+    createAnalyser: vi.fn(() => ({
+      fftSize: 2048,
+      smoothingTimeConstant: 0,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      getFloatTimeDomainData: vi.fn((data: Float32Array) => {
+        data.fill(0);
+      }),
+    })),
+    createOscillator: vi.fn(() => ({
+      frequency: stubAudioParam(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      onended: null as (() => void) | null,
+    })),
   };
 }

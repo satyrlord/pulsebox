@@ -33,6 +33,12 @@ export type PulseCommand =
       { readonly moduleId: ModuleInstanceId; readonly step: number }
     >
   | CommandEnvelope<"transport-swing-set", { readonly swing: number }>
+  | CommandEnvelope<"transport-seek", { readonly positionTicks: number }>
+  | CommandEnvelope<
+      "pattern-humanize-set",
+      { readonly patternIndex: number; readonly humanize: number }
+    >
+  | CommandEnvelope<"pattern-seed-set", { readonly patternIndex: number; readonly seed: number }>
   | CommandEnvelope<"pattern-select", { readonly patternIndex: number }>
   | CommandEnvelope<"pattern-rename", { readonly patternIndex: number; readonly name: string }>
   | CommandEnvelope<"pattern-clear", { readonly patternIndex: number }>

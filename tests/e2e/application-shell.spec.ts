@@ -475,8 +475,8 @@ test("keeps the stopped shell deterministic for visual review", async ({ page })
 
 test("keeps the project menu inside the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.getByRole("button", { name: "Neon Basement" }).click();
-  const menu = page.getByRole("menu", { name: "Project menu" });
+  await page.getByRole("button", { name: /Project selector/ }).click();
+  const menu = page.getByRole("menu", { name: "Project selector" });
   const bounds = await box(menu);
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.y).toBeGreaterThanOrEqual(0);

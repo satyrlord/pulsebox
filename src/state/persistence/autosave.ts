@@ -15,6 +15,8 @@ export interface AutosaveOptions {
   readonly createdAt: () => string;
   /** Last committed ProjectRevision. Autosave never advances it. */
   readonly projectRevision: () => ProjectRevision;
+  /** Committed pin flag, so an autosave snapshot keeps the pin. */
+  readonly pinned?: () => boolean;
   /** Quiet period after the last edit before a snapshot is written. */
   readonly debounceMilliseconds?: number;
   readonly onError?: (error: unknown) => void;
@@ -36,12 +38,13 @@ function toStored(
   createdAt: string,
   now: string,
   projectRevision: ProjectRevision,
+  pinned: boolean,
 ): StoredProject {
   return {
     id: state.project.id,
     name: state.project.name,
     modifiedAt: now,
-    document: serializeProject(state, { createdAt, modifiedAt: now, projectRevision }),
+    document: serializeProject(state, { createdAt, modifiedAt: now, projectRevision, pinned }),
   };
 }
 
@@ -61,7 +64,13 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
     queue = queue
       .then(() =>
         options.repository.saveAutosave(
-          toStored(state, options.createdAt(), options.now(), options.projectRevision()),
+          toStored(
+            state,
+            options.createdAt(),
+            options.now(),
+            options.projectRevision(),
+            options.pinned?.() ?? false,
+          ),
         ),
       )
       .catch((error: unknown) => {

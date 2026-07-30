@@ -88,6 +88,36 @@ test("play activates the AudioWorklet path and Stop is idempotent", async ({ pag
   await expect(page.getByRole("button", { name: /^play$/i })).toBeVisible();
 });
 
+/**
+ * Specification 004 section 21.8: audible playback begins within three seconds
+ * of the first Play gesture on a warm cache. The header master meter reads the
+ * real post-limiter analysis branch, so a non-zero reading is the deterministic
+ * probe for a non-silent output frame. The formal five-run release procedure
+ * with its environment record stays a release task; this test guards the bound
+ * in CI.
+ */
+test("first Play reaches a non-silent master frame within three seconds", async ({ page }) => {
+  await page.getByRole("button", { name: /^play$/i }).click();
+  const meter = page.getByRole("meter", { name: "Master meter channel one" });
+  await expect
+    .poll(async () => Number((await meter.getAttribute("aria-valuenow")) ?? "0"), {
+      timeout: 3_000,
+    })
+    .toBeGreaterThan(0);
+  // The master dB readout follows the same analysis branch.
+  await expect(page.getByLabel("Master level in decibels")).not.toHaveText(/-inf/);
+});
+
+test("a step seek sets the start marker and Stop returns to it", async ({ page }) => {
+  await page.getByRole("button", { name: "Set the start marker to step 5" }).click();
+  const position = page.locator('[data-field="position"]');
+  await expect(position).toContainText("001 : 2 : 000");
+
+  await startPlayback(page);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(position).toContainText("001 : 2 : 000");
+});
+
 test("audition sounds only while pointer or keyboard input is held", async ({ page }) => {
   await page.evaluate(() => {
     const probe = { created: 0, disconnected: 0 };
@@ -651,7 +681,7 @@ test("a saved project reopens from the Open menu", async ({ page }) => {
   await tempo.press("Enter");
 
   const projectMenu = page.locator('[data-component="project-menu"]');
-  await projectMenu.getByRole("button", { name: /Neon Basement/ }).click();
+  await projectMenu.getByRole("button", { name: "Project actions" }).click();
   await projectMenu.getByRole("menuitem", { name: "Save" }).click();
   await expect(projectMenu.getByRole("status")).toContainText("Saved");
 
@@ -659,6 +689,7 @@ test("a saved project reopens from the Open menu", async ({ page }) => {
   await tempo.press("Enter");
   await expect(tempo).toHaveValue("100");
 
+  await projectMenu.getByRole("button", { name: /Project selector/ }).click();
   await page.getByRole("list", { name: "Stored projects" }).getByRole("button").first().click();
 
   await expect(page.locator('[data-field="tempo"]')).toHaveValue("144");
@@ -668,7 +699,7 @@ test("portable export produces a ZIP that imports through the validated archive 
   page,
 }) => {
   const projectMenu = page.locator('[data-component="project-menu"]');
-  await projectMenu.getByRole("button", { name: /Neon Basement/ }).click();
+  await projectMenu.getByRole("button", { name: "Project actions" }).click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     projectMenu.getByRole("menuitem", { name: "Export" }).click(),
@@ -681,6 +712,7 @@ test("portable export produces a ZIP that imports through the validated archive 
   await page.getByLabel("Import project file").setInputFiles(path);
   await expect(projectMenu.getByRole("status")).toContainText("Project imported");
 
+  await projectMenu.getByRole("button", { name: /Project selector/ }).click();
   await expect(
     page.getByRole("list", { name: "Stored projects" }).getByRole("button").first(),
   ).toContainText("Neon Basement");

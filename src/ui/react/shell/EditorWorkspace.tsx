@@ -172,6 +172,50 @@ function AuditionKeys(props: {
   );
 }
 
+const PATTERN_TICKS = 16 * 240;
+
+/**
+ * The moving line over the note grid. Its own component, so the per-frame
+ * position updates re-render two elements rather than the whole Piano Roll.
+ */
+function Playhead() {
+  const positionTicks = useAppStore((state) => state.positionTicks);
+  const ticksInPattern = ((positionTicks % PATTERN_TICKS) + PATTERN_TICKS) % PATTERN_TICKS;
+  const percent = (ticksInPattern / PATTERN_TICKS) * 100;
+  return (
+    <b
+      className={styles.playhead}
+      aria-hidden="true"
+      style={{ transform: `translateX(${String(percent)}%)` }}
+    />
+  );
+}
+
+/**
+ * One transparent seek target per step. Positioning the playhead while the
+ * transport is not playing also moves the transport start marker, so Stop
+ * returns to the chosen step.
+ */
+function SeekSteps() {
+  const playing = useAppStore((state) => state.project.transport.status === "playing");
+  const seek = useAppStore((state) => state.seek);
+  return (
+    <div className={styles.seekSteps} role="group" aria-label="Start marker">
+      {Array.from({ length: 16 }, (_, index) => (
+        <button
+          key={index}
+          type="button"
+          disabled={playing}
+          aria-label={`Set the start marker to step ${String(index + 1)}`}
+          onClick={() => {
+            seek(index * 240);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function PianoRoll() {
   const { auditionNoteFor, manifestFor } = useDependencies();
   const modules = useAppStore((state) => state.project.project.modules);
@@ -181,9 +225,13 @@ function PianoRoll() {
   const swing = useAppStore((state) => state.project.project.swing);
   const selectModule = useAppStore((state) => state.selectModule);
   const setSwing = useAppStore((state) => state.setSwing);
+  const setHumanize = useAppStore((state) => state.setHumanize);
+  const newPatternVariation = useAppStore((state) => state.newPatternVariation);
   const startAudition = useAppStore((state) => state.startAudition);
   const stopAudition = useAppStore((state) => state.stopAudition);
   const swingGesture = useContinuousGesture();
+  const humanizeGesture = useContinuousGesture();
+  const humanize = patterns[activePatternIndex]?.humanize ?? 0;
   const module = selectedModuleId === undefined ? undefined : modules[selectedModuleId];
   const manifest = module === undefined ? undefined : manifestFor(module.pluginId);
   const pitched =
@@ -223,6 +271,37 @@ function PianoRoll() {
           />
           <output>{`${String(Math.round(swing * 100))}%`}</output>
         </label>
+        <label>
+          <span>Humanize</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(humanize * 100)}
+            aria-label="Pattern Humanize"
+            aria-valuetext={`${String(Math.round(humanize * 100))} percent`}
+            {...humanizeGesture.handlers}
+            onChange={(event) => {
+              setHumanize(
+                activePatternIndex,
+                event.currentTarget.valueAsNumber / 100,
+                humanizeGesture.current(),
+              );
+            }}
+          />
+          <output>{`${String(Math.round(humanize * 100))}%`}</output>
+        </label>
+        <button
+          type="button"
+          className={styles.variationButton}
+          title="Store a new seed. The same seed always replays the same variation."
+          onClick={() => {
+            newPatternVariation(activePatternIndex);
+          }}
+        >
+          New variation
+        </button>
         <label className={styles.moduleSelector}>
           <span>Module</span>
           <select
@@ -262,26 +341,29 @@ function PianoRoll() {
           onStart={startAudition}
           onStop={stopAudition}
         />
-        <div
-          className={styles.noteGrid}
-          role="img"
-          aria-label={
-            activeSteps.length === 0
-              ? "The selected Pattern has no active steps."
-              : `Active steps: ${activeSteps.join(", ")}.`
-          }
-        >
-          <div className={styles.pitchRows} aria-hidden="true">
-            {editorRows.map((row) => (
-              <span key={`${row.label}-${String(row.note)}`} data-sharp={row.tone === "sharp"} />
-            ))}
+        <div className={styles.noteGrid}>
+          <div
+            className={styles.noteLayers}
+            role="img"
+            aria-label={
+              activeSteps.length === 0
+                ? "The selected Pattern has no active steps."
+                : `Active steps: ${activeSteps.join(", ")}.`
+            }
+          >
+            <div className={styles.pitchRows} aria-hidden="true">
+              {editorRows.map((row) => (
+                <span key={`${row.label}-${String(row.note)}`} data-sharp={row.tone === "sharp"} />
+              ))}
+            </div>
+            <div className={styles.stepNotes} aria-hidden="true">
+              {Array.from({ length: 16 }, (_, index) => (
+                <i key={index} data-active={steps[index]?.active === true} />
+              ))}
+            </div>
           </div>
-          <div className={styles.stepNotes} aria-hidden="true">
-            {Array.from({ length: 16 }, (_, index) => (
-              <i key={index} data-active={steps[index]?.active === true} />
-            ))}
-          </div>
-          <b className={styles.playhead} aria-hidden="true" />
+          <SeekSteps />
+          <Playhead />
         </div>
       </div>
       <footer className={styles.velocityLane}>

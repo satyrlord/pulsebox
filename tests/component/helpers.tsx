@@ -31,6 +31,8 @@ export interface Harness {
     readonly open: ReturnType<typeof vi.fn>;
     readonly exportPortable: ReturnType<typeof vi.fn>;
     readonly importPortable: ReturnType<typeof vi.fn>;
+    readonly setPinned: ReturnType<typeof vi.fn>;
+    readonly getPinned: ReturnType<typeof vi.fn>;
   };
   readonly dependencies: AppStoreDependencies;
   readonly disconnect: () => void;
@@ -73,16 +75,28 @@ export function createHarness(): Harness {
     stopAudition: vi.fn(),
     stop: vi.fn(),
     setSwing: vi.fn(),
+    getMasterMeter: vi.fn(() => ({ left: 0, right: 0, mid: 0, side: 0, peak: false })),
+    setMetronomeEnabled: vi.fn(),
+    setPower: vi.fn(() => Promise.resolve()),
+    setLaunchQuantization: vi.fn(),
   };
 
+  let pinned = false;
   const projects = {
     save: vi.fn(() => Promise.resolve()),
     list: vi.fn(() =>
-      Promise.resolve([{ id: "stored-1", name: "Saved session", modifiedAt: "2026-07-28" }]),
+      Promise.resolve([
+        { id: "stored-1", name: "Saved session", modifiedAt: "2026-07-28", pinned: false },
+      ]),
     ),
     open: vi.fn(() => Promise.resolve()),
     exportPortable: vi.fn(() => new Uint8Array()),
     importPortable: vi.fn(() => Promise.resolve({ ok: true } as const)),
+    setPinned: vi.fn((next: boolean) => {
+      pinned = next;
+      return Promise.resolve();
+    }),
+    getPinned: vi.fn(() => pinned),
   };
 
   const domain = new PulseStore(

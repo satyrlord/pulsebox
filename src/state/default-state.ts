@@ -22,6 +22,21 @@ export const PATTERN_SLOT_COUNT = 5;
 export const PATTERN_STEP_COUNT = 16;
 export const DEFAULT_MODULE_LEVEL = 0.4;
 export const DEFAULT_MASTER_LEVEL = 0.5;
+/** Specification default: Humanize starts at 12 percent. */
+export const DEFAULT_PATTERN_HUMANIZE = 0.12;
+/** Pattern seeds are unsigned 32-bit integers. */
+export const MAXIMUM_PATTERN_SEED = 0xffff_ffff;
+
+/**
+ * Derives a stable default seed from a Pattern ID, so a new Pattern gets a
+ * repeatable variation without a second random source. Tests that inject a
+ * deterministic ID factory get deterministic seeds for free.
+ */
+function patternSeedFromId(id: string): number {
+  const hex = id.replaceAll("-", "").slice(0, 8);
+  const parsed = Number.parseInt(hex, 16);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
 
 const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as const;
 
@@ -63,13 +78,16 @@ export function createDefaultState(
       ),
       modules: Object.freeze(Object.fromEntries(modules.map((module) => [module.id, module]))),
       patterns: Object.freeze(
-        Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) =>
-          Object.freeze({
-            id: createPatternId(idFactory),
+        Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) => {
+          const id = createPatternId(idFactory);
+          return Object.freeze({
+            id,
             name: DEFAULT_PATTERN_NAMES[index] ?? `Pattern ${String(index + 1)}`,
             length: PATTERN_STEP_COUNT,
-          }),
-        ),
+            humanize: DEFAULT_PATTERN_HUMANIZE,
+            seed: patternSeedFromId(id),
+          });
+        }),
       ),
       activePatternIndex: 1,
       song: Object.freeze({ enabled: false, entries: Object.freeze([]) }),

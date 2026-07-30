@@ -19,6 +19,9 @@ export interface PulseboxAppHandle {
     status: "faulted" | "recovered" | "recovering",
     message?: string,
   ) => void;
+  readonly reportAudioRuntimeState: (
+    state: "locked" | "active" | "suspended" | "unavailable",
+  ) => void;
   readonly reportMeter: (moduleId: ModuleInstanceId, level: number) => void;
   readonly themeService: PulseThemeService;
 }
@@ -32,8 +35,45 @@ export interface MountOptions extends AppStoreDependencies {
  * double-invoked effect that leaked a listener, a frame loop, or an engine node
  * fails loudly here rather than as an audio dropout later.
  */
+/** Lightweight global UI preferences. Storage keys keep the pulse- prefix. */
+const METRONOME_STORAGE_KEY = "pulse-metronome-enabled";
+const LAUNCH_QUANTIZATION_STORAGE_KEY = "pulse-launch-quantization";
+
+function readStoredPreference(key: string): string | undefined {
+  try {
+    return window.localStorage.getItem(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredPreference(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // A browser that blocks storage keeps the in-session preference only.
+  }
+}
+
 export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
-  const { host, ...dependencies } = options;
+  const { host, ...injected } = options;
+
+  const storedLaunchQuantization = Number(readStoredPreference(LAUNCH_QUANTIZATION_STORAGE_KEY));
+  const dependencies: AppStoreDependencies = {
+    ...injected,
+    preferences: {
+      metronomeEnabled: readStoredPreference(METRONOME_STORAGE_KEY) === "true",
+      ...(Number.isSafeInteger(storedLaunchQuantization) && storedLaunchQuantization >= 1
+        ? { launchQuantizationSteps: storedLaunchQuantization }
+        : {}),
+      onMetronomeChange: (enabled) => {
+        writeStoredPreference(METRONOME_STORAGE_KEY, String(enabled));
+      },
+      onLaunchQuantizationChange: (steps) => {
+        writeStoredPreference(LAUNCH_QUANTIZATION_STORAGE_KEY, String(steps));
+      },
+    },
+  };
 
   const themeService = createPulseThemeService({
     host: elementThemeHost(document.documentElement),
@@ -79,6 +119,9 @@ export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
     },
     reportAudioStatus: (status, message) => {
       appStore.getState().reportAudioStatus(status, message);
+    },
+    reportAudioRuntimeState: (state) => {
+      appStore.getState().reportAudioRuntimeState(state);
     },
     reportMeter: (moduleId, level) => {
       appStore.getState().setMeterLevel(moduleId, level);

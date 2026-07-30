@@ -465,6 +465,10 @@ describe("Acid Bass plugin", () => {
     expect(scheduleBatches[0]?.[0]?.atFrame).toBe(960);
 
     context.currentTime = 0.5;
+    // One scheduler tick moves the shared window cursor to the present. The
+    // recovery refill is bounded by that cursor, so a refill past it cannot
+    // overlap the next tick and double the recovered voice's steps.
+    vi.advanceTimersByTime(25);
     scheduleBatches.length = 0;
     publishAdapterStatus?.({ state: "recovered" });
     expect(scheduleBatches[0]?.[0]?.atFrame).toBe(24_960);

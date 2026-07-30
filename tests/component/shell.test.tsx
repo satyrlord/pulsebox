@@ -132,6 +132,77 @@ describe("TransportBar", () => {
     expect(harness.store.getState().meterMode).toBe("ms");
     expect(harness.domain.getState().history.canUndo).toBe(false);
   });
+
+  it("forwards the metronome toggle to the engine port", () => {
+    const harness = createHarness();
+    renderWithHarness(<TransportBar />, harness);
+    fireEvent.click(screen.getByRole("button", { name: "Metronome" }));
+    expect(harness.audio.setMetronomeEnabled).toHaveBeenCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "Metronome" }));
+    expect(harness.audio.setMetronomeEnabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it("sets the tempo from a rolling set of taps", () => {
+    const harness = createHarness();
+    renderWithHarness(<TransportBar />, harness);
+    let nowValue = 0;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => nowValue);
+
+    const tap = screen.getByRole("button", { name: "Tap tempo" });
+    for (const time of [0, 500, 1_000, 1_500]) {
+      nowValue = time;
+      fireEvent.click(tap);
+    }
+
+    // 500 ms between taps is 120 BPM.
+    expect(harness.domain.getState().project.tempo).toBe(120);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+    now.mockRestore();
+  });
+
+  it("powers the audio engine through the port with aria-pressed state", async () => {
+    const harness = createHarness();
+    renderWithHarness(<TransportBar />, harness);
+    const power = screen.getByRole("button", { name: "Audio engine power" });
+    expect(power).toHaveAttribute("aria-pressed", "false");
+
+    await act(async () => {
+      fireEvent.click(power);
+      await Promise.resolve();
+    });
+    expect(harness.audio.setPower).toHaveBeenCalledWith(true);
+
+    act(() => {
+      harness.store.getState().reportAudioRuntimeState("active");
+    });
+    expect(screen.getByRole("button", { name: "Audio engine power" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Audio engine power" }));
+      await Promise.resolve();
+    });
+    expect(harness.audio.setPower).toHaveBeenLastCalledWith(false);
+  });
+
+  it("shows the master dB readout and the peak indicator", () => {
+    const harness = createHarness();
+    renderWithHarness(<TransportBar />, harness);
+    expect(screen.getByLabelText("Master level in decibels")).toHaveTextContent("-inf");
+    expect(screen.getByRole("img", { name: "Master peak: idle" })).toBeInTheDocument();
+  });
+
+  it("labels the meter pair L/R or M/S from the analysis mode", () => {
+    const harness = createHarness();
+    renderWithHarness(<TransportBar />, harness);
+    expect(screen.getByText("L")).toBeInTheDocument();
+    expect(screen.getByText("R")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Master meter mode: left and right" }));
+    expect(screen.getByText("M")).toBeInTheDocument();
+    expect(screen.getByText("S")).toBeInTheDocument();
+  });
 });
 
 describe("Rack", () => {

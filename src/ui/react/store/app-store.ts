@@ -12,6 +12,26 @@ import type { PulseState, PulseStore } from "../../../state/public";
 
 export type AudioStatus = "faulted" | "recovered" | "recovering";
 
+/** Mirror of the engine's audio-runtime state, as the header displays it. */
+export type AudioRuntimeStateView = "locked" | "active" | "suspended" | "unavailable";
+
+/** Post-limiter master analysis for the header meters. Data only. */
+export interface MasterMeterView {
+  readonly left: number;
+  readonly right: number;
+  readonly mid: number;
+  readonly side: number;
+  readonly peak: boolean;
+}
+
+export const SILENT_MASTER_METER: MasterMeterView = Object.freeze({
+  left: 0,
+  right: 0,
+  mid: 0,
+  side: 0,
+  peak: false,
+});
+
 /** The transport surface React is allowed to touch. Never an AudioNode. */
 export interface AudioControlPort {
   readonly getPositionTicks: () => number;
@@ -34,6 +54,12 @@ export interface AudioControlPort {
   readonly stopAudition: (moduleId: ModuleInstanceId) => void;
   readonly stop: () => void;
   readonly setSwing?: (swing: number) => void;
+  /** Post-limiter master analysis, polled while the transport runs. */
+  readonly getMasterMeter?: () => MasterMeterView;
+  readonly setMetronomeEnabled?: (enabled: boolean) => void;
+  /** True resumes the engine; false suspends it. Both keep editing available. */
+  readonly setPower?: (on: boolean) => Promise<void>;
+  readonly setLaunchQuantization?: (steps: number) => void;
 }
 
 export type StudioView = "mixer" | "effects" | "master";
@@ -43,6 +69,8 @@ export interface SavedProjectSummary {
   readonly id: string;
   readonly name: string;
   readonly modifiedAt: string;
+  /** Pinned projects list first in the project selector. */
+  readonly pinned: boolean;
 }
 
 /**
@@ -59,6 +87,10 @@ export interface ProjectServicePort {
   importPortable(
     bytes: Uint8Array,
   ): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>;
+  /** Persists the pin flag as project metadata. */
+  setPinned(pinned: boolean): Promise<void>;
+  /** The active project's committed pin flag. */
+  getPinned(): boolean;
 }
 
 export type AppStorePort = Pick<
@@ -75,6 +107,15 @@ export interface AppStoreDependencies {
   readonly auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) => number;
   readonly visibleSlotCount: number;
   readonly projects?: ProjectServicePort;
+  /** Random source for new Pattern variations. Tests inject a fixed one. */
+  readonly createPatternSeed?: () => number;
+  /** Stored lightweight global UI preferences, wired by the composition root. */
+  readonly preferences?: {
+    readonly metronomeEnabled?: boolean;
+    readonly launchQuantizationSteps?: number;
+    readonly onMetronomeChange?: (enabled: boolean) => void;
+    readonly onLaunchQuantizationChange?: (steps: number) => void;
+  };
 }
 
 export interface UndoNotice {
@@ -103,13 +144,33 @@ export interface AppState {
   readonly metronomeEnabled: boolean;
   readonly selectedSend: "A" | "B" | "C" | "D" | undefined;
   readonly saveStatus: SaveStatus;
+  /** Mirror of the engine's audio-runtime state for the header power control. */
+  readonly audioRuntimeState: AudioRuntimeStateView;
+  /** Latest post-limiter master analysis frame, polled while playing. */
+  readonly masterMeter: MasterMeterView;
+  /** The header peak lamp, latched briefly after the last peak frame. */
+  readonly masterPeakHeld: boolean;
+  /** Pattern-launch boundary in sixteenth steps. A global UI preference. */
+  readonly launchQuantizationSteps: number;
+  /** The active project's committed pin flag. */
+  readonly projectPinned: boolean;
 
   readonly play: () => Promise<void>;
   readonly pause: () => void;
   readonly stop: () => void;
   readonly toggleRecordArm: () => void;
-  readonly setTempo: (tempo: number) => void;
+  readonly setTempo: (tempo: number, gestureId?: GestureId) => void;
   readonly setSwing: (swing: number, gestureId?: GestureId) => void;
+  /** Positions the playhead and start marker while not playing. */
+  readonly seek: (positionTicks: number) => void;
+  readonly setHumanize: (patternIndex: number, humanize: number, gestureId?: GestureId) => void;
+  /** Stores a new random seed, which creates a new deterministic variation. */
+  readonly newPatternVariation: (patternIndex: number) => void;
+  readonly togglePower: () => Promise<void>;
+  readonly setMasterMeterFrame: (frame: MasterMeterView) => void;
+  readonly reportAudioRuntimeState: (state: AudioRuntimeStateView) => void;
+  readonly setLaunchQuantization: (steps: number) => void;
+  readonly togglePinProject: () => Promise<void>;
   readonly commitParameter: (
     moduleId: ModuleInstanceId,
     parameter: string,
@@ -183,14 +244,24 @@ export type AppStore = StoreApi<AppState>;
  * undo, revisions, and engine projection, so this layer holds no project truth
  * of its own — it mirrors and dispatches.
  */
+const PEAK_HOLD_MILLISECONDS = 1_500;
+
 export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   const { store, audio } = dependencies;
   let noticeSequence = 0;
+  let lastPeakAt = 0;
+  /** Blocks a second Play while the first is still activating the engine. */
+  let playInFlight = false;
 
   const notice = (message: string): UndoNotice => {
     noticeSequence += 1;
     return { message, issuedAt: noticeSequence };
   };
+
+  const initialMetronome = dependencies.preferences?.metronomeEnabled ?? false;
+  const initialLaunchQuantization = dependencies.preferences?.launchQuantizationSteps ?? 16;
+  audio.setMetronomeEnabled?.(initialMetronome);
+  audio.setLaunchQuantization?.(initialLaunchQuantization);
 
   const appStore = createStore<AppState>()((set, get) => ({
     project: store.getState(),
@@ -205,18 +276,27 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     studioView: "mixer",
     editorExpanded: true,
     meterMode: "lr",
-    metronomeEnabled: false,
+    metronomeEnabled: initialMetronome,
     selectedSend: undefined,
     saveStatus: "clean",
+    audioRuntimeState: "locked",
+    masterMeter: SILENT_MASTER_METER,
+    masterPeakHeld: false,
+    launchQuantizationSteps: initialLaunchQuantization,
+    projectPinned: dependencies.projects?.getPinned() ?? false,
 
     play: async () => {
-      if (get().audioUnavailable) return;
+      if (get().audioUnavailable || playInFlight) return;
+      if (get().project.transport.status === "playing") return;
+      playInFlight = true;
       const tempo = get().project.project.tempo;
       try {
         await audio.play(tempo);
         store.dispatch(store.createCommand("transport-play", {}));
       } catch {
         set({ audioUnavailable: true });
+      } finally {
+        playInFlight = false;
       }
     },
 
@@ -234,8 +314,98 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(store.createCommand("transport-record-toggle", {}));
     },
 
-    setTempo: (tempo) => {
-      store.dispatch(store.createCommand("transport-tempo-set", { tempo }));
+    setTempo: (tempo, gestureId) => {
+      store.dispatch(
+        store.createCommand(
+          "transport-tempo-set",
+          { tempo },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    seek: (positionTicks) => {
+      store.dispatch(store.createCommand("transport-seek", { positionTicks }));
+    },
+
+    setHumanize: (patternIndex, humanize, gestureId) => {
+      const clamped = Math.min(1, Math.max(0, humanize));
+      store.dispatch(
+        store.createCommand(
+          "pattern-humanize-set",
+          { patternIndex, humanize: clamped },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    newPatternVariation: (patternIndex) => {
+      const seed =
+        dependencies.createPatternSeed?.() ?? Math.floor(Math.random() * 0x1_0000_0000);
+      store.dispatch(store.createCommand("pattern-seed-set", { patternIndex, seed }));
+    },
+
+    togglePower: async () => {
+      if (get().audioUnavailable) return;
+      const powered = get().audioRuntimeState === "active";
+      try {
+        if (powered) {
+          if (get().project.transport.status === "playing") {
+            audio.stop();
+            store.dispatch(store.createCommand("transport-stop", {}));
+          }
+          await audio.setPower?.(false);
+        } else {
+          await audio.setPower?.(true);
+        }
+      } catch {
+        set({ audioUnavailable: true });
+      }
+    },
+
+    setMasterMeterFrame: (frame) => {
+      // One over-threshold analysis frame is shorter than a glance, so the
+      // peak lamp latches briefly instead of following the frame exactly.
+      const now = performance.now();
+      if (frame.peak) lastPeakAt = now;
+      const masterPeakHeld =
+        frame.peak || (lastPeakAt > 0 && now - lastPeakAt < PEAK_HOLD_MILLISECONDS);
+      const current = get().masterMeter;
+      if (
+        masterPeakHeld === get().masterPeakHeld &&
+        current.left === frame.left &&
+        current.right === frame.right &&
+        current.mid === frame.mid &&
+        current.side === frame.side &&
+        current.peak === frame.peak
+      ) {
+        return;
+      }
+      set({ masterMeter: frame, masterPeakHeld });
+    },
+
+    reportAudioRuntimeState: (audioRuntimeState) => {
+      if (get().audioRuntimeState === audioRuntimeState) return;
+      set({ audioRuntimeState });
+    },
+
+    setLaunchQuantization: (steps) => {
+      if (!Number.isSafeInteger(steps) || steps < 1) return;
+      audio.setLaunchQuantization?.(steps);
+      dependencies.preferences?.onLaunchQuantizationChange?.(steps);
+      set({ launchQuantizationSteps: steps });
+    },
+
+    togglePinProject: async () => {
+      const projects = dependencies.projects;
+      if (projects === undefined) return;
+      try {
+        await projects.setPinned(!get().projectPinned);
+        set({ projectPinned: projects.getPinned() });
+        await get().refreshSavedProjects();
+      } catch {
+        set({ projectMessage: "The pin could not be saved. This browser may block storage." });
+      }
     },
 
     setSwing: (swing, gestureId) => {
@@ -394,7 +564,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     toggleMetronome: () => {
-      set((state) => ({ metronomeEnabled: !state.metronomeEnabled }));
+      const metronomeEnabled = !get().metronomeEnabled;
+      audio.setMetronomeEnabled?.(metronomeEnabled);
+      dependencies.preferences?.onMetronomeChange?.(metronomeEnabled);
+      set({ metronomeEnabled });
     },
 
     openSend: (selectedSend) => {
@@ -511,7 +684,11 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (projects === undefined) return;
       try {
         await projects.open(id);
-        set({ projectMessage: "Project opened.", saveStatus: "clean" });
+        set({
+          projectMessage: "Project opened.",
+          saveStatus: "clean",
+          projectPinned: projects.getPinned(),
+        });
       } catch {
         set({ projectMessage: "That project could not be opened." });
       }
@@ -522,7 +699,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (projects === undefined) return;
       const result = await projects.importPortable(bytes);
       if (result.ok) await get().refreshSavedProjects();
-      set({ projectMessage: result.ok ? "Project imported." : result.reason });
+      set({
+        projectMessage: result.ok ? "Project imported." : result.reason,
+        ...(result.ok ? { projectPinned: projects.getPinned() } : {}),
+      });
     },
 
     setProjectMessage: (projectMessage) => {
