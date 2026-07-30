@@ -7,22 +7,13 @@
   gap: 0.25rem;
 }
 
+/* The shared Tooltip control carries the bubble surface. This class holds only
+   the fader-specific position and ink, so cascade order against it cannot
+   matter. */
 .tooltip {
-  position: absolute;
   z-index: 4;
   inset-block-start: -18px;
-  inset-inline-start: 50%;
-  translate: -50% 0;
-  min-inline-size: max-content;
-  padding: 1px 5px;
   color: var(--module-control-ring, var(--pulse-color-accent, #9be564));
-  background: var(--surface-well);
-  border-radius: var(--pulse-radius-control, 4px);
-  box-shadow: var(--sink-1);
-  font:
-    12px/1.4 ui-monospace,
-    monospace;
-  pointer-events: none;
 }
 
 /*

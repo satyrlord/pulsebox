@@ -1,0 +1,20 @@
+/*
+ * The shared bubble. The owner control positions it and sets its ink through
+ * one extra class, so those properties stay out of this rule and the cascade
+ * order between the two classes cannot matter.
+ */
+.tooltip {
+  position: absolute;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  min-inline-size: max-content;
+  padding: 1px 5px;
+  background: var(--surface-well);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
+  font:
+    var(--pulse-type-12, 12px) / 1.4 var(--pulse-font-mono, ui-monospace),
+    monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}

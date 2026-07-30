@@ -16,6 +16,21 @@ import { readCurrentSourceUnits } from "../architecture/source-policy";
 
 const MINIMUM_TEXT_PX = 10;
 
+/** The complete bundled typeface allowlist, per THEMING.md section 3.3. */
+const APPROVED_BUNDLED_FAMILIES = [
+  "Barlow",
+  "Barlow Semi Condensed",
+  "Michroma",
+  "Share Tech Mono",
+] as const;
+
+const BUNDLED_FONT_LICENSES = [
+  "OFL-barlow.txt",
+  "OFL-barlow-semi-condensed.txt",
+  "OFL-michroma.txt",
+  "OFL-share-tech-mono.txt",
+] as const;
+
 function shippedStyleSources(): { path: string; text: string }[] {
   const files = ["src/styles/global.css", "src/themes/themes.css"].map((path) => ({
     path,
@@ -43,14 +58,44 @@ describe("type scale", () => {
     expect(undersized).toEqual([]);
   });
 
-  it("uses system UI and system monospace without loading a legacy-style font", () => {
-    expect(globalCss).toMatch(/--pulse-font-ui:\s*system-ui/);
-    expect(globalCss).toMatch(/--pulse-font-mono:\s*ui-monospace/);
-    // A loaded face would arrive through @font-face or an external stylesheet.
+  it("keeps the bundled faces first and the system fallback last in each token", () => {
+    expect(globalCss).toMatch(/--pulse-font-ui:\s*"Barlow",\s*system-ui,\s*sans-serif/);
+    expect(globalCss).toMatch(/--pulse-font-mono:\s*"Share Tech Mono",\s*ui-monospace,\s*monospace/);
+    expect(globalCss).toMatch(/--type-display:\s*"Barlow Semi Condensed",[^;]*system-ui/);
+    expect(globalCss).toMatch(/--type-brand:\s*"Michroma",[^;]*system-ui/);
+  });
+
+  it("bundles only the approved open-license faces and loads no network font", () => {
     for (const file of shippedStyleSources()) {
-      expect(file.text, `${file.path} must not load a font face`).not.toMatch(/@font-face/i);
-      expect(file.text, `${file.path} must not import a font`).not.toMatch(
+      // Bundled faces are declared once, in the global stylesheet.
+      if (file.path !== "src/styles/global.css") {
+        expect(file.text, `${file.path} must not declare a font face`).not.toMatch(/@font-face/i);
+      }
+      expect(file.text, `${file.path} must not import a hosted font`).not.toMatch(
         /fonts\.(?:googleapis|gstatic)\.com/i,
+      );
+      expect(file.text, `${file.path} must not reference a font over the network`).not.toMatch(
+        /url\(\s*["']?https?:[^)]*\.(?:woff2?|ttf|otf|eot)/i,
+      );
+    }
+
+    const faces = [...globalCss.matchAll(/@font-face\s*\{([^}]*)\}/g)];
+    expect(faces.length).toBeGreaterThan(0);
+    for (const face of faces) {
+      const body = face[1] ?? "";
+      const family = /font-family:\s*"([^"]+)"/.exec(body)?.[1];
+      expect(APPROVED_BUNDLED_FAMILIES).toContain(family);
+      const source = /src:\s*url\(\s*["']?([^"')]+)/.exec(body)?.[1] ?? "";
+      expect(source.startsWith("./fonts/"), `font source must be bundled: ${source}`).toBe(true);
+      expect(source.endsWith(".woff2"), `font source must be woff2: ${source}`).toBe(true);
+    }
+  });
+
+  it("ships the open-font license text beside every bundled face", () => {
+    for (const license of BUNDLED_FONT_LICENSES) {
+      const text = readFileSync(join(process.cwd(), "src/styles/fonts", license), "utf8");
+      expect(text, `${license} must be the SIL Open Font License`).toMatch(
+        /SIL OPEN FONT LICENSE/i,
       );
     }
   });

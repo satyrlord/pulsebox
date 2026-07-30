@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
-import { useRangeGesture } from "./use-range-gesture";
 import styles from "./Fader.module.css";
+import { Tooltip } from "./Tooltip";
+import { useRangeGesture } from "./use-range-gesture";
+import { ValuePopover } from "./ValuePopover";
 
 export interface FaderProps {
   readonly label: string;
@@ -151,35 +153,17 @@ export function Fader({
         </span>
       </div>
       <span className={styles.label}>{label}</span>
-      {adjusting ? (
-        <output className={styles.tooltip} role="tooltip">
-          {text}
-        </output>
-      ) : null}
-      <input
-        key={formatted}
+      {adjusting ? <Tooltip className={styles.tooltip}>{text}</Tooltip> : null}
+      <ValuePopover
         className={styles.readout}
-        type="number"
-        aria-label={`${label} value`}
-        defaultValue={formatted}
+        label={`${label} value`}
+        value={formatted}
         min={displayMin}
         max={displayMax}
         step={displayStep}
         disabled={disabled}
-        inputMode="decimal"
-        onBlur={(event) => {
-          setFromNumeric(parseValue(event.currentTarget.valueAsNumber));
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.currentTarget.value = formatted;
-            event.currentTarget.blur();
-          }
+        onCommit={(next) => {
+          setFromNumeric(parseValue(next));
         }}
       />
     </div>

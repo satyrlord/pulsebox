@@ -1,6 +1,6 @@
 .app {
   display: grid;
-  grid-template-rows: 58px minmax(350px, 1fr) clamp(230px, 30vh, 302px) 52px;
+  grid-template-rows: 58px minmax(350px, 1fr) clamp(230px, 30vh, 300px) 52px;
   inline-size: 100vw;
   block-size: 100vh;
   min-height: 0;

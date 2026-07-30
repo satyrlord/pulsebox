@@ -1,8 +1,11 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import type { PulseThemeService } from "../../../themes";
+import { importUserTheme, type PulseThemeService, type UserThemeReport } from "../../../themes";
 import { useAppStore } from "../store/app-store-context";
 import styles from "./SettingsPage.module.css";
+
+const STORAGE_FAILURE_MESSAGE =
+  "The appearance preference was not changed because it could not be saved. Try again.";
 
 export interface SettingsPageProps {
   readonly themeService: PulseThemeService;
@@ -13,11 +16,35 @@ export function SettingsPage(props: SettingsPageProps) {
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const panelRef = useRef<HTMLElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const [importReport, setImportReport] = useState<UserThemeReport | undefined>(undefined);
+  const [appearanceMessage, setAppearanceMessage] = useState<string | undefined>(undefined);
 
   const appearance = useSyncExternalStore(
     (listener) => themeService.subscribe(listener),
     () => themeService.appearance,
   );
+
+  // A change that the service could not persist keeps the current appearance,
+  // so the page reports the failure instead of pretending the change applied.
+  const applyOrReport = (changed: boolean) => {
+    setAppearanceMessage(changed ? undefined : STORAGE_FAILURE_MESSAGE);
+  };
+
+  const onImportFile = (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (file === undefined) return;
+    void file.text().then(
+      (source) => {
+        const result = importUserTheme(source);
+        setImportReport(result.report);
+        if (result.theme !== undefined) applyOrReport(themeService.installUserTheme(result.theme));
+      },
+      () => {
+        setAppearanceMessage("The theme file could not be read. Try again.");
+      },
+    );
+  };
 
   // Focus moves into the dialog and returns to whatever opened it, so keyboard
   // position is never lost.
@@ -57,9 +84,10 @@ export function SettingsPage(props: SettingsPageProps) {
       }
     };
 
-    panel.addEventListener("keydown", onKeyDown);
+    const listeners = new AbortController();
+    panel.addEventListener("keydown", onKeyDown, { signal: listeners.signal });
     return () => {
-      panel.removeEventListener("keydown", onKeyDown);
+      listeners.abort();
     };
   }, []);
 
@@ -76,16 +104,92 @@ export function SettingsPage(props: SettingsPageProps) {
         Appearance
       </h2>
 
+      <fieldset className={styles.themes}>
+        <legend>Theme</legend>
+        <label className={styles.choice}>
+          <input
+            type="radio"
+            name="theme"
+            checked={appearance.theme === "rack"}
+            onChange={() => {
+              applyOrReport(themeService.setTheme("rack"));
+            }}
+          />
+          <span>Rack</span>
+        </label>
+        {appearance.userTheme === null ? null : (
+          <label className={styles.choice}>
+            <input
+              type="radio"
+              name="theme"
+              checked={appearance.theme === "user"}
+              onChange={() => {
+                applyOrReport(themeService.setTheme("user"));
+              }}
+            />
+            <span>User theme: {appearance.userTheme.name}</span>
+          </label>
+        )}
+      </fieldset>
+
       <label className={styles.contrast}>
         <input
           type="checkbox"
           checked={appearance.highContrast}
           onChange={(event) => {
-            themeService.setHighContrast(event.currentTarget.checked);
+            applyOrReport(themeService.setHighContrast(event.currentTarget.checked));
           }}
         />
         <span>High contrast</span>
       </label>
+
+      <fieldset className={styles.userTheme}>
+        <legend>User theme</legend>
+        <label className={styles.importField}>
+          <span>Import a user theme JSON file</span>
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={(event) => {
+              onImportFile(event.currentTarget);
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className={styles.delete}
+          disabled={appearance.userTheme === null}
+          onClick={() => {
+            setImportReport(undefined);
+            applyOrReport(themeService.deleteUserTheme());
+          }}
+        >
+          Delete user theme
+        </button>
+      </fieldset>
+
+      <div className={styles.report} role="status" aria-live="polite">
+        {appearanceMessage === undefined ? null : <p>{appearanceMessage}</p>}
+        {importReport === undefined ? null : importReport.applied ? (
+          <p>
+            The theme {importReport.name} is installed and active.
+            {importReport.ignoredTokens.length > 0
+              ? ` Ignored unknown tokens: ${importReport.ignoredTokens.join(", ")}.`
+              : null}
+          </p>
+        ) : (
+          <>
+            <p>The theme was rejected. The active theme did not change.</p>
+            <ul className={styles.errors}>
+              {importReport.errors.map((error) => (
+                <li key={`${error.path} ${error.reason}`}>
+                  {error.path}: {error.reason}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
 
       <button
         type="button"

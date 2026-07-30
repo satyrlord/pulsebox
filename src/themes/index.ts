@@ -5,3 +5,4 @@ export {
   serializeAppearance,
 } from "./appearance";
 export { createPulseThemeService, elementThemeHost, type PulseThemeService } from "./theme-service";
+export { importUserTheme, type UserThemeReport } from "./user-theme";

@@ -26,8 +26,6 @@
     inset 0 -1px 0 #0000008c,
     0 3px 7px #0000008c,
     0 1px 2px #00000099;
-  /* The faceplate is a fixed plate: it must not reflow as values change. */
-  container-type: inline-size;
 }
 
 /* Metal rails seat each faceplate in the rack. The fasteners are decorative. */

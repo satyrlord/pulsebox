@@ -9,12 +9,18 @@ function isTextEntry(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
+export interface KeyboardShortcutOptions {
+  /** Collapses or expands the lower editor, matching the workspace-bar button. */
+  readonly toggleEditor: () => void;
+}
+
 /**
- * Application shortcuts. Registered once with a single listener that is removed
- * on unmount, so a StrictMode remount cannot double-fire a transport command.
+ * Application shortcuts. Registered as one listener that is removed on unmount,
+ * so a StrictMode remount cannot double-fire a transport command.
  */
-export function useKeyboardShortcuts(): void {
+export function useKeyboardShortcuts(options: KeyboardShortcutOptions): void {
   const { store } = useAppContext();
+  const { toggleEditor } = options;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -38,7 +44,7 @@ export function useKeyboardShortcuts(): void {
 
       if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "e") {
         event.preventDefault();
-        document.querySelector<HTMLButtonElement>('[data-action="toggle-editor"]')?.click();
+        toggleEditor();
         return;
       }
 
@@ -64,9 +70,10 @@ export function useKeyboardShortcuts(): void {
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    const listeners = new AbortController();
+    window.addEventListener("keydown", onKeyDown, { signal: listeners.signal });
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      listeners.abort();
     };
-  }, [store]);
+  }, [store, toggleEditor]);
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Led } from "../controls/Led";
 import { LevelMeter } from "../controls/LevelMeter";
+import { SegmentDisplay } from "../controls/SegmentDisplay";
 import { useAppStore } from "../store/app-store-context";
 import { masterMeterLevel } from "./master-meter";
 import { ProjectMenu } from "./ProjectMenu";
@@ -239,10 +240,13 @@ export function TransportBar() {
       <span className={styles.mark}>PULSEBOX</span>
 
       <div className={styles.right}>
-        <output className={styles.position} data-field="position" aria-label="Transport position">
-          <strong>{formatElapsed(positionTicks, tempo)}</strong>
-          <span>{formatPosition(positionTicks)}</span>
-        </output>
+        <SegmentDisplay
+          className={styles.position}
+          fieldId="position"
+          label="Transport position"
+          primary={formatElapsed(positionTicks, tempo)}
+          secondary={formatPosition(positionTicks)}
+        />
         <button
           type="button"
           className={styles.iconButton}

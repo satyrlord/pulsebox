@@ -256,13 +256,14 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
 
   // Wheel is registered natively so it can be non-passive and call
   // preventDefault, which React's synthetic handler cannot do.
-  const wheelDetach = useRef<(() => void) | undefined>(undefined);
+  const wheelAbort = useRef<AbortController | undefined>(undefined);
 
   const attachWheel = useCallback(
     (element: HTMLElement | null) => {
-      wheelDetach.current?.();
-      wheelDetach.current = undefined;
+      wheelAbort.current?.abort();
+      wheelAbort.current = undefined;
       if (element === null) return;
+      const listeners = new AbortController();
       const handler = (event: WheelEvent) => {
         event.preventDefault();
         const { step: increment } = latest.current;
@@ -278,21 +279,20 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
           }
         }, WHEEL_IDLE_MILLISECONDS);
       };
-      element.addEventListener("wheel", handler, { passive: false });
-      wheelDetach.current = () => {
-        element.removeEventListener("wheel", handler);
-      };
+      element.addEventListener("wheel", handler, { passive: false, signal: listeners.signal });
+      wheelAbort.current = listeners;
     },
     [beginGesture, cancelWheelTimer, emitInput, endGesture],
   );
 
   useEffect(() => {
-    window.addEventListener("blur", commitActiveGesture);
+    const listeners = new AbortController();
+    window.addEventListener("blur", commitActiveGesture, { signal: listeners.signal });
     return () => {
-      window.removeEventListener("blur", commitActiveGesture);
+      listeners.abort();
       cancelWheelTimer();
-      wheelDetach.current?.();
-      wheelDetach.current = undefined;
+      wheelAbort.current?.abort();
+      wheelAbort.current = undefined;
       // A control may disconnect while a preview is active, for example when a
       // responsive layout replaces the editor. Commit that last valid value so
       // project state and the audio preview cannot diverge.

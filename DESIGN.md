@@ -36,29 +36,35 @@ colors:
   module-sev: "#5AAEFF"
   module-five: "#4ADFC7"
 typography:
+  brand:
+    fontFamily: '"Michroma", "Barlow Semi Condensed", system-ui, sans-serif'
+    fontSize: "16px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "0.17em"
   title:
-    fontFamily: "system-ui, sans-serif"
+    fontFamily: '"Barlow", system-ui, sans-serif'
     fontSize: "20px"
-    fontWeight: 650
+    fontWeight: 600
     lineHeight: 1.2
   headline:
-    fontFamily: "system-ui, sans-serif"
+    fontFamily: '"Barlow", system-ui, sans-serif'
     fontSize: "16px"
-    fontWeight: 650
+    fontWeight: 600
     lineHeight: 1.2
   body:
-    fontFamily: "system-ui, sans-serif"
+    fontFamily: '"Barlow", system-ui, sans-serif'
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.4
   label:
-    fontFamily: "system-ui, sans-serif"
+    fontFamily: '"Barlow Semi Condensed", "Barlow", system-ui, sans-serif'
     fontSize: "10px"
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: "0.06em"
   readout:
-    fontFamily: "ui-monospace, monospace"
+    fontFamily: '"Share Tech Mono", ui-monospace, monospace'
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.2
@@ -216,20 +222,27 @@ color, it is broken. Add an outline, a weight change, a glyph, or a position cue
 
 ## 3. Typography
 
-**UI Font:** system-ui, sans-serif
-**Readout Font:** ui-monospace, monospace
+**UI Font:** "Barlow", system-ui, sans-serif
+**Label Font:** "Barlow Semi Condensed", "Barlow", system-ui, sans-serif
+**Readout Font:** "Share Tech Mono", ui-monospace, monospace
+**Brand Font:** "Michroma", "Barlow Semi Condensed", system-ui, sans-serif
 
-**Character:** Two voices, cleanly split by job. The system sans handles
-everything the user reads as language; the monospace handles everything the user
-reads as a value. No loaded webfont — the system stack is deliberate, not a
-placeholder, and it keeps the first paint instant on a client-side app that must
-make sound immediately.
+**Character:** Four voices, cleanly split by job. Barlow handles everything the
+user reads as language. Barlow Semi Condensed carries the engraved uppercase
+panel labels. Share Tech Mono handles everything the user reads as a value,
+with a CRT edge that suits the recessed glass readouts. Michroma appears in
+exactly one place: the transport mark. All four are SIL Open Font License faces
+bundled into the build — nothing loads from a network host, so the first paint
+stays instant on a client-side app that must make sound immediately. Every
+stack ends in a system fallback.
 
 ### Hierarchy
 
-- **Title** (650, 20px, 1.2): The application mark and page-level headings. The
-  centered transport mark is the only place `PULSEBOX` appears in uppercase.
-- **Headline** (650, 16px, 1.2): Section and panel headings.
+- **Brand** (400, 16px, 1.2, 0.17em, Michroma): The centered transport mark,
+  which is the only place `PULSEBOX` appears in uppercase and the only place
+  the brand face appears at all.
+- **Title** (600, 20px, 1.2): Page-level headings.
+- **Headline** (600, 16px, 1.2): Section and panel headings.
 - **Body** (400, 12px, 1.4): The default. All prose, control labels above 10px,
   and menu text.
 - **Label** (500, 10px, 1.2, 0.06em, uppercase): Control captions under knobs and
@@ -418,8 +431,9 @@ dense workspace, the presence of overflow is information.
   LED, ring detail, mixer header, and overview marker — nothing wider.
 - **Don't** ship a visible control that does nothing. A dead control is a lie
   about what the machine can do.
-- **Don't** introduce a loaded webfont, an icon font, or emoji icons. Icons are
-  original inline SVG using `currentColor`.
+- **Don't** introduce a network-loaded webfont, an icon font, or emoji icons.
+  Bundled faces are limited to the four open-license families in THEMING.md
+  section 3.3. Icons are original inline SVG using `currentColor`.
 - **Don't** add a confirmation dialog. Apply the edit, retain recovery data, and
   show the Undo notice.
 - **Don't** import marketing-page conventions of any kind.

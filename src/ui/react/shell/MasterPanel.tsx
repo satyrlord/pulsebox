@@ -2,6 +2,7 @@ import { DEFAULT_MASTER_LEVEL } from "../../../state/public";
 import { Fader } from "../controls/Fader";
 import { LevelMeter } from "../controls/LevelMeter";
 import { useAppStore } from "../store/app-store-context";
+import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
 import { masterMeterLevel } from "./master-meter";
 import styles from "./Shell.module.css";
 
@@ -28,7 +29,13 @@ export function MasterPanel() {
             max={1}
             step={0.01}
             defaultValue={DEFAULT_MASTER_LEVEL}
-            unit="linear"
+            unit="dB"
+            precision={1}
+            formatValue={gainToDecibels}
+            parseValue={decibelsToGain}
+            displayMin={MINIMUM_FADER_DB}
+            displayMax={0}
+            displayStep={0.1}
             onInput={previewMasterLevel}
             onCommit={(value, gestureId) => {
               setMasterLevel(value, gestureId);

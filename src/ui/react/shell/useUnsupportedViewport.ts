@@ -14,9 +14,10 @@ export function useUnsupportedViewport(): boolean {
     const check = () => {
       setTooSmall(viewportIsUnsupported());
     };
-    window.addEventListener("resize", check);
+    const listeners = new AbortController();
+    window.addEventListener("resize", check, { signal: listeners.signal });
     return () => {
-      window.removeEventListener("resize", check);
+      listeners.abort();
     };
   }, []);
 

@@ -45,9 +45,9 @@
   justify-self: center;
   inline-size: 168px;
   margin-inline-end: -0.17em;
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-20, 20px);
-  font-weight: 600;
+  font-family: var(--type-brand, var(--type-display));
+  font-size: var(--pulse-type-16, 16px);
+  font-weight: 400;
   letter-spacing: 0.17em;
   text-align: center;
   white-space: nowrap;
@@ -182,12 +182,12 @@
     0 0 12px var(--signal-rec);
 }
 
-/* Readout glass: a dark pane in a deep recess with a single diagonal sheen.
-   The ink follows the theme so it stays legible in an imported light theme. */
-.tempo,
-.position {
+/* Readout glass, matching the shared SegmentDisplay pane. The tempo field is
+   an input rather than a display, so it carries the same glass directly. */
+.tempo {
   position: relative;
   overflow: hidden;
+  inline-size: 70px;
   block-size: 42px;
   flex: none;
   display: flex;
@@ -203,17 +203,12 @@
   box-shadow: var(--sink-2);
 }
 
-.tempo::after,
-.position::after {
+.tempo::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background: linear-gradient(160deg, #ffffff09 0 40%, transparent 40%);
-}
-
-.tempo {
-  inline-size: 70px;
 }
 
 /* A rejected value is marked on the field itself as well as in the message, so
@@ -252,7 +247,7 @@
   min-block-size: 24px;
   padding: 0;
   font:
-    var(--pulse-type-14, 14px)/1.1 ui-monospace,
+    var(--pulse-type-14, 14px) / 1.1 var(--pulse-font-mono, ui-monospace),
     monospace;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -261,8 +256,7 @@
   box-shadow: none;
 }
 
-.tempo > span:last-child,
-.position span {
+.tempo > span:last-child {
   font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
   letter-spacing: 0.16em;
@@ -270,23 +264,9 @@
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
+/* Only the pane width is local. The pane itself is the shared SegmentDisplay. */
 .position {
   inline-size: 132px;
-  font-variant-numeric: tabular-nums;
-}
-
-.position span {
-  font-family: var(--pulse-font-mono, ui-monospace, monospace);
-  letter-spacing: 0.06em;
-  text-transform: none;
-}
-
-.position strong {
-  font:
-    var(--pulse-type-14, 14px)/1.1 ui-monospace,
-    monospace;
-  font-weight: 400;
-  color: var(--lcd-ink);
 }
 
 /* Bar-mounted keys: a small machined cap with a radial key light. */
@@ -363,7 +343,7 @@
 
 .masterMeters > span {
   font:
-    var(--pulse-type-10, 10px)/1 ui-monospace,
+    var(--pulse-type-10, 10px) / 1 var(--pulse-font-mono, ui-monospace),
     monospace;
   color: var(--pulse-color-text-secondary, #bac2c8);
 }

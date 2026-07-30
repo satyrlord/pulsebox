@@ -4,19 +4,11 @@ import { Knob } from "../controls/Knob";
 import { LevelMeter } from "../controls/LevelMeter";
 import { Toggle } from "../controls/Toggle";
 import { useAppStore, useDependencies } from "../store/app-store-context";
+import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
 import { masterMeterLevel } from "./master-meter";
 import styles from "./Mixer.module.css";
 
 const SENDS = ["A", "B", "C", "D"] as const;
-const MINIMUM_FADER_DB = -60;
-
-function gainToDecibels(gain: number): number {
-  return gain <= 0 ? MINIMUM_FADER_DB : Math.max(MINIMUM_FADER_DB, 20 * Math.log10(gain));
-}
-
-function decibelsToGain(decibels: number): number {
-  return decibels <= MINIMUM_FADER_DB ? 0 : 10 ** (decibels / 20);
-}
 
 export function Mixer() {
   const { visibleSlotCount, manifestFor } = useDependencies();

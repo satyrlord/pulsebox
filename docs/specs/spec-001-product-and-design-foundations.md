@@ -216,9 +216,14 @@ that table.
 
 ### 11.3 Typography and icons
 
-- System UI sans-serif for normal text.
-- System monospace for time, tempo, ticks, values, and grid coordinates.
-- No loaded legacy-style font.
+- Normal text uses the bundled UI typeface with a system sans-serif fallback.
+- Time, tempo, ticks, values, and grid coordinates use the bundled monospace
+  typeface with a system monospace fallback.
+- Uppercase panel labels use the bundled condensed display typeface. Only the
+  application mark uses the bundled brand typeface.
+- Bundled typefaces are open-license fonts. Their license text ships with the
+  font files. `THEMING.md` section 3.3 owns the exact families and stacks.
+- Shipped CSS loads no font from a network host.
 - Normal labels use sentence case.
 - Short technical labels may use uppercase.
 - Avoid text smaller than about 10 CSS pixels.

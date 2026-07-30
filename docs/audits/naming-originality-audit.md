@@ -12,9 +12,9 @@ scope
 
 The audit covered product source, public documentation, agent instructions,
 repository configuration, package metadata, lockfile, dependency tree, build
-output, and file names. The `design/` and `research/` directories are
-non-shipping evidence. No factory samples, presets, icons, or shipping binary
-assets exist yet.
+output, and file names. The `research/` directory is non-shipping evidence. No
+factory samples, presets, or icons exist yet. The only shipping binary assets
+are the bundled typeface files under `src/styles/fonts/`.
 
 ## Checks
 
@@ -26,7 +26,7 @@ assets exist yet.
 - Inspected the complete dependency tree and the direct decoder chain for pinned
   versions and licenses.
 - Built the production artifact and inspected its file list to confirm that
-  `design/` and `research/` are excluded.
+  `research/` is excluded.
 - Confirmed that policy documents may name prohibited technologies only to state
   the prohibition.
 
@@ -59,6 +59,18 @@ assets exist yet.
   `@audio/decode-aiff` 1.2.3, and `@audio/decode-flac` 1.2.3. Their package
   metadata and the transitive `@wasm-audio-decoders/flac` 0.2.10 metadata
   declare the MIT license.
+- The decoder packages are not unused dependencies. They implement the
+  `SampleDecoder` engine port that `docs/ARCHITECTURE.md` requires, and they
+  ship in the decoder worker chunk of the production build. README.md claims
+  this decoder foundation as a runnable later-phase slice. The sample-import
+  UI arrives with the persistence and export specification.
+- Shipping binary asset provenance: the bundled typefaces Barlow, Barlow Semi
+  Condensed, Michroma, and Share Tech Mono come from Google Fonts as `woff2`
+  files in `src/styles/fonts/`. Each family uses the SIL Open Font License.
+  The license text for each family ships beside its font files. The typography
+  tests verify the family allowlist, the local bundled sources, and the
+  license texts. These faces are licensed third-party fonts, not Pulsebox
+  artwork, and they copy no historical product type treatment.
 - `PULSEBOX` remains reserved for the application mark and browser title.
   Documentation uses `Pulsebox`.
 - The six approved instrument names and IDs remain those in the

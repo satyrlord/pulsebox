@@ -16,32 +16,35 @@
 }
 
 /* The tooltip and the entry chip share one bubble geometry above the dial, so
-   swapping one for the other during a gesture does not move anything. */
+   swapping one for the other during a gesture does not move anything. The
+   shared Tooltip control carries the bubble surface. This rule holds only the
+   knob-specific position and ink, so cascade order against it cannot matter. */
 .tooltip,
 .value {
-  position: absolute;
   z-index: 6;
   inset-block-start: -16px;
-  inset-inline-start: 50%;
-  translate: -50% 0;
-  min-inline-size: max-content;
-  padding: 1px 5px;
   color: var(--lcd-ink);
-  background: var(--surface-well);
-  border-radius: var(--pulse-radius-control, 4px);
-  box-shadow: var(--sink-1);
-  font:
-    var(--pulse-type-12, 12px)/1.4 ui-monospace,
-    monospace;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
 }
 
 /*
  * Direct numeric entry lives in this chip and stays in the DOM. It appears when
- * the knob is hovered or has keyboard focus.
+ * the knob is hovered or has keyboard focus. The chip repeats the bubble
+ * surface because it is a plain container, not the shared Tooltip.
  */
 .value {
+  position: absolute;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  min-inline-size: max-content;
+  padding: 1px 5px;
+  background: var(--surface-well);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
+  font:
+    var(--pulse-type-12, 12px) / 1.4 var(--pulse-font-mono, ui-monospace),
+    monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
   opacity: 0;
   transition: opacity var(--pulse-duration-fast, 80ms) linear;
 }
@@ -145,6 +148,14 @@
 .ticks line {
   stroke: #ffffff42;
   stroke-width: 1.1;
+}
+
+/* The default marker is one brighter mark in the tick ring. The thumb token
+   keeps it visible after a theme change or the high-contrast overlay. */
+.defaultMark {
+  stroke: var(--pulse-color-control-thumb, #e1e6e9);
+  stroke-width: 1.4;
+  opacity: 0.85;
 }
 
 /* The unlit travel is a groove cut into the plate, so the contract track color

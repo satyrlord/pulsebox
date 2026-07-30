@@ -1,0 +1,44 @@
+/* Readout glass: a dark pane in a deep recess with a single diagonal sheen.
+   The ink follows the theme so it stays legible in an imported light theme. */
+.display {
+  position: relative;
+  overflow: hidden;
+  block-size: 42px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2px 8px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--scope-glass) 88%, #000000),
+    var(--scope-glass)
+  );
+  border-radius: 7px;
+  box-shadow: var(--sink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.display::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, #ffffff09 0 40%, transparent 40%);
+}
+
+/* The reading is an operational value: 12px minimum per spec-001 section 11.3. */
+.primary {
+  font:
+    var(--pulse-type-14, 14px) / 1.1 var(--pulse-font-mono, ui-monospace),
+    monospace;
+  font-weight: 400;
+  color: var(--lcd-ink);
+}
+
+.secondary {
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.06em;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+}

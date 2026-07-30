@@ -51,13 +51,12 @@ export function useContinuousGesture(): ContinuousGestureHandles {
   // A pointer released outside the control still ends the gesture, so the next
   // movement cannot be folded into the previous undo entry.
   useEffect(() => {
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-    window.addEventListener("blur", end);
+    const listeners = new AbortController();
+    window.addEventListener("pointerup", end, { signal: listeners.signal });
+    window.addEventListener("pointercancel", end, { signal: listeners.signal });
+    window.addEventListener("blur", end, { signal: listeners.signal });
     return () => {
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-      window.removeEventListener("blur", end);
+      listeners.abort();
       end();
     };
   }, [end]);

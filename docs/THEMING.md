@@ -139,7 +139,7 @@ JSON.
 
 | Group              | Tokens and exact values                                                                                                           |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Fonts              | `--pulse-font-ui: system-ui, sans-serif`; `--pulse-font-mono: ui-monospace, monospace`                                            |
+| Fonts              | `--pulse-font-ui: "Barlow", system-ui, sans-serif`; `--pulse-font-mono: "Share Tech Mono", ui-monospace, monospace`               |
 | Type size          | `--pulse-type-10: 10px`; `--pulse-type-12: 12px`; `--pulse-type-14: 14px`; `--pulse-type-16: 16px`; `--pulse-type-20: 20px`       |
 | Line height        | `--pulse-line-tight: 1.2`; `--pulse-line-normal: 1.4`; `--pulse-line-roomy: 1.6`                                                  |
 | Weight             | `--pulse-weight-normal: 400`; `--pulse-weight-medium: 500`; `--pulse-weight-strong: 650`                                          |
@@ -154,6 +154,30 @@ JSON.
 `--pulse-radius-round` is allowed only for circular controls and compact switch
 tracks. It does not authorize pill-shaped panels or buttons. Text below 10 CSS
 pixels is prohibited. Operational values use `--pulse-type-12` or larger.
+
+The UI layer also defines two fixed display tokens in `src/styles/global.css`:
+
+```css
+--type-display: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+--type-brand: "Michroma", "Barlow Semi Condensed", system-ui, sans-serif;
+```
+
+Uppercase panel labels and engraved captions use `--type-display`. Only the
+transport-bar application mark uses `--type-brand`. Both tokens are foundation
+values and are not user-authorable.
+
+The product bundles exactly four typefaces: Barlow, Barlow Semi Condensed,
+Michroma, and Share Tech Mono. Rules for bundled typefaces:
+
+- Each face is licensed under the SIL Open Font License. Its license text
+  ships in `src/styles/fonts/` beside the font files.
+- The build bundles every font file as a `woff2` asset. Shipped CSS must not
+  load a font from a network host.
+- Every font stack ends in a generic system fallback, so missing glyphs and a
+  failed asset resolve to a system face.
+- A change to this typeface set is a product-contract change. It requires an
+  update to this document, the typography tests, and the naming and
+  originality audit.
 
 ### 3.4 Module-scoped accent tokens
 
@@ -291,6 +315,15 @@ also have a text, shape, boundary, or icon cue that uses overlay colors.
 
 Theme application is one UI patch. It must not dispatch a project command, touch
 engine state, or enter undo history.
+
+### 6.1 Stylesheet delivery
+
+Production styles are Vite-bundled global stylesheets and CSS Modules. The
+theme host is `document.documentElement`, and no component uses Shadow DOM.
+Constructable stylesheets would duplicate this pipeline without a benefit, so
+the product does not use them. This is a recorded deviation from section 11.5
+of the product and design foundations specification, which permits them where
+supported. Revisit this decision only if a component adopts Shadow DOM.
 
 ## 7. User theme JSON format
 

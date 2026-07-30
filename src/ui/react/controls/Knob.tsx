@@ -3,7 +3,9 @@ import { useId, useMemo } from "react";
 import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
 import styles from "./Knob.module.css";
+import { Tooltip } from "./Tooltip";
 import { useRangeGesture } from "./use-range-gesture";
+import { ValuePopover } from "./ValuePopover";
 
 export interface KnobProps {
   readonly controlId: string;
@@ -97,6 +99,16 @@ export function Knob(props: KnobProps) {
   const angle = START_ANGLE + fraction * SWEEP;
   const pointer = useMemo(() => ({ from: polar(angle, 3), to: polar(angle, RADIUS - 4) }), [angle]);
   const formatted = displayValue.toFixed(precision);
+  const text = unit === undefined ? formatted : `${formatted} ${unit}`;
+
+  // The default marker sits with the tick ring, spec-003 section 22.1, so the
+  // double-click reset target is visible before the first adjustment.
+  const defaultFraction = max === min ? 0 : (defaultValue - min) / (max - min);
+  const defaultAngle = START_ANGLE + defaultFraction * SWEEP;
+  const defaultMark = useMemo(
+    () => ({ from: polar(defaultAngle, TICK_INNER - 1.5), to: polar(defaultAngle, TICK_OUTER + 1) }),
+    [defaultAngle],
+  );
 
   return (
     <div
@@ -113,10 +125,10 @@ export function Knob(props: KnobProps) {
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={displayValue}
-        aria-valuetext={unit === undefined ? formatted : `${formatted} ${unit}`}
+        aria-valuetext={text}
         aria-describedby={readoutId}
         aria-disabled={disabled === true ? true : undefined}
-        title={unit === undefined ? formatted : `${formatted} ${unit}`}
+        title={text}
         className={cx(styles.dial, dragging && styles.dragging)}
         onPointerDown={disabled === true ? undefined : onPointerDown}
         onPointerMove={onPointerMove}
@@ -133,6 +145,14 @@ export function Knob(props: KnobProps) {
               <line key={tick.key} x1={tick.x1} y1={tick.y1} x2={tick.x2} y2={tick.y2} />
             ))}
           </g>
+          <line
+            className={styles.defaultMark}
+            data-part="default-marker"
+            x1={defaultMark.from.x.toFixed(2)}
+            y1={defaultMark.from.y.toFixed(2)}
+            x2={defaultMark.to.x.toFixed(2)}
+            y2={defaultMark.to.y.toFixed(2)}
+          />
           <path className={styles.track} d={arcPath(START_ANGLE, START_ANGLE + SWEEP)} />
           {fraction > 0 ? (
             <path className={styles.fill} data-part="value" d={arcPath(START_ANGLE, angle)} />
@@ -183,11 +203,7 @@ export function Knob(props: KnobProps) {
         </svg>
       </div>
       <span className={styles.label}>{props.caption ?? label}</span>
-      {adjusting ? (
-        <output className={styles.tooltip} role="tooltip">
-          {unit === undefined ? formatted : `${formatted} ${unit}`}
-        </output>
-      ) : null}
+      {adjusting ? <Tooltip className={styles.tooltip}>{text}</Tooltip> : null}
       {/*
        * Direct numeric entry, spec-003 section 22.1. The approved composition
        * target draws this as a chip floating above the dial that appears on
@@ -196,31 +212,15 @@ export function Knob(props: KnobProps) {
        * at a time.
        */}
       <div className={styles.value}>
-        <input
-          key={formatted}
+        <ValuePopover
           id={readoutId}
-          type="number"
-          aria-label={`${label} value`}
-          defaultValue={formatted}
+          label={`${label} value`}
+          value={formatted}
           min={min}
           max={max}
           step={step}
           disabled={disabled}
-          inputMode="decimal"
-          onBlur={(event) => {
-            setFromNumeric(event.currentTarget.valueAsNumber);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              event.currentTarget.blur();
-            }
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.currentTarget.value = formatted;
-              event.currentTarget.blur();
-            }
-          }}
+          onCommit={setFromNumeric}
         />
       </div>
     </div>

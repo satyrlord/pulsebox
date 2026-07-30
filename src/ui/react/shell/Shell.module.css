@@ -247,7 +247,7 @@
   gap: 5px;
   align-items: center;
   font:
-    var(--pulse-type-10, 10px)/1 ui-monospace,
+    var(--pulse-type-10, 10px) / 1 var(--pulse-font-mono, ui-monospace),
     monospace;
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
@@ -523,7 +523,7 @@
 .rollTools output,
 .gridReadout {
   font:
-    10px/1 ui-monospace,
+    10px/1 var(--pulse-font-mono, ui-monospace),
     monospace;
 }
 
@@ -587,7 +587,7 @@
   justify-content: flex-start;
   border-radius: 0;
   font:
-    var(--pulse-type-10, 10px)/1.2 ui-monospace,
+    var(--pulse-type-10, 10px) / 1.2 var(--pulse-font-mono, ui-monospace),
     monospace;
   border: 0;
   cursor: pointer;

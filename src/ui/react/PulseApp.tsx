@@ -21,7 +21,6 @@ export interface PulseAppProps {
 
 function EditablePulseApp(props: PulseAppProps) {
   useAudioPosition();
-  useKeyboardShortcuts();
 
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const editorExpanded = useAppStore((state) => state.editorExpanded);
@@ -54,6 +53,8 @@ function EditablePulseApp(props: PulseAppProps) {
       if (editorFocus.current?.isConnected === true) editorFocus.current.focus();
     });
   }, [editorExpanded, setEditorExpanded]);
+
+  useKeyboardShortcuts({ toggleEditor });
 
   return (
     <div className={styles.app} data-component="pulse-app" data-editor-expanded={editorExpanded}>
