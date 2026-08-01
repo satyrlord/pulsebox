@@ -101,7 +101,7 @@ Browser content:
 
 - Category or filter control.
 - Six instrument definitions.
-- Original DOM or SVG thumbnail.
+- Original SVG icon from the module manifest, rendered in the module accent.
 - Short label.
 - Full name.
 - Type description in the card tooltip.

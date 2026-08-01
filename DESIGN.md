@@ -176,12 +176,19 @@ control-ring detail, the mixer header, and the overview marker. Each has a muted
 variant for filled areas, a brighter LED variant for lit indicators, and a ring
 variant for control outlines.
 
-- **Acid Green** (`#9BE564`) — `ACID`, Silver Serpent
-- **Amber Orange** (`#FFB44A`) — `SNAP`, Tin Soldier
+- **Acid Yellow** (`#F2D530`) — `ACID`, Silver Serpent
+- **Soldier Green** (`#6FDE76`) — `SNAP`, Tin Soldier
 - **Warm Red** (`#FF6B5F`) — `BOOM`, Soft Thunder
 - **Violet** (`#B890FF`) — `MESH`, Twin Engine
-- **Electric Blue** (`#5AAEFF`) — `BITS`, Gray Ghost
+- **Ghost Blue** (`#A9C7E8`) — `BITS`, Gray Ghost
 - **Turquoise** (`#4ADFC7`) — `PERC`, Dusty Mosaic
+
+Each instrument also carries an original icon as a maker's mark, declared in
+its manifest and rendered in the accent: an acid smiley (`ACID`), a marching
+snare with crossed sticks (`SNAP`), a thundercloud over a bolt (`BOOM`),
+meshed gears (`MESH`), a ghost (`BITS`), and mosaic tiles (`PERC`). The
+browser engraves it into the thumbnail plate. The faceplate stamps it into a
+recessed badge well beside the short label.
 
 ### Tertiary — level and status
 

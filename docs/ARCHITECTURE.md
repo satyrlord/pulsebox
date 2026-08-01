@@ -333,6 +333,12 @@ interface BasePluginManifest {
 accent tokens owned by `THEMING.md`. Shared UI applies those values generically.
 it does not branch on a plugin ID, short label, or instrument name.
 
+The optional `PluginUiManifest.icon` supplies the module's original iconography
+as one origin-anchored viewBox and one compound SVG path. The validator bounds
+the path to safe path-data characters, so a manifest can never inject markup.
+Shared UI renders the icon generically with `currentColor` and the even-odd
+fill rule. A manifest without an icon falls back to the derived bar thumbnail.
+
 `PluginUiManifest.compactControls` lists the module-level fast controls in
 faceplate order. The optional `voiceCompactControls` list declares
 selected-voice fast controls by parameter suffix. The faceplate resolves

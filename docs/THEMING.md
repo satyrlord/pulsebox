@@ -186,11 +186,11 @@ them. These values identify the module but never fill the whole faceplate.
 
 | Module | `--module-accent` | `--module-accent-muted` | `--module-led` | `--module-control-ring` |
 | ------ | ----------------- | ----------------------- | -------------- | ----------------------- |
-| `ACID` | `#9BE564`         | `#496B36`               | `#B8FF7A`      | `#79B84D`               |
-| `SNAP` | `#FFB44A`         | `#76552A`               | `#FFD078`      | `#D98E2F`               |
+| `ACID` | `#F2D530`         | `#6E6118`               | `#FFE95E`      | `#C7A81F`               |
+| `SNAP` | `#6FDE76`         | `#33663A`               | `#98F19E`      | `#4FB558`               |
 | `BOOM` | `#FF6B5F`         | `#763B37`               | `#FF9188`      | `#D84E45`               |
 | `MESH` | `#B890FF`         | `#594776`               | `#CEB2FF`      | `#9670D8`               |
-| `BITS` | `#5AAEFF`         | `#315979`               | `#86C5FF`      | `#3E8ED8`               |
+| `BITS` | `#A9C7E8`         | `#4E5D70`               | `#CFE3F6`      | `#86A6C8`               |
 | `PERC` | `#4ADFC7`         | `#2B6D63`               | `#7FF2DF`      | `#32B8A3`               |
 
 Module identity also uses text, position, shape, or iconography. Components must

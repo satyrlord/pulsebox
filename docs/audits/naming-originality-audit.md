@@ -81,6 +81,10 @@ are the bundled typeface files under `src/styles/fonts/`.
 - The built-in `rack` theme palette and the high-contrast overlay are original
   token values authored for Pulsebox. They carry no copied color scheme, no
   hardware artwork, and no community theme data.
+- The six decision `D89` module icons are original inline SVG paths authored
+  for Pulsebox. The `ACID` smiley renders the generic acid-house motif as an
+  original drawing. No icon copies or traces a product's artwork or trade
+  dress. No icon is raster artwork.
 - The theme identifier and visible label are the approved `rack` set per
   decision `D79`. The theme name refers to no real product.
 

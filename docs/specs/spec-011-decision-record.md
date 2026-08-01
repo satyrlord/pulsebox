@@ -536,3 +536,18 @@ contains the normative requirements. This table is the traceability record.
   of content now serves both the first start and every New action. Section 9.1
   of [rack and instruments](spec-005-rack-and-instruments.md) owns the content.
   Section 9.2 owns the template action and holds no content of its own.
+- **D89.** Each instrument carries an original manifest-declared SVG icon and a
+  revised accent: `ACID` acid yellow `#F2D530` with a smiley, `SNAP` soldier
+  green `#6FDE76` with a marching snare, `BOOM` warm red with a thundercloud,
+  `MESH` violet with meshed gears, `BITS` ghost blue `#A9C7E8` with a ghost,
+  and `PERC` turquoise with mosaic tiles. This supersedes the color-stability
+  note in `D87` for `ACID`, `SNAP`, and `BITS`.
+
+  The acid-yellow smiley is a direct owner decision. It renders the acid-house
+  motif as an original Pulsebox drawing. No icon or color copies a product's
+  artwork, layout, or trade dress. Icons live in `PluginUiManifest.icon` as
+  bounded path data, so shared UI renders them without plugin branches.
+  Section 11.2 of
+  [product and design foundations](spec-001-product-and-design-foundations.md)
+  owns the accent and icon vocabulary. `THEMING.md` section 3.4 owns the token
+  values.

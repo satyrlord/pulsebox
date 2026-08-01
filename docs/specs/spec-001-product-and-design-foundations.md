@@ -186,14 +186,21 @@ Avoid:
 
 ### 11.2 Instrument accents
 
-- `ACID`: acid green.
-- `SNAP`: amber orange.
+- `ACID`: acid yellow.
+- `SNAP`: soldier green.
 - `BOOM`: warm red.
 - `MESH`: violet.
-- `BITS`: electric blue.
+- `BITS`: ghost blue.
 - `PERC`: turquoise.
 
 Accents identify modules. They do not become full panel colors.
+
+Each instrument also declares one original SVG icon in its manifest. The icon
+is a maker's mark for the instrument: an acid smiley for `ACID`, a marching
+snare for `SNAP`, a thundercloud for `BOOM`, meshed gears for `MESH`, a ghost
+for `BITS`, and mosaic tiles for `PERC`. The module browser thumbnail and the
+faceplate badge render it in the module accent. Icons are original drawings
+and follow the section 2.3 originality rules.
 
 Use each accent for:
 

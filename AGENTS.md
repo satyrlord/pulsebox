@@ -228,7 +228,8 @@ An instrument or effect folder follows the current module shape under
 `src/engine/modules/<plugin-id>/`:
 
 - `manifest.ts` declares the base manifest, parameter descriptors, meters,
-  defaults, and the UI manifest including its `moduleAccent` tokens.
+  defaults, and the UI manifest including its `moduleAccent` tokens and
+  original `icon` path.
 - `dsp-core.ts` holds pure, testable DSP.
 - `<name>.worklet.ts` is the AudioWorkletProcessor.
 - `adapter.ts` loads the worklet module and owns its nodes. It imports the
