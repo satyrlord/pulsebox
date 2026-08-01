@@ -25,12 +25,19 @@ manage their own overflow.
 3. Lower editor workspace: collapsible. Use approximately 260 to 300 pixels on
    taller displays. Use approximately 210 to 230 pixels at the supported
    720-pixel height. Use internal scrolling. Do not shrink controls below their
-   minimum sizes.
+   minimum sizes. A horizontal resize handle sits above the editor. The default
+   editor height is also its minimum. The user raises the height by drag or
+   keyboard until the rack row reaches its 350-pixel minimum. A double-click on
+   the handle restores the default height. The chosen height is session UI
+   state, not project data.
 4. Bottom workspace bar: approximately 50 to 52 pixels.
 
 At 1280 × 720, the complete row stack, inter-region gaps, and borders must fit
 without page-level scrolling or overlap. The rack and editor manage their own
 overflow.
+
+The header uses one project selector for New, Open, Import, and Export. It has
+no second project-management menu.
 
 ### 8.2 Wide desktop composition
 
@@ -40,6 +47,9 @@ At 1536 × 1024:
 - A unified module browser sits on the far left.
 - A narrow rack overview sits beside the browser.
 - A large central rack shows six compact modules.
+- Each rack faceplate puts its control groups in one horizontal row.
+- A user can collapse each control group when the row does not fit.
+- The Output group stays at the right edge of each loaded faceplate.
 - A compact studio column sits on the right and provides mutually exclusive
   Mixer, Effects, and Master tabs.
 - Mixer is the default studio view. Effects and Master replace it inside the
@@ -125,7 +135,7 @@ At every supported width:
   empty strips show a two-digit slot number. Each instrument strip keeps its
   2 × 2 A–D send grid visible. The master strip carries no A–D grid.
 - Effects replaces the Mixer view and presents the four modular send-chain
-  summaries plus detailed-chain entry points.
+  summaries. Show a detailed-chain entry point only when its editor exists.
 - Master opens master routing, master-chain, and output metering.
 - Show only the active studio view. Make only that view interactive. Hide
   inactive panes. Remove them from keyboard navigation and the accessibility
@@ -154,6 +164,7 @@ Behavior:
   name in both states.
 - Undo and redo disable correctly.
 - Save exposes clean, dirty, saving, saved, and error states.
+- The bottom bar is the only explicit Save control at supported sizes.
 - All actions have keyboard shortcuts and accessible names.
 - No button is decorative.
 - When the user collapses the lower editor, remove it from the layout, keyboard
@@ -266,6 +277,11 @@ Support:
 - Value arc or indicator.
 - Default marker where useful.
 
+A knob whose parameter is gated by another control is disabled and dimmed while
+the gate value does not hold. The gate is declared in the plugin UI manifest,
+not in shared UI code. The disabled state keeps the stored value arc, removes
+the control from the tab sequence, and reports `aria-disabled`.
+
 ### 22.2 Faders
 
 Use the shared `Fader` React component.
@@ -289,6 +305,7 @@ Support:
 - Visible focus.
 - `aria-pressed` for toggles.
 - Clear active state.
+- Hover does not wash out a pressed toggle's caption.
 - Clear bypass semantics.
 - Practical hit area.
 

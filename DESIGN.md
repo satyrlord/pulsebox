@@ -176,12 +176,12 @@ control-ring detail, the mixer header, and the overview marker. Each has a muted
 variant for filled areas, a brighter LED variant for lit indicators, and a ring
 variant for control outlines.
 
-- **Acid Green** (`#9BE564`) — `BASS`, Acid Bass
-- **Amber Orange** (`#FFB44A`) — `SIX`, Drumline Six
-- **Warm Red** (`#FF6B5F`) — `BOOM`, Boom Eight
-- **Violet** (`#B890FF`) — `NINE`, Hybrid Nine
-- **Electric Blue** (`#5AAEFF`) — `SEV`, Digit Seven
-- **Turquoise** (`#4ADFC7`) — `FIVE`, Digit Five
+- **Acid Green** (`#9BE564`) — `ACID`, Silver Serpent
+- **Amber Orange** (`#FFB44A`) — `SNAP`, Tin Soldier
+- **Warm Red** (`#FF6B5F`) — `BOOM`, Soft Thunder
+- **Violet** (`#B890FF`) — `MESH`, Twin Engine
+- **Electric Blue** (`#5AAEFF`) — `BITS`, Gray Ghost
+- **Turquoise** (`#4ADFC7`) — `PERC`, Dusty Mosaic
 
 ### Tertiary — level and status
 
@@ -394,8 +394,8 @@ dense workspace, the presence of overflow is information.
 
 ### Do:
 
-- **Do** pair every module accent with its uppercase short label (`BASS`, `SIX`,
-  `BOOM`, `NINE`, `SEV`, `FIVE`). Color alone is never an identity.
+- **Do** pair every module accent with its uppercase short label (`ACID`, `SNAP`,
+  `BOOM`, `MESH`, `BITS`, `PERC`). Color alone is never an identity.
 - **Do** give every state a second, non-color cue — border weight, font weight,
   outline, glyph, or position — so it survives the high-contrast overlay.
 - **Do** decide "recessed or raised" before styling any surface, then apply the

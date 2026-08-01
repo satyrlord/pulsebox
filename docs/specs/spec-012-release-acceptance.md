@@ -20,7 +20,8 @@ The merged MVP is complete only when:
    dependency.
 4. **AC-004.** At 1536 × 1024, the rack remains dominant. The compact right
    studio column provides mutually exclusive Mixer, Effects, and Master views.
-   It has no duplicate effects region.
+   It has no duplicate effects region. The header has one project selector and
+   no second project-management menu.
 5. **AC-005.** It remains usable without overlap at 1280 × 720 and at larger supported
    sizes. Below either minimum dimension, the approved notice appears. The
    limited Save, portable Export, autosave, and read-only summary behavior works.
@@ -30,11 +31,13 @@ The merged MVP is complete only when:
 8. **AC-008.** Eight rack slots work. The user cannot add a ninth instrument in
    the MVP.
 9. **AC-009.** Duplicate instruments work.
-10. **AC-010.** Add, select, collapse, expand, swap, duplicate, remove, and
-    reorder work. Empty-slot plus controls are the only visible rack Add action.
-    `Delete module` is in the loaded module context menu. It works by right-click
-    and the standard keyboard context-menu gesture. No persistent Add or minus
-    buttons exist below the slot list.
+10. **AC-010.** Add, select, swap, duplicate, remove, and reorder work. The
+    module browser Add buttons and rack-overview empty-slot plus controls are
+    the only visible rack Add actions. The loaded module context menu contains
+    Duplicate, Swap, and `Delete module`. It works by right-click and the
+    standard keyboard context-menu gesture. No separate Select, Duplicate,
+    Swap, Add, or minus buttons exist on loaded faceplates or overview cards.
+    Module browser cards put each type description in a tooltip, not fixed text.
 11. **AC-011.** The Piano Roll is the only surface that edits Pattern event
     data. No rack faceplate contains a step grid, any per-step editing, or a
     Pattern activity indicator. The faceplate
@@ -87,6 +90,8 @@ The merged MVP is complete only when:
 34. **AC-034.** Autosave, recovery, explicit Save, import, export, and migrations are
     atomic. Quota failure preserves the last committed project, leaves the
     editor dirty, reports recovery actions, and keeps portable Export available.
+    Creating a project from a template first saves the active project. A failed
+    save cancels the replacement.
 35. **AC-035.** Multiple tabs follow last-writer-wins behavior.
 36. **AC-036.** Master WAV export is unnormalized 16-bit, 44.1 kHz PCM with deterministic
     TPDF dither and high-quality deterministic resampling.
@@ -163,7 +168,8 @@ The merged MVP is complete only when:
 67. **AC-067.** CSS token, spacing, radius, scrollbar, and supported-viewport rules are
     followed. The UI follows the documented major row and column geometry,
     density, materials, typography scale, and control sizing. Semantic controls
-    do not become raster artwork.
+    do not become raster artwork. The tempo shows only its number. Its tooltip
+    defines beats per minute.
 68. **AC-068.** The visible mixer uses fixed compact strips. Every instrument
     strip keeps its A–D sends visible as a 2 × 2 button grid. Channel selection
     or detail editing does not resize the mixer. Empty strips remain
@@ -222,10 +228,12 @@ The merged MVP is complete only when:
     The MVP uses fixed 1/16 timing and fixed 100% quantize strength. It has an
     Alt-drag temporary snap override. It has no Straight, grid, triplet, or
     persistent snap-off control.
-80. **AC-080.** Rack-module collapse persists only as a local UI preference keyed by
-    project, project lineage, and module. It does not travel in `.pulsebox`
-    files or create an undo entry. It never leaks across whole-project
-    replacement lineages.
+80. **AC-080.** Each loaded faceplate keeps its control groups on one
+    horizontal row. Sound, Voice when applicable, and Output are separate
+    collapsible groups. Group disclosure is transient. It does not enter
+    project data, local storage, portable files, or Undo history. Hidden group
+    controls leave the keyboard order and accessibility tree. Output stays at
+    the right edge. Sound and Voice use the flexible lane to its left.
 81. **AC-081.** Each referenced plugin is required and known at a compatible
     version. Missing pack references use the degraded,
     reference-preserving recovery behavior in `PROJECT-FORMAT.md`.

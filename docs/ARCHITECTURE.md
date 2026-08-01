@@ -333,6 +333,21 @@ interface BasePluginManifest {
 accent tokens owned by `THEMING.md`. Shared UI applies those values generically.
 it does not branch on a plugin ID, short label, or instrument name.
 
+`PluginUiManifest.compactControls` lists the module-level fast controls in
+faceplate order. The optional `voiceCompactControls` list declares
+selected-voice fast controls by parameter suffix. The faceplate resolves
+`<selected-voice-id>-<suffix>` against the declared parameters, so one
+descriptor serves every voice and shared UI stays free of plugin branches.
+Voice compact controls are valid only on an instrument with voices. Every
+voice shall declare each referenced parameter.
+
+The optional `parameterGates` list declares parameters the UI disables while
+their gate parameter does not hold the declared value. A gate parameter shall
+be a declared boolean parameter. The engine already ignores the gated
+parameter in that state, so the gate makes the faceplate agree with the audio
+path. Shared UI applies gates generically. It does not branch on a plugin ID,
+short label, or instrument name.
+
 `pluginVersion` shall use semantic-version syntax. `stateSchemaVersion` shall be
 a positive integer and shall change only when serialized plugin state changes.
 `cpuClass` is informational and shall not become a release threshold.
@@ -510,13 +525,9 @@ or silenced. Rendering stops while suspended. Without that frame, the last peak
 would remain the controller's most recent reading. A meter would stay lit for a
 voice that is no longer sounding.
 
-Rack-module collapse shall be a lightweight local UI preference keyed by
-`ProjectId`, `ProjectLineageId`, and `ModuleInstanceId`. It shall use the
-state-owned preference port, shall not enter project data or portable files, and
-shall not create an undo entry. Removing a module shall remove its collapse
-preference. Undoing removal shall restore the module expanded. Whole-project
-Replace, Undo replace, and Import as copy use a different project or lineage
-key, so equal module IDs never inherit another lineage's preference.
+Faceplate-group disclosure is transient component state. It does not enter the
+state layer, project data, local storage, portable files, or history. A hidden
+group leaves the layout, keyboard order, and accessibility tree.
 
 ### 7.3 Undo and inverse data
 
@@ -583,7 +594,7 @@ bursts on one and two targets, no-op commits, Undo, and Redo.
 
 ## 8. Engine controller and AudioWorklet protocol
 
-The Phase 1 Acid Bass adapter and processor implement this protocol. Focused
+The Phase 1 Silver Serpent adapter and processor implement this protocol. Focused
 tests cover both endpoints, queue and message bounds, lifecycle, and bounded
 recovery.
 

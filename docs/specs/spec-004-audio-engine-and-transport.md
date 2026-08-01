@@ -17,10 +17,7 @@ The full-width transport contains:
 
 Far left:
 
-- Main menu.
-- Project selector.
-- Pin project.
-- Project actions.
+- One project selector for New, Open, Import, and Export.
 
 Transport group:
 
@@ -28,8 +25,8 @@ Transport group:
 - Play.
 - Stop.
 - Record.
-- Tempo display.
-- BPM label.
+- Tempo number with no visible unit label.
+- Tempo tooltip that defines beats per minute.
 - Tap tempo.
 
 Center:
@@ -89,8 +86,11 @@ Behavior:
   automation, or export. Count-in length and metronome sound stay with the live
   recording settings in
   [pattern editing](spec-006-pattern-editing.md) section 16.4.
-- Pin project toggles whether the current project appears at the top of the
-  project selector. It uses `aria-pressed` and persists as project metadata.
+- The MVP has no control that marks a project. The project selector orders
+  stored projects by modified time alone. A post-MVP Favourite feature will let
+  the user mark projects. It is a separate feature from the removed Pin control
+  and it will define its own behavior, ordering, and interface. The project
+  format reserves the `favorite` field for it.
 
 The `L/R`/`M/S` control changes analysis only. It never changes live audio,
 project state, automation, undo history, or export. Meter mode is a transient
@@ -111,9 +111,9 @@ to every module. Per-Pattern Swing is post-MVP work.
 
 The Piano Roll header shows these timing properties as horizontal sliders:
 
-- Swing, default 54%. It is project-wide in the MVP. When the user moves it on
+- Swing, default 0%. It is project-wide in the MVP. When the user moves it on
   any Pattern, it changes playback of every Pattern.
-- Humanize, default 12%. Pattern-owned.
+- Humanize, default 0%. Pattern-owned.
 - The MVP fixes quantize strength at 100% and shows no control for it.
 - The MVP fixes the Pattern grid at 1/16. There is no Straight selector, grid
   selector, triplet selector, or persistent snap-off control in the MVP.

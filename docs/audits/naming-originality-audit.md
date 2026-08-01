@@ -1,9 +1,10 @@
 # Naming, dependency, and originality audit
 
-**Date:** 2026-07-28
+**Date:** 2026-08-01
 
-**Repository state:** Phase 1 runnable foundation with the theme, appearance,
-and user-theme import implementation
+**Repository state:** Phase 1 runnable foundation after the decision `D87`
+instrument rename to Silver Serpent, Tin Soldier, Soft Thunder, Twin Engine,
+Gray Ghost, and Dusty Mosaic
 
 **Result:** pass for the current source, shipping text, build, and dependency
 scope
@@ -76,7 +77,7 @@ are the bundled typeface files under `src/styles/fonts/`.
 - The six approved instrument names and IDs remain those in the
   [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
 - The current build contains only `index.html`, CSS, the application module, the
-  Acid Bass worklet asset, and the sample decoder worker.
+  Silver Serpent worklet asset, and the sample decoder worker.
 - The built-in `rack` theme palette and the high-contrast overlay are original
   token values authored for Pulsebox. They carry no copied color scheme, no
   hardware artwork, and no community theme data.

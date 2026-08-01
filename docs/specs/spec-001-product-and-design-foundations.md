@@ -65,14 +65,14 @@ Project files use the `.pulsebox` extension.
 
 ### 2.2 Instrument names
 
-| Full name    | Code ID             | Type                                 | Short label |
-| ------------ | ------------------- | ------------------------------------ | ----------- |
-| Acid Bass    | `bass-mono`         | Monophonic analog-style bass synth   | `BASS`      |
-| Drumline Six | `drum-analog-small` | Small analog-style drum machine      | `SIX`       |
-| Boom Eight   | `drum-analog-large` | Large analog-style drum machine      | `BOOM`      |
-| Hybrid Nine  | `drum-hybrid`       | Analog and sample hybrid machine     | `NINE`      |
-| Digit Seven  | `drum-digital-a`    | Digital drum machine                 | `SEV`       |
-| Digit Five   | `drum-digital-b`    | Digital drum machine with percussion | `FIVE`      |
+| Full name      | Code ID             | Type                                 | Short label |
+| -------------- | ------------------- | ------------------------------------ | ----------- |
+| Silver Serpent | `bass-mono`         | Monophonic analog-style bass synth   | `ACID`      |
+| Tin Soldier    | `drum-analog-small` | Small analog-style drum machine      | `SNAP`      |
+| Soft Thunder   | `drum-analog-large` | Large analog-style drum machine      | `BOOM`      |
+| Twin Engine    | `drum-hybrid`       | Analog and sample hybrid machine     | `MESH`      |
+| Gray Ghost     | `drum-digital-a`    | Digital drum machine                 | `BITS`      |
+| Dusty Mosaic   | `drum-digital-b`    | Digital drum machine with percussion | `PERC`      |
 
 Rules:
 
@@ -80,9 +80,7 @@ Rules:
 - Short labels are no longer than four characters.
 - Use short labels as the primary identity on faceplates, compact rack cards,
   rack-overview markers, mixer strips, and dense selectors.
-- A rack faceplate can show its short label with the approved full name and type
-  as subordinate text.
-- The short label remains the dominant compact identifier.
+- Rack faceplates and rack-overview cards show only the short label.
 - Use full names in the module browser, help text, accessible names, detailed editors,
   and documentation.
 - Do not invent additional visible names for the six instruments.
@@ -188,12 +186,12 @@ Avoid:
 
 ### 11.2 Instrument accents
 
-- `BASS`: acid green.
-- `SIX`: amber orange.
+- `ACID`: acid green.
+- `SNAP`: amber orange.
 - `BOOM`: warm red.
-- `NINE`: violet.
-- `SEV`: electric blue.
-- `FIVE`: turquoise.
+- `MESH`: violet.
+- `BITS`: electric blue.
+- `PERC`: turquoise.
 
 Accents identify modules. They do not become full panel colors.
 
@@ -329,6 +327,9 @@ The following are out of scope for version 1.0:
   and full touch-first mobile design.
 - More than eight rack slots in the MVP. Sixteen slots remain an explicit
   post-MVP target.
+- Marking projects. The Pin control is removed. A Favourite feature is a
+  post-MVP target. It is a separate feature from Pin and it will define its own
+  behavior, ordering, and interface.
 - Native desktop wrappers.
 - PWA installation and service workers.
 - Marketplace or online sample store.

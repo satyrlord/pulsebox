@@ -1,4 +1,4 @@
-# Acid Bass instrument design
+# Silver Serpent instrument design
 
 **Plugin ID:** `bass-mono`
 
@@ -8,7 +8,7 @@
 
 ## Product identity
 
-Acid Bass is an original monophonic subtractive bass instrument. Its shipping
+Silver Serpent is an original monophonic subtractive bass instrument. Its shipping
 name, panel, defaults, pattern, parameter ranges, DSP, and visual treatment are
 Pulsebox-owned. It does not reproduce or claim compatibility with another
 instrument.

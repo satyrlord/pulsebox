@@ -13,7 +13,7 @@ web
 Browser-first beatmakers who have never operated a hardware groovebox. They make
 music in a browser tab, at a desktop, usually on headphones. They arrive fluent
 in software and illiterate in rack conventions, so the dense short labels
-(`BASS`, `SIX`, `BOOM`) and panel logic have to teach themselves through sound
+(`ACID`, `SNAP`, `BOOM`) and panel logic have to teach themselves through sound
 and response rather than through documentation.
 
 The job is sound design and pattern work: build a groove, shape it, keep it.

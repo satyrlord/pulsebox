@@ -76,7 +76,7 @@ Exclude:
 - Temporary previews.
 - Audio power.
 - Save-status animation.
-- Rack-module and ordinary panel collapse preferences.
+- Ordinary panel disclosure preferences.
 
 ### 24.3 Tests
 
@@ -317,12 +317,12 @@ link, naming, and contract-consistency checks. It does not require a runnable
 product application or product tests.
 
 Phase 1: Application shell, controls, state foundation, AudioWorklet foundation,
-transport, Acid Bass, three-slot functional rack. During Phase 1, the product
+transport, Silver Serpent, three-slot functional rack. During Phase 1, the product
 exposes the first three slots of the durable eight-slot model. The development
 seed
-loads Acid Bass in slot 01 and leaves slots 02 and 03 available for Add or
-Duplicate. This seed is not the final default project or the secondary starter
-template.
+loads Silver Serpent in slot 01 and leaves slots 02 and 03 available for Add or
+Duplicate. This seed is not the final default project or the section 9.2
+starter template.
 
 Phase 2: Remaining instruments, sample layers, eight-slot rack, overview,
 internal voice mixers.
@@ -350,8 +350,9 @@ phase. Such a slice does not complete its parent phase or a skipped phase.
 User-facing status must name the exact implemented slice and its missing
 parent-phase scope.
 
-The current runnable foundation contains Phase 1 and narrow slices for Drumline
-Six, named Pattern storage, and basic channel mixing. It also contains Playlist
+The current runnable foundation contains Phase 1 and narrow slices for Tin
+Soldier, named Pattern storage, and basic channel mixing. It also contains
+Playlist
 transport, appearance Settings, and browser project persistence. These slices
 verify shared contracts and integration points. They do not complete Phases 2
 through 7 or their acceptance criteria.

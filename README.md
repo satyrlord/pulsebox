@@ -8,13 +8,28 @@ columns. It includes five named Patterns, basic Playlist transport, channel
 mixing, appearance Settings, and browser project persistence.
 
 Narrow later-phase foundations include six instrument modules and the
-AudioWorklet Acid Bass and Drumline Six paths. The specification 004 transport
+AudioWorklet Silver Serpent and Tin Soldier paths. The specification 004 transport
 and timing slice is also runnable. It covers tap tempo, tempo drag, the
 transport start marker, bar-quantized Pattern launches, deterministic Pattern
 Humanize with stored seeds, the metronome click, the audio-engine power control,
 the default master limiter, and post-limiter `L/R` and `M/S` header metering.
 These slices do not mark their parent phases complete. The rack exposes all
 eight slots. The Mixer exposes all eight instrument strips and one master strip.
+
+The specification 005 rack and instrument slice is also runnable. The module
+browser has a filter, compact identity cards, type tooltips, double-click Add,
+and whole-card pointer drag into a specific empty slot. The rack
+reorders by pointer drag from the ear handles with an insertion marker,
+Escape cancel, and keyboard reorder. Each loaded module has a context menu
+with Duplicate, Swap, and `Delete module`, reachable by right-click, the Menu
+key, and Shift+F10. A swap keeps sequence data and reports unmapped events in
+a non-blocking result panel. Faceplates keep Sound, Voice, and Output groups on
+one horizontal row. Output stays at the right edge. Each group can collapse
+independently. Faceplates carry mute, solo, audition, and selected-voice fast
+controls.
+The built-in `Neon Basement` template creates a fresh copy of the default
+project. The project selector contains New, Open, Import, and Export. A New
+action saves the active project before it loads the template.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications
@@ -50,7 +65,7 @@ Current owners:
   migrations, and portable archives.
 - [THEMING.md](docs/THEMING.md): theme tokens, safe import, high contrast, and theme
   verification.
-- [docs/instruments/acid-bass.md](docs/instruments/acid-bass.md): Acid Bass
+- [docs/instruments/silver-serpent.md](docs/instruments/silver-serpent.md): Silver Serpent
   identity, parameters, behavior, and verification boundary.
 - [docs/instruments/voice-behavior.md](docs/instruments/voice-behavior.md):
   per-instrument voice limits, steal priority, release, choke, and retrigger.
@@ -105,7 +120,7 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the normative contracts.
 Committed edits use typed commands. Continuous gestures create one history
 entry. The product contract requires destructive actions to happen immediately,
 retain full recovery data, and produce a non-blocking Undo notice. Meter frames,
-playheads, focus, hover, audio power, and rack-collapse preferences are not
+playheads, focus, hover, audio power, and faceplate-group disclosure are not
 project data.
 
 ## Audio
@@ -126,6 +141,7 @@ Projects serialize to the versioned manifest defined by
 database and restore on load. Explicit Save and Open use the same validated
 repository path. Portable `.pulsebox` export wraps the canonical manifest in a
 ZIP archive, and import validates the archive and manifest before state changes.
+The bottom bar contains the explicit Save control at supported sizes.
 Assets, packs, collision resolution, recovery history, and the complete Phase 7
 transaction surface remain later work.
 
@@ -157,8 +173,21 @@ The shortcut reference will expand when later editors add commands.
 - The mixer covers level, pan, mute, solo, and master level. Send buttons open
   the applicable empty send-chain summary. Send routing, inserts, master-effects
   bypass, and the master chain remain planned.
-- Acid Bass and Drumline Six implement their Phase 1 sound and compact-rack
-  foundation. Their expanded editors remain planned.
+- Silver Serpent and Tin Soldier implement their Phase 1 sound and compact-rack
+  foundation. Expanded per-module editors remain planned for all six
+  instruments: manifests declare editor sections, but no UI reads them yet.
+- Silver Serpent does not yet implement the sub-oscillator level, second-oscillator
+  detune, clean or dirty filter model, or the compact filter-response
+  visualization from specification 005 section 15.1. Twin Engine does not yet
+  draw its waveform preview.
+- Per-slot enable or bypass and per-slot output routing are not yet
+  implemented. Voice insert slots, sample layers, user choke-group assignment,
+  and per-voice metering remain planned. Per-step probability, micro-timing,
+  flam, and roll wait for the specification 006 editing surface.
+- The default project stores sixteen-step Patterns. The specification 005
+  named-Pattern bar lengths, the time-signature field, and a stored
+  quantize-strength value remain planned. Default send effects and the master
+  chain wait for the specification 007 effect plugins.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
 - Files under `design/` are normally non-normative prototypes, not production

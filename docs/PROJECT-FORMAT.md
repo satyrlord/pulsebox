@@ -27,7 +27,7 @@ This contract covers:
 - deterministic serialization and verification fixtures.
 
 It does not define live audio objects, decoded `AudioBuffer` objects, meter
-frames, playheads, focus, hover, previews, rack-collapse preferences, theme
+frames, playheads, focus, hover, previews, faceplate-group disclosure, theme
 preferences, or other transient UI state. It does not permit loose-file links,
 executable plugins, remote assets, network retrieval, or host file-system paths.
 
@@ -226,10 +226,14 @@ modifiedAt          timestamp, not earlier than createdAt
 lineageId           UUID
 revisionEpoch       UUID
 revision            integer from 0 through 9007199254740991
-pinned              boolean
+favorite            boolean
 tempo               number from 40 through 240 BPM
 swing               number from 0 through 100 percent
 ```
+
+`favorite` is reserved for the post-MVP Favourite feature. The MVP writes `false`
+and offers no control that changes it. A reader must still accept and preserve
+the field.
 
 `tempo` and `swing` are global transport properties. In the MVP a project holds
 exactly one Swing value that applies to every Pattern and every module. A
@@ -740,7 +744,7 @@ revision tokens and offers three explicit resolution actions:
   project-scoped module, pattern, event, effect, lane, clip, asset-record, and
   migration IDs remain unchanged. Their identity is scoped by the new project
   and lineage IDs. Content IDs and pack IDs also
-  remain unchanged. Rack-collapse preferences are not copied. The remapped
+  remain unchanged. The remapped
   candidate receives complete validation again before quota preflight and
   commit.
 - **Replace existing** keeps the existing project UUID and `createdAt`. It
@@ -1023,8 +1027,6 @@ recovery fixtures, then automate their outcomes in unit and browser tests.
 - Same-ID Open existing, Import as copy, Replace existing, and canceled
   resolution, including metadata remapping, cross-lineage equal typed IDs,
   recovery, Undo replace, and atomic rollback.
-- Equal module IDs across Replace and Undo-replace lineages, proving that
-  lineage-keyed rack-collapse preferences do not leak.
 - Pack install and project import failures that leave no partial records.
 - Referenced-pack removal blocked with a usage report and unreferenced removal
   completed atomically.

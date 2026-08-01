@@ -23,8 +23,8 @@ Transport and timing:
 - Time signature: 4/4.
 - Pattern length: 16 steps.
 - Grid: 1/16.
-- Swing: 54%, global to the project.
-- Humanize: 12%.
+- Swing: 0%, global to the project.
+- Humanize: 0%.
 - Quantize strength: 100%.
 - Transport: stopped.
 - Instrument channel level: approximately -8 dB on every occupied slot, so the
@@ -35,12 +35,12 @@ Transport and timing:
 
 Rack order:
 
-1. Acid Bass.
-2. Drumline Six.
-3. Boom Eight.
-4. Hybrid Nine.
-5. Digit Seven.
-6. Digit Five.
+1. Silver Serpent.
+2. Tin Soldier.
+3. Soft Thunder.
+4. Twin Engine.
+5. Gray Ghost.
+6. Dusty Mosaic.
 7. Empty.
 8. Empty.
 
@@ -74,18 +74,19 @@ The limiter occupies the protected final slot and starts enabled.
 Create an original coherent demo loop. Do not use copied patterns, presets,
 samples, or note data.
 
-### 9.2 Secondary starter template
+### 9.2 Starter template
 
-Retain the alternative three-slot starter as a built-in template rather than the
-default:
+Pulsebox has one built-in template, `Neon Basement`. It creates a fresh copy of
+the section 9.1 default project. The template has no separate rack order, tempo,
+pattern set, or note data. Section 9.1 is the single owner of that content.
 
-1. Acid Bass.
-2. Acid Bass.
-3. Boom Eight.
-4. Remaining slots empty.
-5. Tempo: 130 BPM.
+A new installation opens the same content on first start, so the startup project
+and the template stay identical by construction.
 
-It must contain two independent basslines and an original drum pattern.
+The user creates a fresh project from the template through the project selector.
+Before replacement, Pulsebox saves the current project. If the save fails,
+Pulsebox keeps the current project active. A successful action creates a new
+project and lineage ID, and the new project starts with empty Undo history.
 
 ---
 
@@ -103,17 +104,18 @@ Browser content:
 - Original DOM or SVG thumbnail.
 - Short label.
 - Full name.
-- Type description.
-- Drag affordance.
+- Type description in the card tooltip.
 - Useful empty state.
 
 Interactions:
 
-- Click to inspect.
 - Double-click to add to the first empty slot.
-- Drag into a specific slot.
+- Drag the complete module card into a specific slot.
 - Keyboard Add command.
 - No screenshot thumbnails.
+
+Do not add a separate drag handle or inspection panel. The complete module card
+is the drag surface. Keep the type description out of the fixed card text.
 
 ### 13.2 Rack overview
 
@@ -125,12 +127,13 @@ Requirements:
 - Empty labels and add controls.
 - Selected border and accent marker.
 - Two-digit slot number.
-- Duplicate and Swap actions for the selected loaded module.
 - No persistent Add or Remove buttons below the slot list. The plus control in
   each empty slot is the only visible Add action in the overview.
-- A loaded module's context menu contains `Delete module`. Pointer users open it
+- A loaded module's context menu contains Duplicate, Swap, and `Delete module`. Pointer users open it
   with right-click. Keyboard users open the same menu with the Menu key or
   Shift+F10.
+- Do not show separate Select, Duplicate, or Swap buttons. Select a module with
+  its loaded overview card. The context menu owns Duplicate and Swap.
 - Disabled states are visible and semantic.
 - Rack action hit targets remain distinct from module controls and do not
   overlap them at any supported viewport.
@@ -166,11 +169,8 @@ Each slot supports:
 - Enable or bypass.
 - Mute.
 - Solo.
-- Pattern selector.
 - Output routing.
 - Swap.
-- Collapse.
-- Expand.
 - Duplicate.
 - Remove.
 - Reorder.
@@ -179,25 +179,18 @@ Each slot supports:
 - Visible level.
 - Audition, as defined in section 15.0.
 
-Rack-module collapse is a lightweight local UI preference. Its key contains the
-project ID, project lineage ID, and stable module ID. It is not project data.
-Portable files exclude it, and it creates no undo entry.
+A loaded faceplate shows all expanded control groups in one horizontal row.
+Control groups do not wrap to a second line. The groups are Sound, Voice when
+the module has voice controls, and Output. Each group has one disclosure
+control. A user can collapse or expand groups independently when the row does
+not fit. Keep Output at the right edge. Sound and Voice use the flexible lane.
 
-When the user removes a module, remove its local collapse preference. Undo
-restores the module in its expanded state. After a whole-project Replace, Undo
-replace, or Import as copy, the project cannot inherit another lineage's
-collapse state. This rule applies even when module IDs match.
+Group disclosure is transient component state. It does not enter project data,
+local storage, portable files, or Undo history. A collapsed group hides its
+controls from the layout, keyboard order, and accessibility tree.
 
-Collapsed slots remain usable and show:
-
-- Short label.
-- Level.
-- Mute.
-- Solo.
-- Pattern selector.
-- Expand control.
-
-Empty slots show an Add control.
+The full-rack empty slot is a compact identity row. The rack overview and the
+module browser own the visible Add actions.
 
 Reordering a module:
 
@@ -229,13 +222,16 @@ Swapping a module:
 
 - Replaces the plugin.
 - Preserves sequence data where event mapping is valid.
+- Keeps all sequence data in place. An event the new plugin cannot map to a
+  voice does not sound. Swapping back restores it unchanged.
 - Reports unmapped data before or after the operation through a non-blocking
-  result panel.
+  result panel. The panel states the count of events with no voice on the new
+  module.
 - Is undoable.
 - Does not interrupt unrelated audio.
 
-Each full module is approximately 86 to 98 pixels high at the target viewport
-unless expanded.
+Each loaded module is approximately 66 to 74 pixels high at a supported
+viewport. Each full-rack empty slot is approximately 38 pixels high.
 
 ---
 
@@ -246,7 +242,6 @@ Each instrument has:
 - Compact rack faceplate.
 - Expanded editor.
 - Stable parameter IDs.
-- Pattern selector.
 - Audition control.
 - Per-module output level.
 - Mute and solo.
@@ -257,9 +252,10 @@ Each instrument has:
 - Automation support.
 
 Compact faceplates expose the established fast-control set defined for each
-instrument below. Additional synthesis, sample, voice, insert, and routing
-parameters live in the playback-safe expanded editor. Faceplate pages are not
-user-configurable in the MVP.
+instrument below. The controls use the one-row groups from section 14.
+Additional synthesis, sample, voice, insert, and routing parameters live in the
+playback-safe expanded editor. Faceplate pages are not user-configurable in the
+MVP.
 
 Faceplates contain no step grid and no per-step editing. Users edit all Pattern
 events in the Piano Roll, as required by
@@ -302,7 +298,7 @@ Audition control:
 - Assistive technology announces it as an audition control, not as a step or a
   toggle.
 
-### 15.1 Acid Bass
+### 15.1 Silver Serpent
 
 Compact controls:
 
@@ -382,12 +378,12 @@ Each step supports:
 Factory sample content is original and project-owned. Users may layer their
 samples without replacing the synthesis engine.
 
-Default layer balance is machine-specific. Drumline Six and Boom Eight are
-synth-heavy. Hybrid Nine uses a balanced blend. Digit Seven and Digit Five are
+Default layer balance is machine-specific. Tin Soldier and Soft Thunder are
+synth-heavy. Twin Engine uses a balanced blend. Gray Ghost and Dusty Mosaic are
 sample-heavy with their built-in lo-fi stages enabled. Every voice provides both
 a synthesized layer and an optional sample layer.
 
-### 15.3 Drumline Six
+### 15.3 Tin Soldier
 
 Compact controls:
 
@@ -413,7 +409,7 @@ Expanded editor:
 - Per-step properties.
 - Synthesis-specific voice controls.
 
-### 15.4 Boom Eight
+### 15.4 Soft Thunder
 
 Compact controls:
 
@@ -431,7 +427,7 @@ Compact controls:
 Expanded editor includes the shared drum capabilities and original large-machine
 voice design.
 
-### 15.5 Hybrid Nine
+### 15.5 Twin Engine
 
 Compact controls:
 
@@ -465,7 +461,7 @@ Expanded editor includes:
 - Per-step properties.
 - Voice inserts plus parent module send controls and routing.
 
-### 15.6 Digit Seven
+### 15.6 Gray Ghost
 
 Compact controls:
 
@@ -480,9 +476,11 @@ Compact controls:
 - Selected-voice mute and solo.
 - Audition control.
 
-The built-in lo-fi stage starts enabled. The user can disable it.
+The built-in lo-fi stage starts enabled. The user can disable it. While the
+stage is disabled, the bit-reduction and sample-rate-reduction controls are
+disabled.
 
-### 15.7 Digit Five
+### 15.7 Dusty Mosaic
 
 Compact controls:
 
@@ -498,6 +496,8 @@ Compact controls:
 - Selected-voice mute and solo.
 - Audition control.
 
-The built-in lo-fi stage starts enabled. The user can disable it.
+The built-in lo-fi stage starts enabled. The user can disable it. While the
+stage is disabled, the bit-reduction and sample-rate-reduction controls are
+disabled.
 
 ---

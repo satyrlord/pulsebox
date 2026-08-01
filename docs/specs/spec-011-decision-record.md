@@ -24,7 +24,7 @@ contains the normative requirements. This table is the traceability record.
   strips, and one master strip.
 - **D04.** Compact A–D cards summarize modular send-bus chains.
 - **D05.** All drum voices support synth and sample layers. Analog modules
-  default to synth-heavy. Hybrid Nine defaults to blended. Digital modules
+  default to synth-heavy. Twin Engine defaults to blended. Digital modules
   default to sample-heavy with lo-fi enabled.
 - **D06.** No destructive confirmation dialogs. Actions happen immediately and
   preserve complete Undo while active history retains their bounded entry. A
@@ -140,11 +140,13 @@ contains the normative requirements. This table is the traceability record.
   path, collision, validation-order, and atomic-import rules.
 - **D54.** Saves and imports are atomic. Pulsebox requests storage persistence
   after an explicit gesture. Quota failure preserves the last committed project.
-  Portable Export remains available.
+  Portable Export remains available. Creating a project from a template first
+  saves the active project. A failed save cancels the replacement.
 - **D55.** The MVP uses fixed 4/4 musical structure. Editable time-signature
   events and timelines are post-MVP.
-- **D56.** Rack-module collapse is a local UI preference, not portable project
-  data. Pulsebox keys it by lineage and excludes it from undo.
+- **D56.** `D82` supersedes this decision. Whole rack-module collapse no longer
+  exists. Faceplate-group disclosure is transient component state. Pulsebox
+  excludes it from storage, project data, portable files, and Undo.
 - **D57.** Objective audio, browser, accessibility, startup, and first-use
   evidence uses the thresholds and procedures in section 24.4 and the Phase 0
   domain contracts.
@@ -165,8 +167,9 @@ contains the normative requirements. This table is the traceability record.
   Effects, and Master views. The application never duplicates Effects beside or
   below the mixer. Every instrument strip shows A–D send buttons in a 2 × 2
   grid.
-- **D63.** The module browser is one un-tabbed list. Empty-slot plus controls are
-  the only visible rack Add actions, and module deletion lives in an accessible
+- **D63.** The module browser is one un-tabbed list. Browser Add buttons and
+  rack-overview empty-slot plus controls are the visible rack Add actions.
+  Module deletion lives in an accessible
   context menu rather than a persistent minus button. The piano-roll header has
   no local Play, pen, or erase buttons. Pattern mode uses global Play. A
   left-click creates, a right-click deletes, and a drag moves or resizes pitched
@@ -188,16 +191,15 @@ contains the normative requirements. This table is the traceability record.
   master-effects
   bypass leaves master gain and the protected limiter active.
 - **D65.** The Piano Roll is the only Pattern editing surface. Rack faceplates
-  carry no step grid and no per-step editing. Each faceplate keeps an
-  output-only Pattern activity indicator and gains a hold-to-sound audition
-  control for sound design. Fast controls from the expanded editor use the
-  available horizontal space.
+  carry no step grid and no per-step editing. Each faceplate has a hold-to-sound
+  audition control for sound design. Fast controls from the expanded editor use
+  the available horizontal space. `D78` removes the former activity indicator.
 
   Two editing grids for one Pattern part appear as two pattern editors. The
   faceplate grid has less capability.
 
-  Within the 86-98 pixel module height, it cannot show accent, tie, slide,
-  probability, or micro-timing. It also cannot show page position or parts
+  A compact faceplate cannot show accent, tie, slide, probability, or
+  micro-timing. It also cannot show page position or parts
   longer than sixteen
   steps. For a drum machine, it exposes only one voice at a time.
 
@@ -236,11 +238,12 @@ contains the normative requirements. This table is the traceability record.
 
   Ghost lanes already provide the comparison. `AC-079` gates the selector
   and its lane lifecycle. `AC-086` gates ghost behavior.
-- **D67.** The rack faceplate pairs its dominant short label with subordinate
-  full-name and type text. The bottom workspace bar is approximately 50 to 52
-  pixels high. Empty mixer strips show their two-digit slot numbers. The product
-  specifications own responsive and accessible behavior. Design artifacts do
-  not own that behavior.
+- **D67.** `D82` supersedes the faceplate identity part of this decision. `D83`
+  supersedes the browser type-text part. A rack faceplate shows only its short
+  label. The module browser retains the full name. The bottom workspace bar is
+  approximately 50 to 52 pixels high. Empty mixer strips show their two-digit
+  slot numbers. The product specifications own responsive and accessible
+  behavior. Design artifacts do not own that behavior.
 
   `D75` supersedes and removes the master strip's A–D grid. `D77` withdraws the
   separate 1568 × 1003 raster reference. The specifications retain its durable
@@ -384,9 +387,8 @@ contains the normative requirements. This table is the traceability record.
   raster. `AC-067` gates the documented geometry, density, materials,
   typography scale, and control sizing.
 - **D78.** Rack faceplates carry no Pattern activity indicator. The faceplate
-  contents that `D65` and `D72` fixed have a short label and metadata. They also
-  have the Pattern selector, fast controls, audition control, and module state
-  controls.
+  contents have a short label, fast controls, audition control, and module state
+  controls. `D82` removes faceplate metadata and the Pattern selector.
 
   This supersedes the activity-indicator part of `D65` and `D72`. The
   single-editing-surface rule is unchanged. Faceplates have no step grid or
@@ -444,3 +446,93 @@ contains the normative requirements. This table is the traceability record.
   Another rejected alternative added dedicated move-up and move-down buttons.
   That design adds two controls for a move that the handles already provide.
   Section 14 owns the behavior. `AC-010` gates reorder.
+- **D82.** Rack faceplates have no whole-module Fold action, Pattern selector,
+  full-name label, or type label. Loaded faceplates and rack-overview cards have
+  no separate Select, Duplicate, or Swap buttons. Selection uses the loaded
+  overview card. Duplicate and Swap stay in the module menu.
+
+  A loaded faceplate puts Sound, Voice when applicable, and Output groups in one
+  horizontal row. Each group can collapse independently. Group disclosure is
+  transient component state. The full-rack empty slot is a compact identity
+  row. The module browser and rack overview own the visible Add actions.
+
+  The module browser card is the drag surface. It has no separate drag handle
+  or inspection panel. Its visible identity content remains the short label,
+  full name, and thumbnail. Its tooltip contains the type description.
+
+  The same redundancy audit removes three other repeated surfaces. An empty
+  effect card has no Details button that only repeats its empty state. The
+  mixer master label does not duplicate Master-tab navigation. The Pattern
+  inspector does not repeat the fixed grid value from the Piano Roll header.
+
+  These changes remove repeated actions and repeated identity text. They also
+  reduce unused vertical space without removing the module menu or the detailed
+  editor. Sections 13 through 15 own the behavior. `AC-010` and `AC-080` gate
+  the result.
+- **D83.** The transport shows the tempo number without a visible BPM label.
+  Its tooltip defines beats per minute. Module browser cards show the short
+  label and full name. Their tooltips contain the type description.
+
+  Each loaded faceplate reserves its right edge for Output. Sound and Voice use
+  the flexible lane to its left. This alignment keeps the faceplate balanced
+  and keeps Output visible when the available width decreases. Sections 8, 12,
+  13, and 14 own this behavior. `AC-010`, `AC-067`, and `AC-080` gate the result.
+- **D84.** The Pin control is removed from the product. It marked a project so
+  the project selector listed it first. It did not earn its place in the MVP.
+  The transport far-left group now holds the project selector alone, and the
+  selector orders stored projects by modified time alone.
+
+  A Favourite feature is a post-MVP target. It is a separate feature from Pin.
+  It will define its own behavior, ordering, and interface, and it does not
+  inherit the removed Pin behavior. The project format reserves a `favorite`
+  boolean for it. The MVP writes `false` and offers no control that changes it.
+  Section 12 of [audio engine and transport](spec-004-audio-engine-and-transport.md)
+  and section 27 of
+  [product and design foundations](spec-001-product-and-design-foundations.md)
+  own this scope.
+- **D85.** Swing and Humanize default to 0 percent, so a new project starts
+  straight. This supersedes the earlier 54 and 12 percent defaults, which
+  shaped every new project before the user asked for a feel. The timing
+  sliders use a two-segment taper: the first 30 percent of the value spans 60
+  percent of the track. The mouse wheel steps the value by whole percent.
+
+  A smooth power taper was rejected. Its slope near zero makes a keyboard step
+  smaller than the whole-percent store granularity, which reads as a dead
+  control. Section 17 of
+  [audio engine and transport](spec-004-audio-engine-and-transport.md),
+  section 9.1 of [rack and instruments](spec-005-rack-and-instruments.md), and
+  the section 16 shared header of
+  [pattern editing](spec-006-pattern-editing.md) own this behavior.
+- **D86.** The lower editor workspace is user-resizable upward through a
+  horizontal handle above it. The default height stays the minimum, so the
+  rack keeps its visual priority until the user asks for a taller editor. The
+  rack row never drops below its 350-pixel minimum. The chosen height is
+  session UI state. It is not project data and it does not persist. Section
+  8.1 of
+  [application shell and controls](spec-003-application-shell-and-controls.md)
+  owns this behavior.
+- **D87.** The six instruments carry new product names and short labels:
+  Silver Serpent `ACID`, Tin Soldier `SNAP`, Soft Thunder `BOOM`, Twin Engine
+  `MESH`, Gray Ghost `BITS`, and Dusty Mosaic `PERC`. These names replace Acid
+  Bass, Drumline Six, Boom Eight, Hybrid Nine, Digit Seven, and Digit Five.
+  The stable code IDs, plugin IDs, module folder names, and worklet processor
+  names do not change. Project documents reference plugin IDs only, so stored
+  projects stay valid without a migration. Section 2.2 of
+  [product and design foundations](spec-001-product-and-design-foundations.md)
+  owns the name table.
+
+  `SNAP` belongs to Tin Soldier because that machine has a Snap control and
+  six dry synthesized voices. `MESH` belongs to Twin Engine because that
+  machine blends a synthesized layer with a generated one-shot layer on every
+  voice, which decision `D05` records as its defining behavior. Each module
+  keeps the accent color it had before this decision.
+- **D88.** The default project is named `Neon Basement`, and the built-in
+  starter template creates a fresh copy of it. This supersedes the separate
+  three-slot, 130 BPM twin-bassline starter, which is removed with its note
+  data.
+
+  Two authored starting projects made the product teach two different first
+  impressions and doubled the original note data to maintain. One named piece
+  of content now serves both the first start and every New action. Section 9.1
+  of [rack and instruments](spec-005-rack-and-instruments.md) owns the content.
+  Section 9.2 owns the template action and holds no content of its own.

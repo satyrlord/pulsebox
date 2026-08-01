@@ -117,6 +117,10 @@ Shared header:
 - Horizontal Swing slider. It edits the one global project Swing value, so its
   position is the same on every Pattern.
 - Horizontal Humanize slider. The selected Pattern owns its value.
+- Both timing sliders default to 0 percent. Their travel is tapered: the first
+  30 percent of the value takes 60 percent of the track. The mouse wheel steps
+  the value by two percent, or by one percent with Shift held. Each slider
+  reports the true percent to assistive technology.
 - Parameter selector, default Velocity. Do not show a static `Vel 100` label.
   It is the single entry point to every lane the Piano Roll edits, as defined
   in section 16.3.1.

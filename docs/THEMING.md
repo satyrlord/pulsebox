@@ -186,12 +186,12 @@ them. These values identify the module but never fill the whole faceplate.
 
 | Module | `--module-accent` | `--module-accent-muted` | `--module-led` | `--module-control-ring` |
 | ------ | ----------------- | ----------------------- | -------------- | ----------------------- |
-| `BASS` | `#9BE564`         | `#496B36`               | `#B8FF7A`      | `#79B84D`               |
-| `SIX`  | `#FFB44A`         | `#76552A`               | `#FFD078`      | `#D98E2F`               |
+| `ACID` | `#9BE564`         | `#496B36`               | `#B8FF7A`      | `#79B84D`               |
+| `SNAP` | `#FFB44A`         | `#76552A`               | `#FFD078`      | `#D98E2F`               |
 | `BOOM` | `#FF6B5F`         | `#763B37`               | `#FF9188`      | `#D84E45`               |
-| `NINE` | `#B890FF`         | `#594776`               | `#CEB2FF`      | `#9670D8`               |
-| `SEV`  | `#5AAEFF`         | `#315979`               | `#86C5FF`      | `#3E8ED8`               |
-| `FIVE` | `#4ADFC7`         | `#2B6D63`               | `#7FF2DF`      | `#32B8A3`               |
+| `MESH` | `#B890FF`         | `#594776`               | `#CEB2FF`      | `#9670D8`               |
+| `BITS` | `#5AAEFF`         | `#315979`               | `#86C5FF`      | `#3E8ED8`               |
+| `PERC` | `#4ADFC7`         | `#2B6D63`               | `#7FF2DF`      | `#32B8A3`               |
 
 Module identity also uses text, position, shape, or iconography. Components must
 fall back to the general accent tokens when no module scope exists.

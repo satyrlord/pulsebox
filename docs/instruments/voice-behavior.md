@@ -10,12 +10,12 @@ these values. When a manifest changes, update this table in the same change.
 
 | Instrument | Maximum voices | Steal priority | Release | Choke policy | Retrigger policy |
 | ---------- | -------------- | -------------- | ------- | ------------ | ---------------- |
-| Acid Bass (`bass-mono`) | 1 | oldest | 25 ms | none | legato |
-| Drumline Six (`drum-analog-small`) | 6 | oldest | 4 ms | group | restart |
-| Boom Eight (`drum-analog-large`) | 8 | oldest | 5 ms | group | restart |
-| Hybrid Nine (`drum-hybrid`) | 9 | oldest | 4 ms | group | restart |
-| Digit Seven (`drum-digital-a`) | 7 | oldest | 4 ms | group | restart |
-| Digit Five (`drum-digital-b`) | 8 | oldest | 4 ms | group | restart |
+| Silver Serpent (`bass-mono`) | 1 | oldest | 25 ms | none | legato |
+| Tin Soldier (`drum-analog-small`) | 6 | oldest | 4 ms | group | restart |
+| Soft Thunder (`drum-analog-large`) | 8 | oldest | 5 ms | group | restart |
+| Twin Engine (`drum-hybrid`) | 9 | oldest | 4 ms | group | restart |
+| Gray Ghost (`drum-digital-a`) | 7 | oldest | 4 ms | group | restart |
+| Dusty Mosaic (`drum-digital-b`) | 8 | oldest | 4 ms | group | restart |
 
 Rules:
 

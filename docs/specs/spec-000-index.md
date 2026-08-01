@@ -25,7 +25,7 @@ references only.
    criteria, and the decision record in the same change.
 4. Never resolve a contradiction by removing required functionality. Report any
    conflict that the current repository cannot resolve.
-5. Keep global section numbers, decision IDs `D01` through `D81`, and release
+5. Keep global section numbers, decision IDs `D01` through `D83`, and release
    acceptance numbers stable. These identifiers provide cross-file
    traceability. An unqualified numbered-section reference resolves through the
    section ownership in the build-order table below.
