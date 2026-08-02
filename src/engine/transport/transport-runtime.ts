@@ -1107,6 +1107,10 @@ export class TransportRuntime {
     frame: number,
     releaseFrame: number,
   ): void {
+    const batches: {
+      readonly adapter: VoiceAdapterPort;
+      readonly events: readonly ScheduledVoiceEvent[];
+    }[] = [];
     for (const [moduleId, adapter] of this.#adapters) {
       const module = this.#modules.get(moduleId);
       const minimumStep = preserved.lastStepBefore.get(moduleId);
@@ -1128,7 +1132,14 @@ export class TransportRuntime {
         );
       }
       events.sort(compareScheduledVoiceEvents);
-      const due = withoutExpiredOnsets(events, this.#currentFrame(context));
+      batches.push({ adapter, events });
+    }
+    // Use one cutoff for all modules. A loaded main thread can cross an onset
+    // while it builds the batches. It must not send that onset to only the
+    // adapters visited before the clock boundary.
+    const sendFrame = this.#currentFrame(context);
+    for (const { adapter, events } of batches) {
+      const due = withoutExpiredOnsets(events, sendFrame);
       if (due.length > 0) adapter.schedule(due);
     }
   }

@@ -94,6 +94,7 @@ export function createInstrumentManifest(id = "bass-mono"): InstrumentPluginMani
       migrations: [],
     },
     voices: [{ id: "main", name: "Main voice", outputChannels: 2 }],
+    auditionNote: 36,
     acceptedEvents: [{ id: "note", kind: "note" }],
     patternCompatibility: ["notes"],
     voiceStealing: {

@@ -37,6 +37,21 @@ const STATE_BROWSER_GLOBALS = new Set([
   "Storage",
   "Window",
 ]);
+/**
+ * The contracts area is data-only: no singleton, browser handle, or storage
+ * call. A crypto, storage, or DOM global inside it would smuggle a runtime
+ * browser dependency into every layer that imports a shared type.
+ */
+const CONTRACTS_BROWSER_GLOBALS = new Set([
+  ...STATE_BROWSER_GLOBALS,
+  "crypto",
+  "document",
+  "indexedDB",
+  "localStorage",
+  "navigator",
+  "sessionStorage",
+  "window",
+]);
 
 const ALLOWED_LAYER_DEPENDENCIES: Readonly<Record<Layer, readonly Layer[]>> = {
   composition: ["composition", "contracts", "engine", "persistence", "state", "ui"],
@@ -220,8 +235,7 @@ function layerFor(path: string): Layer | undefined {
   if (
     normalized === "src/main.ts" ||
     normalized === "src/main.tsx" ||
-    normalized.startsWith("src/composition/") ||
-    normalized.startsWith("src/app/")
+    normalized.startsWith("src/composition/")
   ) {
     return "composition";
   }
@@ -230,7 +244,7 @@ function layerFor(path: string): Layer | undefined {
   if (directory === "engine") return "engine";
   if (directory === "persistence") return "persistence";
   if (directory === "state") return "state";
-  if (["components", "styles", "themes", "ui"].includes(directory ?? "")) return "ui";
+  if (["styles", "themes", "ui"].includes(directory ?? "")) return "ui";
   return undefined;
 }
 
@@ -260,11 +274,7 @@ function resolveLocalImport(
 
 function isPublicCrossLayerTarget(path: string, targetLayer: Layer): boolean {
   if (targetLayer === "contracts") return true;
-  const normalized = normalizePath(path);
-  return (
-    normalized === `src/${targetLayer}/public.ts` ||
-    (targetLayer === "state" && normalized.startsWith("src/state/ports/"))
-  );
+  return normalizePath(path) === `src/${targetLayer}/public.ts`;
 }
 
 export function findLayerViolations(units: readonly SourceUnit[]): readonly PolicyViolation[] {
@@ -362,6 +372,18 @@ export function findForbiddenTechnologyViolations(
         if (layerFor(unit.path) === "state" && STATE_BROWSER_GLOBALS.has(node.text)) {
           messages.add(`State must not hold browser object ${node.text}.`);
         }
+        if (layerFor(unit.path) === "contracts" && CONTRACTS_BROWSER_GLOBALS.has(node.text)) {
+          messages.add(`Contracts must stay data-only without browser handle ${node.text}.`);
+        }
+        // ARCHITECTURE section 13: only the composition root selects a browser
+        // ID source. Every other layer receives an injected `IdFactory`, so a
+        // stray `crypto` call there would create a second, untestable source.
+        if (node.text === "crypto" && layerFor(unit.path) !== "composition") {
+          messages.add("Only the composition root may select the browser crypto ID source.");
+        }
+      }
+      if (isBrowserCryptoElementAccess(node) && layerFor(unit.path) !== "composition") {
+        messages.add("Only the composition root may select the browser crypto ID source.");
       }
       if (ts.isPropertyAccessExpression(node) && node.name.text === "serviceWorker") {
         messages.add("Service-worker registration is prohibited.");
@@ -503,6 +525,50 @@ function branchMentionsPlugin(node: ts.Node, pluginIds: ReadonlySet<string>): bo
   return containsConcreteId;
 }
 
+function isBrowserCryptoElementAccess(node: ts.Node): boolean {
+  if (!ts.isElementAccessExpression(node)) return false;
+  const argument = node.argumentExpression;
+  return (
+    ts.isIdentifier(node.expression) &&
+    ["globalThis", "self", "window"].includes(node.expression.text) &&
+    ts.isStringLiteralLike(argument) &&
+    argument.text === "crypto"
+  );
+}
+
+/**
+ * A record keyed by concrete plugin IDs is a dispatch table: it routes shared
+ * behavior by product plugin, exactly what a branch does, so it carries the
+ * same restriction. A plugin ID as a property value stays allowed, because
+ * project data and composition seeds legitimately reference plugins by ID.
+ */
+function isPluginKeyedProperty(node: ts.Node, pluginIds: ReadonlySet<string>): boolean {
+  if (!ts.isPropertyAssignment(node)) return false;
+  const name = node.name;
+  if (ts.isStringLiteralLike(name)) return pluginIds.has(name.text);
+  if (ts.isComputedPropertyName(name)) {
+    return branchMentionsPlugin(name.expression, pluginIds);
+  }
+  return false;
+}
+
+function isPluginKeyedMap(node: ts.Node, pluginIds: ReadonlySet<string>): boolean {
+  if (
+    !ts.isNewExpression(node) ||
+    !ts.isIdentifier(node.expression) ||
+    node.expression.text !== "Map"
+  ) {
+    return false;
+  }
+  const entries = node.arguments?.[0];
+  if (entries === undefined || !ts.isArrayLiteralExpression(entries)) return false;
+  return entries.elements.some((entry) => {
+    if (!ts.isArrayLiteralExpression(entry)) return false;
+    const key = entry.elements[0];
+    return key !== undefined && branchMentionsPlugin(key, pluginIds);
+  });
+}
+
 export function findPluginBranchViolations(
   units: readonly SourceUnit[],
 ): readonly PolicyViolation[] {
@@ -511,6 +577,7 @@ export function findPluginBranchViolations(
   for (const unit of units) {
     if (isPluginOwnedPath(unit.path, pluginIds)) continue;
     const sourceFile = parse(unit);
+    const messages = new Set<string>();
     const visit = (node: ts.Node): void => {
       const isBranch =
         ts.isIfStatement(node) ||
@@ -518,16 +585,27 @@ export function findPluginBranchViolations(
         ts.isSwitchStatement(node) ||
         ts.isCaseClause(node);
       if (isBranch && branchMentionsPlugin(node, pluginIds)) {
-        violations.push({
-          path: unit.path,
-          message:
-            "Product-specific plugin-ID branching is allowed only in its plugin folder or registry.",
-        });
+        messages.add(
+          "Product-specific plugin-ID branching is allowed only in its plugin folder or registry.",
+        );
+        return;
+      }
+      if (isPluginKeyedProperty(node, pluginIds)) {
+        messages.add(
+          "Plugin-ID-keyed tables are allowed only in a plugin folder or the registry.",
+        );
+        return;
+      }
+      if (isPluginKeyedMap(node, pluginIds)) {
+        messages.add(
+          "Plugin-ID-keyed tables are allowed only in a plugin folder or the registry.",
+        );
         return;
       }
       ts.forEachChild(node, visit);
     };
     visit(sourceFile);
+    for (const message of messages) violations.push({ path: unit.path, message });
   }
   return violations;
 }

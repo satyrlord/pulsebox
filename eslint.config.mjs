@@ -75,19 +75,26 @@ export default tseslint.config(
   {
     files: ["src/contracts/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restricted(["app", "engine", "state", "persistence", "ui"]),
+      "no-restricted-imports": restricted([
+        "engine",
+        "state",
+        "persistence",
+        "styles",
+        "themes",
+        "ui",
+      ]),
     },
   },
   {
     files: ["src/state/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restricted(["app", "engine", "persistence", "ui"]),
+      "no-restricted-imports": restricted(["engine", "persistence", "styles", "themes", "ui"]),
     },
   },
   {
     files: ["src/engine/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restricted(["app", "persistence", "state", "ui"]),
+      "no-restricted-imports": restricted(["persistence", "state", "styles", "themes", "ui"]),
     },
   },
   {
@@ -95,11 +102,13 @@ export default tseslint.config(
     // reach state but never the engine or the UI.
     files: ["src/persistence/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restricted(["app", "engine", "ui"]),
+      "no-restricted-imports": restricted(["engine", "styles", "themes", "ui"]),
     },
   },
   {
-    files: ["src/ui/**/*.{ts,tsx}"],
+    // `src/themes/` is part of the UI layer boundary, so it carries the same
+    // restrictions as `src/ui/`.
+    files: ["src/ui/**/*.{ts,tsx}", "src/themes/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restricted(["engine", "persistence"]),
     },

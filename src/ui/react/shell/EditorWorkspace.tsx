@@ -3,6 +3,7 @@ import { forwardRef, useCallback, useEffect, useRef, useState, type CSSPropertie
 import type { GestureId, ModuleInstanceId } from "../../../contracts";
 import { AuditionButton } from "../controls/AuditionButton";
 import { useContinuousGesture } from "../controls/use-gesture-id";
+import { WHEEL_IDLE_MILLISECONDS } from "../controls/use-range-gesture";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import styles from "./Shell.module.css";
 
@@ -212,7 +213,6 @@ const TAPER_POSITION_MAX = 100;
 const LOW_BAND_VALUE = 0.3;
 const LOW_BAND_TRAVEL = 60;
 const WHEEL_PERCENT = 2;
-const WHEEL_IDLE_MILLISECONDS = 250;
 
 function taperValue(position: number): number {
   const value =

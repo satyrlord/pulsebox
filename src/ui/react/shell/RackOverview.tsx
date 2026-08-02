@@ -42,15 +42,6 @@ export function RackOverview() {
   const visible = rackSlots.slice(0, visibleSlotCount);
   const firstEmpty = visible.find((slot) => slot.moduleId === undefined);
 
-  const scrollModuleIntoView = (slotIndex: number) => {
-    // Selecting a slot scrolls its full module into view (section 13.2). The
-    // rack renders slots in the same order, so the index maps one to one.
-    const sections = document.querySelectorAll(
-      '[data-component="rack"] [data-component="rack-module"]',
-    );
-    sections[slotIndex]?.scrollIntoView({ block: "nearest" });
-  };
-
   const addItems = (slotId: RackSlotId): readonly PopupMenuItem[] =>
     addablePluginIds.flatMap((pluginId): PopupMenuItem[] => {
       const manifest = manifestFor(pluginId);
@@ -152,8 +143,9 @@ export function RackOverview() {
                     { "--module-accent": manifest.ui.moduleAccent.accent } as React.CSSProperties
                   }
                   onClick={() => {
+                    // The rack itself reveals the selected module (section
+                    // 13.2), so selection is the whole intent here.
                     selectModule(module.id);
-                    scrollModuleIntoView(index);
                   }}
                   onContextMenu={(event) => {
                     event.preventDefault();

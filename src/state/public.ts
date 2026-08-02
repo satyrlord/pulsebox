@@ -1,5 +1,6 @@
 export * from "./commands";
 export * from "./default-state";
+export * from "./edit-policy";
 export * from "./model";
 export * from "./pulse-store";
 export * from "./persistence/project-document";
@@ -8,3 +9,4 @@ export * from "./persistence/project-revision";
 export * from "./persistence/portable-project";
 export * from "./persistence/autosave";
 export * from "./persistence/project-import";
+export * from "./persistence/template-project";

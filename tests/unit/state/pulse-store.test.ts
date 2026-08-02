@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createGestureId, type IdFactory } from "../../../src/contracts/ids";
-import type { PluginId } from "../../../src/contracts/parameters";
+import type { ParameterId, PluginId } from "../../../src/contracts/parameters";
 import { createDefaultState } from "../../../src/state/default-state";
+import {
+  createParameterValidator,
+  type ImportParameterDescriptor,
+} from "../../../src/state/persistence/project-document";
 import { PulseStore } from "../../../src/state/pulse-store";
 
 const seed = {
@@ -17,8 +21,26 @@ const seed = {
   })),
 };
 
+const parameterId = (value: string): ParameterId => value as ParameterId;
+
+// The store requires the shared descriptor-based validator, so these fixtures
+// declare the exact parameters the tests dispatch.
+const DESCRIPTORS: Readonly<Record<string, readonly ImportParameterDescriptor[]>> = {
+  "bass-mono": [
+    { id: parameterId("cutoff"), valueType: "float", minimum: 0, maximum: 20_000 },
+    { id: parameterId("volume"), valueType: "float", minimum: 0, maximum: 1 },
+    { id: parameterId("waveform"), valueType: "enum", enumValues: ["saw", "square"] },
+  ],
+  "drum-analog-small": [
+    { id: parameterId("tone"), valueType: "float", minimum: 0, maximum: 1 },
+    { id: parameterId("drive"), valueType: "float", minimum: 0, maximum: 1 },
+  ],
+};
+
+const validateParameter = createParameterValidator((pluginId) => DESCRIPTORS[pluginId]);
+
 function createStore(ids: IdFactory, onDelta = () => undefined): PulseStore {
-  return new PulseStore(createDefaultState(ids, seed), ids, seed, onDelta);
+  return new PulseStore(createDefaultState(ids, seed), ids, seed, onDelta, validateParameter);
 }
 
 function required<T>(value: T | undefined): T {
@@ -45,8 +67,12 @@ describe("PulseStore", () => {
       [seed.pluginId, seed],
       [drumSeed.pluginId, drumSeed],
     ]);
-    const store = new PulseStore(createDefaultState(ids, seed), ids, (pluginId) =>
-      seeds.get(pluginId),
+    const store = new PulseStore(
+      createDefaultState(ids, seed),
+      ids,
+      (pluginId) => seeds.get(pluginId),
+      () => undefined,
+      validateParameter,
     );
     const secondSlot = required(store.getState().project.rackSlots[1]);
 
@@ -251,6 +277,7 @@ describe("PulseStore", () => {
       ids,
       oversizedSeed,
       deltas,
+      validateParameter,
     );
     const moduleId = required(store.getState().ui.selectedModuleId);
     const snapshot = store.getState();
@@ -327,7 +354,7 @@ describe("PulseStore", () => {
         revision: { ...initial.project.revision, counter: Number.MAX_SAFE_INTEGER },
       },
     };
-    const store = new PulseStore(stateAtLimit, ids, seed);
+    const store = new PulseStore(stateAtLimit, ids, seed, () => undefined, validateParameter);
     const moduleId = required(store.getState().ui.selectedModuleId);
     const previousEpoch = store.getState().project.revision.epoch;
 
@@ -360,6 +387,7 @@ describe("PulseStore", () => {
       ids,
       (pluginId) => seeds.get(pluginId),
       deltas,
+      validateParameter,
     );
     const moduleId = required(store.getState().ui.selectedModuleId);
     store.dispatch(store.createCommand("mixer-level-set", { moduleId, level: 0.8 }));

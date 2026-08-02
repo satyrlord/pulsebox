@@ -6,7 +6,7 @@ import {
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
 import { DEFAULT_HYBRID_PARAMETERS } from "./dsp-core";
-import { HYBRID_VOICE_IDS, HYBRID_VOICE_NAMES, type HybridVoiceId } from "./voices";
+import { HYBRID_VOICE_IDS, HYBRID_VOICE_NAMES, hybridVoiceNote, type HybridVoiceId } from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
   if (!result.ok) throw new Error("Twin Engine contains an invalid stable identifier.");
@@ -249,7 +249,10 @@ export const HYBRID_NINE_MANIFEST = Object.freeze({
     id: voiceId,
     name: HYBRID_VOICE_NAMES[voiceId],
     outputChannels: 2,
+    note: hybridVoiceNote(voiceId),
   })),
+  // The first voice is the kick, the most useful default audition sound.
+  auditionNote: hybridVoiceNote("kick"),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
   voiceStealing: { maximumVoices: 9, priority: "oldest", releaseMilliseconds: 4 },

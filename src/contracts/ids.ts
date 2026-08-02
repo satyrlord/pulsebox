@@ -80,12 +80,6 @@ export const SEND_BUS_IDS = Object.freeze([
   fixedSendBusId("send-d"),
 ] as const);
 
-export const browserIdFactory: IdFactory = Object.freeze({
-  createUuid(): string {
-    return globalThis.crypto.randomUUID();
-  },
-});
-
 export function isCanonicalUuid(value: unknown): value is CanonicalUuid {
   return typeof value === "string" && UUID_V4_PATTERN.test(value);
 }

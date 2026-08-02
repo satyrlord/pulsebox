@@ -1,41 +1,21 @@
+import { type ModuleInstanceId, type PluginId, type ProjectRevision } from "./contracts";
+import { browserIdFactory } from "./composition/browser-id-factory";
 import {
-  browserIdFactory,
-  type ModuleInstanceId,
-  type ParameterValue,
-  type PluginId,
-  type ProjectRevision,
-} from "./contracts";
-import {
-  BASS_MONO_DEFAULT_PARAMETERS,
-  BASS_MONO_MANIFEST,
-  BOOM_EIGHT_DEFAULT_PARAMETERS,
-  BOOM_EIGHT_MANIFEST,
-  DIGIT_FIVE_DEFAULT_PARAMETERS,
-  DIGIT_FIVE_MANIFEST,
-  DIGIT_SEVEN_DEFAULT_PARAMETERS,
-  DIGIT_SEVEN_MANIFEST,
-  DRUMLINE_SIX_DEFAULT_PARAMETERS,
-  DRUMLINE_SIX_MANIFEST,
-  HYBRID_NINE_DEFAULT_PARAMETERS,
-  HYBRID_NINE_MANIFEST,
+  BUILT_IN_MODULES,
   TransportRuntime,
   auditionNoteFor,
   playableNotesFor,
-  createBassVoiceAdapter,
-  createBoomVoiceAdapter,
-  createDigitFiveVoiceAdapter,
-  createDigitSevenVoiceAdapter,
-  createDrumlineVoiceAdapter,
-  createHybridVoiceAdapter,
   createPluginRegistry,
   type TransportModule,
   type VoiceAdapterFactory,
 } from "./engine/public";
 import {
   createAutosave,
+  activateTemplateProject,
   commitPortableProjectImport,
+  createProjectFromTemplate,
+  createParameterValidator,
   createSilentSteps,
-  createMemoryProjectRepository,
   DEFAULT_PROJECT_NAME,
   documentToState,
   nextProjectRevision,
@@ -45,14 +25,13 @@ import {
   restoreAutosave,
   serializeProject,
   serializePortableProject,
-  validateImportedParameter,
   type ModuleSeed,
   type PulseEngineDelta,
   type PulseState,
   type RackModuleState,
 } from "./state/public";
-import { createIndexedDbProjectRepository } from "./persistence/public";
 import { createDefaultProjectState, toParameterValues } from "./composition/default-project";
+import { createBrowserProjectRepository } from "./composition/project-repository";
 import { mountPulseboxApp, type PulseboxAppHandle } from "./ui/public";
 
 // Section 9.1: the MVP rack is exactly eight slots, six loaded and two empty.
@@ -69,55 +48,22 @@ interface RuntimePlugin {
 const appReference: { current: PulseboxAppHandle | undefined } = { current: undefined };
 
 /**
- * The six approved MVP instruments. Registering a module is one entry here plus
- * its own folder, as section 6.5 requires: nothing below this table branches on
- * plugin ID, and the audition pitch comes from the shared voice roster.
+ * The registry is built from the engine's single built-in list. Registering a
+ * module is one entry in `src/engine/modules/index.ts` plus its own folder, as
+ * section 6.5 requires: nothing here names or branches on a plugin ID, and the
+ * audition pitch comes from each manifest's declared notes.
  */
-const INSTRUMENTS = [
-  {
-    manifest: BASS_MONO_MANIFEST,
-    defaults: BASS_MONO_DEFAULT_PARAMETERS,
-    adapter: createBassVoiceAdapter,
-  },
-  {
-    manifest: DRUMLINE_SIX_MANIFEST,
-    defaults: DRUMLINE_SIX_DEFAULT_PARAMETERS,
-    adapter: createDrumlineVoiceAdapter,
-  },
-  {
-    manifest: BOOM_EIGHT_MANIFEST,
-    defaults: BOOM_EIGHT_DEFAULT_PARAMETERS,
-    adapter: createBoomVoiceAdapter,
-  },
-  {
-    manifest: HYBRID_NINE_MANIFEST,
-    defaults: HYBRID_NINE_DEFAULT_PARAMETERS,
-    adapter: createHybridVoiceAdapter,
-  },
-  {
-    manifest: DIGIT_SEVEN_MANIFEST,
-    defaults: DIGIT_SEVEN_DEFAULT_PARAMETERS,
-    adapter: createDigitSevenVoiceAdapter,
-  },
-  {
-    manifest: DIGIT_FIVE_MANIFEST,
-    defaults: DIGIT_FIVE_DEFAULT_PARAMETERS,
-    adapter: createDigitFiveVoiceAdapter,
-  },
-] as const;
-
 const registry = createPluginRegistry<RuntimePlugin>(
-  INSTRUMENTS.map(({ manifest, defaults, adapter }) => ({
+  BUILT_IN_MODULES.map(({ manifest, defaultParameters, createVoiceAdapter }) => ({
     manifest,
     factory: {
-      voiceAdapterFactory: adapter,
+      voiceAdapterFactory: createVoiceAdapter,
       moduleSeed: {
         pluginId: manifest.pluginId,
-        parameters: toParameterValues(defaults),
+        parameters: toParameterValues(defaultParameters),
         steps: createSilentSteps(),
       },
-      auditionNoteForVoice: (voiceId: string | undefined) =>
-        auditionNoteFor(manifest.pluginId, voiceId),
+      auditionNoteForVoice: (voiceId: string | undefined) => auditionNoteFor(manifest, voiceId),
     },
   })),
 );
@@ -165,21 +111,20 @@ const store = new PulseStore(
   browserIdFactory,
   (pluginId) => registry.get(pluginId)?.factory.moduleSeed,
   (delta) => queueAudioDelta(delta),
-  validateParameter,
+  // One validation policy: the descriptor check that guards project import
+  // also guards live commands.
+  createParameterValidator(
+    (pluginId) => registry.get(pluginId as PluginId)?.manifest.parameters,
+  ),
 );
 
 const host = document.querySelector<HTMLElement>("#app");
 if (host === null) throw new Error("Pulsebox requires a #app mount point.");
 
-// Projects live in IndexedDB. A browser that denies storage falls back to an
-// in-memory repository so editing keeps working without persistence.
-const repository = (() => {
-  try {
-    return createIndexedDbProjectRepository(window.indexedDB);
-  } catch {
-    return createMemoryProjectRepository();
-  }
-})();
+// Select the browser adapter only after IndexedDB opens. If the browser denies
+// storage, the explicit non-durable repository keeps editing and export usable.
+const repositorySelection = await createBrowserProjectRepository(window.indexedDB);
+const repository = repositorySelection.repository;
 const registryEntries = registry.entries();
 const parseOptions = {
   knownPluginIds: registryEntries.map(([pluginId]) => pluginId as string),
@@ -198,12 +143,92 @@ let committedMetadata: {
   revision: nextProjectRevision(undefined, browserIdFactory),
 };
 
+const projectsService = {
+  save: async () => {
+    const state = store.getState();
+    const snapshotRevision = state.project.revision;
+    const now = new Date().toISOString();
+    const committed = await repository.save(
+      {
+        id: state.project.id,
+        name: state.project.name,
+        modifiedAt: now,
+        document: serializeProject(state, {
+          createdAt: committedMetadata.createdAt,
+          modifiedAt: now,
+          projectRevision: committedMetadata.revision,
+        }),
+      },
+      browserIdFactory,
+    );
+    committedMetadata = {
+      createdAt: committed.document.project.createdAt,
+      modifiedAt: committed.document.project.modifiedAt,
+      revision: projectRevisionFromMetadata(committed.document.project),
+    };
+    return { snapshotRevision, durable: repositorySelection.durable };
+  },
+  list: async () => {
+    const stored = await repository.list();
+    return stored
+      .map((one) => ({
+        id: one.id,
+        name: one.name,
+        modifiedAt: one.modifiedAt,
+        favorite: one.document.project.favorite,
+      }))
+      .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
+  },
+  open: async (id: string) => {
+    const stored = await repository.load(id);
+    if (stored === undefined) throw new Error("Project not found.");
+    const parsed = parseStoredProject(stored, parseOptions);
+    if (!parsed.ok) throw new Error(parsed.issues[0]?.message ?? "Stored project is invalid.");
+    const next = documentToState(parsed.value.document, store.getState());
+    store.loadProject(next.project);
+    committedMetadata = {
+      createdAt: parsed.value.document.project.createdAt,
+      modifiedAt: parsed.value.document.project.modifiedAt,
+      revision: projectRevisionFromMetadata(parsed.value.document.project),
+    };
+    queueFullAudioProjection();
+  },
+  exportPortable: () =>
+    serializePortableProject(
+      serializeProject(store.getState(), {
+        createdAt: committedMetadata.createdAt,
+        modifiedAt: committedMetadata.modifiedAt,
+        projectRevision: committedMetadata.revision,
+      }),
+    ),
+  importPortable: async (bytes: Uint8Array) => {
+    const result = await commitPortableProjectImport(bytes, {
+      repository,
+      parseOptions,
+      idFactory: browserIdFactory,
+      currentState: () => store.getState(),
+      prepareCandidate: prepareImportedProject,
+    });
+    if (!result.ok) return result;
+    committedMetadata = {
+      createdAt: result.committed.document.project.createdAt,
+      modifiedAt: result.committed.document.project.modifiedAt,
+      revision: projectRevisionFromMetadata(result.committed.document.project),
+    };
+    return { ok: true as const };
+  },
+};
+
 const app = mountPulseboxApp({
   host,
+  idFactory: browserIdFactory,
   addablePluginIds: registryEntries.map(([pluginId]) => pluginId),
   auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) =>
     registry.require(pluginId).factory.auditionNoteForVoice(voiceId),
-  playableNotesFor: (pluginId: PluginId) => playableNotesFor(pluginId),
+  playableNotesFor: (pluginId: PluginId) => {
+    const entry = registry.get(pluginId);
+    return entry === undefined ? undefined : playableNotesFor(entry.manifest);
+  },
   audio: {
     getPositionTicks: () => audio.getPositionTicks(),
     pause: () => audio.pause(),
@@ -258,100 +283,27 @@ const app = mountPulseboxApp({
     {
       id: "neon-basement",
       name: DEFAULT_PROJECT_NAME,
-      // Section 9.2: the built-in starter template replaces the working project
-      // with a fresh copy of the section 9.1 default project, under its own new
-      // project and lineage ID.
-      create: () => {
-        if (store.getState().transport.status !== "stopped") {
-          audio.stop();
-          store.dispatch(store.createCommand("transport-stop", {}));
-        }
-        const next = createDefaultProjectState(browserIdFactory);
-        const loaded = store.loadProject(next.project);
-        if (loaded.status !== "accepted") return;
-        const now = new Date().toISOString();
-        committedMetadata = {
-          createdAt: now,
-          modifiedAt: now,
-          revision: nextProjectRevision(undefined, browserIdFactory),
-        };
-        queueFullAudioProjection();
-      },
+      create: () =>
+        createProjectFromTemplate({
+          storageAvailable: repositorySelection.durable,
+          save: projectsService.save,
+          currentRevision: () => store.getState().project.revision,
+          createFresh: () => createDefaultProjectState(browserIdFactory),
+          activateFresh: (next) => {
+            if (!activateTemplateProject(store, next, () => audio.stop())) return false;
+            const now = new Date().toISOString();
+            committedMetadata = {
+              createdAt: now,
+              modifiedAt: now,
+              revision: nextProjectRevision(undefined, browserIdFactory),
+            };
+            queueFullAudioProjection();
+            return true;
+          },
+        }),
     },
   ],
-  projects: {
-    save: async () => {
-      const state = store.getState();
-      const now = new Date().toISOString();
-      const committed = await repository.save(
-        {
-          id: state.project.id,
-          name: state.project.name,
-          modifiedAt: now,
-          document: serializeProject(state, {
-            createdAt: committedMetadata.createdAt,
-            modifiedAt: now,
-            projectRevision: committedMetadata.revision,
-          }),
-        },
-        browserIdFactory,
-      );
-      committedMetadata = {
-        createdAt: committed.document.project.createdAt,
-        modifiedAt: committed.document.project.modifiedAt,
-        revision: projectRevisionFromMetadata(committed.document.project),
-      };
-    },
-    list: async () => {
-      const stored = await repository.list();
-      return stored
-        .map((one) => ({
-          id: one.id,
-          name: one.name,
-          modifiedAt: one.modifiedAt,
-          favorite: one.document.project.favorite,
-        }))
-        .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
-    },
-    open: async (id) => {
-      const stored = await repository.load(id);
-      if (stored === undefined) throw new Error("Project not found.");
-      const parsed = parseStoredProject(stored, parseOptions);
-      if (!parsed.ok) throw new Error(parsed.issues[0]?.message ?? "Stored project is invalid.");
-      const next = documentToState(parsed.value.document, store.getState());
-      store.loadProject(next.project);
-      committedMetadata = {
-        createdAt: parsed.value.document.project.createdAt,
-        modifiedAt: parsed.value.document.project.modifiedAt,
-        revision: projectRevisionFromMetadata(parsed.value.document.project),
-      };
-      queueFullAudioProjection();
-    },
-    exportPortable: () =>
-      serializePortableProject(
-        serializeProject(store.getState(), {
-          createdAt: committedMetadata.createdAt,
-          modifiedAt: committedMetadata.modifiedAt,
-          projectRevision: committedMetadata.revision,
-        }),
-      ),
-    importPortable: async (bytes) => {
-      const result = await commitPortableProjectImport(bytes, {
-        repository,
-        parseOptions,
-        idFactory: browserIdFactory,
-        currentState: () => store.getState(),
-        prepareCandidate: prepareImportedProject,
-      });
-      if (!result.ok) return result;
-      committedMetadata = {
-        createdAt: result.committed.document.project.createdAt,
-        modifiedAt: result.committed.document.project.modifiedAt,
-        revision: projectRevisionFromMetadata(result.committed.document.project),
-      };
-      return { ok: true };
-    },
-  },
+  projects: projectsService,
 });
 appReference.current = app;
 queueFullAudioProjection();
@@ -556,17 +508,4 @@ function toAudioModule(module: RackModuleState): TransportModule {
       solo: module.solo,
     },
   };
-}
-
-function validateParameter(
-  module: RackModuleState,
-  parameter: string,
-  value: ParameterValue,
-): boolean {
-  const descriptor = registry
-    .get(module.pluginId)
-    ?.manifest.parameters.find((candidate) => candidate.id === parameter);
-  // One validation policy: the descriptor check that guards project import
-  // also guards live commands.
-  return descriptor !== undefined && validateImportedParameter(value, descriptor) === undefined;
 }

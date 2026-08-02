@@ -16,6 +16,10 @@ export function useUnsupportedViewport(): boolean {
     };
     const listeners = new AbortController();
     window.addEventListener("resize", check, { signal: listeners.signal });
+    // The viewport can change after the first render but before this passive
+    // effect subscribes. Read it again so that a missed resize cannot leave
+    // the editable workspace active below the supported boundary.
+    check();
     return () => {
       listeners.abort();
     };

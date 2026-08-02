@@ -19,7 +19,9 @@ contains the normative requirements. This table is the traceability record.
   metadata, and shipped data remain clean.
 - **D02.** Use a hybrid engine. Put custom synthesis and custom DSP in
   AudioWorklet. Put suitable native Web Audio nodes behind engine-owned
-  adapters.
+  adapters. Processors preallocate real-time event and parameter storage. Meter
+  publication is the only bounded exception. It can allocate one small envelope
+  for each published meter frame, at no more than 30 frames per second.
 - **D03.** The MVP has a maximum of eight rack slots, eight instrument mixer
   strips, and one master strip.
 - **D04.** Compact A–D cards summarize modular send-bus chains.

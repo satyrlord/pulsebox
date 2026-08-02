@@ -50,6 +50,22 @@ function copy(target: Uint8Array, offset: number, source: Uint8Array): void {
   target.set(source, offset);
 }
 
+/** Portable-archive file extension, owned beside the serializer that writes it. */
+const PORTABLE_PROJECT_EXTENSION = ".pulsebox";
+
+/**
+ * Reduces a free-text project name to a safe portable filename. A name made
+ * entirely of punctuation reduces to nothing, which would otherwise produce a
+ * file called only the extension.
+ */
+export function portableProjectFilename(name: string): string {
+  const base = name
+    .replaceAll(/[^\w-]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "")
+    .toLowerCase();
+  return `${base.length === 0 ? "project" : base}${PORTABLE_PROJECT_EXTENSION}`;
+}
+
 /**
  * Writes the canonical no-asset `.pulsebox` ZIP. Asset entries will be added
  * when the project asset library ships; accepting hidden extra entries now

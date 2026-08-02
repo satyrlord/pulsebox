@@ -143,6 +143,7 @@ for (const requestedSampleRate of [44_100, 48_000]) {
         meterPeaks: number[];
         nodes: {
           processorName: string;
+          currentFrame: () => number;
           /** Onsets the module has already sounded. */
           sounded: number[];
           /** Onsets waiting in the processor queue. */
@@ -191,6 +192,7 @@ for (const requestedSampleRate of [44_100, 48_000]) {
           super(context, name, options);
           const record = {
             processorName: name,
+            currentFrame: () => Math.floor(context.currentTime * context.sampleRate),
             sounded: [] as number[],
             queued: [] as number[],
             resets: 0,
@@ -286,6 +288,7 @@ for (const requestedSampleRate of [44_100, 48_000]) {
           __audioProbe: {
             nodes: {
               processorName: string;
+              currentFrame: () => number;
               sounded: number[];
               queued: number[];
               resets: number;
@@ -298,12 +301,22 @@ for (const requestedSampleRate of [44_100, 48_000]) {
         // still owns it; only the per-phase counters reset.
         const nodes = state.__audioProbe.nodes
           .filter((node) => node.processorName === processorName)
-          .map((node) => ({
-            processorName: node.processorName,
-            onsets: [...node.sounded, ...node.queued].sort((left, right) => left - right),
-            resets: node.resets,
-            expiredOnsets: node.expiredOnsets,
-          }));
+          .map((node) => {
+            const currentFrame = node.currentFrame();
+            const sounded = [...node.sounded];
+            const queued: number[] = [];
+            for (const onset of node.queued) {
+              if (onset < currentFrame) sounded.push(onset);
+              else queued.push(onset);
+            }
+            node.queued = queued;
+            return {
+              processorName: node.processorName,
+              onsets: [...sounded, ...queued].sort((left, right) => left - right),
+              resets: node.resets,
+              expiredOnsets: node.expiredOnsets,
+            };
+          });
         for (const node of state.__audioProbe.nodes) {
           node.sounded = [];
           node.resets = 0;
@@ -364,6 +377,11 @@ for (const requestedSampleRate of [44_100, 48_000]) {
     await page.mouse.up();
     await waitForPostGestureRefill();
     const humanizeEvidence = await takePhaseEvidence();
+    await expect(humanize).toHaveAttribute("aria-valuetext", "0 percent");
+    // A bounded rebuild keeps imminent events from an earlier preview. Let
+    // that lead window sound before the zero-Humanize Tempo phase.
+    await page.waitForTimeout(150);
+    await takePhaseEvidence();
 
     const tempo = page.locator('[data-field="tempo"]');
     // The Humanize spread tolerance depends on the tempo that was active during

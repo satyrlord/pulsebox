@@ -4,9 +4,9 @@ import { Fader } from "../controls/Fader";
 import { Knob } from "../controls/Knob";
 import { LevelMeter } from "../controls/LevelMeter";
 import { Toggle } from "../controls/Toggle";
+import { masterMeterDisplayLevel } from "../store/app-store";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
-import { masterMeterLevel } from "./master-meter";
 import styles from "./Mixer.module.css";
 
 const SENDS = ["A", "B", "C", "D"] as const;
@@ -21,8 +21,8 @@ function StripMeter(props: { readonly moduleId: ModuleInstanceId; readonly label
 }
 
 /** Leaf meter subscription for the master strip, for the same reason. */
-function MasterStripMeter(props: { readonly masterLevel: number }) {
-  const level = useAppStore((state) => masterMeterLevel(state.meterLevels, props.masterLevel));
+function MasterStripMeter() {
+  const level = useAppStore((state) => masterMeterDisplayLevel(state.masterMeter));
   return <LevelMeter label="Master output" level={level} width={6} stretch />;
 }
 
@@ -261,7 +261,7 @@ export function Mixer() {
             onInput={previewMasterLevel}
             onCommit={(value, gestureId) => setMasterLevel(value, gestureId)}
           />
-          <MasterStripMeter masterLevel={masterLevel} />
+          <MasterStripMeter />
         </div>
       </article>
     </section>

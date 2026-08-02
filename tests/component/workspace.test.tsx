@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_MASTER_LEVEL } from "../../src/state/public";
 import { EditorWorkspace } from "../../src/ui/react/shell/EditorWorkspace";
 import { EffectsBank } from "../../src/ui/react/shell/EffectsBank";
-import { masterMeterLevel } from "../../src/ui/react/shell/master-meter";
 import { MasterPanel } from "../../src/ui/react/shell/MasterPanel";
 import { Mixer } from "../../src/ui/react/shell/Mixer";
 import { ProjectMenu } from "../../src/ui/react/shell/ProjectMenu";
 import { StudioPanel } from "../../src/ui/react/shell/StudioPanel";
 import { WorkspaceBar } from "../../src/ui/react/shell/WorkspaceBar";
+import { masterMeterFrameFor, SILENT_MASTER_METER } from "../../src/ui/react/store/app-store";
 import { createHarness, firstModuleId, renderWithHarness } from "./helpers";
 
 describe("EditorWorkspace", () => {
@@ -328,11 +328,16 @@ describe("Mixer", () => {
       "aria-valuenow",
       "0.5",
     );
-    const masterLevel = harness.domain.getState().project.masterLevel;
-    const expectedMaster = Number(masterMeterLevel({ [moduleId]: 0.5 }, masterLevel).toFixed(2));
+    // The master strip binds the engine's post-master analysis frame, not a
+    // UI approximation, so the two master meters can never disagree.
+    act(() => {
+      harness.store
+        .getState()
+        .setMasterMeterFrame({ left: 0.42, right: 0.3, mid: 0.36, side: 0.06, peak: false });
+    });
     expect(screen.getByRole("meter", { name: "Master output" })).toHaveAttribute(
       "aria-valuenow",
-      String(expectedMaster),
+      "0.42",
     );
   });
 
@@ -387,16 +392,7 @@ describe("Mixer", () => {
 });
 
 describe("master meter", () => {
-  it("scales the instrument peak by the master level", () => {
-    expect(masterMeterLevel({ a: 0.8 }, 1)).toBeCloseTo(0.8, 5);
-    expect(masterMeterLevel({ a: 0.8 }, 0.5)).toBeCloseTo(0.4, 5);
-    // A closed master fader must read silent, not the loudest instrument.
-    expect(masterMeterLevel({ a: 0.9, b: 0.4 }, 0)).toBe(0);
-    expect(masterMeterLevel({}, 0.5)).toBe(0);
-    expect(masterMeterLevel({ a: 1 }, 1)).toBeLessThanOrEqual(1);
-  });
-
-  it("moves the Master view meter when the master level changes", () => {
+  it("shows the louder engine analysis channel in the Master view", () => {
     const harness = createHarness();
     renderWithHarness(<MasterPanel />, harness);
     const valueNow = () =>
@@ -405,14 +401,34 @@ describe("master meter", () => {
       );
 
     act(() => {
-      harness.store.getState().setMeterLevel(firstModuleId(harness), 0.8);
+      harness.store
+        .getState()
+        .setMasterMeterFrame({ left: 0.3, right: 0.8, mid: 0.55, side: 0.25, peak: false });
     });
-    expect(valueNow()).toBeCloseTo(0.4, 2);
+    expect(valueNow()).toBeCloseTo(0.8, 5);
 
+    // Per-module meter frames must not move the master meter: the engine
+    // frame is the single master source.
     act(() => {
-      harness.store.getState().setMasterLevel(1);
+      harness.store.getState().setMeterLevel(firstModuleId(harness), 1);
     });
-    expect(valueNow()).toBeCloseTo(0.8, 2);
+    expect(valueNow()).toBeCloseTo(0.8, 5);
+  });
+
+  it("reads the engine frame while the runtime and transport are active", () => {
+    const frame = { left: 0.6, right: 0.2, mid: 0.4, side: 0.2, peak: false };
+    const readFrame = () => frame;
+    expect(masterMeterFrameFor("active", "playing", readFrame)).toBe(frame);
+  });
+
+  it("holds silence while the runtime or transport is not rendering", () => {
+    const readFrame = vi.fn(() => ({ left: 1, right: 1, mid: 1, side: 0, peak: true }));
+    for (const state of ["locked", "suspended", "unavailable"] as const) {
+      expect(masterMeterFrameFor(state, "playing", readFrame)).toBe(SILENT_MASTER_METER);
+    }
+    expect(masterMeterFrameFor("active", "stopped", readFrame)).toBe(SILENT_MASTER_METER);
+    expect(masterMeterFrameFor("active", "playing", undefined)).toBe(SILENT_MASTER_METER);
+    expect(readFrame).not.toHaveBeenCalled();
   });
 });
 
@@ -486,6 +502,34 @@ describe("WorkspaceBar", () => {
     expect(harness.projects.save).toHaveBeenCalled();
     expect(harness.store.getState().saveStatus).toBe("saved");
   });
+
+  it("keeps an edit made during Save marked as unsaved", async () => {
+    const harness = createHarness();
+    const snapshotRevision = harness.domain.getState().project.revision;
+    let finishSave: (() => void) | undefined;
+    harness.projects.save.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishSave = () => {
+          resolve({ snapshotRevision, durable: true });
+        };
+      }),
+    );
+    renderWithHarness(<WorkspaceBar onToggleEditor={() => undefined} />, harness);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    act(() => {
+      harness.store.getState().setTempo(132);
+    });
+    await act(async () => {
+      finishSave?.();
+      await Promise.resolve();
+    });
+
+    expect(harness.store.getState().saveStatus).toBe("dirty");
+    expect(harness.store.getState().projectMessage).toBe(
+      "Earlier changes were saved. New edits are not saved.",
+    );
+  });
 });
 
 describe("ProjectMenu", () => {
@@ -541,35 +585,12 @@ describe("ProjectMenu", () => {
     expect(trigger).not.toHaveFocus();
   });
 
-  it("saves the current project before a template replaces it", async () => {
+  // The section 9.2 save-create-save transaction is state-owned. The UI
+  // runs the template port once and reports its outcome; it never sequences
+  // the saves itself.
+  it("runs the template transaction through the composition port once", async () => {
     const harness = createHarness();
-    const create = vi.fn();
-    let finishSave: (() => void) | undefined;
-    const pendingSave = new Promise<void>((resolve) => {
-      finishSave = resolve;
-    });
-    harness.projects.save.mockReturnValueOnce(pendingSave);
-    Object.assign(harness.dependencies, {
-      templates: [{ id: "starter", name: "Neon Basement", create }],
-    });
-    renderWithHarness(<ProjectMenu />, harness);
-    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
-    fireEvent.click(screen.getByRole("button", { name: "New: Neon Basement" }));
-
-    expect(harness.projects.save).toHaveBeenCalledOnce();
-    expect(create).not.toHaveBeenCalled();
-    await act(async () => {
-      finishSave?.();
-      await Promise.resolve();
-    });
-
-    expect(create).toHaveBeenCalledOnce();
-  });
-
-  it("keeps the current project when its pre-template save fails", async () => {
-    const harness = createHarness();
-    const create = vi.fn();
-    harness.projects.save.mockRejectedValueOnce(new Error("Storage failed."));
+    const create = vi.fn(() => Promise.resolve({ created: true, saved: true }));
     Object.assign(harness.dependencies, {
       templates: [{ id: "starter", name: "Neon Basement", create }],
     });
@@ -581,9 +602,51 @@ describe("ProjectMenu", () => {
       await Promise.resolve();
     });
 
-    expect(create).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledOnce();
+    expect(harness.projects.save).not.toHaveBeenCalled();
+    expect(harness.store.getState().saveStatus).toBe("saved");
+  });
+
+  it("keeps the current project when the transaction reports a failed save", async () => {
+    const harness = createHarness();
+    const create = vi.fn(() => Promise.resolve({ created: false, saved: false }));
+    Object.assign(harness.dependencies, {
+      templates: [{ id: "starter", name: "Neon Basement", create }],
+    });
+    renderWithHarness(<ProjectMenu />, harness);
+    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New: Neon Basement" }));
+      await Promise.resolve();
+    });
+
     expect(harness.store.getState().saveStatus).toBe("error");
     expect(harness.domain.getState().project.name).toBe("Neon Basement");
+  });
+
+  // A stranded "saving" status would also stop every later edit from marking
+  // the project dirty, so a rejected transaction must resolve the status.
+  it("recovers the save status when the template transaction rejects", async () => {
+    const harness = createHarness();
+    const create = vi.fn(() => Promise.reject(new Error("Storage failed.")));
+    Object.assign(harness.dependencies, {
+      templates: [{ id: "starter", name: "Neon Basement", create }],
+    });
+    renderWithHarness(<ProjectMenu />, harness);
+    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New: Neon Basement" }));
+      await Promise.resolve();
+    });
+
+    expect(harness.store.getState().saveStatus).toBe("error");
+
+    act(() => {
+      harness.store.getState().setTempo(132);
+    });
+    expect(harness.store.getState().saveStatus).toBe("dirty");
   });
 
   it("lists and opens stored projects inside the viewport-bound selector", async () => {

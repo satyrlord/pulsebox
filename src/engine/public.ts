@@ -1,28 +1,19 @@
-export { BASS_MONO_DEFAULT_PARAMETERS, BASS_MONO_MANIFEST } from "./modules/bass-mono/manifest";
-export { createBassVoiceAdapter } from "./modules/bass-mono/adapter";
 export {
-  DRUMLINE_SIX_DEFAULT_PARAMETERS,
-  DRUMLINE_SIX_MANIFEST,
-} from "./modules/drumline-six/manifest";
-export { createDrumlineVoiceAdapter } from "./modules/drumline-six/adapter";
-export {
-  drumVoiceNote,
-} from "./modules/drumline-six/voices";
-export { BOOM_EIGHT_DEFAULT_PARAMETERS, BOOM_EIGHT_MANIFEST } from "./modules/boom-eight/manifest";
-export { createBoomVoiceAdapter } from "./modules/boom-eight/adapter";
-export {
-  HYBRID_NINE_DEFAULT_PARAMETERS,
-  HYBRID_NINE_MANIFEST,
-} from "./modules/hybrid-nine/manifest";
-export { createHybridVoiceAdapter } from "./modules/hybrid-nine/adapter";
-export {
+  BUILT_IN_MODULES,
+  BASS_MONO_DEFAULT_PARAMETERS,
+  BASS_MONO_MANIFEST,
+  BOOM_EIGHT_DEFAULT_PARAMETERS,
+  BOOM_EIGHT_MANIFEST,
+  DIGIT_FIVE_DEFAULT_PARAMETERS,
+  DIGIT_FIVE_MANIFEST,
   DIGIT_SEVEN_DEFAULT_PARAMETERS,
   DIGIT_SEVEN_MANIFEST,
-} from "./modules/digit-seven/manifest";
-export { createDigitSevenVoiceAdapter } from "./modules/digit-seven/adapter";
-export { DIGIT_FIVE_DEFAULT_PARAMETERS, DIGIT_FIVE_MANIFEST } from "./modules/digit-five/manifest";
-export { createDigitFiveVoiceAdapter } from "./modules/digit-five/adapter";
-export { auditionNoteFor, playableNotesFor } from "./modules/voice-rosters";
+  DRUMLINE_SIX_DEFAULT_PARAMETERS,
+  DRUMLINE_SIX_MANIFEST,
+  HYBRID_NINE_DEFAULT_PARAMETERS,
+  HYBRID_NINE_MANIFEST,
+} from "./modules";
+export { auditionNoteFor, playableNotesFor } from "./modules/manifest-notes";
 export {
   TransportRuntime,
   type TransportModule,

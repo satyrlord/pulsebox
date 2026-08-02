@@ -58,6 +58,19 @@ Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
   },
 });
 
+/**
+ * jsdom has no scrolling. The rack reveals the selected module through
+ * `scrollIntoView`, so the shim keeps it mountable. It never moves anything:
+ * jsdom computes no layout, so there is nothing to scroll.
+ */
+if (typeof Element.prototype.scrollIntoView === "undefined") {
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    configurable: true,
+    writable: true,
+    value: () => undefined,
+  });
+}
+
 function setSupportedViewport(): void {
   Object.defineProperties(window, {
     innerWidth: { configurable: true, value: SUPPORTED_WIDTH },

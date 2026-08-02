@@ -6,11 +6,10 @@ import {
   MODULE_ACCENT_KEYS,
   MODULE_ACCENT_TOKENS,
   MODULE_ACCENTS,
-  MODULE_IDENTITIES,
   moduleAccentFor,
-  moduleIdentityForPluginId,
 } from "../../../src/themes/module-accents";
 import { BUILT_IN_PALETTES } from "../../../src/themes/tokens";
+import { MODULE_IDENTITIES, moduleIdentityForPluginId } from "../approved-module-identities";
 
 const HEX = /^#[0-9A-F]{6}$/;
 

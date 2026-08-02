@@ -7,20 +7,16 @@ import { DIGIT_FIVE_MANIFEST } from "../../../src/engine/modules/digit-five/mani
 import { DIGIT_SEVEN_MANIFEST } from "../../../src/engine/modules/digit-seven/manifest";
 import { DRUMLINE_SIX_MANIFEST } from "../../../src/engine/modules/drumline-six/manifest";
 import { HYBRID_NINE_MANIFEST } from "../../../src/engine/modules/hybrid-nine/manifest";
-import {
-  MODULE_ACCENTS,
-  MODULE_IDENTITIES,
-  isModuleAccentKey,
-} from "../../../src/themes/module-accents";
+import { MODULE_ACCENTS, isModuleAccentKey } from "../../../src/themes/module-accents";
+import { MODULE_IDENTITIES } from "../approved-module-identities";
 
 /**
  * Every shipped instrument manifest, in the rack order of spec-001 section 2.2.
  *
- * The identity table in `src/themes/module-accents.ts` is the normative source
- * for the visible name, the short label, and the accent of each instrument.
- * A manifest that drifts from it reintroduces an unapproved visible product
- * name, which section 2.3 forbids, so the two are compared here rather than
- * trusted to review.
+ * The identity table in `tests/unit/approved-module-identities.ts` contains
+ * expected data derived from spec-001. A manifest that drifts from it
+ * reintroduces an unapproved visible product name, which section 2.3 forbids,
+ * so the two are compared here rather than trusted to review.
  */
 const MANIFESTS: readonly InstrumentPluginManifest[] = [
   BASS_MONO_MANIFEST,

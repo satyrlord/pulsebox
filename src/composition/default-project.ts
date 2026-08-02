@@ -22,7 +22,7 @@ import {
   DRUMLINE_SIX_MANIFEST,
   HYBRID_NINE_DEFAULT_PARAMETERS,
   HYBRID_NINE_MANIFEST,
-  drumVoiceNote,
+  auditionNoteFor,
 } from "../engine/public";
 import {
   createDefaultState,
@@ -94,7 +94,9 @@ function demoSteps(baseNote: number, hits: readonly DemoHit[]) {
   );
 }
 
-const DRUM_BASE = drumVoiceNote("kick");
+// Every shipped machine's roster starts at the kick's note, so one base note
+// serves each demo pattern below. The manifest declares it.
+const DRUM_BASE = auditionNoteFor(DRUMLINE_SIX_MANIFEST, "kick");
 
 /** Tin Soldier keeps the backbeat: kick, snare, and a closed-hat pulse. */
 const drumlineSteps = demoSteps(DRUM_BASE, [

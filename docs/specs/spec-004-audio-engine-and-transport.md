@@ -153,7 +153,10 @@ Behavior:
 - Visual timers are never the musical clock.
 - Parameter smoothing.
 - No zipper noise.
-- Do not allocate memory during real-time processing.
+- Preallocate real-time event and parameter storage.
+- Meter publication is the only bounded allocation during real-time processing.
+- Allocate at most one small envelope for each published meter frame.
+- Limit meter publication to 30 frames per second.
 - Do not log during real-time processing.
 - Do not use locks during real-time processing.
 - Conservative output level.

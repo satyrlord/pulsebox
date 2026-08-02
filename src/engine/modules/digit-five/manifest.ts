@@ -6,7 +6,12 @@ import {
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
 import { DEFAULT_DIGIT_FIVE_PARAMETERS } from "./dsp-core";
-import { DIGIT_FIVE_VOICE_IDS, DIGIT_FIVE_VOICE_NAMES, type DigitFiveVoiceId } from "./voices";
+import {
+  DIGIT_FIVE_VOICE_IDS,
+  DIGIT_FIVE_VOICE_NAMES,
+  digitFiveVoiceNote,
+  type DigitFiveVoiceId,
+} from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
   if (!result.ok) throw new Error("Dusty Mosaic contains an invalid stable identifier.");
@@ -268,7 +273,10 @@ export const DIGIT_FIVE_MANIFEST = Object.freeze({
     id: voiceId,
     name: DIGIT_FIVE_VOICE_NAMES[voiceId],
     outputChannels: 2,
+    note: digitFiveVoiceNote(voiceId),
   })),
+  // The first voice is the kick, the most useful default audition sound.
+  auditionNote: digitFiveVoiceNote("kick"),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
   voiceStealing: { maximumVoices: 8, priority: "oldest", releaseMilliseconds: 4 },

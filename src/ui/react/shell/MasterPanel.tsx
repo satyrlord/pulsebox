@@ -1,17 +1,18 @@
 import { DEFAULT_MASTER_LEVEL } from "../../../state/public";
 import { Fader } from "../controls/Fader";
 import { LevelMeter } from "../controls/LevelMeter";
+import { masterMeterDisplayLevel } from "../store/app-store";
 import { useAppStore } from "../store/app-store-context";
 import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
-import { masterMeterLevel } from "./master-meter";
 import styles from "./Shell.module.css";
 
 export function MasterPanel() {
   const masterLevel = useAppStore((state) => state.project.project.masterLevel);
-  const meterLevels = useAppStore((state) => state.meterLevels);
+  // A number selector, so meter frames re-render only this meter's subtree,
+  // not the panel and its fader.
+  const level = useAppStore((state) => masterMeterDisplayLevel(state.masterMeter));
   const previewMasterLevel = useAppStore((state) => state.previewMasterLevel);
   const setMasterLevel = useAppStore((state) => state.setMasterLevel);
-  const level = masterMeterLevel(meterLevels, masterLevel);
 
   return (
     <section

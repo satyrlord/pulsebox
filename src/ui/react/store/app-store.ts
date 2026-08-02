@@ -2,13 +2,21 @@ import { createStore, type StoreApi } from "zustand";
 
 import type {
   GestureId,
+  IdFactory,
   ModuleInstanceId,
   ParameterValue,
   PluginId,
   PluginManifest,
   RackSlotId,
 } from "../../../contracts";
-import type { PulseState, PulseStore } from "../../../state/public";
+import {
+  clampUnitInterval,
+  countUnmappedEvents,
+  type ProjectSaveResult,
+  type PulseState,
+  type PulseStore,
+  type TemplateCreateResult,
+} from "../../../state/public";
 
 export type AudioStatus = "faulted" | "recovered" | "recovering";
 
@@ -31,6 +39,32 @@ export const SILENT_MASTER_METER: MasterMeterView = Object.freeze({
   side: 0,
   peak: false,
 });
+
+/**
+ * Mono display level for the master strip meters: the louder analysis channel
+ * of the engine's post-master frame. The engine frame is the only master meter
+ * source, so the mixer strip, the Master view, and the header all agree.
+ */
+export function masterMeterDisplayLevel(view: MasterMeterView): number {
+  return Math.max(view.left, view.right);
+}
+
+/**
+ * The frame the master meters should show. The engine's analysis branch carries
+ * real signal whenever the runtime renders. The shell contract still requires
+ * silence while transport is stopped, so both engine and transport state gate
+ * the published frame.
+ */
+export function masterMeterFrameFor(
+  runtimeState: AudioRuntimeStateView,
+  transportStatus: PulseState["transport"]["status"],
+  readFrame: (() => MasterMeterView) | undefined,
+): MasterMeterView {
+  if (runtimeState !== "active" || transportStatus !== "playing" || readFrame === undefined) {
+    return SILENT_MASTER_METER;
+  }
+  return readFrame();
+}
 
 /** The transport surface React is allowed to touch. Never an AudioNode. */
 export interface AudioControlPort {
@@ -83,11 +117,11 @@ export interface SavedProjectSummary {
 }
 
 /**
- * Project storage as the UI sees it. Composition owns the repository and the
- * document codec, so no persistence or browser storage type reaches this layer.
+ * Project storage as the UI sees it. State owns the save result and document
+ * policy, so no repository or browser storage type reaches this layer.
  */
 export interface ProjectServicePort {
-  save(): Promise<void>;
+  save(): Promise<ProjectSaveResult>;
   list(): Promise<readonly SavedProjectSummary[]>;
   open(id: string): Promise<void>;
   /** Complete portable `.pulsebox` ZIP bytes for download. */
@@ -102,8 +136,12 @@ export interface ProjectServicePort {
 export interface ProjectTemplate {
   readonly id: string;
   readonly name: string;
-  /** Replaces the working project with a fresh template instance. */
-  readonly create: () => void;
+  /**
+   * Runs the whole section 9.2 transaction: saves the outgoing project,
+   * replaces it with a fresh template instance, and stores the copy. The state
+   * coordinator owns the transaction. This layer only reports its outcome.
+   */
+  readonly create: () => Promise<TemplateCreateResult>;
 }
 
 export type AppStorePort = Pick<
@@ -114,6 +152,8 @@ export type AppStorePort = Pick<
 export interface AppStoreDependencies {
   readonly store: AppStorePort;
   readonly audio: AudioControlPort;
+  /** ID source for gesture identity. Tests inject a deterministic factory. */
+  readonly idFactory: IdFactory;
   readonly manifestFor: (pluginId: PluginId) => PluginManifest | undefined;
   /** Plugins an empty slot offers to add, in menu order. */
   readonly addablePluginIds: readonly PluginId[];
@@ -177,6 +217,8 @@ export interface AppState {
   readonly meterMode: "lr" | "ms";
   readonly metronomeEnabled: boolean;
   readonly selectedSend: "A" | "B" | "C" | "D" | undefined;
+  /** Changes on every module-selection request, including a repeated request. */
+  readonly rackRevealRequest: number;
   readonly saveStatus: SaveStatus;
   /** Mirror of the engine's audio-runtime state for the header power control. */
   readonly audioRuntimeState: AudioRuntimeStateView;
@@ -289,6 +331,9 @@ export type AppStore = StoreApi<AppState>;
 
 const PEAK_HOLD_MILLISECONDS = 1_500;
 
+/** Default Pattern-launch boundary: one bar of sixteenth steps. */
+const DEFAULT_LAUNCH_QUANTIZATION_STEPS = 16;
+
 /**
  * Zustand owns everything React reads. The domain store keeps owning commands,
  * undo, revisions, and engine projection, so this layer holds no project truth
@@ -307,7 +352,8 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   };
 
   const initialMetronome = dependencies.preferences?.metronomeEnabled ?? false;
-  const initialLaunchQuantization = dependencies.preferences?.launchQuantizationSteps ?? 16;
+  const initialLaunchQuantization =
+    dependencies.preferences?.launchQuantizationSteps ?? DEFAULT_LAUNCH_QUANTIZATION_STEPS;
   audio.setMetronomeEnabled?.(initialMetronome);
   audio.setLaunchQuantization?.(initialLaunchQuantization);
 
@@ -327,6 +373,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     meterMode: "lr",
     metronomeEnabled: initialMetronome,
     selectedSend: undefined,
+    rackRevealRequest: 0,
     saveStatus: "clean",
     audioRuntimeState: "locked",
     masterMeter: SILENT_MASTER_METER,
@@ -381,7 +428,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     setHumanize: (patternIndex, humanize, gestureId) => {
-      const clamped = Math.min(1, Math.max(0, humanize));
+      const clamped = clampUnitInterval(humanize);
       store.dispatch(
         store.createCommand(
           "pattern-humanize-set",
@@ -392,7 +439,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     previewHumanize: (patternIndex, humanize) => {
-      audio.previewHumanize?.(patternIndex, Math.min(1, Math.max(0, humanize)));
+      audio.previewHumanize?.(patternIndex, clampUnitInterval(humanize));
     },
 
     newPatternVariation: (patternIndex) => {
@@ -453,7 +500,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     setSwing: (swing, gestureId) => {
-      const clamped = Math.min(1, Math.max(0, swing));
+      const clamped = clampUnitInterval(swing);
       store.dispatch(
         store.createCommand(
           "transport-swing-set",
@@ -464,7 +511,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     previewSwing: (swing) => {
-      const clamped = Math.min(1, Math.max(0, swing));
+      const clamped = clampUnitInterval(swing);
       if (audio.previewSwing !== undefined) audio.previewSwing(clamped);
       else audio.setSwing?.(clamped);
     },
@@ -524,15 +571,11 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (module === undefined) return;
       const fromName = dependencies.manifestFor(module.pluginId)?.productName ?? "module";
       const toName = dependencies.manifestFor(pluginId)?.productName ?? "module";
-      const playable = dependencies.playableNotesFor?.(pluginId);
-      const unmappedEvents =
-        playable === undefined
-          ? 0
-          : module.parts.reduce(
-              (total, steps) =>
-                total + steps.filter((step) => step.active && !playable.has(step.note)).length,
-              0,
-            );
+      // The count is state-owned section 14 policy; this layer only reports it.
+      const unmappedEvents = countUnmappedEvents(
+        module.parts,
+        dependencies.playableNotesFor?.(pluginId),
+      );
       audio.stopAudition(moduleId);
       const result = store.dispatch(
         store.createCommand("rack-module-swap", { moduleId, pluginId }),
@@ -567,6 +610,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(
         store.createCommand("rack-module-select", moduleId === undefined ? {} : { moduleId }),
       );
+      set((state) => ({ rackRevealRequest: state.rackRevealRequest + 1 }));
     },
 
     selectVoice: (moduleId, voiceId) => {
@@ -583,10 +627,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
         set({ audioMessage: "Audio is unavailable. Audition could not start." });
         return;
       }
-      const manifest = dependencies.manifestFor(module.pluginId);
-      const selectedVoice =
-        state.selectedVoiceByModule[moduleId] ??
-        (manifest?.kind === "instrument" ? manifest.voices[0]?.id : undefined);
+      // With no selected voice, the engine falls back to the manifest's
+      // declared audition note, so no default-voice rule lives here.
+      const selectedVoice = state.selectedVoiceByModule[moduleId];
       const note = requestedNote ?? dependencies.auditionNoteFor(module.pluginId, selectedVoice);
       void audio.startAudition(moduleId, note).catch(() => {
         set({
@@ -748,7 +791,26 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (projects === undefined) return false;
       set({ saveStatus: "saving" });
       try {
-        await projects.save();
+        const saved = await projects.save();
+        const currentRevision = store.getState().project.revision;
+        const currentIsSaved =
+          saved.snapshotRevision.epoch === currentRevision.epoch &&
+          saved.snapshotRevision.counter === currentRevision.counter;
+        if (!saved.durable) {
+          set({
+            projectMessage: "Saving failed. This browser is not providing project storage.",
+            saveStatus: "error",
+          });
+          return false;
+        }
+        if (!currentIsSaved) {
+          set({
+            projectMessage: "Earlier changes were saved. New edits are not saved.",
+            saveStatus: "dirty",
+          });
+          await get().refreshSavedProjects();
+          return false;
+        }
         set({
           projectMessage: `Saved ${get().project.project.name}.`,
           saveStatus: "saved",
@@ -809,28 +871,28 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     createProjectFromTemplate: async (id) => {
       const template = dependencies.templates?.find((one) => one.id === id);
       if (template === undefined) return;
-      const projects = dependencies.projects;
-      // With no storage service there is nothing to save into, so the
-      // template still replaces the working project.
-      if (projects !== undefined && !(await get().saveProject())) {
+      set({ saveStatus: "saving" });
+      // A rejected transaction must not strand `saveStatus` at "saving":
+      // `connectDomainStore` never marks a later edit dirty in that state, so
+      // the Save control would stop reporting unsaved work for the session.
+      const result = await template.create().catch(() => ({ created: false, saved: false }));
+      if (!result.created) {
         set({
+          saveStatus: "error",
           projectMessage:
             "The template was not created because the current project could not be saved.",
         });
         return;
       }
-      template.create();
-      // The fresh copy is stored at once, so it appears in the selector and
-      // the Save control reports a saved project, not phantom unsaved edits.
-      // A failed save already reported itself and leaves the copy unsaved.
-      if (projects !== undefined && !(await get().saveProject())) {
-        set({ swapReport: undefined });
-        return;
-      }
+      // The swap report described a module of the replaced project.
       set({
-        projectMessage: `Created ${template.name} from the built-in template.`,
         swapReport: undefined,
+        saveStatus: result.saved ? "saved" : "error",
+        projectMessage: result.saved
+          ? `Created ${template.name} from the built-in template.`
+          : "Saving failed. This browser may be blocking storage.",
       });
+      await get().refreshSavedProjects();
     },
   }));
 

@@ -1,0 +1,30 @@
+/**
+ * State-owned edit policy the UI shares: the bound for continuous timing
+ * controls and the section 14 swap-compatibility count. The store validates
+ * these same bounds on dispatch, so the UI imports this module instead of
+ * restating the numbers.
+ */
+
+import type { PatternStep } from "./model";
+
+/** Swing and Pattern Humanize live on the closed unit interval. */
+export function clampUnitInterval(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * Section 14: a module swap keeps sequence data and reports the events the
+ * swap target cannot map. Undefined playable notes means every note maps, as
+ * on a pitched instrument.
+ */
+export function countUnmappedEvents(
+  parts: readonly (readonly PatternStep[])[],
+  playableNotes: ReadonlySet<number> | undefined,
+): number {
+  if (playableNotes === undefined) return 0;
+  return parts.reduce(
+    (total, steps) =>
+      total + steps.filter((step) => step.active && !playableNotes.has(step.note)).length,
+    0,
+  );
+}

@@ -22,6 +22,8 @@ export function Rack() {
   const { visibleSlotCount } = useDependencies();
   const rackSlots = useAppStore((state) => state.project.project.rackSlots);
   const modules = useAppStore((state) => state.project.project.modules);
+  const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
+  const revealRequest = useAppStore((state) => state.rackRevealRequest);
   const moveModule = useAppStore((state) => state.moveModule);
 
   const rackRef = useRef<HTMLElement | null>(null);
@@ -86,6 +88,17 @@ export function Rack() {
       window.removeEventListener("keydown", onKeyDown, true);
     };
   }, [drag, moveModule, visible]);
+
+  // Section 13.2: selecting a slot scrolls its full module into view. The rack
+  // owns its own DOM, so the reveal lives here; the overview and the mixer
+  // only dispatch the selection.
+  useEffect(() => {
+    if (selectedModuleId === undefined) return;
+    const index = visible.findIndex((slot) => slot.moduleId === selectedModuleId);
+    if (index < 0) return;
+    const sections = rackRef.current?.querySelectorAll('[data-component="rack-module"]');
+    sections?.[index]?.scrollIntoView({ block: "nearest" });
+  }, [revealRequest, selectedModuleId, visible]);
 
   // Stable across renders, because `RackModule` is memoized and a fresh handler
   // for each faceplate would make that memo produce new output on every rack

@@ -210,6 +210,8 @@ export const BASS_MONO_MANIFEST = Object.freeze({
   cpuClass: "light",
   compatibility: { acceptedStateSchemaVersions: [1], migrations: [] },
   voices: [{ id: "main", name: "Main voice", outputChannels: 2 }],
+  // Section 15.0: a pitched module auditions a documented fixed pitch, C2.
+  auditionNote: 36,
   acceptedEvents: [{ id: "note", kind: "note" }],
   patternCompatibility: ["notes"],
   voiceStealing: { maximumVoices: 1, priority: "oldest", releaseMilliseconds: 25 },

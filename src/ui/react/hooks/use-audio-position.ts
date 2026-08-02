@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { SILENT_MASTER_METER } from "../store/app-store";
+import { masterMeterFrameFor } from "../store/app-store";
 import { useAppContext, useDependencies } from "../store/app-store-context";
 
 /** Master analysis publishes at most this often, matching the meter protocol. */
@@ -24,16 +24,20 @@ export function useAudioPosition(): void {
       if (!running) return;
       const state = store.getState();
       state.setPositionTicks(audio.getPositionTicks());
-      // The meters read the real analysis branch only while the transport
-      // runs. While stopped they hold at silence: no fake motion.
-      if (state.project.transport.status === "playing" && audio.getMasterMeter !== undefined) {
-        const now = performance.now();
-        if (now - lastMeterAt >= METER_INTERVAL_MILLISECONDS) {
-          lastMeterAt = now;
-          state.setMasterMeterFrame(audio.getMasterMeter());
-        }
-      } else {
-        state.setMasterMeterFrame(SILENT_MASTER_METER);
+      // Only a real analysis read waits for the publish interval. Silence costs
+      // nothing to produce, and the store drops an unchanged frame anyway.
+      const now = performance.now();
+      const analyzing =
+        state.audioRuntimeState === "active" && state.project.transport.status === "playing";
+      if (!analyzing || now - lastMeterAt >= METER_INTERVAL_MILLISECONDS) {
+        if (analyzing) lastMeterAt = now;
+        state.setMasterMeterFrame(
+          masterMeterFrameFor(
+            state.audioRuntimeState,
+            state.project.transport.status,
+            audio.getMasterMeter,
+          ),
+        );
       }
       frame = requestAnimationFrame(tick);
     };

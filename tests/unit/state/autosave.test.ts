@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { browserIdFactory, type ProjectRevision } from "../../../src/contracts";
+import type { ProjectRevision } from "../../../src/contracts";
+import { browserIdFactory } from "../../../src/composition/browser-id-factory";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/public";
 import {
   createAutosave,

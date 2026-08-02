@@ -1,4 +1,4 @@
-import { browserIdFactory, type StateRevision } from "../../contracts/ids";
+import { type StateRevision } from "../../contracts/ids";
 import type { ParameterValue } from "../../contracts/parameters";
 import {
   ENGINE_PROTOCOL_LIMITS,
@@ -21,6 +21,20 @@ import type {
   VoiceAdapterStatus,
   VoiceFault,
 } from "../transport/voice-adapter";
+
+/**
+ * Node and session IDs are runtime protocol coordination, not durable project
+ * entities: the protocol needs only an opaque non-empty string that no live
+ * port reuses, so that a stale message fails its identity check. A counter that
+ * every adapter in the page shares gives that without a browser handle, which
+ * keeps the injected `IdFactory` the one source of durable entity IDs.
+ */
+let runtimeIdSequence = 0;
+
+function nextRuntimeId(prefix: string): string {
+  runtimeIdSequence += 1;
+  return `${prefix}-${runtimeIdSequence.toString(36)}`;
+}
 
 /**
  * Everything that distinguishes one worklet-backed instrument from another. The
@@ -90,7 +104,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   ) {
     this.#descriptor = descriptor;
     this.#context = context;
-    this.#nodeId = options.nodeId ?? browserIdFactory.createUuid();
+    this.#nodeId = options.nodeId ?? nextRuntimeId("node");
     this.#projectRevision = options.projectRevision;
     this.#acknowledgedProjectRevision = options.projectRevision;
     this.#handshakeTimeoutMilliseconds =
@@ -297,7 +311,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   }
 
   async #openSession(projectRevision: StateRevision = this.#projectRevision): Promise<void> {
-    this.#sessionId = browserIdFactory.createUuid();
+    this.#sessionId = nextRuntimeId("session");
     this.#nextSequence = 0;
     this.#expectedProcessorSequence = 0;
     this.#eventId = 0;

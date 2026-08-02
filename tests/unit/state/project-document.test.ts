@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { browserIdFactory, type ProjectRevision } from "../../../src/contracts";
+import type { ProjectRevision } from "../../../src/contracts";
+import { browserIdFactory } from "../../../src/composition/browser-id-factory";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/public";
 import {
   createDefaultState,
@@ -14,6 +15,7 @@ import {
   PROJECT_FORMAT_VERSION,
   parsePortableProject,
   parseStoredProject,
+  portableProjectFilename,
   serializeProject,
   serializePortableProject,
   serializeProjectToJson,
@@ -302,6 +304,16 @@ describe("project document", () => {
     expect(parsed.ok).toBe(false);
     if (parsed.ok) return;
     expect(parsed.issues[0]?.message).toContain("CRC-32");
+  });
+
+  it("reduces a free-text project name to a safe portable filename", () => {
+    expect(portableProjectFilename("Neon Basement")).toBe("neon-basement.pulsebox");
+    expect(portableProjectFilename("  Late/Night  Jam!  ")).toBe("late-night-jam.pulsebox");
+    expect(portableProjectFilename("Track_09")).toBe("track_09.pulsebox");
+    // A name made only of punctuation reduces to nothing, which would otherwise
+    // download a file called just the extension.
+    expect(portableProjectFilename("!!!")).toBe("project.pulsebox");
+    expect(portableProjectFilename("")).toBe("project.pulsebox");
   });
 
   it("rejects a file that is not valid JSON", () => {

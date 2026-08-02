@@ -6,7 +6,7 @@ import {
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
 import { DEFAULT_DRUMLINE_PARAMETERS } from "./dsp-core";
-import { DRUM_VOICE_IDS, DRUM_VOICE_NAMES, type DrumVoiceId } from "./voices";
+import { DRUM_VOICE_IDS, DRUM_VOICE_NAMES, drumVoiceNote, type DrumVoiceId } from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
   if (!result.ok) throw new Error("Tin Soldier contains an invalid stable identifier.");
@@ -227,7 +227,10 @@ export const DRUMLINE_SIX_MANIFEST = Object.freeze({
     id: voiceId,
     name: DRUM_VOICE_NAMES[voiceId],
     outputChannels: 2,
+    note: drumVoiceNote(voiceId),
   })),
+  // The first voice is the kick, the most useful default audition sound.
+  auditionNote: drumVoiceNote("kick"),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
   voiceStealing: { maximumVoices: 6, priority: "oldest", releaseMilliseconds: 4 },

@@ -44,4 +44,73 @@ describe("plugin registry", () => {
     const registry = createPluginRegistry<unknown>([]);
     expect(() => registry.require(pluginId("bass-mono"))).toThrow(/not registered/u);
   });
+
+  // Section 6.1: registry startup fails for an in-plugin duplicate parameter
+  // ID, duplicate meter ID, duplicate compact control position, or an
+  // incompatible schema tuple. The manifest validator carries these checks and
+  // the registry refuses any manifest that fails it.
+  it.each([
+    [
+      "duplicate parameter ID",
+      (manifest: ReturnType<typeof createInstrumentManifest>) => ({
+        ...manifest,
+        parameters: [...manifest.parameters, ...manifest.parameters],
+      }),
+    ],
+    [
+      "duplicate meter ID",
+      (manifest: ReturnType<typeof createInstrumentManifest>) => ({
+        ...manifest,
+        meters: [...manifest.meters, ...manifest.meters],
+      }),
+    ],
+    [
+      "duplicate compact control position",
+      (manifest: ReturnType<typeof createInstrumentManifest>) => ({
+        ...manifest,
+        ui: {
+          ...manifest.ui,
+          compactControls: [...manifest.ui.compactControls, ...manifest.ui.compactControls],
+        },
+      }),
+    ],
+    [
+      "incompatible schema tuple",
+      (manifest: ReturnType<typeof createInstrumentManifest>) => ({
+        ...manifest,
+        apiVersion: 2 as unknown as 1,
+      }),
+    ],
+  ])("rejects a manifest with a %s before activation", (_name, mutate) => {
+    const manifest = mutate(createInstrumentManifest());
+    expect(() => createPluginRegistry([{ manifest, factory: "engine" }])).toThrow(
+      PluginRegistryValidationError,
+    );
+  });
+
+  it("rejects a manifest that mixes mapped and all-note voices", () => {
+    const manifest = {
+      ...createInstrumentManifest(),
+      voices: [
+        { id: "mapped", name: "Mapped voice", outputChannels: 2 as const, note: 36 },
+        { id: "all-notes", name: "All-note voice", outputChannels: 2 as const },
+      ],
+    };
+
+    expect(() => createPluginRegistry([{ manifest, factory: "engine" }])).toThrow(
+      PluginRegistryValidationError,
+    );
+  });
+
+  it("rejects a note-mapped manifest with an undeclared audition note", () => {
+    const manifest = {
+      ...createInstrumentManifest(),
+      voices: [{ id: "mapped", name: "Mapped voice", outputChannels: 2 as const, note: 37 }],
+      auditionNote: 36,
+    };
+
+    expect(() => createPluginRegistry([{ manifest, factory: "engine" }])).toThrow(
+      PluginRegistryValidationError,
+    );
+  });
 });

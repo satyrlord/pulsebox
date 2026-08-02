@@ -411,9 +411,9 @@ function scanSafeJson(value: unknown, collector: IssueCollector, path = "$", dep
 /**
  * Validates one parameter value against its declared descriptor. Returns the
  * rejection message, or undefined when the value is valid. Import parsing and
- * the composition root's live command validation share this one policy.
+ * the `createParameterValidator` live-command policy share this one check.
  */
-export function validateImportedParameter(
+function validateImportedParameter(
   value: unknown,
   descriptor: ImportParameterDescriptor,
 ): string | undefined {
@@ -438,6 +438,27 @@ export function validateImportedParameter(
     return "Parameter value is outside its registered range.";
   }
   return undefined;
+}
+
+/**
+ * Builds the store's live-command parameter validator from declared parameter
+ * descriptors. Import parsing and live dispatch share
+ * `validateImportedParameter`, so both paths accept exactly the same values and
+ * no second, laxer policy can exist.
+ */
+export function createParameterValidator(
+  descriptorsFor: (pluginId: string) => readonly ImportParameterDescriptor[] | undefined,
+): (
+  module: { readonly pluginId: string },
+  parameter: string,
+  value: number | boolean | string,
+) => boolean {
+  return (module, parameter, value) => {
+    const descriptor = descriptorsFor(module.pluginId)?.find(
+      (candidate) => candidate.id === parameter,
+    );
+    return descriptor !== undefined && validateImportedParameter(value, descriptor) === undefined;
+  };
 }
 
 /**

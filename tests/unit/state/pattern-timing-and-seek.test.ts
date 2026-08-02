@@ -4,6 +4,7 @@ import { createGestureId, type IdFactory } from "../../../src/contracts/ids";
 import type { ParameterId, PluginId } from "../../../src/contracts/parameters";
 import { createDefaultState, DEFAULT_PATTERN_HUMANIZE } from "../../../src/state/default-state";
 import {
+  createParameterValidator,
   documentToState,
   parseProjectDocument,
   serializeProject,
@@ -33,9 +34,15 @@ function deterministicIds(): IdFactory {
 
 function createStore(deltas: PulseEngineDelta[] = []): PulseStore {
   const ids = deterministicIds();
-  return new PulseStore(createDefaultState(ids, seed), ids, seed, (delta) => {
-    deltas.push(delta);
-  });
+  return new PulseStore(
+    createDefaultState(ids, seed),
+    ids,
+    seed,
+    (delta) => {
+      deltas.push(delta);
+    },
+    createParameterValidator((pluginId) => parseOptions.parameterDescriptorsByPluginId[pluginId]),
+  );
 }
 
 const parseOptions: ParseOptions = {

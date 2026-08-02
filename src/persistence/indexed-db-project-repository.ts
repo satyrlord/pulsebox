@@ -65,9 +65,14 @@ function openProjectDatabase(factory: IDBFactory): Promise<IDBDatabase> {
   });
 }
 
-export function createIndexedDbProjectRepository(factory: IDBFactory): ProjectRepositoryPort {
-  let connection: Promise<IDBDatabase> | undefined;
-  const database = () => (connection ??= openProjectDatabase(factory));
+export async function createIndexedDbProjectRepository(
+  factory: IDBFactory,
+): Promise<ProjectRepositoryPort> {
+  // Open before the adapter is selected. This makes an asynchronous browser
+  // denial visible to the composition boundary instead of failing the first
+  // user save after the adapter was already treated as available.
+  const connection = await openProjectDatabase(factory);
+  const database = () => Promise.resolve(connection);
 
   const write = async (store: string, value: StoredProject, key?: string): Promise<void> => {
     const db = await database();

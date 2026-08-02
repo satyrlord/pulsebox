@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GestureId } from "../../src/contracts";
 import { Knob } from "../../src/ui/react/controls/Knob";
+import { renderWithHarness } from "./helpers";
 
 interface Recorded {
   readonly inputs: number[];
@@ -12,7 +13,9 @@ interface Recorded {
 
 function renderKnob(overrides: Partial<React.ComponentProps<typeof Knob>> = {}) {
   const recorded: Recorded = { inputs: [], commits: [] };
-  const view = render(
+  // The knob mints its gesture IDs from the injected factory, so it renders
+  // inside the provider like every other control.
+  const view = renderWithHarness(
     <Knob
       controlId="cutoff"
       label="Cutoff"
@@ -225,7 +228,7 @@ describe("Knob", () => {
   it("does not leak a wheel listener across a StrictMode remount", () => {
     vi.useFakeTimers();
     const recorded: Recorded = { inputs: [], commits: [] };
-    render(
+    renderWithHarness(
       <StrictMode>
         <Knob
           controlId="cutoff"

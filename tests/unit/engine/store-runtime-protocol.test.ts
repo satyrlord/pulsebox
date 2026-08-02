@@ -12,6 +12,7 @@ import {
 import type { VoiceAdapterStatus } from "../../../src/engine/transport/voice-adapter";
 import type { WorkletVoiceAdapter } from "../../../src/engine/worklets/worklet-voice-adapter";
 import { createDefaultState } from "../../../src/state/default-state";
+import { createParameterValidator } from "../../../src/state/persistence/project-document";
 import { PulseStore } from "../../../src/state/pulse-store";
 import { TEST_UUID } from "../contracts/fixtures";
 
@@ -106,8 +107,14 @@ describe("store to Silver Serpent worklet projection", () => {
     await runtime.activate();
 
     const projections: Promise<void>[] = [];
-    const store = new PulseStore(initialState, ids, seed, (delta) =>
-      projections.push(runtime.project(delta)),
+    const store = new PulseStore(
+      initialState,
+      ids,
+      seed,
+      (delta) => projections.push(runtime.project(delta)),
+      createParameterValidator((pluginId) =>
+        pluginId === BASS_MONO_MANIFEST.pluginId ? BASS_MONO_MANIFEST.parameters : undefined,
+      ),
     );
     const moduleId = store.getState().ui.selectedModuleId;
     if (moduleId === undefined) throw new Error("Expected a selected module.");

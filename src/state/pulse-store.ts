@@ -76,13 +76,15 @@ export class PulseStore {
     initialState: PulseState,
     idFactory: IdFactory,
     moduleSeed: ModuleSeed | ((pluginId: PluginId) => ModuleSeed | undefined),
-    onEngineDelta: (delta: PulseEngineDelta) => void = () => undefined,
+    onEngineDelta: (delta: PulseEngineDelta) => void,
+    // Required with no default: a defaulted validator here would be a second,
+    // laxer policy than the shared descriptor check in
+    // `persistence/project-document.ts`, and tests would exercise the wrong one.
     validateParameter: (
       module: RackModuleState,
       parameter: string,
       value: number | boolean | string,
-    ) => boolean = (_module, _parameter, value) =>
-      typeof value === "boolean" || typeof value === "string" || Number.isFinite(value),
+    ) => boolean,
   ) {
     this.#state = {
       ...initialState,

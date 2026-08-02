@@ -117,6 +117,12 @@ export interface InstrumentVoiceDescriptor {
   readonly id: VoiceId | string;
   readonly name: string;
   readonly outputChannels: 1 | 2;
+  /**
+   * Note number that sounds this voice. A drum voice declares its note here so
+   * shared code can map notes to voices from the manifest alone. A pitched
+   * voice that answers every note declares none.
+   */
+  readonly note?: number;
 }
 
 export interface InstrumentEventDescriptor {
@@ -138,6 +144,12 @@ export interface PluginRenderCapabilities {
 export interface InstrumentPluginManifest extends BasePluginManifest {
   readonly kind: "instrument";
   readonly voices: readonly InstrumentVoiceDescriptor[];
+  /**
+   * Note an audition sounds when no voice is selected (section 15.0). A drum
+   * module declares its default voice's note. A pitched module declares its
+   * documented fixed audition pitch.
+   */
+  readonly auditionNote: number;
   readonly acceptedEvents: readonly InstrumentEventDescriptor[];
   readonly patternCompatibility: readonly ("notes" | "triggers")[];
   readonly voiceStealing: InstrumentVoiceStealingDescriptor;
@@ -515,9 +527,13 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
       !Array.isArray(raw.acceptedEvents) ||
       !Array.isArray(raw.patternCompatibility) ||
       !isPlainRecord(raw.voiceStealing) ||
+      typeof raw.auditionNote !== "number" ||
       raw.voices.some(
         (voice) =>
-          !isPlainRecord(voice) || typeof voice.id !== "string" || typeof voice.name !== "string",
+          !isPlainRecord(voice) ||
+          typeof voice.id !== "string" ||
+          typeof voice.name !== "string" ||
+          (voice.note !== undefined && typeof voice.note !== "number"),
       ) ||
       raw.acceptedEvents.some(
         (event) =>
@@ -710,6 +726,47 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
       issues.push({
         path: "voices",
         message: "Voice and event descriptors require stable IDs and names.",
+      });
+    }
+    if (
+      !Number.isSafeInteger(manifest.auditionNote) ||
+      manifest.auditionNote < 0 ||
+      manifest.auditionNote > 127
+    ) {
+      issues.push({
+        path: "auditionNote",
+        message: "Audition note must be an integer from 0 through 127.",
+      });
+    }
+    const voiceNotes = manifest.voices.flatMap((voice) =>
+      voice.note === undefined ? [] : [voice.note],
+    );
+    if (voiceNotes.some((note) => !Number.isSafeInteger(note) || note < 0 || note > 127)) {
+      issues.push({
+        path: "voices",
+        message: "Voice notes must be integers from 0 through 127.",
+      });
+    }
+    if (new Set(voiceNotes).size !== voiceNotes.length) {
+      issues.push({
+        path: "voices",
+        message: "Voice notes must be unique in this plugin.",
+      });
+    }
+    if (voiceNotes.length > 0 && voiceNotes.length !== manifest.voices.length) {
+      issues.push({
+        path: "voices",
+        message: "Voice notes must be declared for all voices or for no voices.",
+      });
+    }
+    if (
+      voiceNotes.length > 0 &&
+      voiceNotes.length === manifest.voices.length &&
+      !voiceNotes.includes(manifest.auditionNote)
+    ) {
+      issues.push({
+        path: "auditionNote",
+        message: "A note-mapped instrument must audition one of its declared voice notes.",
       });
     }
   } else {

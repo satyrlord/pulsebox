@@ -5,6 +5,7 @@ import { LevelMeter } from "../controls/LevelMeter";
 import { SegmentDisplay } from "../controls/SegmentDisplay";
 import { useContinuousGesture } from "../controls/use-gesture-id";
 import { useAppStore } from "../store/app-store-context";
+import { gainToDecibels } from "./fader-decibels";
 import { ProjectMenu } from "./ProjectMenu";
 import styles from "./TransportBar.module.css";
 
@@ -36,10 +37,13 @@ function formatElapsed(ticks: number, tempo: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
 }
 
+/** The header readout floor: deeper than a fader, so quiet peaks stay legible. */
+const METER_READOUT_FLOOR_DB = -96;
+
 /** Fixed-width dB text so the readout never shifts the layout. */
 function formatMasterDb(peak: number): string {
   if (peak <= 0.000_01) return "-inf";
-  const decibels = Math.max(-96, 20 * Math.log10(peak));
+  const decibels = gainToDecibels(peak, METER_READOUT_FLOOR_DB);
   return `${decibels >= 0 ? "+" : ""}${decibels.toFixed(1)}`;
 }
 

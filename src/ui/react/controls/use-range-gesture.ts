@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { browserIdFactory, createGestureId, type GestureId } from "../../../contracts";
+import { createGestureId, type GestureId } from "../../../contracts";
+import { useIdFactory } from "../store/app-store-context";
 
 export interface RangeGestureOptions {
   readonly value: number;
@@ -38,7 +39,11 @@ export interface RangeGestureHandles {
 }
 
 const DEFAULT_DRAG_RANGE = 180;
-const WHEEL_IDLE_MILLISECONDS = 250;
+/**
+ * Section 7.4: a wheel burst ends after 250 milliseconds without another
+ * accepted wheel input. Every wheel-adjustable control shares this boundary.
+ */
+export const WHEEL_IDLE_MILLISECONDS = 250;
 const LARGE_STEP_MULTIPLIER = 10;
 
 const ADJUSTING_KEYS = new Set([
@@ -73,6 +78,7 @@ function quantize(value: number, min: number, max: number, step: number): number
  * entry.
  */
 export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandles {
+  const idFactory = useIdFactory();
   const { value, min, max, step, defaultValue, onInput, onCommit } = options;
   const dragRange = options.dragRange ?? DEFAULT_DRAG_RANGE;
 
@@ -104,10 +110,10 @@ export function useRangeGesture(options: RangeGestureOptions): RangeGestureHandl
 
   const beginGesture = useCallback(() => {
     if (gestureId.current !== undefined) return;
-    gestureId.current = createGestureId(browserIdFactory);
+    gestureId.current = createGestureId(idFactory);
     beforeGesture.current = live.current;
     setAdjusting(true);
-  }, []);
+  }, [idFactory]);
 
   const emitInput = useCallback((next: number) => {
     const { min: low, max: high, step: increment, onInput: input } = latest.current;

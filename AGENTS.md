@@ -209,7 +209,13 @@ The three domain layers and the wiring-only composition boundary live here:
 | `src/state/`        | state       | Project data, typed commands, undo and redo, selectors, serialization, persistence ports  |
 | `src/persistence/`  | persistence | Browser-storage adapters behind state-owned ports. The only layer that names IndexedDB    |
 | `src/ui/`           | UI          | Components, layout, input, focus, accessibility, themes, DOM patching                     |
+| `src/themes/`       | UI          | Theme tokens, palettes, appearance envelope, and user-theme validation                    |
+| `src/styles/`       | UI          | Global stylesheets and bundled fonts                                                      |
 | `src/contracts/`    | contracts   | Data-only shared types with no singleton, browser handle, or algorithm                    |
+
+`src/themes/` and `src/styles/` belong to the UI layer boundary. Only UI code
+and the composition boundary import them. The architecture policy treats them
+as UI.
 
 Cross-layer imports go through the owning layer's `public.ts`
 (`src/engine/public.ts`, `src/state/public.ts`, `src/persistence/public.ts`,
@@ -226,16 +232,26 @@ Cross-layer imports go through the owning layer's `public.ts`
 Read that policy file before adding a source directory or a shared branch.
 
 An instrument or effect folder follows the current module shape under
-`src/engine/modules/<plugin-id>/`:
+`src/engine/modules/<folder-name>/`. The folder name is a stable working name.
+The stable `pluginId` lives in the manifest and can differ from the folder
+name:
 
 - `manifest.ts` declares the base manifest, parameter descriptors, meters,
-  defaults, and the UI manifest including its `moduleAccent` tokens and
-  original `icon` path.
+  defaults, voice notes, the audition note, and the UI manifest including its
+  `moduleAccent` tokens and original `icon` path.
+- `voices.ts` holds the declarative voice data for an instrument with voices:
+  voice IDs, names, and note mapping. A pitched instrument has no `voices.ts`.
 - `dsp-core.ts` holds pure, testable DSP.
 - `<name>.worklet.ts` is the AudioWorkletProcessor.
 - `adapter.ts` loads the worklet module and owns its nodes. It imports the
   worklet through a Vite `?worker&url` import, not a hand-written path.
-- `runtime.ts` implements the lifecycle the engine drives.
+
+No module folder has a `runtime.ts`. The shared
+`src/engine/worklets/worklet-voice-adapter.ts` owns the plugin lifecycle and
+protocol for every module, and `src/engine/transport/transport-runtime.ts`
+drives it. The single registration point for built-in modules is the list in
+`src/engine/modules/index.ts`. Adding an instrument is one folder plus one
+entry in that list.
 
 `PulseStore` in `src/state/pulse-store.ts` is the only mutation path. History is
 limited to 100 entries and 64 MiB in total. One entry is limited to 17 MiB.

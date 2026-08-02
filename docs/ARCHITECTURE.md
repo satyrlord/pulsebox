@@ -302,8 +302,11 @@ dispatch through typed contracts. They shall not branch on a product-specific
 plugin ID.
 
 Before audio activation, registry startup shall fail if two entries claim the
-same plugin ID or stable parameter ID. It shall also fail for a duplicate meter
-ID, compact control position, or incompatible schema tuple.
+same plugin ID, and if any manifest fails validation. Manifest validation
+rejects a duplicate parameter ID, duplicate meter ID, or duplicate compact
+control position inside one plugin, and an incompatible schema tuple. Parameter
+and meter IDs are scoped to their plugin as section 5.2 defines, so equal IDs
+in two different plugins are not a conflict.
 
 ### 6.2 Base manifest
 
@@ -415,7 +418,13 @@ global UI preferences shall not be parameters or automation targets.
 
 An instrument manifest shall add:
 
-- stable voice or lane descriptors.
+- stable voice or lane descriptors. A voice that answers one note shall declare
+  that note. A voice that answers every note shall declare none. Declared voice
+  notes shall be unique integers from 0 through 127 inside one plugin.
+- an `auditionNote` integer from 0 through 127. Section 15.0 of
+  [spec-005](specs/spec-005-rack-and-instruments.md) sounds it when no voice is
+  selected. A drum module declares its default voice's note, and a pitched
+  module its documented fixed audition pitch.
 - accepted event forms, Pattern compatibility, and one editor capability:
   `monophonic-pitched`, `drum-triggers`, or reserved post-MVP
   `polyphonic-pitched`.
@@ -766,7 +775,10 @@ posting into an unbounded browser queue.
 
 Worklet processors shall preallocate their real-time event and parameter storage
 from manifest bounds. They shall not allocate, log, await, lock, decode, fetch,
-parse project JSON, or access persistence during `process()`.
+parse project JSON, or access persistence during `process()`. Meter publication
+is the one bounded exception: a processor may allocate one small meter envelope
+per published frame, at most 30 per second, because `postMessage` cannot send a
+frame without it.
 
 The processor shall use a non-serializing validation path for normal controller
 messages. Full diagnostic validation stays on the controller thread.
@@ -995,9 +1007,12 @@ The tests shall prove unchanged sends and export isolation.
 ## 12. Persistence boundary
 
 The state layer shall define ports for project repositories, asset repositories,
-recovery history, global preferences, and cross-tab revision notices. IndexedDB
-and local storage shall be implementations of those ports, wired at the
-composition boundary.
+recovery history, and cross-tab revision notices. IndexedDB shall be an
+implementation of those ports, wired at the composition boundary.
+
+Lightweight global UI preferences are UI-owned. The UI layer stores them in
+local storage behind its own bounded access. A preference never enters project
+persistence, commands, undo history, or portable export.
 
 The project repository shall commit a validated project document,
 asset-reference updates, and new revision metadata atomically according to
@@ -1032,14 +1047,18 @@ able to inject:
 - an engine graph factory.
 - a worklet node and message-port harness.
 - a sample decoder and decoder worker transport.
-- project, asset, recovery, and preference repositories.
+- project, asset, and recovery repositories.
+- the UI-owned global preference store of section 12.
 - a cross-tab revision channel.
 - file import and export sinks.
 - visibility, audio-unlock, and audio-context state signals.
 
 The production composition root shall be the only place that selects browser
-implementations. Unit tests shall not require a real DOM or audio device for
-state and engine-pure logic. Browser and rendered-audio tests shall use the
+implementations. The one exception is the UI mount boundary, which section 12
+gives the global preference store: it selects local storage there and injects
+every other browser handle it receives. No component, hook, or shared module
+below that boundary shall select a browser implementation of its own. Unit tests
+shall not require a real DOM or audio device for state and engine-pure logic. Browser and rendered-audio tests shall use the
 production build for integration evidence.
 
 Plugin contract tests shall run every registered manifest through one shared

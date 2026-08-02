@@ -1,23 +1,10 @@
 /**
- * Portable-project download, owned in one place so the menu and the
- * unsupported-size notice cannot drift apart on filename rules or on the
- * lifetime of the object URL.
+ * Portable-project download mechanics: the anchor, the object URL, and its
+ * lifetime. The filename rule and the extension are format policy and live
+ * with the portable serializer in the state layer.
  */
 
-const PROJECT_FILE_EXTENSION = ".pulsebox";
-
-/**
- * A project name is free text, so it is reduced to a safe basename. A name made
- * entirely of punctuation reduces to nothing, which would otherwise produce a
- * file called only `.pulsebox`.
- */
-function safeProjectFilename(name: string): string {
-  const filename = name
-    .replaceAll(/[^\w-]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "")
-    .toLowerCase();
-  return filename.length === 0 ? "project" : filename;
-}
+import { portableProjectFilename } from "../../state/public";
 
 export type ProjectDownloadResult =
   { readonly ok: true } | { readonly ok: false; readonly reason: string };
@@ -38,7 +25,7 @@ export function downloadPortableProject(
     url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${safeProjectFilename(projectName)}${PROJECT_FILE_EXTENSION}`;
+    anchor.download = portableProjectFilename(projectName);
     anchor.rel = "noopener";
     anchor.style.display = "none";
     document.body.append(anchor);

@@ -74,6 +74,18 @@ describe("architecture source policy", () => {
       },
       { path: "scripts/server.mjs", source: 'const endpoint = "/api/projects";' },
       { path: "src/ui/rack-delete.ts", source: 'if (window.confirm("Delete module?")) remove();' },
+      {
+        path: "src/contracts/ids.ts",
+        source: "export const factory = { createUuid: () => crypto.randomUUID() };",
+      },
+      {
+        path: "src/ui/react/gesture-id.ts",
+        source: "export const id = () => globalThis.crypto.randomUUID();",
+      },
+      {
+        path: "src/ui/react/indexed-gesture-id.ts",
+        source: 'export const id = () => globalThis["crypto"].randomUUID();',
+      },
     ];
 
     const violations = findForbiddenTechnologyViolations(fixture);
@@ -90,9 +102,35 @@ describe("architecture source policy", () => {
     );
     expect(violations.some((violation) => violation.message.includes("DSP cores"))).toBe(true);
     expect(violations.some((violation) => violation.message.includes("endpoint"))).toBe(true);
+    expect(violations.some((violation) => violation.message.includes("data-only"))).toBe(true);
+    expect(
+      violations.some(
+        (violation) =>
+          violation.path === "src/ui/react/gesture-id.ts" &&
+          violation.message.includes("browser crypto ID source"),
+      ),
+    ).toBe(true);
+    expect(
+      violations.some(
+        (violation) =>
+          violation.path === "src/ui/react/indexed-gesture-id.ts" &&
+          violation.message.includes("browser crypto ID source"),
+      ),
+    ).toBe(true);
     expect(violations.some((violation) => violation.message.includes("confirmation dialogs"))).toBe(
       true,
     );
+  });
+
+  it("allows the composition root to select the browser crypto ID source", () => {
+    const fixture: readonly SourceUnit[] = [
+      {
+        path: "src/composition/browser-id-factory.ts",
+        source: "export const factory = { createUuid: () => globalThis.crypto.randomUUID() };",
+      },
+    ];
+
+    expect(findForbiddenTechnologyViolations(fixture)).toEqual([]);
   });
 
   it("contains no MIDI, ScriptProcessor, or service-worker code", () => {
@@ -180,6 +218,68 @@ describe("architecture source policy", () => {
     ];
 
     expect(findPluginBranchViolations(fixture)).toHaveLength(1);
+  });
+
+  it("rejects a plugin-ID-keyed table outside plugin and registry code", () => {
+    const fixture: readonly SourceUnit[] = [
+      {
+        path: "src/engine/modules/bass-mono/plugin.ts",
+        source: 'export const pluginId = "bass-mono";',
+      },
+      {
+        path: "src/engine/modules/rosters.ts",
+        source: 'export const ROSTERS = { "bass-mono": { note: 36 } };',
+      },
+    ];
+
+    expect(findPluginBranchViolations(fixture)).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      "Map entry",
+      'export const ROSTERS = new Map([["bass-mono", { note: 36 }]]);',
+    ],
+    [
+      "manifest-derived computed property",
+      "declare const BASS_MONO_MANIFEST: { pluginId: string }; export const ROSTERS = { [BASS_MONO_MANIFEST.pluginId]: { note: 36 } };",
+    ],
+  ])("rejects a plugin-ID-keyed %s outside plugin and registry code", (_name, source) => {
+    const fixture: readonly SourceUnit[] = [
+      {
+        path: "src/engine/modules/bass-mono/plugin.ts",
+        source: 'export const pluginId = "bass-mono";',
+      },
+      { path: "src/engine/modules/rosters.ts", source },
+    ];
+
+    expect(findPluginBranchViolations(fixture)).toHaveLength(1);
+  });
+
+  it("allows a plugin ID as a property value in shared code", () => {
+    const fixture: readonly SourceUnit[] = [
+      {
+        path: "src/engine/modules/bass-mono/plugin.ts",
+        source: 'export const pluginId = "bass-mono";',
+      },
+      {
+        path: "src/composition/default-project.ts",
+        source: 'export const seed = { pluginId: "bass-mono" };',
+      },
+    ];
+
+    expect(findPluginBranchViolations(fixture)).toEqual([]);
+  });
+
+  it("treats src/themes as UI for the layer dependency matrix", () => {
+    const fixture: readonly SourceUnit[] = [
+      { path: "src/engine/meter.ts", source: 'import "../themes/tokens";' },
+      { path: "src/themes/tokens.ts", source: "export const TOKENS = {};" },
+    ];
+
+    expect(messages(findLayerViolations(fixture))).toEqual([
+      "engine must not import ui through ../themes/tokens.",
+    ]);
   });
 
   it("allows generic plugin-ID validation and comparison", () => {

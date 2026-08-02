@@ -2,12 +2,8 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
 
-import {
-  browserIdFactory,
-  type ModuleInstanceId,
-  type PluginId,
-  type PluginManifest,
-} from "../../src/contracts";
+import type { ModuleInstanceId, PluginId, PluginManifest } from "../../src/contracts";
+import { browserIdFactory } from "../../src/composition/browser-id-factory";
 import {
   BASS_MONO_DEFAULT_PARAMETERS,
   BASS_MONO_MANIFEST,
@@ -15,7 +11,12 @@ import {
   DRUMLINE_SIX_MANIFEST,
   playableNotesFor,
 } from "../../src/engine/public";
-import { createDefaultState, PulseStore, type ModuleSeed } from "../../src/state/public";
+import {
+  createDefaultState,
+  createParameterValidator,
+  PulseStore,
+  type ModuleSeed,
+} from "../../src/state/public";
 import {
   createAppStore,
   connectDomainStore,
@@ -124,8 +125,22 @@ export function createHarness(
     setLaunchQuantization: vi.fn(),
   };
 
+  const domain = new PulseStore(
+    createDefaultState(browserIdFactory, seed),
+    browserIdFactory,
+    (pluginId) => seeds.get(pluginId),
+    () => undefined,
+    // The production policy, built from the same manifests the harness serves.
+    createParameterValidator((pluginId) => manifests.get(pluginId as PluginId)?.parameters),
+  );
+
   const projects = {
-    save: vi.fn(() => Promise.resolve()),
+    save: vi.fn(() =>
+      Promise.resolve({
+        snapshotRevision: domain.getState().project.revision,
+        durable: true,
+      }),
+    ),
     list: vi.fn(() =>
       Promise.resolve([
         { id: "stored-1", name: "Saved session", modifiedAt: "2026-07-28", favorite: false },
@@ -136,32 +151,10 @@ export function createHarness(
     importPortable: vi.fn(() => Promise.resolve({ ok: true } as const)),
   };
 
-  const domain = new PulseStore(
-    createDefaultState(browserIdFactory, seed),
-    browserIdFactory,
-    (pluginId) => seeds.get(pluginId),
-    () => undefined,
-    (module, parameter, value) => {
-      const descriptor = manifests
-        .get(module.pluginId)
-        ?.parameters.find((one) => one.id === parameter);
-      if (descriptor === undefined) return false;
-      if (descriptor.valueType === "enum") {
-        return typeof value === "string" && descriptor.enumValues?.includes(value) === true;
-      }
-      if (descriptor.valueType === "boolean") return typeof value === "boolean";
-      return (
-        typeof value === "number" &&
-        Number.isFinite(value) &&
-        value >= (descriptor.minimum ?? value) &&
-        value <= (descriptor.maximum ?? value)
-      );
-    },
-  );
-
   const dependencies: AppStoreDependencies = {
     store: domain,
     audio,
+    idFactory: browserIdFactory,
     manifestFor: (pluginId: PluginId) => manifests.get(pluginId),
     addablePluginIds: [
       BASS_MONO_MANIFEST.pluginId,
@@ -169,9 +162,12 @@ export function createHarness(
       ...extraModules.map((module) => module.manifest.pluginId),
     ],
     auditionNoteFor: () => 36,
-    // The real roster lookup, so the section 14 result panel counts the events
-    // a swap target genuinely cannot sound.
-    playableNotesFor,
+    // The real manifest-declared lookup, so the section 14 result panel counts
+    // the events a swap target genuinely cannot sound.
+    playableNotesFor: (pluginId: PluginId) => {
+      const manifest = manifests.get(pluginId);
+      return manifest === undefined ? undefined : playableNotesFor(manifest);
+    },
     visibleSlotCount: 8,
     projects,
   };

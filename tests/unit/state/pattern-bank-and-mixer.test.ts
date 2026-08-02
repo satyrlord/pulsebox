@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { IdFactory, ModuleInstanceId } from "../../../src/contracts/ids";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import { createDefaultState, PATTERN_SLOT_COUNT } from "../../../src/state/default-state";
+import { createParameterValidator } from "../../../src/state/persistence/project-document";
 import { PulseStore } from "../../../src/state/pulse-store";
 
 const SEED = {
@@ -26,7 +27,15 @@ function deterministicIds(): IdFactory {
 
 function harness() {
   const ids = deterministicIds();
-  const store = new PulseStore(createDefaultState(ids, SEED), ids, SEED);
+  const store = new PulseStore(
+    createDefaultState(ids, SEED),
+    ids,
+    SEED,
+    () => undefined,
+    createParameterValidator((pluginId) =>
+      pluginId === BASS_MONO_MANIFEST.pluginId ? BASS_MONO_MANIFEST.parameters : undefined,
+    ),
+  );
   const moduleId = store.getState().ui.selectedModuleId;
   if (moduleId === undefined) throw new Error("Expected a seeded module.");
   return { store, moduleId };

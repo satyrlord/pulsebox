@@ -6,7 +6,7 @@ import {
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
 import { DEFAULT_BOOM_PARAMETERS } from "./dsp-core";
-import { BOOM_VOICE_IDS, BOOM_VOICE_NAMES, type BoomVoiceId } from "./voices";
+import { BOOM_VOICE_IDS, BOOM_VOICE_NAMES, boomVoiceNote, type BoomVoiceId } from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
   if (!result.ok) throw new Error("Soft Thunder contains an invalid stable identifier.");
@@ -227,7 +227,10 @@ export const BOOM_EIGHT_MANIFEST = Object.freeze({
     id: voiceId,
     name: BOOM_VOICE_NAMES[voiceId],
     outputChannels: 2,
+    note: boomVoiceNote(voiceId),
   })),
+  // The first voice is the kick, the most useful default audition sound.
+  auditionNote: boomVoiceNote("kick"),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
   voiceStealing: { maximumVoices: 8, priority: "oldest", releaseMilliseconds: 5 },

@@ -269,6 +269,26 @@ describe("Rack", () => {
     expect(Object.keys(harness.domain.getState().project.modules)).toHaveLength(2);
   });
 
+  it("reveals an already selected module on every overview activation", () => {
+    const harness = createHarness();
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    renderWithHarness(
+      <>
+        <RackOverview />
+        <Rack />
+      </>,
+      harness,
+    );
+    scroll.mockClear();
+    const selected = screen.getByRole("button", { name: /Select Silver Serpent/ });
+
+    fireEvent.click(selected);
+    fireEvent.click(selected);
+
+    expect(scroll).toHaveBeenCalledTimes(2);
+    scroll.mockRestore();
+  });
+
   it("renders no activity indicator and no faceplate step editing", () => {
     const harness = createHarness();
     const { container } = renderWithHarness(<Rack />, harness);

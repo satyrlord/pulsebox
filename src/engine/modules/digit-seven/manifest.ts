@@ -6,7 +6,12 @@ import {
 } from "../../../contracts/parameters";
 import type { InstrumentPluginManifest } from "../../../contracts/plugins";
 import { DEFAULT_DIGIT_SEVEN_PARAMETERS } from "./dsp-core";
-import { DIGIT_SEVEN_VOICE_IDS, DIGIT_SEVEN_VOICE_NAMES, type DigitSevenVoiceId } from "./voices";
+import {
+  DIGIT_SEVEN_VOICE_IDS,
+  DIGIT_SEVEN_VOICE_NAMES,
+  digitSevenVoiceNote,
+  type DigitSevenVoiceId,
+} from "./voices";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
   if (!result.ok) throw new Error("Gray Ghost contains an invalid stable identifier.");
@@ -262,7 +267,10 @@ export const DIGIT_SEVEN_MANIFEST = Object.freeze({
     id: voiceId,
     name: DIGIT_SEVEN_VOICE_NAMES[voiceId],
     outputChannels: 2,
+    note: digitSevenVoiceNote(voiceId),
   })),
+  // The first voice is the kick, the most useful default audition sound.
+  auditionNote: digitSevenVoiceNote("kick"),
   acceptedEvents: [{ id: "trigger", kind: "note" }],
   patternCompatibility: ["notes"],
   voiceStealing: { maximumVoices: 7, priority: "oldest", releaseMilliseconds: 4 },

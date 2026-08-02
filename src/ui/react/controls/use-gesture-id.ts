@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { browserIdFactory, createGestureId, type GestureId } from "../../../contracts";
+import { createGestureId, type GestureId } from "../../../contracts";
+import { useIdFactory } from "../store/app-store-context";
 
 export interface ContinuousGestureHandles {
   /**
@@ -38,20 +39,21 @@ export interface ContinuousGestureHandles {
  * `keyup`, and pointer-down starts a gesture rather than ending one.
  */
 export function useContinuousGesture(): ContinuousGestureHandles {
+  const idFactory = useIdFactory();
   const gestureId = useRef<GestureId | undefined>(undefined);
 
   const current = useCallback((): GestureId => {
-    gestureId.current ??= createGestureId(browserIdFactory);
+    gestureId.current ??= createGestureId(idFactory);
     return gestureId.current;
-  }, []);
+  }, [idFactory]);
 
   const end = useCallback(() => {
     gestureId.current = undefined;
   }, []);
 
   const begin = useCallback(() => {
-    gestureId.current = createGestureId(browserIdFactory);
-  }, []);
+    gestureId.current = createGestureId(idFactory);
+  }, [idFactory]);
 
   // A pointer released outside the control still ends the gesture, so the next
   // movement cannot be folded into the previous undo entry.
