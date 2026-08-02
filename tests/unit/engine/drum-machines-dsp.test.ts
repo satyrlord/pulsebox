@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import { DigitalDrumVoice } from "../../../src/engine/dsp/digital-drum-voice";
+import { EqualPowerPan } from "../../../src/engine/dsp/primitives";
+import { toBoomParameters } from "../../../src/engine/modules/boom-eight/adapter";
 import {
   BoomEightDsp,
   DEFAULT_BOOM_PARAMETERS,
@@ -20,14 +22,51 @@ import {
 } from "../../../src/engine/modules/digit-seven/dsp-core";
 import { DIGIT_SEVEN_MANIFEST } from "../../../src/engine/modules/digit-seven/manifest";
 import { DIGIT_SEVEN_VOICE_IDS } from "../../../src/engine/modules/digit-seven/voices";
+import { toHybridParameters } from "../../../src/engine/modules/hybrid-nine/adapter";
 import {
   DEFAULT_HYBRID_PARAMETERS,
   HybridNineDsp,
 } from "../../../src/engine/modules/hybrid-nine/dsp-core";
 import { HYBRID_NINE_MANIFEST } from "../../../src/engine/modules/hybrid-nine/manifest";
 import { HYBRID_VOICE_IDS } from "../../../src/engine/modules/hybrid-nine/voices";
+import { toDrumlineParameters } from "../../../src/engine/modules/drumline-six/adapter";
 
 const SAMPLE_RATE = 48_000;
+
+describe("drum worklet parameter mapping", () => {
+  it.each([
+    ["Soft Thunder", toBoomParameters],
+    ["Tin Soldier", toDrumlineParameters],
+    ["Twin Engine", toHybridParameters],
+  ])("keeps numeric and boolean values for %s", (_name, mapParameters) => {
+    expect(
+      mapParameters({
+        level: 0.7,
+        "kick-mute": true,
+        "kick-solo": false,
+        invalid: Number.NaN,
+      }),
+    ).toEqual({
+      level: 0.7,
+      "kick-mute": true,
+      "kick-solo": false,
+    });
+  });
+});
+
+describe("EqualPowerPan", () => {
+  it("updates one preallocated gain pair without work in its getters", () => {
+    const pan = new EqualPowerPan(0, SAMPLE_RATE);
+    const samePan = pan;
+
+    expect(pan.left).toBeCloseTo(Math.SQRT1_2, 12);
+    expect(pan.right).toBeCloseTo(Math.SQRT1_2, 12);
+    pan.set(-1);
+    expect(pan).toBe(samePan);
+    expect(pan.left).toBeCloseTo(1, 12);
+    expect(pan.right).toBeCloseTo(0, 12);
+  });
+});
 
 it("drives the shared digital voice lifecycle through its concrete port", () => {
   const voice = new DigitalDrumVoice(
@@ -50,7 +89,7 @@ it("drives the shared digital voice lifecycle through its concrete port", () => 
 });
 
 /**
- * The four machines added alongside Drumline Six. They have different controls
+ * The four machines added alongside Tin Soldier. They have different controls
  * and different voices, but they answer to one behavioural contract: bounded
  * output, deterministic rendering, working chokes, and no divergence under
  * hostile parameters. Testing that contract once keeps a new machine from
@@ -84,42 +123,46 @@ interface MachineDsp {
 
 const MACHINES: readonly MachineUnderTest[] = [
   {
-    name: "Boom Eight",
+    name: "Soft Thunder",
     manifest: BOOM_EIGHT_MANIFEST,
     voiceIds: BOOM_VOICE_IDS,
     // tone, compression, level
     moduleParameterCount: 3,
-    voiceFieldCount: 5,
+    // tune, punch, decay, level, pan, plus mute and solo
+    voiceFieldCount: 7,
     create: (rate) => new BoomEightDsp(rate) as unknown as MachineDsp,
     chokePair: ["closed-hat", "open-hat"],
   },
   {
-    name: "Hybrid Nine",
+    name: "Twin Engine",
     manifest: HYBRID_NINE_MANIFEST,
     voiceIds: HYBRID_VOICE_IDS,
     // filter, level
     moduleParameterCount: 2,
-    voiceFieldCount: 7,
+    // tune, decay, blend, start, attack, level, pan, plus mute and solo
+    voiceFieldCount: 9,
     create: (rate) => new HybridNineDsp(rate) as unknown as MachineDsp,
     chokePair: ["closed-hat", "open-hat"],
   },
   {
-    name: "Digit Seven",
+    name: "Gray Ghost",
     manifest: DIGIT_SEVEN_MANIFEST as unknown as typeof BOOM_EIGHT_MANIFEST,
     voiceIds: DIGIT_SEVEN_VOICE_IDS,
     // compression, bits, rate, level, plus the lo-fi enable
     moduleParameterCount: 5,
-    voiceFieldCount: 4,
+    // tune, decay, level, pan, plus mute and solo
+    voiceFieldCount: 6,
     create: (rate) => new DigitSevenDsp(rate) as unknown as MachineDsp,
     chokePair: ["closed-hat", "open-hat"],
   },
   {
-    name: "Digit Five",
+    name: "Dusty Mosaic",
     manifest: DIGIT_FIVE_MANIFEST as unknown as typeof BOOM_EIGHT_MANIFEST,
     voiceIds: DIGIT_FIVE_VOICE_IDS,
     // filter, bits, rate, level, plus the lo-fi enable
     moduleParameterCount: 5,
-    voiceFieldCount: 5,
+    // tune, decay, noise, level, pan, plus mute and solo
+    voiceFieldCount: 7,
     create: (rate) => new DigitFiveDsp(rate) as unknown as MachineDsp,
     chokePair: ["conga", "bongo"],
   },
@@ -191,6 +234,7 @@ describe.each(MACHINES)("$name manifest", (machine) => {
 
 describe.each(MACHINES)("$name DSP", (machine) => {
   const firstVoice = required(machine.voiceIds[0], "a first voice");
+  const secondVoice = required(machine.voiceIds[1], "a second voice");
 
   it("rejects a nonsense sample rate rather than rendering garbage", () => {
     expect(() => machine.create(0)).toThrow(RangeError);
@@ -313,6 +357,95 @@ describe.each(MACHINES)("$name DSP", (machine) => {
     expect(peak(left)).toBeGreaterThan(0.01);
   });
 
+  it("uses a changed voice pan on the next render", () => {
+    const { left, right } = render(machine, (dsp) => {
+      dsp.setParameters({ voices: { [firstVoice]: { pan: -1 } } }, "immediate");
+      dsp.trigger(firstVoice, 1, false);
+    });
+    expect(peak(left)).toBeGreaterThan(peak(right) * 4);
+  });
+
+  /**
+   * Spec-005 section 15.2 and AC-021: every voice carries a mute and a solo
+   * that affect audio. Mute drops the voice from the mix, solo makes the mix
+   * exclusive, and mute wins when both are set on one voice.
+   */
+  it("renders silence for a muted voice while an unmuted voice still sounds", () => {
+    const muted = render(machine, (dsp) => {
+      dsp.setParameters({ voices: { [firstVoice]: { mute: true } } }, "immediate");
+      dsp.trigger(firstVoice, 1, false);
+    });
+    expect(peak(muted.left)).toBe(0);
+    expect(peak(muted.right)).toBe(0);
+
+    const unmuted = render(machine, (dsp) => {
+      dsp.setParameters({ voices: { [firstVoice]: { mute: true } } }, "immediate");
+      dsp.trigger(secondVoice, 1, false);
+    });
+    expect(peak(unmuted.left)).toBeGreaterThan(0.01);
+  });
+
+  it("silences a triggered non-solo voice while a soloed voice still sounds", () => {
+    const soloed = render(machine, (dsp) => {
+      dsp.setParameters({ voices: { [firstVoice]: { solo: true } } }, "immediate");
+      dsp.trigger(firstVoice, 1, false);
+    });
+    expect(peak(soloed.left)).toBeGreaterThan(0.01);
+
+    const bystander = render(machine, (dsp) => {
+      dsp.setParameters({ voices: { [firstVoice]: { solo: true } } }, "immediate");
+      dsp.trigger(secondVoice, 1, false);
+    });
+    expect(peak(bystander.left)).toBe(0);
+    expect(peak(bystander.right)).toBe(0);
+  });
+
+  it("keeps a voice silent when it is both muted and soloed", () => {
+    const { left, right } = render(machine, (dsp) => {
+      dsp.setParameters({ voices: { [firstVoice]: { mute: true, solo: true } } }, "immediate");
+      dsp.trigger(firstVoice, 1, false);
+    });
+    expect(peak(left)).toBe(0);
+    expect(peak(right)).toBe(0);
+  });
+
+  /**
+   * A mute pressed while the voice rings must ramp, not step. A gate that
+   * branches the voice out of the sum drops a live tail to zero in one frame,
+   * which is an audible click. Compared against the same voice rendered with
+   * no mute, so each machine's own signal jumps are the baseline and only the
+   * gate's contribution is under test.
+   */
+  it("ramps a mute pressed mid-tail rather than cutting the voice", () => {
+    const largestJump = (buffer: Float32Array): number => {
+      let largest = 0;
+      for (let index = 1; index < buffer.length; index += 1) {
+        const jump = Math.abs((buffer[index] ?? 0) - (buffer[index - 1] ?? 0));
+        if (jump > largest) largest = jump;
+      }
+      return largest;
+    };
+    const renderWithMute = (mute: boolean): Float32Array => {
+      const dsp = machine.create(SAMPLE_RATE);
+      const buffer = new Float32Array(4_096);
+      dsp.trigger(firstVoice, 1, false);
+      dsp.process(buffer, undefined, 0, 512);
+      if (mute) dsp.setParameters({ voices: { [firstVoice]: { mute: true } } });
+      dsp.process(buffer, undefined, 512, 4_096);
+      return buffer;
+    };
+
+    const free = renderWithMute(false);
+    const muted = renderWithMute(true);
+    expect(peak(free.subarray(0, 512))).toBeGreaterThan(0.05);
+    // The mute adds no discontinuity of its own beyond what the voice already
+    // produces. A stepped gate would drop the whole live tail in one frame.
+    expect(largestJump(muted)).toBeLessThanOrEqual(largestJump(free) + 1e-6);
+    // The mute still takes effect: the tail is silent well before the buffer
+    // ends.
+    expect(peak(muted.subarray(3_072))).toBe(0);
+  });
+
   it("retriggers a voice from the start rather than layering it", () => {
     const dsp = machine.create(SAMPLE_RATE);
     const left = new Float32Array(2_048);
@@ -387,7 +520,7 @@ describe("digital machines expose a defeatable lo-fi stage", () => {
   });
 });
 
-describe("Hybrid Nine blends a synth layer against a generated one-shot", () => {
+describe("Twin Engine blends a synth layer against a generated one-shot", () => {
   it("defaults to a blended balance, per decision D05", () => {
     for (const voiceId of HYBRID_VOICE_IDS) {
       expect(DEFAULT_HYBRID_PARAMETERS.voices[voiceId].blend).toBeCloseTo(0.5, 5);
@@ -408,6 +541,18 @@ describe("Hybrid Nine blends a synth layer against a generated one-shot", () => 
     expect(peak(oneShotOnly.left)).toBeGreaterThan(0.01);
   });
 
+  it("fades the one-shot layer in over the boundary ramp when Start is advanced", () => {
+    // Spec-004 section 21.5: start offsets get an automatic 2 ms fade-in. A
+    // mid-buffer seek at full amplitude was a full-scale first sample.
+    const { left } = render(required(MACHINES[1], "a machine"), (dsp) => {
+      dsp.setParameters({ voices: { kick: { blend: 1, start: 0.5, attack: 0 } } }, "immediate");
+      dsp.trigger("kick", 1, false);
+    });
+    const firstSample = Math.abs(left[0] ?? 0);
+    expect(firstSample).toBeLessThan(0.05);
+    expect(peak(left)).toBeGreaterThan(firstSample * 4);
+  });
+
   it("moves the attack of the one-shot layer when Start is advanced", () => {
     const fromZero = render(required(MACHINES[1], "a machine"), (dsp) => {
       dsp.setParameters({ voices: { kick: { blend: 1, start: 0 } } }, "immediate");
@@ -421,7 +566,36 @@ describe("Hybrid Nine blends a synth layer against a generated one-shot", () => 
   });
 });
 
-describe("Boom Eight bus compression", () => {
+describe("voice level smoothing", () => {
+  function energy(samples: Float32Array): number {
+    let total = 0;
+    for (const sample of samples) total += sample * sample;
+    return total;
+  }
+
+  it.each(MACHINES.map((machine) => [machine.name, machine] as const))(
+    "fades a ringing voice over the declared ramp instead of cutting it for %s",
+    (_name, machine) => {
+      const dsp = machine.create(SAMPLE_RATE);
+      dsp.trigger("kick", 1, false);
+      const before = new Float32Array(1_024);
+      dsp.process(before, new Float32Array(1_024));
+      dsp.setParameters({ voices: { kick: { level: 0 } } });
+      const after = new Float32Array(4_096);
+      dsp.process(after, new Float32Array(4_096));
+
+      const preEnergy = energy(before.subarray(640));
+      const rampEnergy = energy(after.subarray(0, 384));
+      expect(preEnergy).toBeGreaterThan(0);
+      // The declared eight-millisecond glide keeps signal flowing while the
+      // level moves; a single-sample cut zeroes this window.
+      expect(rampEnergy).toBeGreaterThan(preEnergy * 0.05);
+      expect(peak(after.subarray(2_048))).toBeLessThan(1e-3);
+    },
+  );
+});
+
+describe("Soft Thunder bus compression", () => {
   it("reduces peak level as compression is raised", () => {
     const clean = render(required(MACHINES[0], "a machine"), (dsp) => {
       dsp.setParameters({ compression: 0, level: 1 }, "immediate");

@@ -21,6 +21,7 @@ const SHAPE = {
   moduleFields: new Set(["level", "filter", "bits", "rate"]),
   booleanModuleFields: new Set(["lofi-enabled"]),
   voiceFields: new Set<string>(["tune", "decay", "noise", "level", "pan"]),
+  booleanVoiceFields: new Set<string>(["mute", "solo"]),
   isVoiceId: isDigitFiveVoiceId,
 } as const;
 
@@ -37,7 +38,7 @@ function toDspParameters(
 }
 
 class DigitFiveProcessor extends WorkletVoiceProcessor<PartialParameters> {
-  protected readonly displayName = "Digit Five";
+  protected readonly displayName = "Dusty Mosaic";
   readonly #dsp = new DigitFiveDsp(sampleRate);
 
   protected decodeParameterObject(value: unknown): PartialParameters | undefined {

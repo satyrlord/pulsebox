@@ -1,4 +1,4 @@
-export { ACID_BASS_DEFAULT_PARAMETERS, ACID_BASS_MANIFEST } from "./modules/bass-mono/manifest";
+export { BASS_MONO_DEFAULT_PARAMETERS, BASS_MONO_MANIFEST } from "./modules/bass-mono/manifest";
 export { createBassVoiceAdapter } from "./modules/bass-mono/adapter";
 export {
   DRUMLINE_SIX_DEFAULT_PARAMETERS,
@@ -22,7 +22,7 @@ export {
 export { createDigitSevenVoiceAdapter } from "./modules/digit-seven/adapter";
 export { DIGIT_FIVE_DEFAULT_PARAMETERS, DIGIT_FIVE_MANIFEST } from "./modules/digit-five/manifest";
 export { createDigitFiveVoiceAdapter } from "./modules/digit-five/adapter";
-export { auditionNoteFor } from "./modules/voice-rosters";
+export { auditionNoteFor, playableNotesFor } from "./modules/voice-rosters";
 export {
   TransportRuntime,
   type TransportModule,

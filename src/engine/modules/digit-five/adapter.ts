@@ -27,7 +27,7 @@ function toDigitFiveParameters(
 const DESCRIPTOR: WorkletVoiceDescriptor = {
   processorName: "pulsebox-digit-five",
   moduleUrl: workletUrl,
-  displayName: "Digit Five",
+  displayName: "Dusty Mosaic",
   mapParameters: toDigitFiveParameters,
 };
 

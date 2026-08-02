@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import { contrastRatio } from "../../../src/themes/contrast";
 import {
   MODULE_ACCENT_KEYS,
@@ -56,13 +56,13 @@ describe("instrument identity vocabulary", () => {
 });
 
 describe("shipped manifests carry their approved accent", () => {
-  it("gives Acid Bass the BASS accent set and identity", () => {
-    const identity = moduleIdentityForPluginId(ACID_BASS_MANIFEST.pluginId);
-    expect(identity?.productName).toBe(ACID_BASS_MANIFEST.productName);
-    expect(identity?.shortLabel).toBe(ACID_BASS_MANIFEST.shortLabel);
+  it("gives Silver Serpent the ACID accent set and identity", () => {
+    const identity = moduleIdentityForPluginId(BASS_MONO_MANIFEST.pluginId);
+    expect(identity?.productName).toBe(BASS_MONO_MANIFEST.productName);
+    expect(identity?.shortLabel).toBe(BASS_MONO_MANIFEST.shortLabel);
 
-    const accent = MODULE_ACCENTS.BASS;
-    expect(ACID_BASS_MANIFEST.ui.moduleAccent).toEqual({
+    const accent = MODULE_ACCENTS.ACID;
+    expect(BASS_MONO_MANIFEST.ui.moduleAccent).toEqual({
       accent: accent["--module-accent"],
       accentMuted: accent["--module-accent-muted"],
       led: accent["--module-led"],

@@ -28,6 +28,7 @@ export function Toggle({
     <button
       type="button"
       className={cx(styles.toggle, styles[tone], pressed && styles.pressed)}
+      data-component="toggle"
       aria-label={label}
       aria-pressed={pressed}
       disabled={disabled}

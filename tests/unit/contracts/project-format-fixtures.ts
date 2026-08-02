@@ -245,13 +245,6 @@ export const PROJECT_FORMAT_FIXTURE_DEFINITIONS = [
       "Open, copy, replace, and cancel paths preserve their remap, recovery, and rollback rules.",
   },
   {
-    id: "storage-lineage-collapse-isolation",
-    group: "storage",
-    input: "storage-runtime",
-    outcome: "accept",
-    assertion: "Equal module IDs across replacement lineages do not leak collapse preferences.",
-  },
-  {
     id: "storage-install-import-rollback",
     group: "storage",
     input: "storage-runtime",

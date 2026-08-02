@@ -22,7 +22,9 @@
   cursor: pointer;
 }
 
-.toggle:hover:not(:disabled) {
+/* Hover brightens a resting toggle only. A pressed toggle keeps its lit-cap
+   ink: washing it to the resting hover gray would hide dark-on-light caps. */
+.toggle:hover:not(:disabled):not(.pressed) {
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
 

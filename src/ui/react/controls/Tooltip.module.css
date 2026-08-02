@@ -1,17 +1,19 @@
 /*
- * The shared bubble. The owner control positions it and sets its ink through
- * one extra class, so those properties stay out of this rule and the cascade
- * order between the two classes cannot matter.
+ * The shared bubble. It floats against the viewport so the module scrollers and
+ * the mixer wells cannot clip it; the component supplies the coordinates. The
+ * owner control sets its ink through one extra class, so that property stays
+ * out of this rule and the cascade order between the two classes cannot matter.
  */
 .tooltip {
-  position: absolute;
-  inset-inline-start: 50%;
-  translate: -50% 0;
+  position: fixed;
+  z-index: 40;
   min-inline-size: max-content;
   padding: 1px 5px;
   background: var(--surface-well);
   border-radius: var(--pulse-radius-control, 4px);
-  box-shadow: var(--sink-1);
+  box-shadow:
+    var(--sink-1),
+    0 2px 6px #000000a6;
   font:
     var(--pulse-type-12, 12px) / 1.4 var(--pulse-font-mono, ui-monospace),
     monospace;

@@ -5,8 +5,8 @@ import { deterministicIdFactory } from "../contracts/fixtures";
 
 import type * as AdapterModule from "../../../src/engine/modules/bass-mono/adapter";
 
-type AcidBassAdapter = InstanceType<typeof AdapterModule.AcidBassAdapter>;
-let AcidBassAdapterClass: typeof AdapterModule.AcidBassAdapter;
+type BassMonoAdapter = InstanceType<typeof AdapterModule.BassMonoAdapter>;
+let BassMonoAdapterClass: typeof AdapterModule.BassMonoAdapter;
 
 /**
  * The adapter and the processor are the two halves of one protocol. Testing each
@@ -68,7 +68,7 @@ interface PairedNode extends EventTarget {
 }
 
 /**
- * An AudioWorkletNode stand-in whose port is wired to a live AcidBassProcessor.
+ * An AudioWorkletNode stand-in whose port is wired to a live BassMonoProcessor.
  * Messages cross in both directions exactly as the browser would deliver them.
  */
 function createPairedNodeClass(instances: PairedNode[]): typeof EventTarget {
@@ -124,7 +124,7 @@ function requiredNode(nodes: readonly PairedNode[], index: number): PairedNode {
 }
 
 async function pairedAdapter(): Promise<{
-  readonly adapter: AcidBassAdapter;
+  readonly adapter: BassMonoAdapter;
   readonly nodes: PairedNode[];
 }> {
   const nodes: PairedNode[] = [];
@@ -132,7 +132,7 @@ async function pairedAdapter(): Promise<{
   const context = {
     audioWorklet: { addModule: vi.fn().mockResolvedValue(undefined) },
   } as unknown as AudioContext;
-  const adapter = new AcidBassAdapterClass(context, { projectRevision: REVISION });
+  const adapter = new BassMonoAdapterClass(context, { projectRevision: REVISION });
   await adapter.prepare();
   return { adapter, nodes };
 }
@@ -148,7 +148,7 @@ beforeAll(async () => {
     }),
   );
   await import("../../../src/engine/modules/bass-mono/bass-mono.worklet");
-  ({ AcidBassAdapter: AcidBassAdapterClass } =
+  ({ BassMonoAdapter: BassMonoAdapterClass } =
     await import("../../../src/engine/modules/bass-mono/adapter"));
 });
 
@@ -156,7 +156,7 @@ afterAll(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Acid Bass controller and processor pairing", () => {
+describe("Silver Serpent controller and processor pairing", () => {
   it("completes the handshake against the real processor", async () => {
     const { adapter, nodes } = await pairedAdapter();
 

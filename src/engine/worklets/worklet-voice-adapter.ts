@@ -4,6 +4,7 @@ import {
   ENGINE_PROTOCOL_LIMITS,
   ENGINE_PROTOCOL_VERSION,
   compareScheduledEvents,
+  isRealtimeSafeControllerEnvelope,
   isProcessorToControllerKind,
   validateEngineMessageEnvelope,
   type AcknowledgementPayload,
@@ -53,6 +54,7 @@ interface Handshake {
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MILLISECONDS = 2_000;
 const DISPOSE_RELEASE_MILLISECONDS = 100;
+const PREVIEW_INTERVAL_MILLISECONDS = 16;
 
 export class WorkletVoiceAdapter implements VoiceAdapterPort {
   readonly #descriptor: WorkletVoiceDescriptor;
@@ -67,6 +69,8 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   #acknowledgedProjectRevision: StateRevision;
   #currentParameterSnapshot: Record<string, ParameterValue> = {};
   #deferredParameters: Record<string, ParameterValue> = {};
+  #previewParameters: Record<string, ParameterValue> = {};
+  #previewTimer: ReturnType<typeof setTimeout> | undefined;
   #node: AudioWorkletNode | undefined;
   #sessionId = "";
   #nextSequence = 0;
@@ -145,6 +149,12 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     projectRevision: StateRevision,
   ): void {
     const mapped = this.#descriptor.mapParameters(parameters);
+    const committedParameters = new Set(Object.keys(mapped));
+    this.#previewParameters = Object.fromEntries(
+      Object.entries(this.#previewParameters).filter(
+        ([parameter]) => !committedParameters.has(parameter),
+      ),
+    );
     this.#projectRevision = projectRevision;
     Object.assign(this.#currentParameterSnapshot, mapped);
     if (!this.#canSendMusicalControl()) return;
@@ -156,13 +166,9 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   }
 
   readonly previewParameters = (parameters: Readonly<Record<string, ParameterValue>>): void => {
-    if (
-      !this.#canSendMusicalControl() ||
-      this.#pending.size >= ENGINE_PROTOCOL_LIMITS.backpressureEnvelopeCount
-    ) {
-      return;
-    }
-    this.#postParameterBatch(this.#descriptor.mapParameters(parameters));
+    if (!this.#canSendMusicalControl()) return;
+    Object.assign(this.#previewParameters, this.#descriptor.mapParameters(parameters));
+    this.#schedulePreviewFlush();
   };
 
   readonly replaceState = (
@@ -173,22 +179,38 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#projectRevision = projectRevision;
     this.#currentParameterSnapshot = { ...mapped };
     this.#deferredParameters = {};
+    this.#clearPreviewParameters();
     if (this.#canSendMusicalControl()) {
       this.#postControl("state-snapshot", { parameters: mapped });
     }
   };
 
   readonly schedule = (events: readonly ScheduledVoiceEvent[]): void => {
-    if (
-      !this.#canSendMusicalControl() ||
-      events.length === 0 ||
-      events.length > ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch
-    ) {
+    if (!this.#canSendMusicalControl() || events.length === 0) return;
+    // An oversized batch is a scheduler bug. Discarding it silently would drop
+    // a whole window of notes, so it is reported through the fault path.
+    if (events.length > ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch) {
+      this.#fail(
+        "event-batch-overflow",
+        `The ${this.#descriptor.displayName} event batch exceeded the protocol limit.`,
+        "Pulsebox will silence and replace this processor from its latest state.",
+        true,
+      );
       return;
     }
     const scheduled: ScheduledEventPayload[] = [];
     for (const event of events) {
-      if (!Number.isSafeInteger(event.atFrame) || event.atFrame < 0) return;
+      // An invalid frame is a scheduler bug. Discarding the batch silently
+      // would drop a whole window of notes, so it faults like the overflow.
+      if (!Number.isSafeInteger(event.atFrame) || event.atFrame < 0) {
+        this.#fail(
+          "event-batch-invalid-frame",
+          `The ${this.#descriptor.displayName} event batch carried an invalid audio frame.`,
+          "Pulsebox will silence and replace this processor from its latest state.",
+          true,
+        );
+        return;
+      }
       scheduled.push({
         eventId: `${this.#sessionId}:${this.#eventId.toString()}`,
         audioFrame: event.atFrame,
@@ -201,10 +223,19 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#postControl("event-batch", { events: scheduled });
   };
 
-  readonly clearScheduledEvents = (): void => {
-    if (this.#canSendMusicalControl()) {
-      this.#postControl("clear-scheduled-events", {});
-    }
+  /**
+   * Without a bound, the whole queue clears. With `fromFrame`, only events at
+   * or past that frame drop and the imminent events before it keep playing
+   * from the processor queue, exactly as they were sent.
+   */
+  readonly clearScheduledEvents = (fromFrame?: number): void => {
+    if (!this.#canSendMusicalControl()) return;
+    this.#postControl(
+      "clear-scheduled-events",
+      fromFrame !== undefined && Number.isSafeInteger(fromFrame) && fromFrame >= 0
+        ? { fromFrame }
+        : {},
+    );
   };
 
   resume(): void {
@@ -222,7 +253,19 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
 
   dispose(): void {
     if (this.#state === "disposed" || this.#state === "disposing") return;
+    // A handshake still in flight would never settle: once the state below
+    // becomes disposing, `#fail` ignores this adapter. Reject it first so a
+    // pending `prepare()` completes.
+    const handshake = this.#handshake;
+    if (handshake !== undefined) {
+      clearTimeout(handshake.timer);
+      this.#handshake = undefined;
+      handshake.reject(
+        new Error(`${this.#descriptor.displayName} was disposed during preparation.`),
+      );
+    }
     if (this.#node === undefined) {
+      this.#clearPreviewParameters();
       this.#state = "disposed";
       return;
     }
@@ -389,6 +432,30 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     if (changes.length > 0) this.#postControl("parameter-batch", { changes });
   }
 
+  #schedulePreviewFlush(): void {
+    if (this.#previewTimer !== undefined || Object.keys(this.#previewParameters).length === 0) {
+      return;
+    }
+    this.#previewTimer = setTimeout(() => {
+      this.#previewTimer = undefined;
+      if (
+        !this.#canSendMusicalControl() ||
+        this.#pending.size >= ENGINE_PROTOCOL_LIMITS.backpressureEnvelopeCount
+      ) {
+        return;
+      }
+      const parameters = this.#previewParameters;
+      this.#previewParameters = {};
+      this.#postParameterBatch(parameters);
+    }, PREVIEW_INTERVAL_MILLISECONDS);
+  }
+
+  #clearPreviewParameters(): void {
+    if (this.#previewTimer !== undefined) clearTimeout(this.#previewTimer);
+    this.#previewTimer = undefined;
+    this.#previewParameters = {};
+  }
+
   #postControl(
     kind: ControllerToProcessorKind,
     payload: Readonly<Record<string, unknown>>,
@@ -417,6 +484,15 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       projectRevision,
       payload,
     };
+    if (!isRealtimeSafeControllerEnvelope(message)) {
+      this.#fail(
+        "invalid-control-payload",
+        `The ${this.#descriptor.displayName} control data exceeded the protocol limits.`,
+        "Pulsebox will silence this processor until valid state replaces it.",
+        false,
+      );
+      return;
+    }
     this.#nextSequence += 1;
     this.#pending.set(message.sequence, message);
     node.port.postMessage(message);
@@ -451,6 +527,9 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       const deferred = this.#deferredParameters;
       this.#deferredParameters = {};
       this.#postParameterBatch(deferred);
+    }
+    if (this.#pending.size < ENGINE_PROTOCOL_LIMITS.backpressureEnvelopeCount) {
+      this.#schedulePreviewFlush();
     }
   }
 
@@ -508,6 +587,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     node?.port.close();
     this.#pending.clear();
     this.#deferredParameters = {};
+    this.#clearPreviewParameters();
     const handshake = this.#handshake;
     if (handshake !== undefined) {
       clearTimeout(handshake.timer);
@@ -575,6 +655,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   }
 
   #finishDisposal(): void {
+    this.#clearPreviewParameters();
     if (this.#disposeTimer !== undefined) clearTimeout(this.#disposeTimer);
     this.#disposeTimer = undefined;
     const node = this.#node;

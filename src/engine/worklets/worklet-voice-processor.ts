@@ -3,9 +3,9 @@ import type {} from "./audio-worklet-globals";
 import type { StateRevision } from "../../contracts/ids";
 import {
   ENGINE_PROTOCOL_VERSION,
-  isControllerToProcessorKind,
-  validateEngineMessageEnvelope,
+  isRealtimeSafeControllerEnvelope,
   type AcknowledgementPayload,
+  type ClearScheduledEventsPayload,
   type ControllerToProcessorKind,
   type EngineFaultPayload,
   type EngineMessageEnvelope,
@@ -114,28 +114,18 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
 
   #receive(value: unknown): void {
     if (this.#terminated) return;
-    const validated = validateEngineMessageEnvelope(value);
-    if (!validated.ok) {
-      const detail = validated.issues.map((issue) => `${issue.path}: ${issue.message}`).join(" ");
+    if (!isRealtimeSafeControllerEnvelope(value)) {
       this.#fault(
         "malformed-controller-message",
-        `The ${this.displayName} processor received an invalid message. ${detail}`,
+        `The ${this.displayName} processor received an invalid message.`,
         "Replace this processor and restore it from the latest acknowledged snapshot.",
         value,
       );
       return;
     }
-    const message = validated.value;
-    if (!isControllerToProcessorKind(message.kind)) {
-      this.#fault(
-        "invalid-message-direction",
-        `The ${this.displayName} processor received a processor-only message kind.`,
-        "Replace this processor and verify controller message routing.",
-        message,
-      );
-      return;
-    }
-
+    // `isRealtimeSafeControllerEnvelope` already narrows the kind to a
+    // controller-to-processor kind, so no direction check is needed here.
+    const message = value;
     if (this.#sessionId === undefined || this.#nodeId === undefined) {
       this.#beginSession(message);
       return;
@@ -268,9 +258,22 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
         this.resetDsp();
         this.#eventCount = 0;
         return true;
-      case "clear-scheduled-events":
-        this.#eventCount = 0;
+      case "clear-scheduled-events": {
+        const { fromFrame } = payload as ClearScheduledEventsPayload;
+        if (typeof fromFrame !== "number") {
+          this.#eventCount = 0;
+          return true;
+        }
+        // The queue is kept sorted by frame, so a bounded clear truncates the
+        // tail. Everything before `fromFrame` keeps playing from this queue.
+        while (
+          this.#eventCount > 0 &&
+          (this.#frames[this.#eventCount - 1] ?? 0) >= fromFrame
+        ) {
+          this.#eventCount -= 1;
+        }
         return true;
+      }
       case "all-notes-off":
         this.#silenceAndReportMeter();
         return true;
@@ -413,10 +416,14 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
 
   #applyDueEvents(frame: number): void {
     while (this.#eventCount > 0 && (this.#frames[0] ?? Number.POSITIVE_INFINITY) <= frame) {
+      const eventFrame = this.#frames[0] ?? frame;
       const flags = this.#flags[0] ?? 0;
       if ((flags & 2) !== 0) this.resetDsp();
       else if ((flags & 1) !== 0) this.triggerNoteOff();
-      else {
+      // A note-on that arrived after its target is expired. Replaying several
+      // expired onsets on one sample causes the burst heard after a UI stall.
+      // Releases and resets still apply because they make the graph safer.
+      else if (eventFrame === frame) {
         this.triggerNoteOn(
           this.#notes[0] ?? 0,
           this.#velocities[0] ?? 1,
@@ -463,18 +470,23 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
       offset = nextOffset;
     }
 
-    this.#observeMeter(left, frameCount);
+    this.#observeMeter(left, right, frameCount);
     return true;
   }
 
   /**
-   * Peak over the emitted block, rate-limited to the protocol ceiling. This
+   * Peak over both emitted channels, rate-limited to the protocol ceiling. This
    * measures the signal actually produced, so the meter can never show level
-   * for a voice that is silent.
+   * for a voice that is silent. A voice panned hard to one side still meters,
+   * because the peak takes the louder channel of each frame.
    */
-  #observeMeter(left: Float32Array, frameCount: number): void {
+  #observeMeter(left: Float32Array, right: Float32Array | undefined, frameCount: number): void {
     for (let index = 0; index < frameCount; index += 1) {
-      const magnitude = Math.abs(left[index] ?? 0);
+      const leftMagnitude = Math.abs(left[index] ?? 0);
+      const magnitude =
+        right === undefined
+          ? leftMagnitude
+          : Math.max(leftMagnitude, Math.abs(right[index] ?? 0));
       if (magnitude > this.#meterPeak) this.#meterPeak = magnitude;
     }
     this.#meterFrames += frameCount;

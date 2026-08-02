@@ -1,7 +1,44 @@
 import { describe, expect, it } from "vitest";
 
+import type { ParameterDescriptor } from "../../../src/contracts/parameters";
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import { createInstrumentManifest, parameterId } from "./fixtures";
+
+/** A boolean gate parameter in the shape the shipped lo-fi stage uses. */
+function createBooleanParameter(defaultValue = true): ParameterDescriptor {
+  return {
+    id: parameterId("lofi-enabled"),
+    name: "Lo-fi stage",
+    valueType: "boolean",
+    defaultValue,
+    unit: "none",
+    displayPrecision: 0,
+    resetValue: defaultValue,
+    smoothing: { curve: "none", durationMilliseconds: 0 },
+    workletRate: "message",
+    automation: "step",
+    modulation: "none",
+  };
+}
+
+function manifestWithGate(): ReturnType<typeof createInstrumentManifest> {
+  const base = createInstrumentManifest();
+  return {
+    ...base,
+    parameters: [...base.parameters, createBooleanParameter()],
+    defaultState: { ...base.defaultState, "lofi-enabled": true },
+    ui: {
+      ...base.ui,
+      parameterGates: [
+        {
+          parameterId: parameterId("cutoff"),
+          gateParameterId: parameterId("lofi-enabled"),
+          gateValue: true,
+        },
+      ],
+    },
+  };
+}
 
 describe("plugin manifest validation", () => {
   it("accepts a complete instrument manifest", () => {
@@ -94,6 +131,43 @@ describe("plugin manifest validation", () => {
     }
   });
 
+  it("rejects a module icon with markup and an unanchored viewBox", () => {
+    const base = createInstrumentManifest();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        icon: { viewBox: "2 2 24 24", path: '<script>alert("x")</script>' },
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.path === "ui.icon.viewBox")).toBe(true);
+      expect(result.issues.some((issue) => issue.path === "ui.icon.path")).toBe(true);
+    }
+  });
+
+  it("rejects a module icon path beyond the size bound", () => {
+    const base = createInstrumentManifest();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        icon: { viewBox: "0 0 24 24", path: `M0 0${"L1 1".repeat(600)}Z` },
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.path === "ui.icon.path")).toBe(true);
+    }
+  });
+
+  it("accepts a manifest without an icon", () => {
+    const base = createInstrumentManifest();
+    const result = validatePluginManifest({ ...base, ui: { ...base.ui, icon: undefined } });
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects semantic versions with build metadata", () => {
     expect(
       validatePluginManifest({
@@ -130,5 +204,93 @@ describe("plugin manifest validation", () => {
     const defaultState: Record<string, unknown> = {};
     defaultState.self = defaultState;
     expect(validatePluginManifest({ ...createInstrumentManifest(), defaultState }).ok).toBe(false);
+  });
+
+  it("accepts a parameter gate on a declared boolean parameter", () => {
+    expect(validatePluginManifest(manifestWithGate()).ok).toBe(true);
+  });
+
+  it("rejects a parameter gate that references an undeclared parameter", () => {
+    const base = manifestWithGate();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        parameterGates: [
+          {
+            parameterId: parameterId("missing"),
+            gateParameterId: parameterId("lofi-enabled"),
+            gateValue: true,
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.message.includes("Gated control"))).toBe(true);
+    }
+  });
+
+  it("rejects a parameter gate that references an undeclared gate parameter", () => {
+    const base = manifestWithGate();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        parameterGates: [
+          {
+            parameterId: parameterId("cutoff"),
+            gateParameterId: parameterId("missing"),
+            gateValue: true,
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.message.includes("gate parameter"))).toBe(true);
+    }
+  });
+
+  it("rejects a parameter gate whose gate parameter is not boolean", () => {
+    const base = createInstrumentManifest();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        parameterGates: [
+          {
+            parameterId: parameterId("cutoff"),
+            gateParameterId: parameterId("cutoff"),
+            gateValue: true,
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.message.includes("boolean parameter"))).toBe(
+        true,
+      );
+    }
+  });
+
+  it("rejects a parameter gate with a non-boolean gate value", () => {
+    const base = manifestWithGate();
+    expect(
+      validatePluginManifest({
+        ...base,
+        ui: {
+          ...base.ui,
+          parameterGates: [
+            {
+              parameterId: parameterId("cutoff"),
+              gateParameterId: parameterId("lofi-enabled"),
+              gateValue: 1,
+            },
+          ],
+        },
+      }).ok,
+    ).toBe(false);
   });
 });

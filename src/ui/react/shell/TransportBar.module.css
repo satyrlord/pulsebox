@@ -338,14 +338,6 @@
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
-.tempo > span:last-child {
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--pulse-color-text-secondary, #bac2c8);
-}
-
 /* Only the pane width is local. The pane itself is the shared SegmentDisplay. */
 .position {
   inline-size: 132px;

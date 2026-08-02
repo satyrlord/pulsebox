@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { browserIdFactory, type ProjectRevision } from "../../../src/contracts";
-import { ACID_BASS_MANIFEST } from "../../../src/engine/public";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/public";
 import {
   createDefaultState,
   createAutosave,
@@ -28,7 +28,7 @@ import {
 } from "../../../src/themes";
 
 const SEED: ModuleSeed = {
-  pluginId: ACID_BASS_MANIFEST.pluginId,
+  pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, resonance: 0.38, waveform: "saw" },
   steps: Array.from({ length: 16 }, (_, index) => ({
     active: index % 4 === 0,
@@ -53,9 +53,9 @@ const TEST_ID_FACTORY = {
 };
 
 const PARSE = {
-  knownPluginIds: [ACID_BASS_MANIFEST.pluginId as string],
+  knownPluginIds: [BASS_MONO_MANIFEST.pluginId as string],
   parameterDescriptorsByPluginId: {
-    [ACID_BASS_MANIFEST.pluginId]: ACID_BASS_MANIFEST.parameters,
+    [BASS_MONO_MANIFEST.pluginId]: BASS_MONO_MANIFEST.parameters,
   },
 };
 
@@ -105,7 +105,7 @@ describe("project document", () => {
 
   it("records exactly the plugins the project requires", () => {
     expect(document().plugins).toEqual([
-      { pluginId: ACID_BASS_MANIFEST.pluginId, stateSchemaVersion: 1 },
+      { pluginId: BASS_MONO_MANIFEST.pluginId, stateSchemaVersion: 1 },
     ]);
   });
 
@@ -308,8 +308,8 @@ describe("project document", () => {
     expect(parseProjectJson("{ nope", PARSE).ok).toBe(false);
   });
 
-  it("rejects a file beyond the size limit before parsing it", () => {
-    const result = parseProjectJson("x".repeat(33 * 1024 * 1024), PARSE);
+  it("rejects a file beyond the 8 MiB manifest limit before parsing it", () => {
+    const result = parseProjectJson("x".repeat(8 * 1024 * 1024 + 1), PARSE);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.issues[0]?.message).toContain("size limit");

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { IdFactory, ModuleInstanceId } from "../../../src/contracts/ids";
-import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import { createDefaultState, PATTERN_SLOT_COUNT } from "../../../src/state/default-state";
 import { PulseStore } from "../../../src/state/pulse-store";
 
 const SEED = {
-  pluginId: ACID_BASS_MANIFEST.pluginId,
+  pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, waveform: "saw", volume: 0.62 },
   steps: Array.from({ length: 16 }, (_, index) => ({
     active: index % 4 === 0,
@@ -94,17 +94,27 @@ describe("pattern bank", () => {
 describe("song chain", () => {
   it("appends, repeats, and removes entries", () => {
     const { store } = harness();
+    // Decision D92: the default project ships a five-entry Song chain.
+    const baseline = store.getState().project.song.entries;
+    expect(baseline).toHaveLength(5);
+
     store.dispatch(store.createCommand("song-entry-add", { patternIndex: 0 }));
     store.dispatch(store.createCommand("song-entry-add", { patternIndex: 1 }));
-    store.dispatch(store.createCommand("song-entry-repeats-set", { entryIndex: 1, repeats: 4 }));
+    store.dispatch(
+      store.createCommand("song-entry-repeats-set", { entryIndex: baseline.length + 1, repeats: 4 }),
+    );
 
     expect(store.getState().project.song.entries).toEqual([
+      ...baseline,
       { patternIndex: 0, repeats: 1 },
       { patternIndex: 1, repeats: 4 },
     ]);
 
-    store.dispatch(store.createCommand("song-entry-remove", { entryIndex: 0 }));
-    expect(store.getState().project.song.entries).toEqual([{ patternIndex: 1, repeats: 4 }]);
+    store.dispatch(store.createCommand("song-entry-remove", { entryIndex: baseline.length }));
+    expect(store.getState().project.song.entries).toEqual([
+      ...baseline,
+      { patternIndex: 1, repeats: 4 },
+    ]);
   });
 
   it("rejects a repeat count outside its range", () => {
@@ -118,11 +128,12 @@ describe("song chain", () => {
 
   it("toggles song mode without disturbing the chain", () => {
     const { store } = harness();
+    const baseline = store.getState().project.song.entries.length;
     store.dispatch(store.createCommand("song-entry-add", { patternIndex: 0 }));
     store.dispatch(store.createCommand("song-mode-toggle", {}));
 
     expect(store.getState().project.song.enabled).toBe(true);
-    expect(store.getState().project.song.entries).toHaveLength(1);
+    expect(store.getState().project.song.entries).toHaveLength(baseline + 1);
   });
 });
 

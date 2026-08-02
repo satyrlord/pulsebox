@@ -167,6 +167,12 @@ Playwright:
 - First-run supplied-loop path from empty browser storage.
 - Missing-pack degraded load and recovery.
 - Storage persistence status and quota failure recovery.
+- Eight active modules during Tempo, Swing, and Humanize interaction at 44.1
+  kHz and 48 kHz.
+- During these interactions, compare identical module queues after each reset.
+  Reject an expired, missing, or duplicate onset. Tempo and Swing onsets must
+  match. Humanize onset spread must stay within one half step across modules.
+- Performance regression tests run with zero retries.
 
 Visual regression:
 
@@ -190,6 +196,8 @@ normative:
 - Across 44.1 kHz and 48 kHz fixtures, scheduled event time differs by at most
   1 millisecond. Oscillator pitch differs by at most 1 cent after conversion to
   seconds and hertz.
+- Two modules that receive the same event frame start rendered PCM within one
+  audio sample of each other.
 - Every audible parameter descriptor declares its smoothing curve and duration.
   A constant-input sweep fixture must match that control trajectory within
   `1e-6`. It must introduce no output discontinuity above `0.02` full scale at

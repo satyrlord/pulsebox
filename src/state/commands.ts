@@ -19,7 +19,10 @@ export type PulseCommand =
       "rack-module-move",
       { readonly moduleId: ModuleInstanceId; readonly slotId: RackSlotId }
     >
-  | CommandEnvelope<"rack-module-collapse-toggle", { readonly moduleId: ModuleInstanceId }>
+  | CommandEnvelope<
+      "rack-module-swap",
+      { readonly moduleId: ModuleInstanceId; readonly pluginId: PluginId }
+    >
   | CommandEnvelope<
       "rack-parameter-set",
       {

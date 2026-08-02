@@ -15,6 +15,8 @@ import { AppStoreProvider } from "./store/app-store-context";
 export interface PulseboxAppHandle {
   readonly dispose: () => void;
   readonly markAudioUnavailable: () => void;
+  /** Shows the non-blocking project notice with its ARIA live announcement. */
+  readonly reportProjectNotice: (message: string) => void;
   readonly reportAudioStatus: (
     status: "faulted" | "recovered" | "recovering",
     message?: string,
@@ -97,6 +99,25 @@ export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
   };
   window.addEventListener("storage", onStorage);
 
+  /*
+   * Meter frames arrive per module at about 30 Hz, so a full rack posts a few
+   * hundred a second. Committing each one separately runs every selector in the
+   * tree that many times, and that main-thread work is what makes the scheduler
+   * tick land late. Coalescing a frame's levels into one commit per animation
+   * frame keeps the meters at display rate and takes the load off the tick.
+   * When the tab is hidden the callback stops firing, which is the wanted
+   * behavior: no meter repaint is needed and the pending levels are replaced by
+   * fresher ones on the next visible frame.
+   */
+  let pendingMeters: Record<string, number> | undefined;
+  let meterFrame: number | undefined;
+  const flushMeters = () => {
+    meterFrame = undefined;
+    const levels = pendingMeters;
+    pendingMeters = undefined;
+    if (levels !== undefined) appStore.getState().setMeterLevels(levels);
+  };
+
   let root: Root | undefined = createRoot(host);
   root.render(
     <StrictMode>
@@ -110,12 +131,18 @@ export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
     themeService,
     dispose: () => {
       window.removeEventListener("storage", onStorage);
+      if (meterFrame !== undefined) cancelAnimationFrame(meterFrame);
+      meterFrame = undefined;
+      pendingMeters = undefined;
       disconnect();
       root?.unmount();
       root = undefined;
     },
     markAudioUnavailable: () => {
       appStore.getState().markAudioUnavailable();
+    },
+    reportProjectNotice: (message) => {
+      appStore.getState().setProjectMessage(message);
     },
     reportAudioStatus: (status, message) => {
       appStore.getState().reportAudioStatus(status, message);
@@ -124,7 +151,8 @@ export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
       appStore.getState().reportAudioRuntimeState(state);
     },
     reportMeter: (moduleId, level) => {
-      appStore.getState().setMeterLevel(moduleId, level);
+      pendingMeters = { ...pendingMeters, [moduleId]: level };
+      meterFrame ??= requestAnimationFrame(flushMeters);
     },
   };
 }

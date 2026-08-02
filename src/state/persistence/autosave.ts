@@ -1,6 +1,11 @@
 import type { PulseState } from "../model";
 import type { ProjectRevision } from "../../contracts/ids";
-import { documentToState, serializeProject, type ParseOptions } from "./project-document";
+import {
+  documentToState,
+  serializeProject,
+  type ParseOptions,
+  type ProjectDocument,
+} from "./project-document";
 import {
   parseStoredProject,
   type ProjectRepositoryPort,
@@ -15,8 +20,6 @@ export interface AutosaveOptions {
   readonly createdAt: () => string;
   /** Last committed ProjectRevision. Autosave never advances it. */
   readonly projectRevision: () => ProjectRevision;
-  /** Committed pin flag, so an autosave snapshot keeps the pin. */
-  readonly pinned?: () => boolean;
   /** Quiet period after the last edit before a snapshot is written. */
   readonly debounceMilliseconds?: number;
   readonly onError?: (error: unknown) => void;
@@ -38,13 +41,12 @@ function toStored(
   createdAt: string,
   now: string,
   projectRevision: ProjectRevision,
-  pinned: boolean,
 ): StoredProject {
   return {
     id: state.project.id,
     name: state.project.name,
     modifiedAt: now,
-    document: serializeProject(state, { createdAt, modifiedAt: now, projectRevision, pinned }),
+    document: serializeProject(state, { createdAt, modifiedAt: now, projectRevision }),
   };
 }
 
@@ -64,13 +66,7 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
     queue = queue
       .then(() =>
         options.repository.saveAutosave(
-          toStored(
-            state,
-            options.createdAt(),
-            options.now(),
-            options.projectRevision(),
-            options.pinned?.() ?? false,
-          ),
+          toStored(state, options.createdAt(), options.now(), options.projectRevision()),
         ),
       )
       .catch((error: unknown) => {
@@ -116,25 +112,39 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
   };
 }
 
+export interface RestoredAutosave {
+  readonly state: PulseState;
+  /**
+   * The parsed snapshot document, absent when no valid snapshot exists. The
+   * caller reads the snapshot metadata from this one parse. A second
+   * repository read could diverge from the record this restore applied.
+   */
+  readonly document?: ProjectDocument;
+}
+
 /**
  * Restores the last autosave, or returns the base state when there is none.
- * A snapshot that fails validation is discarded rather than partially applied.
+ * A snapshot that fails validation is discarded rather than partially applied,
+ * and the failure reaches `onError` so the caller can report the discard.
  */
 export async function restoreAutosave(
   base: Readonly<PulseState>,
   options: Pick<AutosaveOptions, "repository" | "parseOptions" | "onError">,
-): Promise<PulseState> {
+): Promise<RestoredAutosave> {
   try {
     const stored = await options.repository.loadAutosave();
-    if (stored === undefined) return base;
+    if (stored === undefined) return { state: base };
     const parsed = parseStoredProject(stored, options.parseOptions);
     if (!parsed.ok) {
       options.onError?.(parsed.issues);
-      return base;
+      return { state: base };
     }
-    return documentToState(parsed.value.document, base);
+    return {
+      state: documentToState(parsed.value.document, base),
+      document: parsed.value.document,
+    };
   } catch (error) {
     options.onError?.(error);
-    return base;
+    return { state: base };
   }
 }

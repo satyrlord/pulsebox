@@ -27,7 +27,7 @@ function toDigitSevenParameters(
 const DESCRIPTOR: WorkletVoiceDescriptor = {
   processorName: "pulsebox-digit-seven",
   moduleUrl: workletUrl,
-  displayName: "Digit Seven",
+  displayName: "Gray Ghost",
   mapParameters: toDigitSevenParameters,
 };
 

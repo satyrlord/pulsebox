@@ -107,7 +107,8 @@ engine status and bounded telemetry
 The application composition boundary shall create objects, inject ports, route
 accepted commands, and manage startup and shutdown. It is not a fourth domain
 layer. It shall contain no product rules, audio algorithms, project mutations,
-or UI rendering.
+or UI rendering. In the repository it is `src/main.tsx` plus the wiring-only
+`src/composition/` directory.
 
 A small `contracts` area may hold data-only TypeScript types shared between
 layers. It shall contain no mutable singleton, browser handle, storage call, DOM
@@ -588,11 +589,18 @@ Rules:
 - Keyboard-repeat gestures end at key release or focus loss.
 - A wheel burst coalesces by target parameter and ends after 250 milliseconds
   without another accepted wheel input.
+- Timing controls send transient audio previews during keyboard repeats and wheel bursts.
+  They commit project state once when the gesture ends.
 - Direct numeric entry commits once when accepted. An invalid entry changes
   neither state nor history.
 - Automation recording shall collect deliberate moves into one bounded take per
   gesture or recording pass and shall use the specification's last-value-wins
   grid rule.
+- History entries are full state snapshots and keep their commit order when a
+  gesture coalesces. When two gestures interleave, an undo of the later entry
+  restores the snapshot taken at that gesture's begin, so the other gesture's
+  mid-gesture value can appear at an intermediate undo step. Decision `D94`
+  accepts this snapshot semantic.
 
 Tests shall use a fake monotonic clock for the 250-millisecond boundary. They
 shall cover pointer release, cancellation, blur, Escape, key repeat, wheel
@@ -685,6 +693,26 @@ batch shall be sorted by frame, then by a deterministic event priority, then by
 stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
 
+The controller shall keep a 500-millisecond event horizon at each active
+processor. A 25-millisecond interval maintains this horizon. A late pass shall
+start at one shared future boundary for all modules. It shall not send an
+expired note-on. The next events shall remain on the original musical grid.
+
+An adapter that becomes ready during playback shall receive the remaining
+events in the current shared horizon. This rule applies to add, swap, and fault
+recovery paths.
+
+A live step edit shall replace the affected adapter's queued horizon. A
+quantized Pattern launch shall replace queued events that cross its stored
+launch boundary.
+
+The clear message may carry an absolute frame bound. A bounded clear drops only
+the queued events at or past that frame. Events before the bound stay queued
+and keep playing exactly as sent. A rebuild that keeps the imminent lead window
+shall use a bounded clear and shall re-send the one release the bound drops, so
+the kept note ends on its natural gate. A timing change that does not change
+the tempo shall not move the pattern grid anchor.
+
 An acknowledgment shall identify the highest contiguous applied sequence and
 complete state revision token. That token is the receiver's own current
 revision, which legitimately runs ahead of the acknowledged envelope when that
@@ -705,9 +733,12 @@ Every queue and payload shall have a declared bound.
   per node.
 - Backpressure begins at 192 unacknowledged envelopes.
 - An ordinary serialized message payload shall not exceed 64 KiB.
+- An ordinary payload shall not exceed 64 nested levels.
+- The controller and processor shall reject cyclic, non-finite, or oversized
+  ordinary payloads without serializing data on the audio thread.
 - A `parameter-batch` shall contain at most 128 changes.
 - An `event-batch` shall contain at most 256 events and shall not schedule
-  beyond the engine's documented lookahead horizon.
+  beyond the 500-millisecond lookahead horizon.
 - Meter publication shall be at most 30 frames per second per visible meter
   group. Only the newest unsent meter frame is retained.
 - Status messages shall be edge-triggered. Identical repeated status shall
@@ -723,6 +754,10 @@ discard older unsent meter and status telemetry. It shall not discard structural
 commands, note-off events, transport stop, reset, disposal, or graph-safety
 messages.
 
+During a pointer gesture, an adapter shall coalesce parameter previews for 16
+milliseconds. It shall send only the latest value for each parameter in that
+interval. A committed value supersedes a pending preview for the same parameter.
+
 If coalescing cannot keep the queue below 256, the controller shall reject new
 nonessential previews. It shall issue one bounded `all-notes-off` and mark the
 node as degraded. At the next safe boundary, it shall rebuild the node from the
@@ -732,6 +767,9 @@ posting into an unbounded browser queue.
 Worklet processors shall preallocate their real-time event and parameter storage
 from manifest bounds. They shall not allocate, log, await, lock, decode, fetch,
 parse project JSON, or access persistence during `process()`.
+
+The processor shall use a non-serializing validation path for normal controller
+messages. Full diagnostic validation stays on the controller thread.
 
 ### 8.5 Frame-count and fixed-block rules
 

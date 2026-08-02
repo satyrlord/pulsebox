@@ -1,6 +1,6 @@
-import { forwardRef, useState, type CSSProperties } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
-import type { ModuleInstanceId } from "../../../contracts";
+import type { GestureId, ModuleInstanceId } from "../../../contracts";
 import { AuditionButton } from "../controls/AuditionButton";
 import { useContinuousGesture } from "../controls/use-gesture-id";
 import { useAppStore, useDependencies } from "../store/app-store-context";
@@ -86,27 +86,54 @@ function PatternInspector() {
           <dt>Duration</dt>
           <dd>{pattern === undefined ? "Unknown" : `${String(pattern.length)} steps`}</dd>
         </div>
-        <div>
-          <dt>Grid</dt>
-          <dd>1/16</dd>
-        </div>
       </dl>
       <div className={styles.inspectorActions}>
         <button
           type="button"
+          aria-label="Copy the Pattern to the next slot"
+          title="Copy the Pattern to the next slot."
           onClick={() => {
             copyPattern(activePatternIndex, (activePatternIndex + 1) % patterns.length);
           }}
         >
-          Copy to next
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect
+              x="2"
+              y="3.5"
+              width="7"
+              height="9"
+              rx="1"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M10.5 8H14m-2-2.5L14.5 8 12 10.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
         <button
           type="button"
+          aria-label="Clear the Pattern"
+          title="Clear every step of the Pattern."
           onClick={() => {
             clearPattern(activePatternIndex);
           }}
         >
-          Clear
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path
+              d="m4 4 8 8m0-8-8 8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
     </aside>
@@ -172,6 +199,245 @@ function AuditionKeys(props: {
   );
 }
 
+/**
+ * Swing and Humanize are musically useful mostly below 30 percent, so slider
+ * travel is tapered: the first 30 percent of the value takes 60 percent of the
+ * track at 0.5 percent per step. A smooth power taper was rejected because its
+ * near-zero slope leaves keyboard steps below the whole-percent store
+ * granularity, which reads as a dead control. The native input value is a track
+ * position, 0 through 100. The dispatched project value is the tapered ratio,
+ * quantized to whole percent.
+ */
+const TAPER_POSITION_MAX = 100;
+const LOW_BAND_VALUE = 0.3;
+const LOW_BAND_TRAVEL = 60;
+const WHEEL_PERCENT = 2;
+const WHEEL_IDLE_MILLISECONDS = 250;
+
+function taperValue(position: number): number {
+  const value =
+    position <= LOW_BAND_TRAVEL
+      ? (position / LOW_BAND_TRAVEL) * LOW_BAND_VALUE
+      : LOW_BAND_VALUE +
+        ((position - LOW_BAND_TRAVEL) / (TAPER_POSITION_MAX - LOW_BAND_TRAVEL)) *
+          (1 - LOW_BAND_VALUE);
+  return Math.round(value * 100) / 100;
+}
+
+function taperPosition(value: number): number {
+  const unit = Math.min(1, Math.max(0, value));
+  const position =
+    unit <= LOW_BAND_VALUE
+      ? (unit / LOW_BAND_VALUE) * LOW_BAND_TRAVEL
+      : LOW_BAND_TRAVEL +
+        ((unit - LOW_BAND_VALUE) / (1 - LOW_BAND_VALUE)) * (TAPER_POSITION_MAX - LOW_BAND_TRAVEL);
+  return Math.round(position);
+}
+
+function TimingSlider(props: {
+  readonly label: string;
+  readonly ariaLabel: string;
+  readonly value: number;
+  readonly onPreview: (value: number) => void;
+  readonly onCommit: (value: number, gestureId: GestureId) => void;
+}) {
+  const gesture = useContinuousGesture();
+  const [position, setPosition] = useState(() => taperPosition(props.value));
+  const [trackedValue, setTrackedValue] = useState(props.value);
+  const percent = Math.round(taperValue(position) * 100);
+  const pointer = useRef<
+    | {
+        pointerId: number;
+        startValue: number;
+        value: number;
+      }
+    | undefined
+  >(undefined);
+  const keyboard = useRef<{ startValue: number; value: number } | undefined>(undefined);
+  const wheel = useRef<{ startValue: number; value: number } | undefined>(undefined);
+
+  // Several low positions round to one stored percent. Keep the finer user
+  // position unless the store value no longer matches it. This runs during
+  // render, which is the React pattern for state that follows a prop.
+  if (props.value !== trackedValue) {
+    setTrackedValue(props.value);
+    if (Math.round(taperValue(position) * 100) !== Math.round(props.value * 100)) {
+      setPosition(taperPosition(props.value));
+    }
+  }
+
+  const live = useRef({ position, onPreview: props.onPreview, onCommit: props.onCommit, gesture });
+  useEffect(() => {
+    live.current = {
+      position,
+      onPreview: props.onPreview,
+      onCommit: props.onCommit,
+      gesture,
+    };
+  });
+
+  const wheelIdle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const wheelAbort = useRef<AbortController | undefined>(undefined);
+
+  // The listener must be non-passive to call preventDefault, so React's
+  // synthetic wheel handler cannot register it.
+  const attachWheel = useCallback((element: HTMLInputElement | null) => {
+    wheelAbort.current?.abort();
+    wheelAbort.current = undefined;
+    if (element === null) return;
+    const listeners = new AbortController();
+    element.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        const current = live.current;
+        const direction = event.deltaY > 0 ? -1 : 1;
+        // The wheel steps in whole value percent, not track positions, so every
+        // notch is an audible change at any point of the taper.
+        const magnitude = event.shiftKey ? 1 : WHEEL_PERCENT;
+        const percentNow = Math.round(taperValue(current.position) * 100);
+        const nextPercent = Math.min(100, Math.max(0, percentNow + direction * magnitude));
+        if (nextPercent !== percentNow) {
+          wheel.current ??= { startValue: taperValue(current.position), value: taperValue(current.position) };
+          const nextPosition = taperPosition(nextPercent / 100);
+          live.current.position = nextPosition;
+          setPosition(nextPosition);
+          wheel.current.value = nextPercent / 100;
+          current.onPreview(nextPercent / 100);
+        }
+        if (wheelIdle.current !== undefined) clearTimeout(wheelIdle.current);
+        wheelIdle.current = setTimeout(() => {
+          wheelIdle.current = undefined;
+          const active = wheel.current;
+          wheel.current = undefined;
+          if (active !== undefined && active.value !== active.startValue) {
+            live.current.onCommit(active.value, live.current.gesture.current());
+          }
+          live.current.gesture.end();
+        }, WHEEL_IDLE_MILLISECONDS);
+      },
+      { passive: false, signal: listeners.signal },
+    );
+    wheelAbort.current = listeners;
+  }, []);
+
+  useEffect(
+    () => () => {
+      wheelAbort.current?.abort();
+      wheelAbort.current = undefined;
+      if (wheelIdle.current !== undefined) clearTimeout(wheelIdle.current);
+      const active = pointer.current ?? keyboard.current ?? wheel.current;
+      pointer.current = undefined;
+      keyboard.current = undefined;
+      wheel.current = undefined;
+      if (active !== undefined && active.value !== active.startValue) {
+        live.current.onCommit(active.value, live.current.gesture.current());
+      }
+      live.current.gesture.end();
+    },
+    [],
+  );
+
+  const endPointer = (pointerId: number, cancel: boolean) => {
+    const active = pointer.current;
+    if (active?.pointerId !== pointerId) return;
+    pointer.current = undefined;
+    if (cancel) {
+      setPosition(taperPosition(active.startValue));
+      props.onPreview(active.startValue);
+    } else if (active.value !== active.startValue) {
+      props.onCommit(active.value, gesture.current());
+    }
+    gesture.end();
+  };
+
+  const endKeyboard = () => {
+    const active = keyboard.current;
+    keyboard.current = undefined;
+    if (active !== undefined && active.value !== active.startValue) {
+      props.onCommit(active.value, gesture.current());
+    }
+    gesture.end();
+  };
+
+  const endWheel = () => {
+    if (wheelIdle.current !== undefined) clearTimeout(wheelIdle.current);
+    wheelIdle.current = undefined;
+    const active = wheel.current;
+    wheel.current = undefined;
+    if (active !== undefined && active.value !== active.startValue) {
+      props.onCommit(active.value, gesture.current());
+    }
+    gesture.end();
+  };
+
+  return (
+    <label className={styles.timingSlider}>
+      <span>{props.label}</span>
+      <input
+        ref={attachWheel}
+        type="range"
+        min={0}
+        max={TAPER_POSITION_MAX}
+        step={1}
+        value={position}
+        aria-label={props.ariaLabel}
+        aria-valuetext={`${String(percent)} percent`}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          pointer.current = {
+            pointerId: event.pointerId,
+            startValue: props.value,
+            value: props.value,
+          };
+          gesture.handlers.onPointerDown();
+          if (typeof event.currentTarget.setPointerCapture === "function") {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }
+        }}
+        onPointerUp={(event) => endPointer(event.pointerId, false)}
+        onPointerCancel={(event) => endPointer(event.pointerId, true)}
+        onKeyDown={(event) => {
+          if (
+            keyboard.current === undefined &&
+            ["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home", "PageDown", "PageUp"].includes(
+              event.key,
+            )
+          ) {
+            const value = taperValue(live.current.position);
+            keyboard.current = { startValue: value, value };
+            gesture.current();
+          }
+        }}
+        onKeyUp={() => endKeyboard()}
+        onBlur={() => {
+          const active = pointer.current;
+          if (active !== undefined) endPointer(active.pointerId, false);
+          else if (keyboard.current !== undefined) endKeyboard();
+          else if (wheel.current !== undefined) endWheel();
+          else gesture.handlers.onBlur();
+        }}
+        onChange={(event) => {
+          const next = event.currentTarget.valueAsNumber;
+          const value = taperValue(next);
+          live.current.position = next;
+          setPosition(next);
+          const active = pointer.current;
+          if (active === undefined && keyboard.current === undefined) {
+            props.onCommit(value, gesture.current());
+          }
+          else {
+            if (active !== undefined) active.value = value;
+            if (keyboard.current !== undefined) keyboard.current.value = value;
+            props.onPreview(value);
+          }
+        }}
+      />
+      <output>{`${String(percent)}%`}</output>
+    </label>
+  );
+}
+
 const PATTERN_TICKS = 16 * 240;
 
 /**
@@ -225,12 +491,12 @@ function PianoRoll() {
   const swing = useAppStore((state) => state.project.project.swing);
   const selectModule = useAppStore((state) => state.selectModule);
   const setSwing = useAppStore((state) => state.setSwing);
+  const previewSwing = useAppStore((state) => state.previewSwing);
   const setHumanize = useAppStore((state) => state.setHumanize);
+  const previewHumanize = useAppStore((state) => state.previewHumanize);
   const newPatternVariation = useAppStore((state) => state.newPatternVariation);
   const startAudition = useAppStore((state) => state.startAudition);
   const stopAudition = useAppStore((state) => state.stopAudition);
-  const swingGesture = useContinuousGesture();
-  const humanizeGesture = useContinuousGesture();
   const humanize = patterns[activePatternIndex]?.humanize ?? 0;
   const module = selectedModuleId === undefined ? undefined : modules[selectedModuleId];
   const manifest = module === undefined ? undefined : manifestFor(module.pluginId);
@@ -254,44 +520,24 @@ function PianoRoll() {
     <section className={styles.pianoRoll} data-component="piano-roll" aria-label="Piano Roll">
       <header className={styles.rollTools}>
         <span className={styles.gridReadout}>1/16</span>
-        <label>
-          <span>Swing</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={Math.round(swing * 100)}
-            aria-label="Project Swing"
-            aria-valuetext={`${String(Math.round(swing * 100))} percent`}
-            {...swingGesture.handlers}
-            onChange={(event) => {
-              setSwing(event.currentTarget.valueAsNumber / 100, swingGesture.current());
-            }}
-          />
-          <output>{`${String(Math.round(swing * 100))}%`}</output>
-        </label>
-        <label>
-          <span>Humanize</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={Math.round(humanize * 100)}
-            aria-label="Pattern Humanize"
-            aria-valuetext={`${String(Math.round(humanize * 100))} percent`}
-            {...humanizeGesture.handlers}
-            onChange={(event) => {
-              setHumanize(
-                activePatternIndex,
-                event.currentTarget.valueAsNumber / 100,
-                humanizeGesture.current(),
-              );
-            }}
-          />
-          <output>{`${String(Math.round(humanize * 100))}%`}</output>
-        </label>
+        <TimingSlider
+          label="Swing"
+          ariaLabel="Project Swing"
+          value={swing}
+          onPreview={previewSwing}
+          onCommit={setSwing}
+        />
+        <TimingSlider
+          label="Humanize"
+          ariaLabel="Pattern Humanize"
+          value={humanize}
+          onPreview={(value) => {
+            previewHumanize(activePatternIndex, value);
+          }}
+          onCommit={(value, gestureId) => {
+            setHumanize(activePatternIndex, value, gestureId);
+          }}
+        />
         <button
           type="button"
           className={styles.variationButton}

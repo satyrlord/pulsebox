@@ -9,14 +9,19 @@ import workletUrl from "./drumline-six.worklet.ts?worker&url";
 /**
  * Manifest parameter IDs already match the processor's own naming, so this is a
  * validating pass-through rather than a rename map: module fields stay flat and
- * per-voice fields keep their `<voice-id>.<field>` form.
+ * per-voice fields keep their `<voice-id>-<field>` form.
  */
-function toDrumlineParameters(
+export function toDrumlineParameters(
   values: Readonly<Record<string, ParameterValue>>,
 ): Readonly<Record<string, ParameterValue>> {
-  const result: Record<string, number> = {};
+  const result: Record<string, ParameterValue> = {};
   for (const [parameterId, value] of Object.entries(values)) {
-    if (typeof value === "number" && Number.isFinite(value)) result[parameterId] = value;
+    if (
+      (typeof value === "number" && Number.isFinite(value)) ||
+      typeof value === "boolean"
+    ) {
+      result[parameterId] = value;
+    }
   }
   return result;
 }
@@ -24,7 +29,7 @@ function toDrumlineParameters(
 const DESCRIPTOR: WorkletVoiceDescriptor = {
   processorName: "pulsebox-drumline-six",
   moduleUrl: workletUrl,
-  displayName: "Drumline Six",
+  displayName: "Tin Soldier",
   mapParameters: toDrumlineParameters,
 };
 

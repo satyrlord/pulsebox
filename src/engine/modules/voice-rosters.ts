@@ -35,7 +35,7 @@ interface VoiceRoster {
   /**
    * Note sounded when no voice is selected. Section 15.0 requires a drum module
    * to audition its selected voice and a pitched module a documented fixed
-   * pitch, which is C2 for Acid Bass.
+   * pitch, which is C2 for Silver Serpent.
    */
   readonly defaultAuditionNote: number;
 }
@@ -59,14 +59,14 @@ function drumRoster<TVoiceId extends string>(
   };
 }
 
-const ACID_BASS_AUDITION_NOTE = 36;
+const BASS_MONO_AUDITION_NOTE = 36;
 
 const ROSTERS: Readonly<Record<string, VoiceRoster>> = {
   "bass-mono": {
     voiceIds: [],
     nameFor: () => undefined,
     noteFor: () => undefined,
-    defaultAuditionNote: ACID_BASS_AUDITION_NOTE,
+    defaultAuditionNote: BASS_MONO_AUDITION_NOTE,
   },
   "drum-analog-small": drumRoster(DRUM_VOICE_IDS, DRUM_VOICE_NAMES, drumVoiceNote),
   "drum-analog-large": drumRoster(BOOM_VOICE_IDS, BOOM_VOICE_NAMES, boomVoiceNote),
@@ -93,6 +93,23 @@ function voiceNoteFor(
  */
 export function auditionNoteFor(pluginId: PluginId | string, voiceId: string | undefined): number {
   const roster = voiceRosterFor(pluginId);
-  if (roster === undefined) return ACID_BASS_AUDITION_NOTE;
+  if (roster === undefined) return BASS_MONO_AUDITION_NOTE;
   return voiceNoteFor(pluginId, voiceId) ?? roster.defaultAuditionNote;
+}
+
+/**
+ * The notes a plugin can sound, or undefined when every note maps, as on a
+ * pitched instrument. Section 14 swap keeps sequence data where event mapping
+ * is valid and reports the rest; this set is what "valid" means for a drum
+ * machine, whose voices each answer one note.
+ */
+export function playableNotesFor(pluginId: PluginId | string): ReadonlySet<number> | undefined {
+  const roster = voiceRosterFor(pluginId);
+  if (roster === undefined || roster.voiceIds.length === 0) return undefined;
+  const notes = new Set<number>();
+  for (const voiceId of roster.voiceIds) {
+    const note = roster.noteFor(voiceId);
+    if (note !== undefined) notes.add(note);
+  }
+  return notes;
 }

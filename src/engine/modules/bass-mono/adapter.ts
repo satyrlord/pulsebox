@@ -42,11 +42,11 @@ function toBassParameters(
 const DESCRIPTOR: WorkletVoiceDescriptor = {
   processorName: "pulsebox-bass-mono",
   moduleUrl: workletUrl,
-  displayName: "Acid Bass",
+  displayName: "Silver Serpent",
   mapParameters: toBassParameters,
 };
 
-export class AcidBassAdapter extends WorkletVoiceAdapter {
+export class BassMonoAdapter extends WorkletVoiceAdapter {
   constructor(context: AudioContext, options: Parameters<VoiceAdapterFactory>[1]) {
     super(DESCRIPTOR, context, options);
   }
@@ -54,4 +54,4 @@ export class AcidBassAdapter extends WorkletVoiceAdapter {
 
 /** Registry entry point: one adapter instance per rack module. */
 export const createBassVoiceAdapter: VoiceAdapterFactory = (context, options) =>
-  new AcidBassAdapter(context, options);
+  new BassMonoAdapter(context, options);

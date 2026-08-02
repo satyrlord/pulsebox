@@ -108,7 +108,7 @@
   display: grid;
   grid-template-columns: 62px minmax(0, 1fr);
   gap: 9px;
-  min-block-size: 74px;
+  min-block-size: 60px;
   align-items: center;
   padding: 7px 5px 7px 9px;
   position: relative;
@@ -119,6 +119,8 @@
   transition:
     box-shadow var(--pulse-duration-fast, 80ms) linear,
     border-color var(--pulse-duration-fast, 80ms) linear;
+  cursor: grab;
+  touch-action: none;
 }
 
 .moduleChoice:hover {
@@ -128,13 +130,67 @@
     0 0 0 1px color-mix(in srgb, var(--k) 45%, transparent);
 }
 
-.moduleChoice > button {
-  position: absolute;
-  inset-block-end: 4px;
-  inset-inline-end: 4px;
+.moduleChoiceActions {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+}
+
+.moduleChoiceActions button {
   min-inline-size: 32px;
   min-block-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: var(--pulse-type-10, 10px);
+}
+
+.moduleChoiceActions button svg {
+  inline-size: 12px;
+  block-size: 12px;
+}
+
+.moduleChoiceActions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.browserFilter {
+  flex: none;
+  padding: 4px;
+  border-block-end: 1px solid var(--edge-hairline);
+}
+
+.browserFilter input {
+  inline-size: 100%;
+  min-block-size: 24px;
+  padding-inline: 6px;
+  font-size: var(--pulse-type-12, 12px);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--surface-well);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
+}
+
+.browserEmpty {
+  margin: 0;
+  padding: 8px;
+  font-size: var(--pulse-type-12, 12px);
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.browserEmpty button {
+  min-block-size: 24px;
+  padding-inline: 8px;
+  cursor: pointer;
+}
+
+/* A browser drag highlights the empty slot it would land on. */
+:global([data-drop-hint="true"]) {
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: -2px;
 }
 
 /* The thumbnail reads as a miniature faceplate: a brushed tinted plate under an
@@ -164,30 +220,44 @@
     0 1px 2px var(--edge-shadow);
 }
 
-.moduleThumbnail i {
-  inline-size: 7px;
-  block-size: 7px;
-  margin-block-start: 5px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 28%, var(--metal-screw-top), var(--metal-cap-bot) 74%);
-  box-shadow:
-    inset 0 0 0 1px var(--edge-highlight),
-    0 0 3px color-mix(in srgb, var(--k) 30%, transparent),
-    0 1px 1px #000000b3;
+/* The manifest-declared module icon, engraved into the thumbnail plate in the
+   module's own accent. */
+.moduleIcon {
+  block-size: 24px;
+  inline-size: 24px;
+  margin-block-start: 4px;
+  color: var(--k);
+  filter: drop-shadow(0 1px 0 #000000cc)
+    drop-shadow(0 0 4px color-mix(in srgb, var(--k) 35%, transparent));
 }
 
-.moduleThumbnail i:last-child {
-  inline-size: 3px;
-  block-size: 2px;
-  border-radius: 1px;
-  background: var(--k);
-  box-shadow: 0 0 3px color-mix(in srgb, var(--k) 45%, transparent);
+/* Fallback for a definition with no declared icon: a bar profile derived from
+   the plugin ID, so every entry stays visually distinct without raster
+   artwork. */
+.moduleThumbnail i {
+  inline-size: 5px;
+  margin-block-start: 5px;
+  border-radius: 2px;
+  align-self: flex-end;
+  margin-block-end: 5px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--k) 80%, #ffffff),
+    color-mix(in srgb, var(--k) 70%, #000000)
+  );
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 0 3px color-mix(in srgb, var(--k) 40%, transparent),
+    0 1px 1px #000000b3;
 }
 
 .moduleChoiceText {
   min-inline-size: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 4px;
 }
 
 .moduleChoiceText strong {
@@ -199,41 +269,22 @@
 }
 
 .moduleChoiceText span {
+  grid-column: 1 / -1;
+  grid-row: 2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The kind line wraps to avoid truncation against the Add key's gutter. */
-.moduleChoiceText small {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  max-block-size: 26px;
-}
-
-/* The Add key floats over the lower corner of the entry, so the kind line keeps
-   its own gutter instead of running underneath the key. */
-.moduleChoiceText small {
-  padding-inline-end: 40px;
 }
 
 .moduleChoiceText span {
   font-size: var(--pulse-type-12, 12px);
 }
 
-.moduleChoiceText small {
-  font-size: var(--pulse-type-10, 10px);
-  color: var(--pulse-color-text-muted, #919ba3);
-}
-
 .slotList {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 6px;
   margin: 0;
   padding: 17px 4px 4px;
   list-style: none;
@@ -324,6 +375,23 @@
   border-color: var(--accent-lamp);
 }
 
+/* The miniature card body uses the short label and accent marker only. */
+.occupiedSlot {
+  gap: 6px;
+}
+
+/* The accent marker pairs with the lit selection ring, so the selected slot
+   reads through shape and brightness as well as hue. */
+.slotCardMark {
+  flex: none;
+  inline-size: 4px;
+  block-size: 18px;
+  border-radius: 2px;
+  background: var(--k);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--k) 55%, transparent);
+}
+
+
 /* Three peer views, so three equal tabs seated in their own recess. The
    selected tab rises out of it and lights its lower edge. */
 .studioTabs {
@@ -384,7 +452,7 @@
 }
 
 .effectCard {
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
 }
 
@@ -431,12 +499,6 @@
   margin: 2px 0 0;
   font-size: var(--pulse-type-10, 10px);
   color: var(--pulse-color-text-muted, #919ba3);
-}
-
-.effectDetails {
-  grid-column: 1 / -1;
-  padding-block-start: 6px;
-  border-block-start: 1px solid var(--pulse-color-border-default, #6d7881);
 }
 
 .masterOutput {
@@ -500,6 +562,18 @@
   gap: 4px;
 }
 
+.inspectorActions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 26px;
+}
+
+.inspectorActions button svg {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
 .rollTools {
   flex: none;
   min-block-size: 38px;
@@ -516,8 +590,28 @@
   align-items: center;
 }
 
-.rollTools input[type="range"] {
-  inline-size: 82px;
+/* The tapered timing sliders flex, so their low musical range gets the widest
+   track the header can spare at each supported width. */
+.timingSlider {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.timingSlider input[type="range"] {
+  flex: 1 1 120px;
+  min-inline-size: 82px;
+  max-inline-size: 190px;
+}
+
+/* The readout reserves its widest value, `100%`. Without a fixed box, each
+   added digit reflows the header row and moves every control after it. The
+   `ch` unit measures the zero glyph alone, so the percent sign needs its own
+   allowance. */
+.timingSlider output {
+  flex: none;
+  inline-size: calc(4ch + 6px);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
 .rollTools output,
@@ -1007,10 +1101,6 @@ input:focus-visible {
 
   .moduleThumbnail {
     block-size: 30px;
-  }
-
-  .moduleChoiceText small {
-    padding-inline-end: 34px;
   }
 
   .rollContext {

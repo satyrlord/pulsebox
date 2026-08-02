@@ -21,6 +21,13 @@ export interface VoiceParameterShape<TVoiceId extends string, TVoiceFields> {
    */
   readonly booleanModuleFields?: ReadonlySet<string>;
   readonly voiceFields: ReadonlySet<string>;
+  /**
+   * Per-voice fields carrying a boolean rather than a number, such as a mute
+   * or solo switch. Listed separately so a numeric field can never accept a
+   * boolean. Field names must stay single words: the last hyphen in a
+   * parameter ID is the voice separator.
+   */
+  readonly booleanVoiceFields?: ReadonlySet<string>;
   readonly isVoiceId: (value: string) => value is TVoiceId;
   readonly voices?: Partial<Record<TVoiceId, Partial<TVoiceFields>>>;
 }
@@ -49,9 +56,8 @@ function applyVoiceParameter<TVoiceId extends string, TVoiceFields>(
     return true;
   }
 
-  if (typeof value !== "number" || !Number.isFinite(value)) return false;
-
   if (shape.moduleFields.has(parameterId)) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return false;
     target[parameterId] = value;
     return true;
   }
@@ -60,7 +66,15 @@ function applyVoiceParameter<TVoiceId extends string, TVoiceFields>(
   if (separator <= 0) return false;
   const voiceId = parameterId.slice(0, separator);
   const field = parameterId.slice(separator + 1);
-  if (!shape.isVoiceId(voiceId) || !shape.voiceFields.has(field)) return false;
+  if (!shape.isVoiceId(voiceId)) return false;
+
+  if (shape.booleanVoiceFields?.has(field) === true) {
+    if (typeof value !== "boolean") return false;
+  } else if (shape.voiceFields.has(field)) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  } else {
+    return false;
+  }
 
   const voices: Partial<Record<TVoiceId, Partial<TVoiceFields>>> = target.voices ?? {};
   voices[voiceId] = { ...voices[voiceId], [field]: value } as Partial<TVoiceFields>;

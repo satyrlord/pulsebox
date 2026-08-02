@@ -76,11 +76,19 @@
 }
 
 .master .channelName {
+  display: block;
+  text-align: center;
   color: var(--pulse-color-text-primary, #f3f5f6);
   text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
+/* The selected channel keeps its accent name and gains an underline. Color and
+   font weight repeat here because the global pressed-key rule paints on-accent
+   ink for an accent fill this strip does not draw; without them the selected
+   name goes near-black on the chassis. */
 .channelName[aria-pressed="true"] {
+  color: var(--k);
+  font-weight: 700;
   background: none;
   box-shadow: none;
   text-decoration: underline 2px;

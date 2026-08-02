@@ -34,7 +34,8 @@ export const PROJECT_FORMAT_VERSION = 1;
 
 /** Guards a hostile or corrupt file before any of it is trusted. */
 export const DOCUMENT_LIMITS = {
-  maximumBytes: 32 * 1024 * 1024,
+  /** PROJECT-FORMAT.md section 4.3: the project manifest is at most 8 MiB. */
+  maximumBytes: 8 * 1024 * 1024,
   maximumRackSlots: RACK_SLOT_IDS.length,
   maximumPatternSteps: 512,
   maximumEventRecords: 1_000_000,
@@ -51,7 +52,11 @@ export interface ProjectMetadataDocument {
   readonly lineageId: string;
   readonly revisionEpoch: string;
   readonly revision: number;
-  readonly pinned: boolean;
+  /**
+   * Persisted favorite flag. The MVP has no control that sets it, so it is
+   * always false. The post-MVP Favourite feature owns the interface for it.
+   */
+  readonly favorite: boolean;
   readonly tempo: number;
   /**
    * Global Swing, 0 through 100 percent, per decision D69. One value applies to
@@ -158,7 +163,6 @@ export interface SerializeOptions {
   readonly modifiedAt: string;
   /** Last committed token, never the runtime StateRevision. */
   readonly projectRevision: ProjectRevision;
-  readonly pinned?: boolean;
   readonly manifestVersionFor?: (pluginId: string) => number;
 }
 
@@ -186,7 +190,8 @@ export function serializeProject(
       lineageId: project.lineageId,
       revisionEpoch: options.projectRevision.epoch,
       revision: options.projectRevision.counter,
-      pinned: options.pinned ?? false,
+      // No MVP control sets this; the post-MVP Favourite feature will.
+      favorite: false,
       tempo: project.tempo,
       // State keeps Swing as a 0-to-1 ratio; the format stores the percent the
       // specification and the interface both speak in.
@@ -281,7 +286,7 @@ const PROJECT_KEYS = new Set([
   "lineageId",
   "revisionEpoch",
   "revision",
-  "pinned",
+  "favorite",
   "tempo",
   "swing",
 ]);
@@ -403,36 +408,36 @@ function scanSafeJson(value: unknown, collector: IssueCollector, path = "$", dep
   }
 }
 
-function validateImportedParameter(
+/**
+ * Validates one parameter value against its declared descriptor. Returns the
+ * rejection message, or undefined when the value is valid. Import parsing and
+ * the composition root's live command validation share this one policy.
+ */
+export function validateImportedParameter(
   value: unknown,
   descriptor: ImportParameterDescriptor,
-  path: string,
-  collector: IssueCollector,
-): void {
+): string | undefined {
   if (descriptor.valueType === "boolean") {
-    if (typeof value !== "boolean") collector.add(path, "Expected a boolean parameter value.");
-    return;
+    return typeof value === "boolean" ? undefined : "Expected a boolean parameter value.";
   }
   if (descriptor.valueType === "enum") {
-    if (typeof value !== "string" || !descriptor.enumValues?.includes(value)) {
-      collector.add(path, "Expected one of the parameter's declared enum values.");
-    }
-    return;
+    return typeof value === "string" && descriptor.enumValues?.includes(value) === true
+      ? undefined
+      : "Expected one of the parameter's declared enum values.";
   }
   if (typeof value !== "number" || !Number.isFinite(value) || Object.is(value, -0)) {
-    collector.add(path, "Expected a finite numeric parameter value.");
-    return;
+    return "Expected a finite numeric parameter value.";
   }
   if (descriptor.valueType === "integer" && !Number.isInteger(value)) {
-    collector.add(path, "Expected an integer parameter value.");
-    return;
+    return "Expected an integer parameter value.";
   }
   if (
     (descriptor.minimum !== undefined && value < descriptor.minimum) ||
     (descriptor.maximum !== undefined && value > descriptor.maximum)
   ) {
-    collector.add(path, "Parameter value is outside its registered range.");
+    return "Parameter value is outside its registered range.";
   }
+  return undefined;
 }
 
 /**
@@ -484,8 +489,8 @@ export function parseProjectDocument(
     }
     if (!Number.isSafeInteger(metadata.revision) || Number(metadata.revision) < 0)
       collector.add("project.revision", "Revision must be a non-negative safe integer.");
-    if (typeof metadata.pinned !== "boolean")
-      collector.add("project.pinned", "Pinned must be boolean.");
+    if (typeof metadata.favorite !== "boolean")
+      collector.add("project.favorite", "Favorite must be boolean.");
     if (!finiteNumber(metadata.tempo, 40, 240))
       collector.add("project.tempo", "Tempo must be between 40 and 240 BPM.");
     // Global Swing, per decision D69. Absent in documents written before it.
@@ -597,12 +602,8 @@ export function parseProjectDocument(
                 "Parameter ID is not declared by the registered plugin.",
               );
             } else {
-              validateImportedParameter(
-                parameter,
-                descriptor,
-                `${path}.parameters.${id}`,
-                collector,
-              );
+              const message = validateImportedParameter(parameter, descriptor);
+              if (message !== undefined) collector.add(`${path}.parameters.${id}`, message);
             }
           } else if (!(
             typeof parameter === "boolean" ||

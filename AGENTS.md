@@ -204,6 +204,7 @@ The three domain layers and the wiring-only composition boundary live here:
 | Path                | Layer       | Owns                                                                                      |
 | ------------------- | ----------- | ----------------------------------------------------------------------------------------- |
 | `src/main.tsx`      | composition | Object creation, port injection, command routing, startup and shutdown                    |
+| `src/composition/`  | composition | Wiring-only content such as the default project                                           |
 | `src/engine/`       | engine      | AudioContext, AudioNodes, worklets, transport clock, scheduling, decoding, offline render |
 | `src/state/`        | state       | Project data, typed commands, undo and redo, selectors, serialization, persistence ports  |
 | `src/persistence/`  | persistence | Browser-storage adapters behind state-owned ports. The only layer that names IndexedDB    |

@@ -78,9 +78,13 @@ Rules:
 
 - Short labels are always uppercase.
 - Short labels are no longer than four characters.
-- Use short labels as the primary identity on faceplates, compact rack cards,
-  rack-overview markers, mixer strips, and dense selectors.
-- Rack faceplates and rack-overview cards show only the short label.
+- Use short labels as the primary identity on compact rack cards, rack-overview
+  markers, mixer strips, and dense selectors.
+- A loaded rack faceplate shows only the module icon as its identity. It shows
+  no short label, full name, or slot number. The slot number stays in the
+  accessible name and in the rack overview. An empty faceplate keeps its slot
+  number and `Empty` label, because it has no icon.
+- Rack-overview cards show only the short label.
 - Use full names in the module browser, help text, accessible names, detailed editors,
   and documentation.
 - Do not invent additional visible names for the six instruments.
@@ -198,9 +202,10 @@ Accents identify modules. They do not become full panel colors.
 Each instrument also declares one original SVG icon in its manifest. The icon
 is a maker's mark for the instrument: an acid smiley for `ACID`, a marching
 snare for `SNAP`, a thundercloud for `BOOM`, meshed gears for `MESH`, a ghost
-for `BITS`, and mosaic tiles for `PERC`. The module browser thumbnail and the
-faceplate badge render it in the module accent. Icons are original drawings
-and follow the section 2.3 originality rules.
+for `BITS`, and mosaic tiles for `PERC`. The module browser thumbnail renders
+it beside the short label and full name. On a loaded rack faceplate, the icon
+badge is the only identity mark. Icons are original drawings and follow the
+section 2.3 originality rules.
 
 Use each accent for:
 
@@ -211,9 +216,9 @@ Use each accent for:
 - Mixer header.
 - Overview marker.
 
-Never rely on color alone. Pair every accent with the module short label. Give
-selection, status, and disabled states a non-color cue that survives the
-high-contrast overlay.
+Never rely on color alone. Pair every accent with the module short label or the
+module icon, whose shape is a non-color cue. Give selection, status, and
+disabled states a non-color cue that survives the high-contrast overlay.
 
 `THEMING.md` section 3.4 owns the normative token values for these six accents.
 A plugin declares its own accent in its manifest `moduleAccent`, which must match

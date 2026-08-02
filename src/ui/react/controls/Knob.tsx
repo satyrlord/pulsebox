@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useCallback, useId, useMemo, useRef } from "react";
 
 import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
@@ -95,6 +95,18 @@ export function Knob(props: KnobProps) {
   /** Scoped so several knobs on one plate cannot share a paint server. */
   const domeId = useId();
 
+  // The dial is both the wheel target and the tooltip anchor. `wheelRef` is a
+  // callback ref, so the element is captured here as well rather than replacing
+  // it.
+  const dialRef = useRef<HTMLDivElement | null>(null);
+  const setDial = useCallback(
+    (element: HTMLDivElement | null) => {
+      dialRef.current = element;
+      if (disabled !== true) wheelRef(element);
+    },
+    [wheelRef, disabled],
+  );
+
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const angle = START_ANGLE + fraction * SWEEP;
   const pointer = useMemo(() => ({ from: polar(angle, 3), to: polar(angle, RADIUS - 4) }), [angle]);
@@ -116,9 +128,10 @@ export function Knob(props: KnobProps) {
       data-parameter={controlId}
       data-component="knob"
       data-adjusting={adjusting}
+      data-disabled={disabled === true ? true : undefined}
     >
       <div
-        ref={disabled === true ? undefined : wheelRef}
+        ref={setDial}
         role="slider"
         tabIndex={disabled === true ? -1 : 0}
         aria-label={label}
@@ -203,13 +216,16 @@ export function Knob(props: KnobProps) {
         </svg>
       </div>
       <span className={styles.label}>{props.caption ?? label}</span>
-      {adjusting ? <Tooltip className={styles.tooltip}>{text}</Tooltip> : null}
+      {adjusting ? (
+        <Tooltip anchorRef={dialRef} className={styles.tooltip}>
+          {text}
+        </Tooltip>
+      ) : null}
       {/*
-       * Direct numeric entry, spec-003 section 22.1. The approved composition
-       * target draws this as a chip floating above the dial that appears on
-       * hover or keyboard focus rather than as a fixed box on the faceplate.
-       * The chip yields to the adjustment tooltip above, so one bubble shows
-       * at a time.
+       * Direct numeric entry, spec-003 section 22.1. The field is revealed by
+       * keyboard focus rather than by hover: the browser's own `title` tooltip
+       * on the dial already reports the value under the pointer, and a second
+       * floating chip only competed with it.
        */}
       <div className={styles.value}>
         <ValuePopover

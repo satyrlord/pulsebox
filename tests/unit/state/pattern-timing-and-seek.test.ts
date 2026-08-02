@@ -48,7 +48,7 @@ const parseOptions: ParseOptions = {
 };
 
 describe("Pattern timing commands", () => {
-  it("seeds every default Pattern with the 12 percent Humanize and a stable seed", () => {
+  it("seeds every default Pattern with the default Humanize and a stable seed", () => {
     const state = createDefaultState(deterministicIds(), seed);
     for (const pattern of state.project.patterns) {
       expect(pattern.humanize).toBe(DEFAULT_PATTERN_HUMANIZE);
@@ -177,7 +177,7 @@ describe("transport seek command", () => {
 });
 
 describe("Pattern timing serialization", () => {
-  it("round-trips Humanize, seed, and the pin flag through the document", () => {
+  it("round-trips Humanize and seed through the document", () => {
     const ids = deterministicIds();
     const store = createStore();
     store.dispatch(
@@ -189,16 +189,34 @@ describe("Pattern timing serialization", () => {
       createdAt: "2026-07-30T00:00:00.000Z",
       modifiedAt: "2026-07-31T00:00:00.000Z",
       projectRevision: nextProjectRevision(undefined, ids),
-      pinned: true,
     });
     const parsed = parseProjectDocument(JSON.parse(JSON.stringify(document)), parseOptions);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.value.project.pinned).toBe(true);
 
     const restored = documentToState(parsed.value, createDefaultState(deterministicIds(), seed));
     expect(restored.project.patterns[1]?.humanize).toBe(0.33);
     expect(restored.project.patterns[1]?.seed).toBe(42);
+  });
+
+  it("snaps a committed Swing to the whole-percent grid the document stores", () => {
+    const ids = deterministicIds();
+    const store = createStore();
+    store.dispatch(store.createCommand("transport-swing-set", { swing: 0.505 }));
+    const committed = store.getState().project.swing;
+    // The store accepts only values that survive the percent serialization.
+    expect(committed).toBe(0.51);
+
+    const document = serializeProject(store.getState(), {
+      createdAt: "2026-07-30T00:00:00.000Z",
+      modifiedAt: "2026-07-31T00:00:00.000Z",
+      projectRevision: nextProjectRevision(undefined, ids),
+    });
+    const parsed = parseProjectDocument(JSON.parse(JSON.stringify(document)), parseOptions);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const restored = documentToState(parsed.value, createDefaultState(deterministicIds(), seed));
+    expect(restored.project.swing).toBe(committed);
   });
 
   it("keeps an old document without timing fields mechanical and deterministic", () => {

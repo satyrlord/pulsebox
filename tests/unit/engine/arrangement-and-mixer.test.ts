@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
-import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import type {
   PatternStepView,
   ScheduledVoiceEvent,
@@ -72,7 +72,7 @@ function stubContext() {
 function moduleWith(parts: readonly PatternStepView[][]): TransportModule {
   return {
     id: MODULE,
-    pluginId: ACID_BASS_MANIFEST.pluginId,
+    pluginId: BASS_MONO_MANIFEST.pluginId,
     parameters: {},
     parts,
     mix: DEFAULT_MIX,

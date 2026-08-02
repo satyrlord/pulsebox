@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { AcidBassDsp } from "../../../src/engine/modules/bass-mono/dsp-core";
+import { BassMonoDsp } from "../../../src/engine/modules/bass-mono/dsp-core";
 
 function render(sampleRate: number, frameCount: number, chunkSize: number): Float32Array {
-  const dsp = new AcidBassDsp(sampleRate);
+  const dsp = new BassMonoDsp(sampleRate);
   dsp.noteOn(45, 0.8, true);
   const output = new Float32Array(frameCount);
   for (let offset = 0; offset < frameCount; offset += chunkSize) {
@@ -12,7 +12,7 @@ function render(sampleRate: number, frameCount: number, chunkSize: number): Floa
   return output;
 }
 
-describe("AcidBassDsp", () => {
+describe("BassMonoDsp", () => {
   it("is deterministic and independent of host render quantum", () => {
     const expected = render(48_000, 4096, 128);
     for (const chunkSize of [1, 17, 64, 255, 512]) {
@@ -29,8 +29,27 @@ describe("AcidBassDsp", () => {
     }
   });
 
+  it("keeps the filter stable and audible at maximum cutoff and minimum resonance", () => {
+    // The Chamberlin topology diverges above its stability bound. A diverged
+    // state latched NaN and silenced the instrument permanently, so this pins
+    // the shared bound at the worst-case corner across both live rates.
+    for (const sampleRate of [44_100, 48_000]) {
+      const dsp = new BassMonoDsp(sampleRate);
+      dsp.setParameters({ cutoff: 12_000, resonance: 0, envelopeAmount: 1 }, "immediate");
+      const output = new Float32Array(Math.floor(sampleRate / 2));
+      for (let offset = 0; offset < output.length; offset += 128) {
+        // Retrigger every tenth of a second so the envelope stays open.
+        if (offset % 4_864 === 0) dsp.noteOn(45, 1, true);
+        dsp.process(output.subarray(offset, Math.min(output.length, offset + 128)));
+      }
+      expect(output.every(Number.isFinite)).toBe(true);
+      const tail = output.subarray(output.length - 4_800);
+      expect(tail.some((sample) => Math.abs(sample) > 1e-5)).toBe(true);
+    }
+  });
+
   it("clamps unsafe parameter values", () => {
-    const dsp = new AcidBassDsp(44_100);
+    const dsp = new BassMonoDsp(44_100);
     dsp.setParameters({ cutoff: Number.POSITIVE_INFINITY, resonance: 12, volume: 8 });
     dsp.noteOn(127, 1, true);
     const output = new Float32Array(2048);
@@ -40,7 +59,7 @@ describe("AcidBassDsp", () => {
   });
 
   it("follows the declared eight-millisecond parameter trajectories", () => {
-    const dsp = new AcidBassDsp(48_000);
+    const dsp = new BassMonoDsp(48_000);
     dsp.setParameters({
       tune: 12,
       cutoff: 2_880,
@@ -79,7 +98,7 @@ describe("AcidBassDsp", () => {
   });
 
   it("applies state snapshots immediately and crossfades waveform edits", () => {
-    const dsp = new AcidBassDsp(48_000);
+    const dsp = new BassMonoDsp(48_000);
     dsp.setParameters({ cutoff: 400, volume: 0.4 }, "immediate");
     expect(dsp.getParameterSnapshot()).toMatchObject({ cutoff: 400, volume: 0.4 });
     dsp.noteOn(36, 0.8);
@@ -94,7 +113,7 @@ describe("AcidBassDsp", () => {
   });
 
   it("does not restart an unrelated parameter trajectory", () => {
-    const dsp = new AcidBassDsp(48_000);
+    const dsp = new BassMonoDsp(48_000);
     dsp.setParameters({ resonance: 0.78 });
     dsp.process(new Float32Array(192));
     dsp.setParameters({ cutoff: 2_880 });
@@ -104,7 +123,7 @@ describe("AcidBassDsp", () => {
   });
 
   it("releases without a hard cut", () => {
-    const dsp = new AcidBassDsp(48_000);
+    const dsp = new BassMonoDsp(48_000);
     dsp.noteOn(45, 1);
     const before = new Float32Array(2048);
     dsp.process(before);

@@ -1,23 +1,14 @@
-/*
- * A rack unit is a brushed faceplate mounted in the rack: a lit top edge, a
- * dark base line, and a short shadow that seats it on the chassis. The plate
- * carries a trace of the module accent so each unit is identifiable before its
- * label is read.
- */
 .module {
   --k: var(--module-accent, var(--pulse-color-accent, #9be564));
-  --plate-top: color-mix(in srgb, var(--k) var(--mod-tint), var(--surface-plate-top));
-  --plate-bot: color-mix(in srgb, var(--k) calc(var(--mod-tint) - 3%), var(--surface-plate-bot));
 
-  flex: 0 0 94px;
+  flex: 0 0 74px;
   position: relative;
-  min-block-size: 86px;
-  max-block-size: 98px;
+  min-block-size: 74px;
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) auto;
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
   overflow: visible;
-  padding-inline: 12px;
+  padding-inline: 14px;
   background: var(--mat-plate);
   border: 1px solid var(--edge-hairline);
   border-radius: var(--pulse-radius-panel, 6px);
@@ -28,7 +19,6 @@
     0 1px 2px #00000099;
 }
 
-/* Metal rails seat each faceplate in the rack. The fasteners are decorative. */
 .module::before,
 .module::after {
   content: "";
@@ -66,8 +56,6 @@
   inset-inline-end: 2px;
 }
 
-/* Selection lights the plate perimeter. It is paired with `data-selected` and
-   the disabled Select key, so it never rests on color alone. */
 .selected {
   border-color: color-mix(in srgb, var(--k) 55%, var(--edge-hairline));
   box-shadow:
@@ -83,36 +71,53 @@
   box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #ffffff);
 }
 
-/* The identity strip closes with a hairline and a lit edge, so the plate reads
-   as two milled sections rather than one flat surface. */
 .nameBlock {
   grid-column: 1;
   align-self: stretch;
   min-inline-size: 0;
   display: flex;
+  /* The badge stamps above the engraved label, like a maker's mark over a
+     unit name. A row would not fit both in the fixed name column. */
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
-  gap: 1px;
-  padding: 0 var(--pulse-space-2, 8px);
+  gap: 3px;
+  padding-inline: var(--pulse-space-2, 8px);
   border-inline-end: 1px solid var(--edge-hairline);
   box-shadow: 1px 0 0 var(--edge-highlight);
+}
+
+/* A recessed badge well stamped into the name block. The module icon sits in
+   it like an engraved maker's mark, lit by the module accent. It is the loaded
+   faceplate's only identity mark, so it takes the whole name column. */
+.iconBadge {
+  flex: 0 0 auto;
+  inline-size: 40px;
+  block-size: 40px;
+  margin-inline: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--surface-well, #0b0d10);
+  box-shadow:
+    inset 0 2px 5px #000000a6,
+    inset 0 -1px 0 var(--edge-highlight),
+    0 1px 0 var(--edge-highlight);
+  color: var(--k);
+}
+
+.iconBadge svg {
+  inline-size: 28px;
+  block-size: 28px;
+  filter: drop-shadow(0 1px 0 #000000cc) drop-shadow(0 0 5px color-mix(in srgb, var(--k) 30%, transparent));
 }
 
 .header {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 5px;
   min-inline-size: 0;
-}
-
-.subtitle {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--pulse-type-10, 10px);
-  line-height: 12px;
-  color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
 .slot {
@@ -122,10 +127,7 @@
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
-/* The unit name is engraved into the plate in the condensed technical face and
-   lit with the module accent, the way a silkscreened panel name reads. */
 .title {
-  flex: 1 1 auto;
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,33 +144,137 @@
     0 0 5px color-mix(in srgb, var(--k) 20%, transparent);
 }
 
-.addRow {
+.module[data-label="Empty"] {
+  flex-basis: 38px;
+  min-block-size: 38px;
+}
+
+.module[data-label="Empty"] .title {
+  font-size: var(--pulse-type-12, 12px);
+}
+
+.controlGroups {
   grid-column: 2;
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.25rem;
-  padding-inline: var(--pulse-space-2, 8px);
-}
-
-/* Six keys in a fixed three-by-two block. A fixed grid keeps every faceplate's
-   key rows aligned down the rack, whatever the key words are. */
-.actions {
+  min-inline-size: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  margin-block-start: 3px;
-  position: relative;
-  z-index: 2;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 5px;
+  overflow: hidden;
+  padding: 4px 7px;
 }
 
-/* Faceplate keys are small raised caps inside a hairline frame, dimmer than the
-   plate until they engage. The 24px target is carried by the transparent inset
-   below rather than by visual bulk. */
+.primaryControlGroups {
+  min-inline-size: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.controlGroup {
+  flex: 0 0 auto;
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--surface-well) 76%, transparent);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
+}
+
+.groupToggle {
+  align-self: stretch;
+  min-inline-size: 36px;
+  min-block-size: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px 4px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: var(--surface-raised);
+  border: 0;
+  border-inline-end: 1px solid var(--edge-hairline);
+  border-radius: 3px 0 0 3px;
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  cursor: pointer;
+}
+
+.groupToggle:hover {
+  color: var(--pulse-color-text-primary, #f3f5f6);
+}
+
+.groupToggle > span:last-child {
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  line-height: 8px;
+  color: var(--k);
+}
+
+.controlGroup[data-expanded="false"] .groupToggle {
+  border-inline-end: 0;
+  border-radius: 3px;
+}
+
+.groupBody {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px;
+  padding: 2px 6px;
+}
+
+.groupBody[hidden] {
+  display: none;
+}
+
+.groupBody :global([data-component="knob"]) {
+  min-inline-size: 38px;
+  gap: 1px;
+}
+
+.groupBody :global([data-component="knob"] [role="slider"]),
+.groupBody :global([data-component="knob"] [role="slider"] svg) {
+  inline-size: 34px;
+  block-size: 34px;
+}
+
+.groupBody :global([data-component="knob"] [role="slider"]) {
+  position: relative;
+}
+
+.groupBody :global([data-component="knob"] [role="slider"])::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 50%;
+  inline-size: 24px;
+  block-size: 24px;
+  translate: -50% -50%;
+}
+
+.groupBody :global([data-component="knob"] [data-part="value"]) {
+  stroke: color-mix(in srgb, var(--k) 82%, #cade6a);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--k) 75%, transparent));
+}
+
+.groupBody :global([data-component="knob"] > span) {
+  font-size: var(--pulse-type-10, 10px);
+}
+
 .action {
   position: relative;
-  min-height: 18px;
-  min-width: 24px;
-  padding: 2px 4px;
+  min-block-size: 24px;
+  min-inline-size: 28px;
+  padding: 2px 5px;
   text-align: center;
   font-family: var(--type-display);
   font-size: var(--pulse-type-10, 10px);
@@ -186,183 +292,123 @@
   cursor: pointer;
 }
 
-.action::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  inset-block-start: 50%;
-  block-size: 24px;
-  translate: 0 -50%;
-}
-
 .action:hover:not(:disabled) {
   color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
-.action:disabled {
-  background: none;
-  box-shadow: inset 0 0 0 1px var(--edge-hairline);
-  opacity: 0.45;
-  cursor: default;
-}
-
-/* An engaged key fills with the module color and loses the dimming, so the
-   change is a brightness step as well as a hue. */
 .action[data-active="true"] {
   color: var(--accent-ink);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--k) 72%, #ffffff),
-    color-mix(in srgb, var(--k) 96%, #000000) 55%,
-    color-mix(in srgb, var(--k) 90%, #000000)
-  );
-  box-shadow:
-    inset 0 1px 0 #ffffff2e,
-    0 1px 2px #00000080;
+  background: var(--k);
   filter: none;
 }
 
-/* The knob bank owns the full plate height, so the dials keep a readable face
-   at rack density instead of being squeezed under a row of keys. */
-.controls {
-  grid-column: 2;
-  align-self: center;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-evenly;
-  gap: 4px;
-  min-inline-size: 0;
-  padding-inline: 12px;
-}
-
-.controls :global([data-component="knob"]) {
-  min-inline-size: 42px;
-  gap: 1px;
-}
-
-/* The trailing bay: voice, audition, and the unit's output ladder. */
-.side {
-  grid-column: 3;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding-inline: var(--pulse-space-2, 8px);
-}
-
-.sideKeys {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-/* The rack is dense, so the dial keeps a compact face. The operable area is
-   carried by a transparent inset rather than by visual bulk, which is how the
-   24px minimum target is met without growing the faceplate. */
-.controls :global([data-component="knob"] [role="slider"]) {
-  position: relative;
-}
-
-.controls :global([data-component="knob"] [role="slider"])::after {
-  content: "";
-  position: absolute;
-  inset-inline-start: 50%;
-  inset-block-start: 50%;
-  inline-size: 24px;
-  block-size: 24px;
-  translate: -50% -50%;
-}
-
-.controls :global([data-component="knob"] [role="slider"]),
-.controls :global([data-component="knob"] [role="slider"] svg) {
-  inline-size: 38px;
-  block-size: 38px;
-}
-
-/* Rack arcs use a bright module color so value rings stay readable. */
-.controls :global([data-component="knob"] [data-part="value"]) {
-  stroke: color-mix(in srgb, var(--k) 82%, #cade6a);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--k) 75%, transparent));
-}
-
-/* Control captions sit at the 10px floor from spec-001 section 11.3. */
-.controls :global([data-component="knob"] > span) {
-  font-size: var(--pulse-type-10, 10px);
-}
-
-.voiceSelector {
+.voiceSelector,
+.enumControl {
   position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  width: fit-content;
-  font-size: var(--pulse-type-12, 12px);
-  color: var(--pulse-color-text-primary, #f3f5f6);
+  gap: 4px;
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
-/* Inside the faceplate the selector is lit type on glass, not a raised chip
-   fighting the plate. */
-.voiceSelector select {
-  min-height: 1.5rem;
+.voiceSelector > span,
+.enumControl > span {
   font-family: var(--type-display);
-  letter-spacing: 0.06em;
-  color: var(--k);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.voiceSelector select,
+.enumControl select {
+  min-block-size: 24px;
+  max-inline-size: 82px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-primary, #f3f5f6);
   background: var(--surface-well);
   box-shadow: var(--sink-1);
 }
 
-.voiceSelector > span {
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--pulse-color-text-muted, #919ba3);
+.enumControl {
+  flex-direction: column;
+  gap: 1px;
 }
 
-/* A folded unit keeps only its identity strip, so the rack can hold every slot
-   at once without the plate reflowing. */
-.module[data-collapsed="true"] {
-  flex-basis: 38px;
-  min-block-size: 38px;
-  max-block-size: 38px;
+.earHandle {
+  position: absolute;
+  z-index: 4;
+  inset-block: 0;
+  inline-size: 14px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
 }
 
-.module[data-collapsed="true"] .nameBlock {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  border-inline-end: 0;
-  box-shadow: none;
+.earStart {
+  inset-inline-start: 0;
 }
 
-.module[data-collapsed="true"] .subtitle {
-  flex: 1 1 auto;
+.earEnd {
+  inset-inline-end: 0;
 }
 
-.module[data-collapsed="true"] .actions {
-  margin-block-start: 0;
-  flex-wrap: nowrap;
+.earHandle > span {
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 50%;
+  inline-size: 3px;
+  translate: -50% 0;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--pulse-color-text-muted, #98a0ab) 0 2px,
+    transparent 2px 5px
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+.earHandle:hover > span,
+.earHandle:focus-visible > span {
+  opacity: 0.9;
+}
+
+.earHandle:focus-visible {
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: -2px;
+}
+
+.dragging {
+  opacity: 0.6;
+  cursor: grabbing;
+}
+
+.dropTarget {
+  box-shadow:
+    inset 0 1px 0 #ffffff2e,
+    inset 0 -1px 0 #0000008c,
+    0 0 0 2px var(--pulse-color-focus-inner, #ffffff),
+    0 3px 7px #0000008c;
+}
+
+.dropTarget::before {
+  background: var(--pulse-color-focus-inner, #ffffff);
 }
 
 @media (max-height: 900px) {
-  .module:not([data-collapsed="true"]) {
-    flex-basis: 80px;
-    min-block-size: 80px;
-    max-block-size: 80px;
+  .module:not([data-label="Empty"]) {
+    flex-basis: 66px;
+    min-block-size: 66px;
   }
 
-  /* The short row shrinks the drawn dial, never the operable area or the text.
-     The transparent inset above still carries the full 24px target. */
-  .controls :global([data-component="knob"] [role="slider"]),
-  .controls :global([data-component="knob"] [role="slider"] svg) {
+  .groupBody :global([data-component="knob"] [role="slider"]),
+  .groupBody :global([data-component="knob"] [role="slider"] svg) {
     inline-size: 30px;
     block-size: 30px;
-  }
-
-  .controls :global([data-component="knob"] > span) {
-    font-size: var(--pulse-type-10, 10px);
   }
 }

@@ -204,6 +204,41 @@ describe("PulseStore", () => {
     expect(store.undo()).toMatchObject({ status: "accepted", changed: false });
   });
 
+  it("keeps one undo entry per gesture when two gestures interleave", () => {
+    const ids = deterministicIds();
+    const store = createStore(ids);
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const originalCutoff = required(store.getState().project.modules[moduleId]).parameters.cutoff;
+    const originalVolume = required(store.getState().project.modules[moduleId]).parameters.volume;
+    const cutoffGesture = createGestureId(ids);
+    const volumeGesture = createGestureId(ids);
+    const set = (parameter: string, value: number, gestureId: typeof cutoffGesture) => {
+      store.dispatch(
+        store.createCommand("rack-parameter-set", { moduleId, parameter, value }, { gestureId }),
+      );
+    };
+
+    // Section 7.4: a wheel burst on two targets interleaves two open gestures.
+    set("cutoff", 900, cutoffGesture);
+    set("volume", 0.5, volumeGesture);
+    set("cutoff", 1200, cutoffGesture);
+    set("volume", 0.4, volumeGesture);
+
+    expect(required(store.getState().project.modules[moduleId]).parameters.cutoff).toBe(1200);
+    expect(required(store.getState().project.modules[moduleId]).parameters.volume).toBe(0.4);
+
+    // One entry per gesture: two undos restore the pre-gesture values exactly.
+    expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
+    expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
+    expect(required(store.getState().project.modules[moduleId]).parameters.cutoff).toBe(
+      originalCutoff,
+    );
+    expect(required(store.getState().project.modules[moduleId]).parameters.volume).toBe(
+      originalVolume,
+    );
+    expect(store.getState().history).toEqual({ canUndo: false, canRedo: true });
+  });
+
   it("rejects an oversized history entry before mutating state or engine projection", () => {
     const ids = deterministicIds();
     const deltas = vi.fn();
@@ -308,33 +343,70 @@ describe("PulseStore", () => {
     expect(store.getState().project.revision.epoch).not.toBe(previousEpoch);
   });
 
-  it("keeps collapse preference outside project revision and history", () => {
+  it("swaps the plugin while the module keeps identity, parts, and mixer state", () => {
     const ids = deterministicIds();
-    const store = createStore(ids);
+    const drumSeed = {
+      pluginId: "drum-analog-small" as PluginId,
+      parameters: { tone: 0.45, drive: 0.2 },
+      steps: seed.steps,
+    };
+    const seeds = new Map<PluginId, typeof seed | typeof drumSeed>([
+      [seed.pluginId, seed],
+      [drumSeed.pluginId, drumSeed],
+    ]);
+    const deltas = vi.fn();
+    const store = new PulseStore(
+      createDefaultState(ids, seed),
+      ids,
+      (pluginId) => seeds.get(pluginId),
+      deltas,
+    );
     const moduleId = required(store.getState().ui.selectedModuleId);
-    const revision = store.getState().project.revision;
+    store.dispatch(store.createCommand("mixer-level-set", { moduleId, level: 0.8 }));
+    const before = required(store.getState().project.modules[moduleId]);
+
     expect(
-      store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId })),
-    ).toMatchObject({ status: "accepted" });
-    expect(store.getState().project.revision).toBe(revision);
-    expect(store.getState().ui.collapsedModuleIds.has(moduleId)).toBe(true);
-    expect(store.undo()).toMatchObject({ status: "accepted", changed: false });
-  });
-
-  it("removes collapse preference and restores an undone module expanded", () => {
-    const ids = deterministicIds();
-    const store = createStore(ids);
-    const moduleId = required(store.getState().ui.selectedModuleId);
-
-    store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId }));
-    expect(store.getState().ui.collapsedModuleIds.has(moduleId)).toBe(true);
-
-    store.dispatch(store.createCommand("rack-module-remove", { moduleId }));
-    expect(store.getState().ui.collapsedModuleIds.has(moduleId)).toBe(false);
+      store.dispatch(
+        store.createCommand("rack-module-swap", { moduleId, pluginId: drumSeed.pluginId }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    const after = required(store.getState().project.modules[moduleId]);
+    expect(after.id).toBe(moduleId);
+    expect(after.pluginId).toBe(drumSeed.pluginId);
+    expect(after.parameters).toEqual(drumSeed.parameters);
+    expect(after.parts).toEqual(before.parts);
+    expect(after.level).toBe(0.8);
+    expect(deltas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: "module-swap",
+        payload: { moduleId, pluginId: drumSeed.pluginId },
+      }),
+    );
 
     store.undo();
-    expect(store.getState().project.modules[moduleId]?.id).toBe(moduleId);
-    expect(store.getState().ui.collapsedModuleIds.has(moduleId)).toBe(false);
+    const undone = required(store.getState().project.modules[moduleId]);
+    expect(undone.pluginId).toBe(seed.pluginId);
+    expect(undone.parameters).toEqual(before.parameters);
+  });
+
+  it("rejects a swap to an unregistered plugin and skips a same-plugin swap", () => {
+    const ids = deterministicIds();
+    const store = createStore(ids);
+    const moduleId = required(store.getState().ui.selectedModuleId);
+
+    expect(
+      store.dispatch(
+        store.createCommand("rack-module-swap", {
+          moduleId,
+          pluginId: "unknown-plugin" as PluginId,
+        }),
+      ),
+    ).toMatchObject({ status: "rejected", error: { field: "payload.pluginId" } });
+    expect(
+      store.dispatch(
+        store.createCommand("rack-module-swap", { moduleId, pluginId: seed.pluginId }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: false });
   });
 
   it("removes dangling UI references when Undo or Redo removes a module", () => {
@@ -347,12 +419,10 @@ describe("PulseStore", () => {
     );
     const addedModuleId = required(store.getState().project.rackSlots[1]?.moduleId);
     store.dispatch(store.createCommand("rack-module-select", { moduleId: addedModuleId }));
-    store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId: addedModuleId }));
 
     store.undo();
     expect(store.getState().project.modules[addedModuleId]).toBeUndefined();
     expect(store.getState().ui.selectedModuleId).toBeUndefined();
-    expect(store.getState().ui.collapsedModuleIds.has(addedModuleId)).toBe(false);
 
     store.redo();
     store.dispatch(store.createCommand("rack-module-select", { moduleId: addedModuleId }));

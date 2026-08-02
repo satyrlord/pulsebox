@@ -105,18 +105,77 @@ function SettingsIcon() {
   );
 }
 
+/**
+ * Leaf position readout. Position ticks update per animation frame during
+ * playback, so only this display re-renders, not the whole header.
+ */
+function TransportPosition(props: { readonly tempo: number }) {
+  const positionTicks = useAppStore((state) => state.positionTicks);
+  return (
+    <SegmentDisplay
+      className={styles.position}
+      fieldId="position"
+      label="Transport position"
+      primary={formatElapsed(positionTicks, props.tempo)}
+      secondary={formatPosition(positionTicks)}
+    />
+  );
+}
+
+/**
+ * Leaf master readout: the meter pair, the peak lamp, and the dB text. Master
+ * meter frames arrive per animation frame, so only these elements re-render.
+ */
+function MasterMeterReadout(props: {
+  readonly playing: boolean;
+  readonly meterMode: "lr" | "ms";
+}) {
+  const masterMeter = useAppStore((state) => state.masterMeter);
+  const peakHeld = useAppStore((state) => state.masterPeakHeld);
+  const { playing, meterMode } = props;
+  const channelOne = playing ? (meterMode === "lr" ? masterMeter.left : masterMeter.mid) : 0;
+  const channelTwo = playing ? (meterMode === "lr" ? masterMeter.right : masterMeter.side) : 0;
+  return (
+    <>
+      <div className={styles.masterMeters} aria-label="Two-channel master meter">
+        <span>{meterMode === "lr" ? "L" : "M"}</span>
+        <LevelMeter
+          label="Master meter channel one"
+          level={channelOne}
+          width={116}
+          height={6}
+          orientation="horizontal"
+        />
+        <span>{meterMode === "lr" ? "R" : "S"}</span>
+        <LevelMeter
+          label="Master meter channel two"
+          level={channelTwo}
+          width={116}
+          height={6}
+          orientation="horizontal"
+        />
+      </div>
+      <div className={styles.peak} data-lit={peakHeld}>
+        <Led label="Master peak" lit={peakHeld} />
+        <span aria-hidden="true">Peak</span>
+      </div>
+      <output className={styles.masterDb} aria-label="Master level in decibels">
+        {formatMasterDb(playing ? Math.max(masterMeter.left, masterMeter.right) : 0)}
+        <span> dB</span>
+      </output>
+    </>
+  );
+}
+
 export function TransportBar() {
   const status = useAppStore((state) => state.project.transport.status);
   const recordArmed = useAppStore((state) => state.project.transport.recordArmed);
   const tempo = useAppStore((state) => state.project.project.tempo);
   const songEnabled = useAppStore((state) => state.project.project.song.enabled);
-  const positionTicks = useAppStore((state) => state.positionTicks);
   const audioStatus = useAppStore((state) => state.audioStatus);
   const audioMessage = useAppStore((state) => state.audioMessage);
   const audioUnavailable = useAppStore((state) => state.audioUnavailable);
   const audioRuntimeState = useAppStore((state) => state.audioRuntimeState);
-  const masterMeter = useAppStore((state) => state.masterMeter);
-  const peakHeld = useAppStore((state) => state.masterPeakHeld);
   const meterMode = useAppStore((state) => state.meterMode);
   const metronomeEnabled = useAppStore((state) => state.metronomeEnabled);
   const play = useAppStore((state) => state.play);
@@ -124,6 +183,7 @@ export function TransportBar() {
   const stop = useAppStore((state) => state.stop);
   const toggleRecordArm = useAppStore((state) => state.toggleRecordArm);
   const setTempo = useAppStore((state) => state.setTempo);
+  const previewTempo = useAppStore((state) => state.previewTempo);
   const toggleSongMode = useAppStore((state) => state.toggleSongMode);
   const toggleMeterMode = useAppStore((state) => state.toggleMeterMode);
   const toggleMetronome = useAppStore((state) => state.toggleMetronome);
@@ -137,6 +197,7 @@ export function TransportBar() {
         pointerId: number;
         startY: number;
         startTempo: number;
+        value: number;
         dragging: boolean;
       }
     | undefined
@@ -144,8 +205,6 @@ export function TransportBar() {
   const tempoGesture = useContinuousGesture();
   const tempoDraft = draft ?? String(tempo);
   const playing = status === "playing";
-  const channelOne = playing ? (meterMode === "lr" ? masterMeter.left : masterMeter.mid) : 0;
-  const channelTwo = playing ? (meterMode === "lr" ? masterMeter.right : masterMeter.side) : 0;
 
   /**
    * A rejected tempo says what was wrong and what will work, and the field keeps
@@ -153,6 +212,7 @@ export function TransportBar() {
    * reverting would leave the user unable to tell a rejection from a no-op.
    */
   const commitTempo = () => {
+    if (tempoDrag.current?.dragging === true) return;
     const next = Number(tempoDraft);
     if (tempoDraft.trim() === "" || !Number.isFinite(next)) {
       setTempoError(
@@ -197,6 +257,7 @@ export function TransportBar() {
       pointerId: event.pointerId,
       startY: event.clientY,
       startTempo: tempo,
+      value: tempo,
       dragging: false,
     };
   };
@@ -207,7 +268,9 @@ export function TransportBar() {
     if (!drag.dragging) {
       if (Math.abs(delta) < TEMPO_DRAG_THRESHOLD_PIXELS) return;
       drag.dragging = true;
-      event.currentTarget.setPointerCapture(event.pointerId);
+      if (typeof event.currentTarget.setPointerCapture === "function") {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
     }
     event.preventDefault();
     const fine = event.shiftKey ? 4 : 1;
@@ -219,11 +282,31 @@ export function TransportBar() {
     );
     setDraft(undefined);
     setTempoError(undefined);
-    setTempo(next, tempoGesture.current());
+    if (next === drag.value) return;
+    drag.value = next;
+    setDraft(String(next));
+    previewTempo(next);
   };
   const onTempoPointerEnd = (event: ReactPointerEvent<HTMLInputElement>) => {
-    if (tempoDrag.current?.pointerId !== event.pointerId) return;
+    const drag = tempoDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
     tempoDrag.current = undefined;
+    if (drag.dragging && drag.value !== drag.startTempo) {
+      setDraft(undefined);
+      setTempo(drag.value, tempoGesture.current());
+    }
+    tempoGesture.end();
+  };
+  const onTempoPointerCancel = (event: ReactPointerEvent<HTMLInputElement>) => {
+    const drag = tempoDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    tempoDrag.current = undefined;
+    if (drag.dragging) {
+      setDraft(undefined);
+      setTempoError(undefined);
+      previewTempo(drag.startTempo);
+    }
+    tempoGesture.end();
   };
 
   const statusText = audioUnavailable
@@ -292,8 +375,14 @@ export function TransportBar() {
             <TransportIcon kind="record" />
           </button>
         </div>
-        <label className={styles.tempo} title="Tempo in beats per minute. Drag or type.">
+        <label
+          className={styles.tempo}
+          title="Beats per minute. Drag vertically or type a value."
+        >
           <span className={styles.srOnly}>Tempo</span>
+          <span className={styles.srOnly} id="tempo-description">
+            Beats per minute
+          </span>
           <input
             data-field="tempo"
             type="number"
@@ -303,7 +392,9 @@ export function TransportBar() {
             inputMode="numeric"
             aria-label="Tempo"
             aria-invalid={tempoError !== undefined}
-            aria-describedby={tempoError === undefined ? undefined : "tempo-error"}
+            aria-describedby={
+              tempoError === undefined ? "tempo-description" : "tempo-description tempo-error"
+            }
             value={tempoDraft}
             onChange={(event) => {
               setDraft(event.currentTarget.value);
@@ -314,7 +405,7 @@ export function TransportBar() {
             onPointerDown={onTempoPointerDown}
             onPointerMove={onTempoPointerMove}
             onPointerUp={onTempoPointerEnd}
-            onPointerCancel={onTempoPointerEnd}
+            onPointerCancel={onTempoPointerCancel}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
@@ -327,7 +418,6 @@ export function TransportBar() {
               commitTempo();
             }}
           />
-          <span>BPM</span>
         </label>
         <button
           type="button"
@@ -348,13 +438,7 @@ export function TransportBar() {
       <span className={styles.mark}>PULSEBOX</span>
 
       <div className={styles.right}>
-        <SegmentDisplay
-          className={styles.position}
-          fieldId="position"
-          label="Transport position"
-          primary={formatElapsed(positionTicks, tempo)}
-          secondary={formatPosition(positionTicks)}
-        />
+        <TransportPosition tempo={tempo} />
         <button
           type="button"
           className={styles.iconButton}
@@ -389,32 +473,7 @@ export function TransportBar() {
         >
           {meterMode === "lr" ? "L/R" : "M/S"}
         </button>
-        <div className={styles.masterMeters} aria-label="Two-channel master meter">
-          <span>{meterMode === "lr" ? "L" : "M"}</span>
-          <LevelMeter
-            label="Master meter channel one"
-            level={channelOne}
-            width={116}
-            height={6}
-            orientation="horizontal"
-          />
-          <span>{meterMode === "lr" ? "R" : "S"}</span>
-          <LevelMeter
-            label="Master meter channel two"
-            level={channelTwo}
-            width={116}
-            height={6}
-            orientation="horizontal"
-          />
-        </div>
-        <div className={styles.peak} data-lit={peakHeld}>
-          <Led label="Master peak" lit={peakHeld} />
-          <span aria-hidden="true">Peak</span>
-        </div>
-        <output className={styles.masterDb} aria-label="Master level in decibels">
-          {formatMasterDb(playing ? Math.max(masterMeter.left, masterMeter.right) : 0)}
-          <span> dB</span>
-        </output>
+        <MasterMeterReadout playing={playing} meterMode={meterMode} />
         <output className={`${styles.audioStatus} audio-status`} aria-live="polite">
           <Led label="Audio engine" lit={audioRuntimeState === "active"} decorative />
           {statusText}

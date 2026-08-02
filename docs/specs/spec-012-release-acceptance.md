@@ -117,7 +117,9 @@ The merged MVP is complete only when:
 47. **AC-047.** AudioWorklet plugins process the host-supplied frame count without
     assuming 128 frames. All fixed-block buffering has documented bounds.
 48. **AC-048.** 44.1 kHz and 48 kHz live playback meets the 1-millisecond event-time and
-    1-cent pitch tolerances in section 24.4.
+    1-cent pitch tolerances in section 24.4. Eight active modules stay aligned
+    during timing-control interaction. Humanize can vary module timing only
+    within its specified bound. A late scheduler pass does not replay expired note-ons.
 49. **AC-049.** Parameter sweeps meet their declared smoothing trajectories and the
     constant-input discontinuity threshold in section 24.4.
 50. **AC-050.** Sample boundaries use the approved micro-fades.

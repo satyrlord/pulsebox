@@ -46,6 +46,7 @@ export type PulseEngineDelta = EngineDelta<
   | "module-add"
   | "module-remove"
   | "module-move"
+  | "module-swap"
   | "parameter-set"
   | "step-set"
   | "transport"
@@ -352,8 +353,6 @@ export class PulseStore {
           projectChanged: false,
         };
       }
-      case "rack-module-collapse-toggle":
-        return this.#toggleCollapse(command.payload.moduleId);
       case "rack-module-add":
         return this.#addModule(command.payload.slotId, command.payload.pluginId);
       case "rack-module-duplicate":
@@ -362,6 +361,8 @@ export class PulseStore {
         return this.#remove(command.payload.moduleId);
       case "rack-module-move":
         return this.#move(command.payload.moduleId, command.payload.slotId);
+      case "rack-module-swap":
+        return this.#swap(command.payload.moduleId, command.payload.pluginId);
       case "rack-parameter-set":
         return this.#setParameter(
           command.payload.moduleId,
@@ -408,8 +409,8 @@ export class PulseStore {
     }
   }
 
-  #setSwing(swing: number) {
-    if (!Number.isFinite(swing) || swing < 0 || swing > 1) {
+  #setSwing(rawSwing: number) {
+    if (!Number.isFinite(rawSwing) || rawSwing < 0 || rawSwing > 1) {
       return {
         error: rejected(
           "payload.swing",
@@ -418,6 +419,9 @@ export class PulseStore {
         ),
       };
     }
+    // The document stores whole percent, so the accepted value snaps to the
+    // same grid. Otherwise a saved project would replay with shifted timing.
+    const swing = Math.round(rawSwing * 100) / 100;
     if (swing === this.#state.project.swing)
       return { state: this.#state, projectChanged: false as const };
     return this.#projectTransition({ ...this.#state.project, swing }, "transport", [], { swing });
@@ -815,8 +819,6 @@ export class PulseStore {
     const modules = Object.fromEntries(
       Object.entries(this.#state.project.modules).filter(([id]) => id !== moduleId),
     ) as Readonly<Record<ModuleInstanceId, RackModuleState>>;
-    const collapsedModuleIds = new Set(this.#state.ui.collapsedModuleIds);
-    collapsedModuleIds.delete(moduleId);
     return this.#projectTransition(
       {
         ...this.#state.project,
@@ -833,7 +835,6 @@ export class PulseStore {
           this.#state.ui.selectedModuleId === moduleId
             ? undefined
             : this.#state.ui.selectedModuleId,
-        collapsedModuleIds,
       },
     );
   }
@@ -869,6 +870,46 @@ export class PulseStore {
       "module-move",
       [moduleId, slotId],
       { moduleId, slotId },
+    );
+  }
+
+  /**
+   * Section 14: a swap replaces the plugin and its parameters while the module
+   * keeps its identity, Pattern parts, and mixer state. Event data survives in
+   * place; a target that cannot map a note simply does not sound it, and the UI
+   * reports the unmapped count through the non-blocking result panel.
+   */
+  #swap(moduleId: ModuleInstanceId, pluginId: PluginId) {
+    const module = this.#state.project.modules[moduleId];
+    if (module === undefined)
+      return {
+        error: rejected("payload.moduleId", "Module does not exist.", "Swap a loaded module."),
+      };
+    if (module.pluginId === pluginId)
+      return { state: this.#state, projectChanged: false as const };
+    const seed = this.#moduleSeedFor(pluginId);
+    if (seed === undefined) {
+      return {
+        error: rejected(
+          "payload.pluginId",
+          "Plugin is not registered.",
+          "Choose an instrument from the module browser.",
+        ),
+      };
+    }
+    const nextModule: RackModuleState = {
+      ...module,
+      pluginId,
+      parameters: { ...seed.parameters },
+    };
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        modules: { ...this.#state.project.modules, [moduleId]: nextModule },
+      },
+      "module-swap",
+      [moduleId],
+      { moduleId, pluginId },
     );
   }
 
@@ -945,20 +986,6 @@ export class PulseStore {
     );
   }
 
-  #toggleCollapse(moduleId: ModuleInstanceId) {
-    if (this.#state.project.modules[moduleId] === undefined)
-      return {
-        error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module."),
-      };
-    const collapsed = new Set(this.#state.ui.collapsedModuleIds);
-    if (collapsed.has(moduleId)) collapsed.delete(moduleId);
-    else collapsed.add(moduleId);
-    return {
-      state: { ...this.#state, ui: { ...this.#state.ui, collapsedModuleIds: collapsed } },
-      projectChanged: false,
-    };
-  }
-
   #projectTransition(
     project: ProjectState,
     kind: PulseEngineDelta["kind"],
@@ -980,12 +1007,20 @@ export class PulseStore {
     after: ProjectState,
     gestureId: GestureId | undefined,
   ): HistoryPlan | { readonly error: CommandResult } {
-    const previousEntry = this.#undo.at(-1);
-    const coalescedEntry =
-      gestureId !== undefined && previousEntry?.gestureId === gestureId ? previousEntry : undefined;
+    // Two gestures can interleave, as when a wheel burst runs on two targets,
+    // so the matching entry is not always on top. The newest entry with the
+    // same gesture ID absorbs this edit in place: moving it to the top would
+    // reorder history and make a later undo restore a mid-gesture state. The
+    // scan is bounded by the 100-entry stack.
+    const coalescedIndex =
+      gestureId === undefined
+        ? -1
+        : this.#undo.findLastIndex((entry) => entry.gestureId === gestureId);
+    const coalescedEntry = coalescedIndex === -1 ? undefined : this.#undo[coalescedIndex];
     const entryBefore = coalescedEntry?.before ?? before;
-    const undo = coalescedEntry === undefined ? [...this.#undo] : this.#undo.slice(0, -1);
+    const undo = [...this.#undo];
     if (coalescedEntry !== undefined && sameProjectContent(entryBefore, after)) {
+      undo.splice(coalescedIndex, 1);
       return { undo };
     }
     const bytes = new TextEncoder().encode(
@@ -999,6 +1034,17 @@ export class PulseStore {
           "Reduce the edited project data before retrying.",
         ),
       };
+    }
+
+    if (coalescedIndex !== -1) {
+      undo[coalescedIndex] = { before: entryBefore, after, bytes, gestureId };
+      let historyBytes = undo.reduce((total, entry) => total + entry.bytes, 0);
+      while (historyBytes > MAX_HISTORY_BYTES) {
+        const evicted = undo.shift();
+        if (evicted === undefined) break;
+        historyBytes -= evicted.bytes;
+      }
+      return { undo };
     }
 
     let historyBytes = undo.reduce((total, entry) => total + entry.bytes, 0);
@@ -1063,30 +1109,49 @@ function reconcileUiReferences(project: ProjectState, ui: PulseState["ui"]): Pul
     ui.selectedModuleId !== undefined && project.modules[ui.selectedModuleId] !== undefined
       ? ui.selectedModuleId
       : undefined;
-  const collapsedModuleIds = new Set(
-    [...ui.collapsedModuleIds].filter((moduleId) => project.modules[moduleId] !== undefined),
-  );
-  return { ...ui, selectedModuleId, collapsedModuleIds };
+  return { ...ui, selectedModuleId };
 }
 
 function sameProjectContent(left: ProjectState, right: ProjectState): boolean {
-  return JSON.stringify(projectContent(left)) === JSON.stringify(projectContent(right));
+  return (
+    left.id === right.id &&
+    left.lineageId === right.lineageId &&
+    left.name === right.name &&
+    left.tempo === right.tempo &&
+    left.swing === right.swing &&
+    left.masterLevel === right.masterLevel &&
+    sameStructuredValue(left.rackSlots, right.rackSlots) &&
+    sameStructuredValue(left.modules, right.modules) &&
+    sameStructuredValue(left.patterns, right.patterns) &&
+    left.activePatternIndex === right.activePatternIndex &&
+    sameStructuredValue(left.song, right.song)
+  );
 }
 
-function projectContent(project: ProjectState): Omit<ProjectState, "revision"> {
-  return {
-    id: project.id,
-    lineageId: project.lineageId,
-    name: project.name,
-    tempo: project.tempo,
-    swing: project.swing,
-    masterLevel: project.masterLevel,
-    rackSlots: project.rackSlots,
-    modules: project.modules,
-    patterns: project.patterns,
-    activePatternIndex: project.activePatternIndex,
-    song: project.song,
-  };
+/** Compares immutable project data without serializing the full project. */
+function sameStructuredValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (typeof left !== "object" || left === null || typeof right !== "object" || right === null) {
+    return false;
+  }
+  if (Array.isArray(left)) {
+    if (!Array.isArray(right) || left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (!sameStructuredValue(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  if (Array.isArray(right)) return false;
+  const leftRecord = left as Readonly<Record<string, unknown>>;
+  const rightRecord = right as Readonly<Record<string, unknown>>;
+  const leftKeys = Object.keys(leftRecord);
+  if (leftKeys.length !== Object.keys(rightRecord).length) return false;
+  for (const key of leftKeys) {
+    if (!Object.hasOwn(rightRecord, key) || !sameStructuredValue(leftRecord[key], rightRecord[key])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function rejected(field: string, message: string, recoveryAction: string): CommandResult {

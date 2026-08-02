@@ -18,7 +18,7 @@ describe("Phase 0 project-format fixture definitions", () => {
         PROJECT_FORMAT_FIXTURE_DEFINITIONS.filter((fixture) => fixture.group === group).length,
       ]),
     );
-    expect(counts).toEqual({ valid: 7, rejection: 12, repair: 5, storage: 11 });
+    expect(counts).toEqual({ valid: 7, rejection: 12, repair: 5, storage: 10 });
   });
 
   it("gives every definition an actionable expected assertion", () => {

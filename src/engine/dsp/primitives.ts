@@ -26,12 +26,66 @@ export function softClip(value: number): number {
 }
 
 /**
- * Equal-power stereo placement. A centred voice keeps its apparent loudness
- * when panned, which a linear law would not preserve.
+ * The ramp length every drum manifest declares for its smoothed float fields
+ * (`smoothing: { curve: "linear", durationMilliseconds: 8 }`). The DSP cores
+ * share this constant so the rendered ramp matches the declared descriptor.
  */
-export function panGains(pan: number): readonly [number, number] {
-  const angle = ((clamp(pan, -1, 1) + 1) * Math.PI) / 4;
-  return [Math.cos(angle), Math.sin(angle)];
+const DECLARED_SMOOTHING_SECONDS = 0.008;
+
+/**
+ * Equal-power stereo placement with a per-frame glide.
+ *
+ * A drum machine owns one instance for each voice. The render loop advances it
+ * toward the committed pan and reads two numbers; trigonometry reruns only on
+ * the frames where the position is still moving.
+ */
+export class EqualPowerPan {
+  #pan = 0;
+  #left = 0;
+  #right = 0;
+  readonly #step: number;
+
+  constructor(pan: number, sampleRate: number, seconds = DECLARED_SMOOTHING_SECONDS) {
+    this.#step = 1 / Math.max(1, Math.round(sampleRate * seconds));
+    this.set(pan);
+  }
+
+  /** Jumps immediately. Used when a whole-state snapshot replaces the value. */
+  set(pan: number): void {
+    this.#pan = clamp(pan, -1, 1);
+    this.#apply();
+  }
+
+  /**
+   * Glides one frame toward the target position. The manifests declare pan as
+   * a smoothed field, and a stepped pan on a ringing voice is a single-frame
+   * gain step on each channel, so the position ramps like every other smoothed
+   * parameter.
+   */
+  advance(target: number): void {
+    const bounded = clamp(target, -1, 1);
+    const difference = bounded - this.#pan;
+    if (difference === 0) return;
+    this.#pan =
+      Math.abs(difference) <= this.#step
+        ? bounded
+        : this.#pan + Math.sign(difference) * this.#step;
+    this.#apply();
+  }
+
+  #apply(): void {
+    const angle = ((this.#pan + 1) * Math.PI) / 4;
+    this.#left = Math.cos(angle);
+    this.#right = Math.sin(angle);
+  }
+
+  get left(): number {
+    return this.#left;
+  }
+
+  get right(): number {
+    return this.#right;
+  }
 }
 
 /**
@@ -134,6 +188,10 @@ export class StateVariableFilter {
     // cannot come back from. Clearing it costs one branch and keeps a single bad
     // sample from silencing the instrument for the rest of the session.
     if (!Number.isFinite(this.#low + this.#band + this.#high)) this.reset();
+  }
+
+  get low(): number {
+    return this.#low;
   }
 
   get band(): number {
@@ -266,7 +324,7 @@ export class ParameterGlide {
   readonly #step: number;
   #value: number;
 
-  constructor(initial: number, sampleRate: number, seconds = 0.02) {
+  constructor(initial: number, sampleRate: number, seconds = DECLARED_SMOOTHING_SECONDS) {
     this.#value = initial;
     this.#step = 1 / Math.max(1, Math.round(sampleRate * seconds));
   }
@@ -284,5 +342,44 @@ export class ParameterGlide {
         ? target
         : this.#value + Math.sign(difference) * this.#step;
     return this.#value;
+  }
+}
+
+/**
+ * Per-voice mute and solo gates for a machine's voice mix.
+ *
+ * Section 15.2 gives every drum voice a mute and a solo. Both decide whether a
+ * voice reaches the mix, so a naive gate drops a ringing tail to zero in one
+ * frame, which is an audible click. Each voice therefore keeps its own glide
+ * and the gate is a gain the mix multiplies by, not a branch that skips it.
+ *
+ * A voice still renders while gated, so envelopes and chokes keep their place
+ * in time and un-muting mid-tail resumes where the voice really is.
+ */
+export class VoiceMixGates {
+  readonly #gains: readonly ParameterGlide[];
+
+  /**
+   * Gates address voices by index into the machine's own roster array. Every
+   * DSP core builds its voice list from that same array, so the render loop's
+   * voice index is the gate index. An index avoids a per-frame-per-voice hash
+   * lookup inside the real-time render loop.
+   */
+  constructor(voiceCount: number, sampleRate: number) {
+    this.#gains = Array.from({ length: voiceCount }, () => new ParameterGlide(1, sampleRate));
+  }
+
+  /**
+   * Gain for one voice this frame, given its own switches and whether any voice
+   * on the machine is soloed. Mute wins over solo on the same voice.
+   */
+  advance(voiceIndex: number, muted: boolean, soloed: boolean, soloActive: boolean): number {
+    const audible = !muted && (!soloActive || soloed);
+    return this.#gains[voiceIndex]?.advance(audible ? 1 : 0) ?? 1;
+  }
+
+  /** Jumps every gate to its target. Used when a snapshot replaces the state. */
+  set(voiceIndex: number, muted: boolean, soloed: boolean, soloActive: boolean): void {
+    this.#gains[voiceIndex]?.set(!muted && (!soloActive || soloed) ? 1 : 0);
   }
 }

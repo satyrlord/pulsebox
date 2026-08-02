@@ -3,12 +3,19 @@ import type { ModuleInstanceId, StateRevision } from "../../contracts/ids";
 import type { ParameterValue, PluginId } from "../../contracts/parameters";
 import {
   chainedStepResolver,
+  highestStepBefore,
   loopingStepResolver,
+  pendingReleaseEvent,
   schedulePatternWindow,
   type PatternTiming,
+  type PatternWindowRequest,
   type StepResolver,
 } from "./pattern-scheduler";
-import type { PatternStepView } from "./scheduled-event";
+import {
+  compareScheduledVoiceEvents,
+  type PatternStepView,
+  type ScheduledVoiceEvent,
+} from "./scheduled-event";
 import { TransportClock } from "./transport-clock";
 import type {
   VoiceAdapterFactory,
@@ -44,6 +51,7 @@ export type TransportEngineDelta = EngineDelta<
   | "module-add"
   | "module-remove"
   | "module-move"
+  | "module-swap"
   | "parameter-set"
   | "step-set"
   | "transport"
@@ -95,11 +103,11 @@ export type TransportRuntimeStatus =
   | { readonly moduleId: ModuleInstanceId; readonly state: "recovered" };
 
 /**
- * The brief's window: schedule 100 ms ahead, wake every 25 ms. The tick only
- * decides *when to look*; every note is stamped with an absolute audio frame, so
- * timer jitter cannot move a note.
+ * Keep half a second of frame-stamped events at each processor. This verified
+ * margin is longer than the allowed UI long task, so UI work does not own the
+ * next musical deadline. The audio thread still applies each event at its frame.
  */
-const SCHEDULER_LOOKAHEAD_SECONDS = 0.1;
+const SCHEDULER_LOOKAHEAD_SECONDS = 0.5;
 const SCHEDULER_TICK_MILLISECONDS = 25;
 
 /**
@@ -110,6 +118,9 @@ const SCHEDULER_LEAD_SECONDS = 0.02;
 
 /** A sixteenth at 960 ticks per quarter. */
 const TICKS_PER_STEP = 240;
+
+/** Matches the transport clock's tick resolution. */
+const TICKS_PER_QUARTER = 960;
 
 /** One 4/4 bar of sixteenths: the default Pattern-launch boundary. */
 const DEFAULT_LAUNCH_QUANTIZATION_STEPS = 16;
@@ -136,6 +147,28 @@ export interface TransportRuntimeOptions {
 
 interface AuditionSession {
   adapter?: VoiceAdapterPort;
+}
+
+/**
+ * The old-timing facts a bounded queue clear still needs, captured before the
+ * change mutates that timing. The imminent events themselves stay in each
+ * processor queue: the clear keeps everything before the rebuild frame.
+ */
+interface CapturedLeadWindow {
+  /**
+   * Highest absolute step per module whose onset under the captured timing lies
+   * before the rebuild frame. A timing-change rebuild emits only steps above
+   * it, so every step across the change fires exactly once.
+   */
+  readonly lastStepBefore: ReadonlyMap<ModuleInstanceId, number>;
+  /**
+   * The one release per module that the bounded clear drops: the note-off owed
+   * by the newest kept onset when that note-off lies at or past the rebuild
+   * frame. Re-sent so the kept note still ends on its natural gate.
+   */
+  readonly releases: ReadonlyMap<ModuleInstanceId, ScheduledVoiceEvent>;
+  /** True when a pending Pattern-launch boundary lay inside the window. */
+  readonly launchBoundaryInside: boolean;
 }
 
 interface MetronomeVoice {
@@ -187,9 +220,14 @@ export class TransportRuntime {
   #nextScheduleFrame = 0;
   #swing = 0;
   #patternTiming: readonly PatternTiming[] = [];
+  #previewTempo: number | undefined;
+  #previewSwing: number | undefined;
+  #previewPatternTiming: readonly PatternTiming[] | undefined;
+  #timingPreviewTimer: ReturnType<typeof setTimeout> | undefined;
   #arrangement: TransportArrangement = DEFAULT_ARRANGEMENT;
   /** A Pattern launch waiting for its quantization boundary. */
   #pendingArrangement: TransportArrangement | undefined;
+  #pendingArrangementFrame: number | undefined;
   #launchQuantizationSteps = DEFAULT_LAUNCH_QUANTIZATION_STEPS;
   /** The transport start marker, kept even before the clock exists. */
   #seekTicks: number | undefined;
@@ -221,11 +259,15 @@ export class TransportRuntime {
    * whole song. Rebuilding that forty times a second is work the arrangement
    * does not need, so the cache is cleared whenever the inputs change.
    */
-  #resolverFor(module: TransportModule): StepResolver {
-    const cached = this.#resolvers.get(module.id);
+  #resolverFor(
+    module: TransportModule,
+    arrangement: TransportArrangement = this.#arrangement,
+  ): StepResolver {
+    const usesCurrentArrangement = arrangement === this.#arrangement;
+    const cached = usesCurrentArrangement ? this.#resolvers.get(module.id) : undefined;
     if (cached?.parts === module.parts) return cached.resolve;
 
-    const { activePatternIndex, songEnabled, songEntries } = this.#arrangement;
+    const { activePatternIndex, songEnabled, songEntries } = arrangement;
     let resolve: StepResolver;
     if (!songEnabled || songEntries.length === 0) {
       resolve = loopingStepResolver(module.parts[activePatternIndex] ?? [], activePatternIndex);
@@ -241,7 +283,7 @@ export class TransportRuntime {
       }
       resolve = chainedStepResolver(chain);
     }
-    this.#resolvers.set(module.id, { parts: module.parts, resolve });
+    if (usesCurrentArrangement) this.#resolvers.set(module.id, { parts: module.parts, resolve });
     return resolve;
   }
 
@@ -274,7 +316,40 @@ export class TransportRuntime {
       arrangement.songEntries === current.songEntries &&
       arrangement.activePatternIndex !== current.activePatternIndex;
     if (patternLaunchOnly) {
+      const frame = this.#currentFrame(context);
+      const releaseFrame = frame + this.#leadFrames(context);
+      const stepFrames = this.#exactStepFrames(context, clock, frame);
+      const boundary = this.#launchBoundaryFrame(stepFrames, releaseFrame);
       this.#pendingArrangement = arrangement;
+      this.#pendingArrangementFrame = boundary;
+      // When the boundary lies beyond every queued event, nothing queued
+      // crosses it. The queue stays valid and the scheduler splits its next
+      // windows at the boundary, so no voice is cut and no onset is dropped.
+      if (boundary >= this.#nextScheduleFrame) return;
+      // The queued horizon crosses the boundary. Everything before it is the
+      // active Pattern, which sounds until the launch, so only the tail from
+      // the boundary is dropped and refilled with the launched Pattern. The
+      // metronome grid does not move, so the clicks stay untouched.
+      for (const [moduleId, adapter] of this.#adapters) {
+        const module = this.#modules.get(moduleId);
+        if (module === undefined) continue;
+        // Humanize can push the last kept onset's release across the on-grid
+        // boundary. The bounded clear would drop it, so it is re-sent.
+        const release = pendingReleaseEvent(
+          this.#moduleWindowRequest(module, stepFrames, frame + 1, boundary),
+          boundary,
+        );
+        adapter.clearScheduledEvents(boundary);
+        if (release !== undefined) adapter.schedule([release]);
+        this.#scheduleModuleWindow(
+          module,
+          adapter,
+          stepFrames,
+          boundary,
+          this.#nextScheduleFrame,
+          arrangement,
+        );
+      }
       return;
     }
 
@@ -287,6 +362,7 @@ export class TransportRuntime {
 
   #applyArrangementNow(arrangement: TransportArrangement): void {
     this.#pendingArrangement = undefined;
+    this.#pendingArrangementFrame = undefined;
     this.#arrangement = arrangement;
     // Every cached resolver was built for the previous arrangement.
     this.#resolvers.clear();
@@ -300,14 +376,21 @@ export class TransportRuntime {
 
   /** Pattern-owned Humanize and seed, by bank index. */
   setPatternTiming(timing: readonly PatternTiming[]): void {
-    this.#patternTiming = timing;
-    const context = this.#context;
-    const clock = this.#clock;
-    if (context === undefined || clock === undefined) return;
-    const frame = this.#currentFrame(context);
-    const snapshot = clock.getSnapshot(frame);
-    if (snapshot.status === "playing")
-      this.#reanchor(context, clock, frame, snapshot.positionTicks);
+    this.#previewPatternTiming = undefined;
+    this.#applyTimingChange({ patternTiming: timing });
+  }
+
+  /** Coalesces pointer-rate Humanize previews into one transport update. */
+  previewPatternHumanize(patternIndex: number, humanize: number): void {
+    if (!Number.isInteger(patternIndex) || patternIndex < 0) return;
+    const timing = [...(this.#previewPatternTiming ?? this.#patternTiming)];
+    const current = timing[patternIndex] ?? { humanize: 0, seed: 0 };
+    timing[patternIndex] = {
+      ...current,
+      humanize: Math.min(1, Math.max(0, Number.isFinite(humanize) ? humanize : 0)),
+    };
+    this.#previewPatternTiming = timing;
+    this.#scheduleTimingPreview();
   }
 
   setMasterLevel(level: number): void {
@@ -484,6 +567,7 @@ export class TransportRuntime {
         if (this.#context !== undefined) {
           const adapter = await this.#ensureAdapter(moduleProjection);
           adapter?.replaceState(moduleProjection.parameters, delta.projectRevision);
+          this.#scheduleRecoveredModule(moduleProjection.id);
         }
         return;
       }
@@ -497,6 +581,26 @@ export class TransportRuntime {
         this.#adapters.delete(moduleId);
         this.#disposeChannel(moduleId);
         this.#applyMix();
+        return;
+      }
+      case "module-swap": {
+        if (moduleProjection === undefined) {
+          throw new Error("Module swap requires its bounded module projection.");
+        }
+        const moduleId = moduleProjection.id;
+        this.#setRevision(delta.projectRevision);
+        // Only this module's voice restarts. Its mixer channel stays connected,
+        // so unrelated audio and the module's own mix state are untouched.
+        this.stopAudition(moduleId);
+        this.#modules.set(moduleId, moduleProjection);
+        this.#resolvers.delete(moduleId);
+        this.#adapters.get(moduleId)?.dispose();
+        this.#adapters.delete(moduleId);
+        if (this.#context !== undefined) {
+          const adapter = await this.#ensureAdapter(moduleProjection);
+          adapter?.replaceState(moduleProjection.parameters, delta.projectRevision);
+          this.#scheduleRecoveredModule(moduleProjection.id);
+        }
         return;
       }
       case "parameter-set": {
@@ -526,6 +630,7 @@ export class TransportRuntime {
                 : steps,
             ),
           });
+          this.#rescheduleModule(moduleId);
         }
         return;
       }
@@ -671,7 +776,14 @@ export class TransportRuntime {
       },
     });
     session.adapter = adapter;
-    await adapter.prepare();
+    try {
+      await adapter.prepare();
+    } catch (error) {
+      // stopAudition disposes the in-flight adapter, and that disposal rejects
+      // the pending handshake. A cancelled audition is not a failure.
+      if (this.#auditions.get(moduleId) !== session) return;
+      throw error;
+    }
     if (this.#auditions.get(moduleId) !== session) {
       adapter.dispose();
       return;
@@ -697,27 +809,87 @@ export class TransportRuntime {
   }
 
   setTempo(tempo: number): void {
-    const context = this.#context;
-    const clock = this.#clock;
-    if (context === undefined || clock === undefined) return;
-    const frame = this.#currentFrame(context);
-    const snapshot = clock.getSnapshot(frame);
-    clock.setTempo(tempo, frame);
-    if (snapshot.status === "playing")
-      this.#reanchor(context, clock, frame, snapshot.positionTicks);
+    this.#previewTempo = undefined;
+    this.#applyTimingChange({ tempo });
+  }
+
+  /** Coalesces pointer-rate tempo previews into one transport update. */
+  previewTempo(tempo: number): void {
+    if (!Number.isFinite(tempo) || tempo < 40 || tempo > 240) return;
+    this.#previewTempo = tempo;
+    this.#scheduleTimingPreview();
   }
 
   setSwing(swing: number): void {
-    const next = Math.min(1, Math.max(0, Number.isFinite(swing) ? swing : 0));
-    if (next === this.#swing) return;
-    this.#swing = next;
+    this.#previewSwing = undefined;
+    this.#applyTimingChange({ swing });
+  }
+
+  /** Coalesces pointer-rate Swing previews into one transport update. */
+  previewSwing(swing: number): void {
+    this.#previewSwing = Math.min(1, Math.max(0, Number.isFinite(swing) ? swing : 0));
+    this.#scheduleTimingPreview();
+  }
+
+  #applyTimingChange(change: {
+    readonly tempo?: number;
+    readonly swing?: number;
+    readonly patternTiming?: readonly PatternTiming[];
+  }): void {
     const context = this.#context;
     const clock = this.#clock;
-    if (context === undefined || clock === undefined) return;
+    const nextSwing =
+      change.swing === undefined
+        ? this.#swing
+        : Math.min(1, Math.max(0, Number.isFinite(change.swing) ? change.swing : 0));
+    const nextPatternTiming = change.patternTiming ?? this.#patternTiming;
+    const timingChanged = !samePatternTiming(nextPatternTiming, this.#patternTiming);
+    const swingChanged = nextSwing !== this.#swing;
+
+    if (context === undefined || clock === undefined) {
+      this.#swing = nextSwing;
+      this.#patternTiming = nextPatternTiming;
+      return;
+    }
     const frame = this.#currentFrame(context);
     const snapshot = clock.getSnapshot(frame);
-    if (snapshot.status === "playing")
-      this.#reanchor(context, clock, frame, snapshot.positionTicks);
+    const tempoChanged = change.tempo !== undefined && change.tempo !== snapshot.tempo;
+    if (!tempoChanged && !swingChanged && !timingChanged) return;
+    // Capture the lead-window events before the change. The re-anchor below
+    // clears each queue, and these events are still due under the timing the
+    // listener hears now, so they must survive the rebuild.
+    const preserved =
+      snapshot.status === "playing"
+        ? this.#captureLeadWindow(context, clock, frame)
+        : undefined;
+    if (tempoChanged) clock.setTempo(change.tempo ?? snapshot.tempo, frame);
+    this.#swing = nextSwing;
+    this.#patternTiming = nextPatternTiming;
+    if (preserved !== undefined) {
+      // Only a tempo change stretches the grid around the playhead, so only
+      // it re-pins the anchor. Re-deriving the anchor for a Swing or Humanize
+      // change would move the whole grid by the clock's float rounding, and
+      // that jitter would land audibly in the recomputed events.
+      this.#reanchor(context, clock, frame, snapshot.positionTicks, preserved, tempoChanged);
+    }
+  }
+
+  #scheduleTimingPreview(): void {
+    if (this.#timingPreviewTimer !== undefined) return;
+    this.#timingPreviewTimer = setTimeout(() => {
+      this.#timingPreviewTimer = undefined;
+      const tempo = this.#previewTempo;
+      const swing = this.#previewSwing;
+      const patternTiming = this.#previewPatternTiming;
+      this.#previewTempo = undefined;
+      this.#previewSwing = undefined;
+      this.#previewPatternTiming = undefined;
+      this.#applyTimingChange({
+        ...(tempo === undefined ? {} : { tempo }),
+        ...(swing === undefined ? {} : { swing }),
+        ...(patternTiming === undefined ? {} : { patternTiming }),
+      });
+    }, SCHEDULER_TICK_MILLISECONDS);
   }
 
   setMetronomeEnabled(enabled: boolean): void {
@@ -789,6 +961,8 @@ export class TransportRuntime {
 
   dispose(): void {
     this.#stopScheduler();
+    if (this.#timingPreviewTimer !== undefined) clearTimeout(this.#timingPreviewTimer);
+    this.#timingPreviewTimer = undefined;
     this.#stopScheduledClicks(0);
     this.#stopAllAuditions();
     for (const adapter of this.#adapters.values()) adapter.dispose();
@@ -860,26 +1034,167 @@ export class TransportRuntime {
    * drops anything already queued past the playhead, so a tempo or swing change
    * takes effect without a doubled or dropped step.
    *
-   * Clearing the queue also discards the note-off that belonged to a note whose
-   * onset already played, and the rebuilt window never re-emits it. Each voice
-   * therefore gets one explicit release at the re-anchor point; a note-off with
-   * no sounding note is harmless.
+   * With a capture, the clear is bounded: every queued event before the rebuild
+   * frame stays in the processor queue exactly as it was sent, so a preview
+   * flush never drops an imminent step. The one release the bounded clear drops
+   * is re-sent, so the kept note still ends on its natural gate. Without a
+   * capture, the whole queue clears and each voice gets one explicit release at
+   * the re-anchor point; a note-off with no sounding note is harmless.
+   *
+   * A preserved rebuild also plays each step exactly once across the change.
+   * The kept events keep their old-timing frames. A catch-up window under the
+   * new timing rescues a step the change pulled into the lead window, and the
+   * per-module step filter keeps the rebuild from re-emitting a step the kept
+   * queue already carries.
    */
   #reanchor(
     context: AudioContext,
     clock: TransportClock,
     frame: number,
     positionTicks: number,
+    preserved?: CapturedLeadWindow,
+    repinGrid = true,
   ): void {
     const releaseFrame = frame + this.#leadFrames(context);
-    for (const adapter of this.#adapters.values()) {
-      adapter.clearScheduledEvents();
-      adapter.schedule([{ atFrame: releaseFrame, type: "note-off" }]);
+    if (preserved === undefined) {
+      for (const adapter of this.#adapters.values()) {
+        adapter.clearScheduledEvents();
+        adapter.schedule([{ atFrame: releaseFrame, type: "note-off" }]);
+      }
+      this.#stopScheduledClicks(frame);
+    } else {
+      // The kept lead window still sounds, so only the events and clicks at
+      // or past the rebuild point are replaced.
+      for (const adapter of this.#adapters.values()) {
+        adapter.clearScheduledEvents(releaseFrame);
+      }
+      this.#stopScheduledClicks(releaseFrame);
     }
-    this.#stopScheduledClicks(frame);
-    this.#patternStartFrame = frame - clock.ticksToFrames(positionTicks);
+    // A Swing or Humanize change keeps the anchor: re-deriving it through the
+    // clock's float path can move the whole grid by a frame per flush.
+    if (repinGrid) this.#patternStartFrame = frame - clock.ticksToFrames(positionTicks);
+    const stepFrames = this.#exactStepFrames(context, clock, frame);
+    if (this.#pendingArrangement !== undefined) {
+      if (preserved?.launchBoundaryInside === true) {
+        // The kept queue already plays the launched Pattern from its
+        // boundary, so this rebuild commits the launch.
+        this.#applyArrangementNow(this.#pendingArrangement);
+      } else {
+        this.#pendingArrangementFrame = this.#launchBoundaryFrame(stepFrames, releaseFrame);
+      }
+    }
+    if (preserved !== undefined) {
+      this.#scheduleCatchUpWindows(context, preserved, stepFrames, frame, releaseFrame);
+    }
     this.#nextScheduleFrame = releaseFrame;
-    this.#schedule();
+    // The filter matters only inside this first rebuilt window: a shifted step
+    // near the boundary cannot move past the current lookahead horizon, and
+    // every later window holds only higher step indexes.
+    this.#schedule(preserved?.lastStepBefore);
+  }
+
+  /**
+   * Sends each module the events the bounded clear cannot keep: the dropped
+   * release of the newest kept onset, and a catch-up window under the new
+   * timing that rescues a step whose onset the change pulled into the lead
+   * window. The exclusive step filter keeps the catch-up from re-emitting a
+   * step the kept queue already carries.
+   */
+  #scheduleCatchUpWindows(
+    context: AudioContext,
+    preserved: CapturedLeadWindow,
+    stepFrames: number,
+    frame: number,
+    releaseFrame: number,
+  ): void {
+    for (const [moduleId, adapter] of this.#adapters) {
+      const module = this.#modules.get(moduleId);
+      const minimumStep = preserved.lastStepBefore.get(moduleId);
+      const events: ScheduledVoiceEvent[] = [];
+      const release = preserved.releases.get(moduleId);
+      if (release !== undefined) events.push(release);
+      if (module !== undefined && minimumStep !== undefined) {
+        events.push(
+          ...schedulePatternWindow(
+            this.#moduleWindowRequest(
+              module,
+              stepFrames,
+              frame + 1,
+              releaseFrame,
+              this.#arrangement,
+              minimumStep,
+            ),
+          ),
+        );
+      }
+      events.sort(compareScheduledVoiceEvents);
+      const due = withoutExpiredOnsets(events, this.#currentFrame(context));
+      if (due.length > 0) adapter.schedule(due);
+    }
+  }
+
+  /**
+   * Frames per sixteenth, unrounded. Each onset rounds once from the exact
+   * product, so the audible grid cannot drift by an accumulated per-step
+   * rounding error. Uses the same tick contract as the transport clock.
+   */
+  #exactStepFrames(context: AudioContext, clock: TransportClock, frame: number): number {
+    const tempo = clock.getSnapshot(frame).tempo;
+    return (TICKS_PER_STEP * 60 * context.sampleRate) / (tempo * TICKS_PER_QUARTER);
+  }
+
+  /**
+   * The next quantized launch boundary at or after `fromFrame`. The boundary
+   * is inclusive: a request that lands exactly on a boundary launches there.
+   * `fromFrame` is already lead time ahead of the playhead, so the result is
+   * always a future frame.
+   */
+  #launchBoundaryFrame(stepFrames: number, fromFrame: number): number {
+    const quantFrames = stepFrames * this.#launchQuantizationSteps;
+    const sinceStart = Math.max(0, fromFrame - this.#patternStartFrame);
+    return (
+      this.#patternStartFrame + Math.round(Math.ceil(sinceStart / quantFrames) * quantFrames)
+    );
+  }
+
+  /**
+   * The old-timing facts a bounded queue clear still needs. Computed from the
+   * current timing, so call this before a change mutates that state. The
+   * imminent events themselves are not captured: the bounded clear keeps them
+   * in each processor queue exactly as they were sent, which also keeps a
+   * pending Pattern launch's boundary split intact.
+   */
+  #captureLeadWindow(
+    context: AudioContext,
+    clock: TransportClock,
+    frame: number,
+  ): CapturedLeadWindow {
+    const releaseFrame = frame + this.#leadFrames(context);
+    const stepFrames = this.#exactStepFrames(context, clock, frame);
+    const launchBoundaryInside =
+      this.#pendingArrangement !== undefined &&
+      this.#pendingArrangementFrame !== undefined &&
+      this.#pendingArrangementFrame < releaseFrame;
+    const lastStepBefore = new Map<ModuleInstanceId, number>();
+    const releases = new Map<ModuleInstanceId, ScheduledVoiceEvent>();
+    for (const module of this.#modules.values()) {
+      if (!this.#adapters.has(module.id)) continue;
+      const request = this.#moduleWindowRequest(
+        module,
+        stepFrames,
+        frame + 1,
+        releaseFrame,
+        this.#arrangement,
+      );
+      lastStepBefore.set(module.id, highestStepBefore(request, releaseFrame));
+      // The one note-off the bounded clear drops: the release owed by the
+      // newest kept onset when it lands at or past the rebuild frame. The
+      // sounding note predates any pending launch, so its release always
+      // derives from the active arrangement.
+      const release = pendingReleaseEvent(request, releaseFrame);
+      if (release !== undefined) releases.set(module.id, release);
+    }
+    return { lastStepBefore, releases, launchBoundaryInside };
   }
 
   #setRevision(projectRevision: StateRevision): void {
@@ -1022,64 +1337,124 @@ export class TransportRuntime {
     this.#timer = undefined;
   }
 
-  #schedule(): void {
+  #schedule(minimumSteps?: ReadonlyMap<ModuleInstanceId, number>): void {
     const context = this.#context;
     const clock = this.#clock;
     if (context === undefined || clock === undefined) return;
     const currentFrame = this.#currentFrame(context);
-    const windowStart = Math.max(this.#nextScheduleFrame, currentFrame + this.#leadFrames(context));
-    const windowEnd = currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS);
+    // A late pass starts at one shared future boundary. It never replays an
+    // expired sequence at the first sample of the next render block. All module
+    // adapters receive the same boundary, so recovery cannot split the rack.
+    const windowStart = Math.max(
+      this.#nextScheduleFrame,
+      currentFrame + this.#leadFrames(context),
+    );
+    const windowEnd =
+      currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS);
     if (windowStart >= windowEnd) return;
 
+    const stepFrames = this.#exactStepFrames(context, clock, currentFrame);
     const pending = this.#pendingArrangement;
     if (pending === undefined) {
-      this.#scheduleWindow(clock, windowStart, windowEnd);
+      this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, minimumSteps);
     } else {
       // A queued Pattern launch applies exactly at its quantization boundary:
       // the old arrangement fills the window up to the boundary, the new one
       // fills the rest. The grid anchor never moves, so the launched Pattern
       // starts at the boundary step.
-      const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
-      const quantFrames = stepFrames * this.#launchQuantizationSteps;
-      const sinceStart = windowStart - this.#patternStartFrame;
-      const boundary =
-        this.#patternStartFrame + Math.ceil(sinceStart / quantFrames) * quantFrames;
-      if (boundary >= windowEnd) {
-        this.#scheduleWindow(clock, windowStart, windowEnd);
-      } else {
-        if (boundary > windowStart) this.#scheduleWindow(clock, windowStart, boundary);
+      const boundary = this.#pendingArrangementFrame ?? windowEnd;
+      if (currentFrame >= boundary) {
         this.#applyArrangementNow(pending);
-        this.#scheduleWindow(clock, boundary, windowEnd);
+        this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, minimumSteps);
+      } else if (boundary >= windowEnd) {
+        this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, minimumSteps);
+      } else {
+        if (boundary > windowStart) {
+          this.#scheduleWindow(stepFrames, windowStart, boundary, this.#arrangement, minimumSteps);
+        }
+        this.#scheduleWindow(
+          stepFrames,
+          Math.max(windowStart, boundary),
+          windowEnd,
+          pending,
+          minimumSteps,
+        );
       }
     }
-    this.#scheduleMetronome(context, clock, windowStart, windowEnd);
+    this.#scheduleMetronome(context, stepFrames, windowStart, windowEnd);
     this.#nextScheduleFrame = windowEnd;
   }
 
-  #scheduleWindow(clock: TransportClock, windowStart: number, windowEnd: number): void {
-    const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
+  #scheduleWindow(
+    stepFrames: number,
+    windowStart: number,
+    windowEnd: number,
+    arrangement: TransportArrangement = this.#arrangement,
+    minimumSteps?: ReadonlyMap<ModuleInstanceId, number>,
+  ): void {
     for (const module of this.#modules.values()) {
       const adapter = this.#adapters.get(module.id);
       if (adapter === undefined) continue;
-      adapter.schedule(
-        schedulePatternWindow({
-          resolveStep: this.#resolverFor(module),
-          stepFrames,
-          swing: this.#swing,
-          patternTiming: this.#patternTiming,
-          voiceSalt: voiceSaltFor(module.id),
-          windowStartFrame: windowStart,
-          windowEndFrame: windowEnd,
-          patternStartFrame: this.#patternStartFrame,
-        }),
+      this.#scheduleModuleWindow(
+        module,
+        adapter,
+        stepFrames,
+        windowStart,
+        windowEnd,
+        arrangement,
+        minimumSteps?.get(module.id),
       );
     }
+  }
+
+  #moduleWindowRequest(
+    module: TransportModule,
+    stepFrames: number,
+    windowStart: number,
+    windowEnd: number,
+    arrangement: TransportArrangement = this.#arrangement,
+    minimumStepExclusive?: number,
+  ): PatternWindowRequest {
+    return {
+      resolveStep: this.#resolverFor(module, arrangement),
+      stepFrames,
+      swing: this.#swing,
+      patternTiming: this.#patternTiming,
+      voiceSalt: voiceSaltFor(module.id),
+      windowStartFrame: windowStart,
+      windowEndFrame: windowEnd,
+      patternStartFrame: this.#patternStartFrame,
+      ...(minimumStepExclusive === undefined ? {} : { minimumStepExclusive }),
+    };
+  }
+
+  #scheduleModuleWindow(
+    module: TransportModule,
+    adapter: VoiceAdapterPort,
+    stepFrames: number,
+    windowStart: number,
+    windowEnd: number,
+    arrangement: TransportArrangement = this.#arrangement,
+    minimumStepExclusive?: number,
+  ): void {
+    adapter.schedule(
+      schedulePatternWindow(
+        this.#moduleWindowRequest(
+          module,
+          stepFrames,
+          windowStart,
+          windowEnd,
+          arrangement,
+          minimumStepExclusive,
+        ),
+      ),
+    );
   }
 
   /** Schedules the metronome clicks whose beats land inside the window. */
   #scheduleMetronome(
     context: AudioContext,
-    clock: TransportClock,
+    stepFrames: number,
     windowStart: number,
     windowEnd: number,
   ): void {
@@ -1089,11 +1464,15 @@ export class TransportRuntime {
     if (this.#metronomeOutput === undefined) this.#ensureMaster(context);
     const output = this.#metronomeOutput;
     if (output === undefined) return;
-    const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
+    // Each click rounds once from the exact step size, so the clicks stay on
+    // the same drift-free grid as the scheduled onsets.
     const beatFrames = stepFrames * STEPS_PER_BEAT;
-    const firstBeat = Math.max(0, Math.ceil((windowStart - this.#patternStartFrame) / beatFrames));
+    const firstBeat = Math.max(
+      0,
+      Math.ceil((windowStart - this.#patternStartFrame) / beatFrames) - 1,
+    );
     for (let beat = firstBeat; ; beat += 1) {
-      const frame = this.#patternStartFrame + beat * beatFrames;
+      const frame = this.#patternStartFrame + Math.round(beat * beatFrames);
       if (frame >= windowEnd) break;
       if (frame < windowStart) continue;
       this.#scheduleClick(context, output, frame, beat % BEATS_PER_BAR === 0);
@@ -1180,7 +1559,6 @@ export class TransportRuntime {
     }
     const currentFrame = this.#currentFrame(context);
     if (clock.getSnapshot(currentFrame).status !== "playing") return;
-    const stepFrames = Math.max(1, Math.round(clock.ticksToFrames(TICKS_PER_STEP)));
     // The refill ends where the shared window already ended. Running past
     // `#nextScheduleFrame` would overlap the next tick's window and double the
     // recovered voice's steps.
@@ -1190,18 +1568,56 @@ export class TransportRuntime {
       currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS),
     );
     if (windowStart >= windowEnd) return;
-    adapter.schedule(
-      schedulePatternWindow({
-        resolveStep: this.#resolverFor(module),
-        stepFrames,
-        swing: this.#swing,
-        patternTiming: this.#patternTiming,
-        voiceSalt: voiceSaltFor(module.id),
-        windowStartFrame: windowStart,
-        windowEndFrame: windowEnd,
-        patternStartFrame: this.#patternStartFrame,
-      }),
+    const stepFrames = this.#exactStepFrames(context, clock, currentFrame);
+    const pending = this.#pendingArrangement;
+    const boundary = this.#pendingArrangementFrame;
+    if (pending === undefined || boundary === undefined || boundary >= windowEnd) {
+      this.#scheduleModuleWindow(module, adapter, stepFrames, windowStart, windowEnd);
+      return;
+    }
+    if (boundary > windowStart) {
+      this.#scheduleModuleWindow(module, adapter, stepFrames, windowStart, boundary);
+    }
+    this.#scheduleModuleWindow(
+      module,
+      adapter,
+      stepFrames,
+      Math.max(windowStart, boundary),
+      windowEnd,
+      pending,
     );
+  }
+
+  /** Replaces one module's queued window after an edit to that module. */
+  #rescheduleModule(moduleId: ModuleInstanceId): void {
+    const context = this.#context;
+    const clock = this.#clock;
+    const adapter = this.#adapters.get(moduleId);
+    const module = this.#modules.get(moduleId);
+    if (
+      context === undefined ||
+      clock === undefined ||
+      adapter === undefined ||
+      module === undefined
+    ) {
+      return;
+    }
+    const frame = this.#currentFrame(context);
+    if (clock.getSnapshot(frame).status !== "playing") return;
+    const releaseFrame = frame + this.#leadFrames(context);
+    const stepFrames = this.#exactStepFrames(context, clock, frame);
+    // The module's steps already carry the edit, so the lead window recomputed
+    // here is the correct imminent schedule. A bare clear plus note-off would
+    // drop the imminent onsets and cut the sounding tail.
+    const request = this.#moduleWindowRequest(module, stepFrames, frame + 1, releaseFrame);
+    const events = [...schedulePatternWindow(request)];
+    const release = pendingReleaseEvent(request, frame);
+    if (release !== undefined) events.push(release);
+    events.sort(compareScheduledVoiceEvents);
+    adapter.clearScheduledEvents();
+    const due = withoutExpiredOnsets(events, this.#currentFrame(context));
+    if (due.length > 0) adapter.schedule(due);
+    this.#scheduleRecoveredModule(moduleId);
   }
 
   #requiredContext(): AudioContext {
@@ -1265,6 +1681,45 @@ interface MixerChannel {
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * Drops the onsets the audio clock already passed, per section 21.2: the
+ * scheduler never sends an expired note-on.
+ *
+ * A rebuild captures its lead window at the frame the change began at and posts
+ * it after every module's window is computed, so the clock has moved on by the
+ * time the batch leaves. The queue this batch replaces still held those onsets
+ * while the clock passed them, so the processor already sounded them. It also
+ * rejects an expired onset rather than firing it late, so a resend is a lost
+ * step, not a second hit. Releases and resets stay: they only make the graph
+ * safer, and one extra release with no sounding note is harmless.
+ */
+function withoutExpiredOnsets(
+  events: readonly ScheduledVoiceEvent[],
+  fromFrame: number,
+): readonly ScheduledVoiceEvent[] {
+  const due = (event: ScheduledVoiceEvent) =>
+    event.type !== "note-on" || event.atFrame >= fromFrame;
+  return events.every(due) ? events : events.filter(due);
+}
+
+function samePatternTiming(
+  left: readonly PatternTiming[],
+  right: readonly PatternTiming[],
+): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftValue = left[index];
+    const rightValue = right[index];
+    if (
+      leftValue?.humanize !== rightValue?.humanize ||
+      leftValue?.seed !== rightValue?.seed
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Deterministic 32-bit salt from a stable module ID string. */

@@ -111,6 +111,8 @@ export function Fader({
     [disabled, wheelRef],
   );
 
+  const capRef = useRef<HTMLSpanElement | null>(null);
+
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const formatted = formatValue(displayValue).toFixed(precision);
   const text = `${formatted}${unit === undefined ? "" : ` ${unit}`}`;
@@ -148,12 +150,23 @@ export function Fader({
           aria-hidden="true"
           style={{ blockSize: `calc(${capOffset} + ${String(CAP_HEIGHT / 2 - 4)}px)` }}
         />
-        <span className={styles.cap} aria-hidden="true" style={{ insetBlockEnd: capOffset }}>
+        <span
+          ref={capRef}
+          className={styles.cap}
+          aria-hidden="true"
+          style={{ insetBlockEnd: capOffset }}
+        >
           <span className={styles.capGroove} />
         </span>
       </div>
       <span className={styles.label}>{label}</span>
-      {adjusting ? <Tooltip className={styles.tooltip}>{text}</Tooltip> : null}
+      {/* The bubble rides the cap rather than the well, so a long travel keeps
+          the readout beside the value it reports. */}
+      {adjusting ? (
+        <Tooltip anchorRef={capRef} className={styles.tooltip}>
+          {text}
+        </Tooltip>
+      ) : null}
       <ValuePopover
         className={styles.readout}
         label={`${label} value`}

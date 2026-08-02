@@ -46,13 +46,20 @@ Rack order:
 
 The MVP rack contains exactly eight slots.
 
-Default named Patterns:
+Default named Patterns: Intro, Verse, Break, Drop, and Outro. Each Pattern is
+one bar of sixteen steps.
+
+The default Song chain plays the Patterns in this order:
 
 1. Intro, 8 bars.
 2. Verse, 16 bars.
 3. Break, 8 bars.
 4. Drop, 16 bars.
 5. Outro, 8 bars.
+
+A bar count is the entry's repeat count in the chain. The chain ships
+disabled. Song mode plays the chain when the user enables it. Decision `D92`
+records this reading of the bar counts.
 
 Select Verse by default.
 
@@ -84,9 +91,15 @@ A new installation opens the same content on first start, so the startup project
 and the template stay identical by construction.
 
 The user creates a fresh project from the template through the project selector.
-Before replacement, Pulsebox saves the current project. If the save fails,
-Pulsebox keeps the current project active. A successful action creates a new
-project and lineage ID, and the new project starts with empty Undo history.
+Before replacement, Pulsebox saves the current project. If that save fails,
+Pulsebox keeps the current project active and reports that the template was not
+created. A successful action creates a new project and lineage ID, and the new
+project starts with empty Undo history.
+
+After replacement, Pulsebox stores the fresh copy at once. Both projects then
+appear in the project selector, and the save control does not report unsaved
+edits for a project the user has not edited. When storage is unavailable,
+Pulsebox still creates the fresh project and leaves it unsaved.
 
 ---
 
@@ -227,6 +240,9 @@ Swapping a module:
 - Reports unmapped data before or after the operation through a non-blocking
   result panel. The panel states the count of events with no voice on the new
   module.
+- The panel clears itself after about twelve seconds, and the user can dismiss
+  it sooner. It also clears on Undo, on Redo, and when another project replaces
+  the working project, because its count describes the swapped module only.
 - Is undoable.
 - Does not interrupt unrelated audio.
 

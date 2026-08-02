@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_MASTER_LEVEL } from "../../src/state/public";
 import { EditorWorkspace } from "../../src/ui/react/shell/EditorWorkspace";
@@ -30,7 +30,7 @@ describe("EditorWorkspace", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Selected Pattern" }), {
       target: { value: "0" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear the Pattern" }));
 
     expect(harness.domain.getState().project.activePatternIndex).toBe(0);
     expect(
@@ -73,26 +73,158 @@ describe("EditorWorkspace", () => {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
 
+    // Decision D92: the default project ships a five-entry Song chain, so the
+    // added entry lands after it.
+    const baseline = harness.domain.getState().project.song.entries;
     fireEvent.click(screen.getByRole("button", { name: "Add selected Pattern" }));
 
     expect(harness.domain.getState().project.song.entries).toEqual([
+      ...baseline,
       expect.objectContaining({ patternIndex: 1, repeats: 1 }),
     ]);
-    expect(screen.getByRole("button", { name: /Verse/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Verse/ }).length).toBeGreaterThan(0);
   });
 
-  it("edits the active Pattern's Humanize through the header slider", () => {
+  it("edits the active Pattern's Humanize through the tapered header slider", () => {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
     const slider = screen.getByRole("slider", { name: "Pattern Humanize" });
-    expect(slider).toHaveValue("12");
+    expect(slider).toHaveValue("0");
+    expect(slider).toHaveAttribute("aria-valuetext", "0 percent");
 
-    fireEvent.change(slider, { target: { value: "40" } });
+    // The track is tapered: position 60 of 100 is the 30 percent value.
+    fireEvent.change(slider, { target: { value: "60" } });
 
-    expect(harness.domain.getState().project.patterns[1]?.humanize).toBeCloseTo(0.4, 6);
+    expect(harness.domain.getState().project.patterns[1]?.humanize).toBeCloseTo(0.3, 6);
+    expect(slider).toHaveAttribute("aria-valuetext", "30 percent");
     // Humanize is Pattern-owned: the other Patterns keep their own value.
-    expect(harness.domain.getState().project.patterns[0]?.humanize).toBeCloseTo(0.12, 6);
+    expect(harness.domain.getState().project.patterns[0]?.humanize).toBe(0);
   });
+
+  it("previews Humanize during a pointer gesture and commits once on release", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const slider = screen.getByRole("slider", { name: "Pattern Humanize" });
+
+    fireEvent.pointerDown(slider, { button: 0, pointerId: 21 });
+    fireEvent.change(slider, { target: { value: "40" } });
+    fireEvent.change(slider, { target: { value: "60" } });
+
+    expect(slider).toHaveAttribute("aria-valuetext", "30 percent");
+    expect(harness.audio.previewHumanize).toHaveBeenLastCalledWith(1, 0.3);
+    expect(harness.domain.getState().project.patterns[1]?.humanize).toBe(0);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+
+    fireEvent.pointerUp(slider, { button: 0, pointerId: 21 });
+
+    expect(harness.domain.getState().project.patterns[1]?.humanize).toBeCloseTo(0.3, 6);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+    act(() => {
+      harness.store.getState().undo();
+    });
+    expect(harness.domain.getState().project.patterns[1]?.humanize).toBe(0);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+  });
+
+  it("previews Swing during a pointer gesture and commits once on release", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const slider = screen.getByRole("slider", { name: "Project Swing" });
+
+    fireEvent.pointerDown(slider, { button: 0, pointerId: 22 });
+    fireEvent.change(slider, { target: { value: "40" } });
+    fireEvent.change(slider, { target: { value: "60" } });
+
+    expect(slider).toHaveAttribute("aria-valuetext", "30 percent");
+    expect(harness.audio.previewSwing).toHaveBeenLastCalledWith(0.3);
+    expect(harness.domain.getState().project.swing).toBe(0);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+
+    fireEvent.pointerUp(slider, { button: 0, pointerId: 22 });
+
+    expect(harness.domain.getState().project.swing).toBeCloseTo(0.3, 6);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+    act(() => {
+      harness.store.getState().undo();
+    });
+    expect(harness.domain.getState().project.swing).toBe(0);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+  });
+
+  it("previews a Swing wheel burst and commits once after idle", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const slider = screen.getByRole("slider", { name: "Project Swing" });
+    expect(harness.domain.getState().project.swing).toBe(0);
+
+    fireEvent.wheel(slider, { deltaY: -100 });
+    fireEvent.wheel(slider, { deltaY: -100 });
+
+    expect(harness.audio.previewSwing).toHaveBeenLastCalledWith(0.04);
+    expect(harness.domain.getState().project.swing).toBe(0);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+
+    fireEvent.wheel(slider, { deltaY: 100, shiftKey: true });
+    expect(harness.audio.previewSwing).toHaveBeenLastCalledWith(0.03);
+    expect(harness.domain.getState().project.swing).toBe(0);
+
+    await act(() => vi.advanceTimersByTime(250));
+
+    expect(harness.domain.getState().project.swing).toBeCloseTo(0.03, 6);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("previews repeated Swing keys and commits once on key release", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const slider = screen.getByRole("slider", { name: "Project Swing" });
+
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    fireEvent.change(slider, { target: { value: "1" } });
+    fireEvent.keyDown(slider, { key: "ArrowRight", repeat: true });
+    fireEvent.change(slider, { target: { value: "2" } });
+
+    expect(harness.audio.previewSwing).toHaveBeenLastCalledWith(0.01);
+    expect(harness.domain.getState().project.swing).toBe(0);
+    expect(harness.domain.getState().history.canUndo).toBe(false);
+
+    fireEvent.keyUp(slider, { key: "ArrowRight" });
+
+    expect(harness.domain.getState().project.swing).toBeCloseTo(0.01, 6);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+  });
+
+  it.each(["pointer", "keyboard", "wheel"] as const)(
+    "commits an active Swing %s gesture when the control disconnects",
+    (input) => {
+      vi.useFakeTimers();
+      const harness = createHarness();
+      const view = renderWithHarness(<EditorWorkspace />, harness);
+      const slider = screen.getByRole("slider", { name: "Project Swing" });
+
+      if (input === "pointer") {
+        fireEvent.pointerDown(slider, { button: 0, pointerId: 31 });
+        fireEvent.change(slider, { target: { value: "40" } });
+      } else if (input === "keyboard") {
+        fireEvent.keyDown(slider, { key: "ArrowRight" });
+        fireEvent.change(slider, { target: { value: "2" } });
+      } else {
+        fireEvent.wheel(slider, { deltaY: -100 });
+      }
+      expect(harness.domain.getState().history.canUndo).toBe(false);
+
+      view.unmount();
+
+      expect(harness.domain.getState().project.swing).toBeGreaterThan(0);
+      expect(harness.domain.getState().history.canUndo).toBe(true);
+      act(() => harness.store.getState().undo());
+      expect(harness.domain.getState().project.swing).toBe(0);
+      expect(harness.domain.getState().history.canUndo).toBe(false);
+      vi.useRealTimers();
+    },
+  );
 
   it("stores a new deterministic seed through the variation button", () => {
     const harness = createHarness();
@@ -132,7 +264,7 @@ describe("Mixer", () => {
   it("commits its displayed decibel value on blur", () => {
     const harness = createHarness();
     renderWithHarness(<Mixer />, harness);
-    const level = screen.getByRole("spinbutton", { name: "Acid Bass level value" });
+    const level = screen.getByRole("spinbutton", { name: "Silver Serpent level value" });
 
     fireEvent.change(level, { target: { value: "-6" } });
     expect(harness.domain.getState().project.modules[firstModuleId(harness)]?.level).toBe(0.4);
@@ -149,13 +281,13 @@ describe("Mixer", () => {
 
     expect(container.querySelectorAll('[data-component="channel-strip"]')).toHaveLength(8);
     expect(container.querySelectorAll('[data-empty="true"]')).toHaveLength(7);
-    expect(screen.getByRole("article", { name: "Acid Bass channel" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Silver Serpent channel" })).toBeInTheDocument();
     expect(screen.getByRole("article", { name: "Master channel" })).toBeInTheDocument();
   });
 
   it("keeps the empty strip controls visible and disabled", () => {
     const { container } = renderWithHarness(<Mixer />);
-    const acid = screen.getByRole("article", { name: "Acid Bass channel" });
+    const acid = screen.getByRole("article", { name: "Silver Serpent channel" });
     expect(within(acid).getAllByRole("button", { name: /Open send/ })).toHaveLength(4);
 
     const empty = container.querySelector('[data-empty="true"]');
@@ -184,15 +316,36 @@ describe("Mixer", () => {
   });
 
 
+  it("renders strip meters through leaf subscriptions that track the store", () => {
+    const harness = createHarness();
+    renderWithHarness(<Mixer />, harness);
+    const moduleId = firstModuleId(harness);
+
+    act(() => {
+      harness.store.getState().setMeterLevel(moduleId, 0.5);
+    });
+
+    expect(screen.getByRole("meter", { name: "Silver Serpent output" })).toHaveAttribute(
+      "aria-valuenow",
+      "0.5",
+    );
+    const masterLevel = harness.domain.getState().project.masterLevel;
+    const expectedMaster = Number(masterMeterLevel({ [moduleId]: 0.5 }, masterLevel).toFixed(2));
+    expect(screen.getByRole("meter", { name: "Master output" })).toHaveAttribute(
+      "aria-valuenow",
+      String(expectedMaster),
+    );
+  });
+
   it("mutes a channel through a typed command", () => {
     const harness = createHarness();
     renderWithHarness(<Mixer />, harness);
     const moduleId = firstModuleId(harness);
 
-    fireEvent.click(screen.getByRole("button", { name: "Mute Acid Bass" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mute Silver Serpent" }));
 
     expect(harness.domain.getState().project.modules[moduleId]?.muted).toBe(true);
-    expect(screen.getByRole("button", { name: "Mute Acid Bass" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Mute Silver Serpent" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -203,7 +356,7 @@ describe("Mixer", () => {
     renderWithHarness(<Mixer />, harness);
     const moduleId = firstModuleId(harness);
     const before = harness.domain.getState().project.modules[moduleId]?.level ?? 0;
-    const fader = screen.getByRole("slider", { name: "Acid Bass level" });
+    const fader = screen.getByRole("slider", { name: "Silver Serpent level" });
 
     fireEvent.keyDown(fader, { key: "ArrowUp" });
     fireEvent.keyUp(fader, { key: "ArrowUp" });
@@ -265,34 +418,12 @@ describe("master meter", () => {
 });
 
 describe("EffectsBank", () => {
-  it("keeps each send's aria-controls target present when collapsed", () => {
+  it("shows the four send-chain empty states without dead detail controls", () => {
     const { container } = renderWithHarness(<EffectsBank />);
     const cards = container.querySelectorAll('[data-component="effect-slot"]');
     expect(cards).toHaveLength(4);
-
-    for (const card of cards) {
-      const details = within(card as HTMLElement).getByRole("button", { name: "Details" });
-      const targetId = details.getAttribute("aria-controls");
-      if (targetId === null) throw new Error("Expected an aria-controls target.");
-      // A dangling aria-controls points at nothing, so the reference must
-      // resolve even while the panel is collapsed.
-      const target = document.getElementById(targetId);
-      expect(target).not.toBeNull();
-      expect(target).not.toBeVisible();
-    }
-  });
-
-  it("reveals the selected send's details and leaves the others hidden", () => {
-    renderWithHarness(<EffectsBank />);
-    const detailButtons = screen.getAllByRole("button", { name: "Details" });
-    const first = detailButtons[0];
-    if (first === undefined) throw new Error("Expected a Details control.");
-
-    fireEvent.click(first);
-
-    expect(first).toHaveAttribute("aria-expanded", "true");
-    expect(document.getElementById("send-a-details")).toBeVisible();
-    expect(document.getElementById("send-b-details")).not.toBeVisible();
+    expect(screen.getAllByText("Empty chain")).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: "Details" })).toBeNull();
   });
 });
 
@@ -325,14 +456,13 @@ describe("StudioPanel", () => {
     const harness = createHarness();
     renderWithHarness(<StudioPanel />, harness);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open send A for Acid Bass" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open send A for Silver Serpent" }));
 
     expect(harness.store.getState().studioView).toBe("effects");
     expect(harness.store.getState().selectedSend).toBe("A");
-    // Every send keeps its details element mounted, so assert on the selected
-    // send's own panel rather than on the shared text.
-    expect(document.getElementById("send-a-details")).toBeVisible();
-    expect(document.getElementById("send-b-details")).not.toBeVisible();
+    expect(document.querySelector('[data-component="effect-slot"][data-selected="true"]')).toHaveTextContent(
+      "Send A",
+    );
   });
 });
 
@@ -372,17 +502,89 @@ describe("ProjectMenu", () => {
     expect(harness.store.getState().savedProjects[0]?.name).toBe("Saved session");
   });
 
-  it("saves through the project actions menu and the injected service", async () => {
+  it("keeps project management in one selector menu", () => {
+    const harness = createHarness();
+    Object.assign(harness.dependencies, {
+      templates: [{ id: "starter", name: "Neon Basement", create: vi.fn() }],
+    });
+    renderWithHarness(<ProjectMenu />, harness);
+    expect(screen.queryByRole("button", { name: "Main menu" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Project actions" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
+    const dialog = within(screen.getByRole("dialog", { name: "Project selector" }));
+    expect(dialog.getByRole("button", { name: "Export" })).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: "Import" })).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: "New: Neon Basement" })).toBeInTheDocument();
+    expect(dialog.queryByRole("button", { name: "Save" })).toBeNull();
+  });
+
+  it("closes the selector on Escape with focus restored and on an outside press", () => {
     const harness = createHarness();
     renderWithHarness(<ProjectMenu />, harness);
-    fireEvent.click(screen.getByRole("button", { name: "Project actions" }));
+    const trigger = screen.getByRole("button", { name: /Project selector/ });
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
 
+    fireEvent.click(trigger);
+    const popover = screen.getByRole("dialog", { name: "Project selector" });
+    // The non-modal dialog moves focus to its first action on open.
+    expect(popover.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(popover, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Project selector" })).toBeNull();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("dialog", { name: "Project selector" })).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("dialog", { name: "Project selector" })).toBeNull();
+    // An outside press keeps focus with the press target, not the trigger.
+    expect(trigger).not.toHaveFocus();
+  });
+
+  it("saves the current project before a template replaces it", async () => {
+    const harness = createHarness();
+    const create = vi.fn();
+    let finishSave: (() => void) | undefined;
+    const pendingSave = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    harness.projects.save.mockReturnValueOnce(pendingSave);
+    Object.assign(harness.dependencies, {
+      templates: [{ id: "starter", name: "Neon Basement", create }],
+    });
+    renderWithHarness(<ProjectMenu />, harness);
+    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
+    fireEvent.click(screen.getByRole("button", { name: "New: Neon Basement" }));
+
+    expect(harness.projects.save).toHaveBeenCalledOnce();
+    expect(create).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitem", { name: "Save" }));
+      finishSave?.();
       await Promise.resolve();
     });
 
-    expect(harness.projects.save).toHaveBeenCalled();
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the current project when its pre-template save fails", async () => {
+    const harness = createHarness();
+    const create = vi.fn();
+    harness.projects.save.mockRejectedValueOnce(new Error("Storage failed."));
+    Object.assign(harness.dependencies, {
+      templates: [{ id: "starter", name: "Neon Basement", create }],
+    });
+    renderWithHarness(<ProjectMenu />, harness);
+    fireEvent.click(screen.getByRole("button", { name: /Project selector/ }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New: Neon Basement" }));
+      await Promise.resolve();
+    });
+
+    expect(create).not.toHaveBeenCalled();
+    expect(harness.store.getState().saveStatus).toBe("error");
+    expect(harness.domain.getState().project.name).toBe("Neon Basement");
   });
 
   it("lists and opens stored projects inside the viewport-bound selector", async () => {
@@ -399,24 +601,6 @@ describe("ProjectMenu", () => {
     });
 
     expect(harness.projects.open).toHaveBeenCalledWith("stored-1");
-  });
-
-  it("pins the project with an aria-pressed toggle through the service", async () => {
-    const harness = createHarness();
-    renderWithHarness(<ProjectMenu />, harness);
-    const pin = screen.getByRole("button", { name: "Pin project" });
-    expect(pin).toHaveAttribute("aria-pressed", "false");
-
-    await act(async () => {
-      fireEvent.click(pin);
-      await Promise.resolve();
-    });
-
-    expect(harness.projects.setPinned).toHaveBeenCalledWith(true);
-    expect(screen.getByRole("button", { name: "Pin project" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
   });
 
   it("reports a rejected import without changing the project", async () => {

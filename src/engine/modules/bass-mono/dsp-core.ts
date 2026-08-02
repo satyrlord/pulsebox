@@ -1,3 +1,5 @@
+import { StateVariableFilter } from "../../dsp/primitives";
+
 export type BassWaveform = "saw" | "square";
 
 export interface BassParameters {
@@ -84,7 +86,7 @@ class ScalarSmoother {
   }
 }
 
-export class AcidBassDsp {
+export class BassMonoDsp {
   readonly #sampleRate: number;
   readonly #smoothingFrames: number;
   #parameters: BassParameters = DEFAULT_BASS_PARAMETERS;
@@ -104,8 +106,10 @@ export class AcidBassDsp {
   #envelope = 0;
   #gate = false;
   #accent = 0;
-  #filterLow = 0;
-  #filterBand = 0;
+  // The shared filter enforces the Chamberlin stability bound and resets on a
+  // non-finite state. A hand-rolled copy of the topology went unstable at high
+  // cutoff and latched NaN, which silenced the instrument permanently.
+  readonly #filter = new StateVariableFilter();
 
   constructor(sampleRate: number) {
     if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
@@ -190,8 +194,7 @@ export class AcidBassDsp {
     this.#phase = 0;
     this.#envelope = 0;
     this.#gate = false;
-    this.#filterLow = 0;
-    this.#filterBand = 0;
+    this.#filter.reset();
   }
 
   process(left: Float32Array, right?: Float32Array, start = 0, end = left.length): void {
@@ -231,14 +234,11 @@ export class AcidBassDsp {
         40,
         Math.min(12_000, this.#sampleRate * 0.42),
       );
-      const coefficient = 2 * Math.sin((Math.PI * modulatedCutoff) / this.#sampleRate);
       const damping = 1.7 - resonance * 1.55;
-      this.#filterLow += coefficient * this.#filterBand;
-      const high = oscillator - this.#filterLow - damping * this.#filterBand;
-      this.#filterBand += coefficient * high;
+      this.#filter.process(oscillator, modulatedCutoff, damping, this.#sampleRate);
 
       const sample = clamp(
-        this.#filterLow * this.#envelope * volume * (0.55 + accentBoost * 0.25),
+        this.#filter.low * this.#envelope * volume * (0.55 + accentBoost * 0.25),
         -0.95,
         0.95,
       );

@@ -1,7 +1,7 @@
 /**
  * The shared digital drum voice.
  *
- * Digit Seven and Digit Five are both digital machines whose voices are stored
+ * Gray Ghost and Dusty Mosaic are both digital machines whose voices are stored
  * one-shots played back through a lo-fi stage, so the voice engine is one
  * implementation parameterized by a character table rather than two nearly
  * identical copies. Each machine still owns its own roster, its own character
@@ -22,6 +22,7 @@ import {
   clamp,
   DeterministicNoise,
   OnePoleHighpass,
+  ParameterGlide,
   semitoneRatio,
   StateVariableFilter,
 } from "./primitives";
@@ -108,6 +109,8 @@ export function generateDigitalOneShot(
 
 const CHOKE_RELEASE_SECONDS = 0.004;
 
+type DigitalVoiceUpdateMode = "immediate" | "smooth";
+
 export class DigitalDrumVoice {
   readonly id: string;
   readonly #sampleRate: number;
@@ -115,6 +118,13 @@ export class DigitalDrumVoice {
   readonly #noise: DeterministicNoise;
   readonly #crusher = new BitCrusher();
   readonly #highpass = new OnePoleHighpass();
+  /**
+   * The manifests declare voice level as a smoothed field, so a committed
+   * change on a ringing voice glides instead of stepping in one sample.
+   */
+  readonly #level: ParameterGlide;
+  /** Linear choke: spec-004 section 21.5 mandates a linear 4 ms fade-out. */
+  readonly #chokeStep: number;
   #parameters: DigitalVoiceParameters;
   /** Fractional read position into the stored table. */
   #cursor = 0;
@@ -136,18 +146,29 @@ export class DigitalDrumVoice {
     this.#parameters = parameters;
     this.#table = table;
     this.#noise = new DeterministicNoise(character.seed);
+    this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
+    this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
   readonly isActive = (): boolean => this.#active;
 
-  readonly setParameters = (parameters: DigitalVoiceParameters): void => {
+  readonly setParameters = (
+    parameters: DigitalVoiceParameters,
+    mode: DigitalVoiceUpdateMode = "smooth",
+  ): void => {
     this.#parameters = parameters;
+    // A snapshot is a state replacement, so the smoothed fields land without
+    // a ramp. An incremental change glides from the render loop.
+    if (mode === "immediate") this.#level.set(clamp(parameters.level, 0, 1));
   };
 
   readonly trigger = (velocity: number, accent: boolean): void => {
     this.#noise.reset();
     this.#crusher.reset();
     this.#highpass.reset();
+    // A hit that starts from silence takes the committed level directly; the
+    // glide exists to protect a ringing tail, not to lag a fresh attack.
+    if (!this.#active) this.#level.set(clamp(this.#parameters.level, 0, 1));
     this.#cursor = 0;
     this.#velocity = clamp(velocity, 0, 1);
     this.#accent = accent ? 1 : 0;
@@ -180,8 +201,11 @@ export class DigitalDrumVoice {
 
     const decaySeconds = clamp(this.#parameters.decay, 0.01, 3);
     const decayCoefficient = Math.exp(-1 / (decaySeconds * this.#sampleRate));
-    const chokeCoefficient = Math.exp(-1 / (CHOKE_RELEASE_SECONDS * this.#sampleRate));
-    this.#amplitude *= this.#choking ? chokeCoefficient : decayCoefficient;
+    if (this.#choking) {
+      this.#amplitude = Math.max(0, this.#amplitude - this.#chokeStep);
+    } else {
+      this.#amplitude *= decayCoefficient;
+    }
     if (this.#amplitude < 1e-6) {
       this.silence();
       return 0;
@@ -198,7 +222,7 @@ export class DigitalDrumVoice {
     const cleaned = this.#highpass.process(crushed, 28, this.#sampleRate);
 
     const gain = this.#velocity * (1 + this.#accent * 0.45);
-    return cleaned * this.#amplitude * gain * clamp(this.#parameters.level, 0, 1);
+    return cleaned * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 
   readonly getPan = (): number => this.#parameters.pan;

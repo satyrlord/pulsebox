@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
 import { ENGINE_PROTOCOL_LIMITS } from "../../../src/contracts/worklet-protocol";
-import { AcidBassAdapter } from "../../../src/engine/modules/bass-mono/adapter";
+import { BassMonoAdapter } from "../../../src/engine/modules/bass-mono/adapter";
 import {
-  ACID_BASS_DEFAULT_PARAMETERS,
-  ACID_BASS_MANIFEST,
+  BASS_MONO_DEFAULT_PARAMETERS,
+  BASS_MONO_MANIFEST,
 } from "../../../src/engine/modules/bass-mono/manifest";
 import type { ScheduledVoiceEvent } from "../../../src/engine/transport/scheduled-event";
 import {
@@ -38,17 +38,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Acid Bass plugin", () => {
+describe("Silver Serpent plugin", () => {
   it("publishes a valid manifest whose defaults match every parameter", () => {
-    const defaults: Readonly<Record<string, unknown>> = ACID_BASS_DEFAULT_PARAMETERS;
-    expect(validatePluginManifest(ACID_BASS_MANIFEST)).toMatchObject({ ok: true });
-    expect(Object.keys(ACID_BASS_DEFAULT_PARAMETERS).sort()).toEqual(
-      ACID_BASS_MANIFEST.parameters.map((parameter) => parameter.id).sort(),
+    const defaults: Readonly<Record<string, unknown>> = BASS_MONO_DEFAULT_PARAMETERS;
+    expect(validatePluginManifest(BASS_MONO_MANIFEST)).toMatchObject({ ok: true });
+    expect(Object.keys(BASS_MONO_DEFAULT_PARAMETERS).sort()).toEqual(
+      BASS_MONO_MANIFEST.parameters.map((parameter) => parameter.id).sort(),
     );
-    for (const parameter of ACID_BASS_MANIFEST.parameters) {
+    for (const parameter of BASS_MONO_MANIFEST.parameters) {
       expect(defaults[parameter.id]).toBe(parameter.defaultValue);
     }
-    expect(ACID_BASS_MANIFEST.renderCapabilities).toEqual({
+    expect(BASS_MONO_MANIFEST.renderCapabilities).toEqual({
       live: true,
       offline: false,
     });
@@ -57,9 +57,9 @@ describe("Acid Bass plugin", () => {
   it("keeps operational accent tokens distinct from the rack control surface", () => {
     const surface = "#242A30";
     for (const color of [
-      ACID_BASS_MANIFEST.ui.moduleAccent.accent,
-      ACID_BASS_MANIFEST.ui.moduleAccent.led,
-      ACID_BASS_MANIFEST.ui.moduleAccent.controlRing,
+      BASS_MONO_MANIFEST.ui.moduleAccent.accent,
+      BASS_MONO_MANIFEST.ui.moduleAccent.led,
+      BASS_MONO_MANIFEST.ui.moduleAccent.controlRing,
     ]) {
       expect(contrastRatio(color, surface)).toBeGreaterThanOrEqual(3);
     }
@@ -114,7 +114,7 @@ describe("Acid Bass plugin", () => {
     const context = {
       audioWorklet: { addModule: vi.fn().mockResolvedValue(undefined) },
     } as unknown as AudioContext;
-    const adapter = new AcidBassAdapter(context, {
+    const adapter = new BassMonoAdapter(context, {
       projectRevision: PROJECT_REVISION,
     });
 
@@ -134,6 +134,7 @@ describe("Acid Bass plugin", () => {
   });
 
   it("exposes the complete worklet voice port on the shared adapter", async () => {
+    vi.useFakeTimers();
     const sentKinds: string[] = [];
     class FakePort {
       onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
@@ -198,7 +199,10 @@ describe("Acid Bass plugin", () => {
     await adapter.prepare();
     adapter.activate({} as AudioNode);
     adapter.setProjectRevision(NEXT_PROJECT_REVISION);
+    adapter.previewParameters({ cutoff: 300 });
+    adapter.previewParameters({ cutoff: 350 });
     adapter.previewParameters({ cutoff: 400 });
+    await vi.advanceTimersByTimeAsync(16);
     adapter.replaceState({ cutoff: 800 }, NEXT_PROJECT_REVISION);
     adapter.schedule([
       { atFrame: 48, type: "note-on", note: 36, velocity: 0.8, accent: false, slide: false },
@@ -213,6 +217,8 @@ describe("Acid Bass plugin", () => {
         "clear-scheduled-events",
       ]),
     );
+    expect(sentKinds.filter((kind) => kind === "parameter-batch")).toHaveLength(1);
+    vi.useRealTimers();
   });
 
   it("replaces one faulted processor without replaying unacknowledged parameters", async () => {
@@ -274,7 +280,7 @@ describe("Acid Bass plugin", () => {
       audioWorklet: { addModule: vi.fn().mockResolvedValue(undefined) },
     } as unknown as AudioContext;
     const destination = {} as AudioNode;
-    const adapter = new AcidBassAdapter(context, {
+    const adapter = new BassMonoAdapter(context, {
       projectRevision: PROJECT_REVISION,
     });
     await adapter.prepare();
@@ -378,7 +384,7 @@ describe("Acid Bass plugin", () => {
     const context = {
       audioWorklet: { addModule: vi.fn().mockResolvedValue(undefined) },
     } as unknown as AudioContext;
-    const adapter = new AcidBassAdapter(context, {
+    const adapter = new BassMonoAdapter(context, {
       projectRevision: PROJECT_REVISION,
       handshakeTimeoutMilliseconds: 10,
       onStatus: (status) => statuses.push(status),
@@ -444,8 +450,8 @@ describe("Acid Bass plugin", () => {
       [
         {
           id: moduleId,
-          pluginId: ACID_BASS_MANIFEST.pluginId,
-          parameters: ACID_BASS_DEFAULT_PARAMETERS,
+          pluginId: BASS_MONO_MANIFEST.pluginId,
+          parameters: BASS_MONO_DEFAULT_PARAMETERS,
           parts: [
             Array.from({ length: 16 }, () => ({
               active: true,

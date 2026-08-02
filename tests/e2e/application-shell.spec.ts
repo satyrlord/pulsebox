@@ -211,19 +211,44 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
       )
       .toEqual({ widthMatches: true, heightMatches: true });
 
-    if (viewport.width >= 1440) {
-      // The seeded project loads six of the eight slots. The height band below
-      // describes a loaded faceplate, so empty slots are excluded here.
-      const modules = page.locator('[data-component="rack-module"]:not([data-label="Empty"])');
-      await expect(modules).toHaveCount(6);
-      for (const module of await modules.all()) {
-        const moduleBox = await box(module);
-        if (viewport.height > 900) {
-          expect(moduleBox.height).toBeGreaterThanOrEqual(86);
-          expect(moduleBox.height).toBeLessThanOrEqual(98);
-        }
+    // Loaded faceplates use one compact horizontal row. Empty rows use less
+    // space because the overview and browser own all Add actions.
+    const modules = page.locator('[data-component="rack-module"]:not([data-label="Empty"])');
+    const emptyModules = page.locator('[data-component="rack-module"][data-label="Empty"]');
+    await expect(modules).toHaveCount(6);
+    await expect(emptyModules).toHaveCount(2);
+    for (const module of await modules.all()) {
+      const moduleBox = await box(module);
+      expect(moduleBox.height).toBeGreaterThanOrEqual(65);
+      expect(moduleBox.height).toBeLessThanOrEqual(75);
+      if (viewport.width >= 1440) {
         expect(moduleBox.y + moduleBox.height).toBeLessThanOrEqual(rack.y + rack.height);
       }
+
+      const groupRows = await module.locator('[data-component="module-control-group"]').evaluateAll(
+        (groups) =>
+          groups.map((group) => ({
+            top: group.getBoundingClientRect().top,
+            flexWrap: getComputedStyle(group.parentElement as Element).flexWrap,
+          })),
+      );
+      expect(new Set(groupRows.map((group) => Math.round(group.top))).size).toBe(1);
+      expect(groupRows.every((group) => group.flexWrap === "nowrap")).toBe(true);
+
+      const outputGap = await module
+        .locator('[data-component="module-control-group"][data-group="output"]')
+        .evaluate((group) => {
+          const row = group.closest('[data-component="module-control-groups"]');
+          if (row === null) throw new Error("Expected a module control row.");
+          return row.getBoundingClientRect().right - group.getBoundingClientRect().right;
+        });
+      expect(outputGap).toBeGreaterThanOrEqual(6);
+      expect(outputGap).toBeLessThanOrEqual(8);
+    }
+    for (const emptyModule of await emptyModules.all()) {
+      const emptyBox = await box(emptyModule);
+      expect(emptyBox.height).toBeGreaterThanOrEqual(37);
+      expect(emptyBox.height).toBeLessThanOrEqual(39);
     }
 
     const inspector = await box(page.locator('[data-component="pattern-inspector"]'));
@@ -273,6 +298,58 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     }
   });
 }
+
+test("omits redundant rack and module-browser controls", async ({ page }) => {
+  const rack = page.locator('[data-component="rack"]');
+  const overview = page.locator('[data-component="rack-overview"]');
+  const browser = page.locator('[data-component="module-browser"]');
+  const bassMono = rack.locator('[data-label="Silver Serpent"]');
+
+  // Section 2.2: the icon badge is the loaded faceplate's only identity mark.
+  await expect(bassMono.locator('[data-component="module-icon"]')).toBeVisible();
+  await expect(bassMono).not.toContainText("ACID");
+  await expect(bassMono.getByText("Silver Serpent", { exact: true })).toHaveCount(0);
+  await expect(rack.getByText(/^(SEL|FOLD|DUP|SWAP)$/u)).toHaveCount(0);
+  await expect(overview.getByText(/^(SEL|DUP|SWAP)$/u)).toHaveCount(0);
+  await expect(rack.getByRole("combobox", { name: /Pattern/u })).toHaveCount(0);
+  await expect(rack.getByRole("button", { name: /Add module to rack slot/u })).toHaveCount(0);
+  await expect(browser.locator('[data-component="module-inspector"]')).toHaveCount(0);
+  await expect(browser.getByRole("button", { name: /Drag /u })).toHaveCount(0);
+  const bassMonoCard = browser.locator("article").filter({ hasText: "Silver Serpent" });
+  await expect(bassMonoCard).toHaveAttribute(
+    "title",
+    "Monophonic instrument. Drag Silver Serpent into an empty rack slot.",
+  );
+  await expect(browser.getByText("Monophonic instrument", { exact: true })).toHaveCount(0);
+  const tempoPlate = page.locator("label").filter({ has: page.locator('[data-field="tempo"]') });
+  await expect(tempoPlate).toHaveAttribute(
+    "title",
+    "Beats per minute. Drag vertically or type a value.",
+  );
+  await expect(tempoPlate.getByText("BPM", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open the master channel" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Effects" }).click();
+  await expect(page.getByRole("button", { name: "Details" })).toHaveCount(0);
+
+  await bassMono.getByRole("button", { name: "Silver Serpent module menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Swap to Tin Soldier" })).toBeVisible();
+});
+
+test("collapses one faceplate group without hiding the other groups", async ({ page }) => {
+  const soundToggle = page.getByRole("button", {
+    name: "Collapse Silver Serpent sound controls",
+  });
+  const cutoff = page.getByRole("slider", { name: "Cutoff" });
+  const audition = page.getByRole("button", { name: "Silver Serpent audition" });
+
+  await expect(cutoff).toBeVisible();
+  await soundToggle.click();
+  await expect(cutoff).toHaveCount(0);
+  await expect(audition).toBeVisible();
+  await page.getByRole("button", { name: "Expand Silver Serpent sound controls" }).click();
+  await expect(cutoff).toBeVisible();
+});
 
 test("keeps all mixer strips visible and studio panes mutually exclusive", async ({ page }) => {
   const studio = page.locator('[data-component="studio-panel"]');
@@ -400,7 +477,7 @@ test("holds and releases a Piano Roll pitch key with pointer and keyboard input"
   await expect(key).toHaveAttribute("data-active", "false");
 
   await page.getByRole("combobox", { name: "Piano Roll module" }).selectOption({
-    label: "Drumline Six",
+    label: "Tin Soldier",
   });
   await expect(page.getByRole("group", { name: "Piano keyboard" })).toHaveCount(0);
   const drumVoices = page.getByRole("group", { name: "Drum voices" });
@@ -411,7 +488,7 @@ test("holds and releases a Piano Roll pitch key with pointer and keyboard input"
 test("changes transport scope without stopping and toggles meter analysis without changing audio", async ({
   page,
 }) => {
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.locator(".audio-status")).toHaveText("Audio active");
   await page.getByRole("button", { name: "Song" }).click();
   await expect(page.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
@@ -449,6 +526,94 @@ test("collapses and restores the lower editor with its focus and scroll context"
   expect(await playlist.evaluate((element) => element.scrollTop)).toBe(12);
 });
 
+test("holds the timing controls still while Swing and Humanize values change", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const swing = page.getByRole("slider", { name: "Project Swing" });
+  const humanize = page.getByRole("slider", { name: "Pattern Humanize" });
+
+  const humanizeLabel = page
+    .locator('[data-component="piano-roll"] header label')
+    .filter({ has: humanize })
+    .locator("span");
+
+  const setPosition = async (slider: Locator, position: number) => {
+    await slider.evaluate((element, value) => {
+      const input = element as HTMLInputElement;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        input,
+        String(value),
+      );
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, position);
+  };
+
+  // A one-digit, two-digit, and three-digit readout must all occupy the same
+  // width, so a value change never reflows the header row.
+  const positions = [0, 20, 60, 100];
+  const labelXs: number[] = [];
+  const inputXs: number[] = [];
+  const record = async () => {
+    labelXs.push((await box(humanizeLabel)).x);
+    inputXs.push((await box(humanize)).x);
+  };
+
+  for (const position of positions) {
+    await setPosition(swing, position);
+    await record();
+  }
+  await setPosition(swing, 0);
+  for (const position of positions) {
+    await setPosition(humanize, position);
+    await record();
+  }
+
+  expect(Math.max(...labelXs) - Math.min(...labelXs)).toBeLessThanOrEqual(1);
+  expect(Math.max(...inputXs) - Math.min(...inputXs)).toBeLessThanOrEqual(1);
+
+  // The reserved readout box must still show its widest value in full.
+  const readout = page
+    .locator('[data-component="piano-roll"] header label')
+    .filter({ has: humanize })
+    .locator("output");
+  await setPosition(humanize, 100);
+  const metrics = await readout.evaluate((element) => ({
+    text: element.textContent,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(metrics.text).toBe("100%");
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+});
+
+test("raises the lower editor with the resize handle and restores the default", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const editor = page.locator('[data-component="editor-workspace"]');
+  const handle = page.locator('[data-component="editor-resize-handle"]');
+  const before = await box(editor);
+
+  const grip = await box(handle);
+  const gripCenterX = grip.x + grip.width / 2;
+  const gripCenterY = grip.y + grip.height / 2;
+  await page.mouse.move(gripCenterX, gripCenterY);
+  await page.mouse.down();
+  await page.mouse.move(gripCenterX, gripCenterY - 120, { steps: 8 });
+  await page.mouse.up();
+
+  const after = await box(editor);
+  expect(after.height).toBeGreaterThan(before.height + 80);
+  // The default height is the minimum, so a downward drag cannot pass it.
+  const main = await box(page.locator('[data-component="main-workspace"]'));
+  expect(main.height).toBeGreaterThanOrEqual(350);
+
+  await handle.dblclick();
+
+  const restored = await box(editor);
+  expect(Math.abs(restored.height - before.height)).toBeLessThanOrEqual(1);
+});
+
 test("keeps the stopped shell deterministic for visual review", async ({ page }) => {
   await page.setViewportSize({ width: 1536, height: 1024 });
   await page.evaluate(
@@ -473,10 +638,31 @@ test("keeps the stopped shell deterministic for visual review", async ({ page })
   });
 });
 
+test("suppresses the native context menu on the shell but not on text entry", async ({ page }) => {
+  const outcome = await page.evaluate(() => {
+    const suppressed = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (element === null) throw new Error(`Expected ${selector} to exist.`);
+      // `dispatchEvent` returns false when a listener called `preventDefault`.
+      return !element.dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    };
+    return {
+      shell: suppressed('[data-component="pulse-app"]'),
+      // Text entry keeps Cut, Copy, Paste, Undo, and Select all.
+      tempo: suppressed('[data-field="tempo"]'),
+      filter: suppressed('[data-component="module-browser"] input[type="search"]'),
+    };
+  });
+
+  expect(outcome).toEqual({ shell: true, tempo: false, filter: false });
+});
+
 test("keeps the project menu inside the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: /Project selector/ }).click();
-  const menu = page.getByRole("menu", { name: "Project selector" });
+  const menu = page.getByRole("dialog", { name: "Project selector" });
   const bounds = await box(menu);
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.y).toBeGreaterThanOrEqual(0);

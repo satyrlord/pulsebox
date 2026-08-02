@@ -47,7 +47,6 @@ export function MasterPanel() {
       <article>
         <h3>Master chain</h3>
         <p>No master effects are loaded.</p>
-        <p>The master level remains active.</p>
       </article>
     </section>
   );

@@ -45,7 +45,11 @@ export interface VoiceAdapterPort {
   /** Transient value during a gesture. Never enters project state or history. */
   previewParameters(parameters: Readonly<Record<string, ParameterValue>>): void;
   schedule(events: readonly ScheduledVoiceEvent[]): void;
-  clearScheduledEvents(): void;
+  /**
+   * Drops queued events. With `fromFrame`, only events at or past that
+   * absolute frame drop; everything before it keeps playing from the queue.
+   */
+  clearScheduledEvents(fromFrame?: number): void;
   resume(): void;
   suspend(): void;
   dispose(): void;

@@ -1,5 +1,5 @@
 /**
- * The Digit Five voice roster. Data only, so the manifest and the composition
+ * The Dusty Mosaic voice roster. Data only, so the manifest and the composition
  * root can name voices without importing the DSP core, which must execute only
  * inside an AudioWorklet.
  *
@@ -33,7 +33,7 @@ export const DIGIT_FIVE_VOICE_NAMES: Readonly<Record<DigitFiveVoiceId, string>> 
 
 /**
  * Note numbers select the voice, so one drum lane per voice needs no change to
- * the shared pattern model. The roster starts at C1.
+ * the shared pattern model. The roster starts at C2.
  */
 const DIGIT_FIVE_BASE_NOTE = 36;
 

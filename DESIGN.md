@@ -187,8 +187,10 @@ Each instrument also carries an original icon as a maker's mark, declared in
 its manifest and rendered in the accent: an acid smiley (`ACID`), a marching
 snare with crossed sticks (`SNAP`), a thundercloud over a bolt (`BOOM`),
 meshed gears (`MESH`), a ghost (`BITS`), and mosaic tiles (`PERC`). The
-browser engraves it into the thumbnail plate. The faceplate stamps it into a
-recessed badge well beside the short label.
+browser engraves it into the thumbnail plate beside the short label and full
+name. On a loaded faceplate, the icon sits alone in a recessed badge well as
+the module's only identity mark: the label and slot number would repeat what
+the icon and the rack overview already say.
 
 ### Tertiary — level and status
 
@@ -402,7 +404,8 @@ dense workspace, the presence of overflow is information.
 ### Do:
 
 - **Do** pair every module accent with its uppercase short label (`ACID`, `SNAP`,
-  `BOOM`, `MESH`, `BITS`, `PERC`). Color alone is never an identity.
+  `BOOM`, `MESH`, `BITS`, `PERC`) or, on a loaded faceplate, with the module
+  icon. Color alone is never an identity.
 - **Do** give every state a second, non-color cue — border weight, font weight,
   outline, glyph, or position — so it survives the high-contrast overlay.
 - **Do** decide "recessed or raised" before styling any surface, then apply the

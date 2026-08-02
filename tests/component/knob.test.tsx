@@ -253,4 +253,19 @@ describe("Knob", () => {
     expect(recorded.commits).toHaveLength(1);
     vi.useRealTimers();
   });
+
+  it("disables every input path and reports the state to assistive technology", () => {
+    const { recorded, dial } = renderKnob({ disabled: true });
+
+    expect(dial).toHaveAttribute("aria-disabled", "true");
+    expect(dial).toHaveAttribute("tabindex", "-1");
+
+    fireEvent.keyDown(dial, { key: "ArrowUp" });
+    fireEvent.doubleClick(dial);
+    fireEvent.wheel(dial, { deltaY: -1 });
+    fireEvent.pointerDown(dial, { pointerId: 1, button: 0, clientY: 100 });
+
+    expect(recorded.inputs).toEqual([]);
+    expect(recorded.commits).toEqual([]);
+  });
 });

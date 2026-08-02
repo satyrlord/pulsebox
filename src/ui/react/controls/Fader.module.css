@@ -7,13 +7,11 @@
   gap: 0.25rem;
 }
 
-/* The shared Tooltip control carries the bubble surface. This class holds only
-   the fader-specific position and ink, so cascade order against it cannot
-   matter. */
+/* The shared Tooltip control carries the bubble surface and floats itself above
+   the cap. This class holds only the fader-specific ink, so cascade order
+   against it cannot matter. */
 .tooltip {
-  z-index: 4;
-  inset-block-start: -18px;
-  color: var(--module-control-ring, var(--pulse-color-accent, #9be564));
+  color: var(--module-control-ring, var(--pulse-color-accent, #7ed9a3));
 }
 
 /*

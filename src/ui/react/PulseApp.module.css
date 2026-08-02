@@ -1,6 +1,16 @@
 .app {
   display: grid;
-  grid-template-rows: 58px minmax(350px, 1fr) clamp(230px, 30vh, 300px) 52px;
+
+  /* Row four is the editor. Its default clamp is also its minimum: the resize
+     handle raises --editor-size, and the calc cap keeps the rack row at
+     350px or more (58 + 52 + 6 + 350 = 466). The row constants are mirrored in
+     PulseApp.tsx. */
+  grid-template-rows:
+    58px
+    minmax(350px, 1fr)
+    6px
+    clamp(clamp(230px, 30vh, 300px), var(--editor-size, 0px), calc(100vh - 466px))
+    52px;
   inline-size: 100vw;
   block-size: 100vh;
   min-height: 0;
@@ -13,7 +23,43 @@
 }
 
 .app[data-editor-expanded="false"] {
-  grid-template-rows: 58px minmax(0, 1fr) 0 52px;
+  grid-template-rows: 58px minmax(0, 1fr) 0 0 52px;
+}
+
+.editorResize {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+/* The 6px row is a thin pointer target, so the hit area extends past it. */
+.editorResize::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block: -4px;
+}
+
+.editorResize::after {
+  content: "";
+  inline-size: 56px;
+  block-size: 3px;
+  border-radius: 2px;
+  background: var(--pulse-color-text-muted, #919ba3);
+  opacity: 0.55;
+}
+
+.editorResize:hover::after,
+.editorResize:focus-visible::after {
+  opacity: 1;
+}
+
+.editorResize:focus-visible {
+  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: -1px;
 }
 
 :global([data-high-contrast="true"]) .app {
@@ -40,6 +86,13 @@
   background: var(--pulse-color-surface-panel, #15191d);
   border: 1px solid var(--pulse-color-border-default, #6d7881);
   border-radius: var(--pulse-radius-control, 4px);
+}
+
+/* The swap result panel stacks above the undo notice so both stay readable
+   when a swap and its undo notice appear together. */
+.swapReport {
+  inset-block-end: 4rem;
+  max-inline-size: 28rem;
 }
 
 .notice button {

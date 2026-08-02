@@ -2,8 +2,19 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
 
-import { browserIdFactory, type ModuleInstanceId, type PluginId } from "../../src/contracts";
-import { ACID_BASS_DEFAULT_PARAMETERS, ACID_BASS_MANIFEST } from "../../src/engine/public";
+import {
+  browserIdFactory,
+  type ModuleInstanceId,
+  type PluginId,
+  type PluginManifest,
+} from "../../src/contracts";
+import {
+  BASS_MONO_DEFAULT_PARAMETERS,
+  BASS_MONO_MANIFEST,
+  DRUMLINE_SIX_DEFAULT_PARAMETERS,
+  DRUMLINE_SIX_MANIFEST,
+  playableNotesFor,
+} from "../../src/engine/public";
 import { createDefaultState, PulseStore, type ModuleSeed } from "../../src/state/public";
 import {
   createAppStore,
@@ -31,14 +42,18 @@ export interface Harness {
     readonly open: ReturnType<typeof vi.fn>;
     readonly exportPortable: ReturnType<typeof vi.fn>;
     readonly importPortable: ReturnType<typeof vi.fn>;
-    readonly setPinned: ReturnType<typeof vi.fn>;
-    readonly getPinned: ReturnType<typeof vi.fn>;
   };
   readonly dependencies: AppStoreDependencies;
   readonly disconnect: () => void;
 }
 
-function parameterValues(
+/** One extra module a test can add to the rack, with its manifest and seed. */
+export interface HarnessModule {
+  readonly seed: ModuleSeed;
+  readonly manifest: PluginManifest;
+}
+
+export function parameterValues(
   values: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, number | boolean | string>> {
   return Object.fromEntries(
@@ -51,26 +66,54 @@ function parameterValues(
   );
 }
 
+/**
+ * Step 8 sits above every drum roster, so a swap from the pitched Silver Serpent to
+ * a drum machine has exactly one event with no voice on the target. That is
+ * what the section 14 result panel counts.
+ */
+export const UNMAPPABLE_TEST_NOTE = 72;
+
 export const TEST_STEPS = Array.from({ length: 16 }, (_, index) => ({
   active: index % 4 === 0,
-  note: 36,
+  note: index === 8 ? UNMAPPABLE_TEST_NOTE : 36,
   velocity: 0.8,
   accent: index === 0,
   slide: index === 5,
 }));
 
-export function createHarness(): Harness {
+export function createHarness(
+  options: { readonly extraModules?: readonly HarnessModule[] } = {},
+): Harness {
+  const extraModules = options.extraModules ?? [];
   const seed: ModuleSeed = {
-    pluginId: ACID_BASS_MANIFEST.pluginId,
-    parameters: parameterValues(ACID_BASS_DEFAULT_PARAMETERS),
+    pluginId: BASS_MONO_MANIFEST.pluginId,
+    parameters: parameterValues(BASS_MONO_DEFAULT_PARAMETERS),
     steps: TEST_STEPS,
   };
+  const drumSeed: ModuleSeed = {
+    pluginId: DRUMLINE_SIX_MANIFEST.pluginId,
+    parameters: parameterValues(DRUMLINE_SIX_DEFAULT_PARAMETERS),
+    steps: TEST_STEPS,
+  };
+  const seeds = new Map<PluginId, ModuleSeed>([
+    [seed.pluginId, seed],
+    [drumSeed.pluginId, drumSeed],
+    ...extraModules.map((module) => [module.seed.pluginId, module.seed] as const),
+  ]);
+  const manifests = new Map<PluginId, PluginManifest>([
+    [BASS_MONO_MANIFEST.pluginId, BASS_MONO_MANIFEST],
+    [DRUMLINE_SIX_MANIFEST.pluginId, DRUMLINE_SIX_MANIFEST],
+    ...extraModules.map((module) => [module.manifest.pluginId, module.manifest] as const),
+  ]);
 
   const audio = {
     getPositionTicks: () => 0,
     pause: vi.fn(() => 0),
     play: vi.fn(() => Promise.resolve()),
     previewParameter: vi.fn(),
+    previewTempo: vi.fn(),
+    previewSwing: vi.fn(),
+    previewHumanize: vi.fn(),
     startAudition: vi.fn(() => Promise.resolve()),
     stopAudition: vi.fn(),
     stop: vi.fn(),
@@ -81,35 +124,32 @@ export function createHarness(): Harness {
     setLaunchQuantization: vi.fn(),
   };
 
-  let pinned = false;
   const projects = {
     save: vi.fn(() => Promise.resolve()),
     list: vi.fn(() =>
       Promise.resolve([
-        { id: "stored-1", name: "Saved session", modifiedAt: "2026-07-28", pinned: false },
+        { id: "stored-1", name: "Saved session", modifiedAt: "2026-07-28", favorite: false },
       ]),
     ),
     open: vi.fn(() => Promise.resolve()),
     exportPortable: vi.fn(() => new Uint8Array()),
     importPortable: vi.fn(() => Promise.resolve({ ok: true } as const)),
-    setPinned: vi.fn((next: boolean) => {
-      pinned = next;
-      return Promise.resolve();
-    }),
-    getPinned: vi.fn(() => pinned),
   };
 
   const domain = new PulseStore(
     createDefaultState(browserIdFactory, seed),
     browserIdFactory,
-    seed,
+    (pluginId) => seeds.get(pluginId),
     () => undefined,
-    (_module, parameter, value) => {
-      const descriptor = ACID_BASS_MANIFEST.parameters.find((one) => one.id === parameter);
+    (module, parameter, value) => {
+      const descriptor = manifests
+        .get(module.pluginId)
+        ?.parameters.find((one) => one.id === parameter);
       if (descriptor === undefined) return false;
       if (descriptor.valueType === "enum") {
         return typeof value === "string" && descriptor.enumValues?.includes(value) === true;
       }
+      if (descriptor.valueType === "boolean") return typeof value === "boolean";
       return (
         typeof value === "number" &&
         Number.isFinite(value) &&
@@ -122,10 +162,16 @@ export function createHarness(): Harness {
   const dependencies: AppStoreDependencies = {
     store: domain,
     audio,
-    manifestFor: (pluginId: PluginId) =>
-      pluginId === ACID_BASS_MANIFEST.pluginId ? ACID_BASS_MANIFEST : undefined,
-    addablePluginIds: [ACID_BASS_MANIFEST.pluginId],
+    manifestFor: (pluginId: PluginId) => manifests.get(pluginId),
+    addablePluginIds: [
+      BASS_MONO_MANIFEST.pluginId,
+      DRUMLINE_SIX_MANIFEST.pluginId,
+      ...extraModules.map((module) => module.manifest.pluginId),
+    ],
     auditionNoteFor: () => 36,
+    // The real roster lookup, so the section 14 result panel counts the events
+    // a swap target genuinely cannot sound.
+    playableNotesFor,
     visibleSlotCount: 8,
     projects,
   };

@@ -9,6 +9,11 @@ export interface ContinuousGestureHandles {
    * collapses the movement into a single undo entry.
    */
   readonly current: () => GestureId;
+  /**
+   * Ends the gesture in progress, if one exists. Wheel adjustment has no
+   * release event, so a wheel listener calls this after an idle delay.
+   */
+  readonly end: () => void;
   /** Handlers to spread onto a native range input. */
   readonly handlers: {
     readonly onPointerDown: () => void;
@@ -63,6 +68,7 @@ export function useContinuousGesture(): ContinuousGestureHandles {
 
   return {
     current,
+    end,
     handlers: {
       onPointerDown: begin,
       onPointerUp: end,

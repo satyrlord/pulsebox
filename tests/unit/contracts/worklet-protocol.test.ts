@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ENGINE_PROTOCOL_LIMITS,
   compareScheduledEvents,
+  isRealtimeSafeControllerEnvelope,
   validateEngineMessageEnvelope,
   type EventBatchPayload,
   type ParameterBatchPayload,
@@ -28,6 +29,107 @@ function envelope(kind: string, payload: object) {
 }
 
 describe("worklet protocol envelope validation", () => {
+  it("checks processor-bound control data without the diagnostic validator", () => {
+    const message = {
+      ...envelope("parameter-batch", {
+        changes: [{ parameterId: "cutoff", value: 900 }],
+      }),
+      projectRevision: { epoch: TEST_UUID, counter: 1 },
+    };
+    expect(isRealtimeSafeControllerEnvelope(message)).toBe(true);
+    expect(
+      isRealtimeSafeControllerEnvelope({
+        ...message,
+        payload: { changes: [{ parameterId: "cutoff", value: Number.NaN }] },
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts an absent project revision and checks its shape only when present", () => {
+    // The envelope contract makes projectRevision optional. Kinds that need
+    // it, such as hello, enforce presence at the receiver instead.
+    expect(isRealtimeSafeControllerEnvelope(envelope("configure", {}))).toBe(true);
+    expect(
+      isRealtimeSafeControllerEnvelope({
+        ...envelope("configure", {}),
+        projectRevision: { epoch: "not-a-uuid", counter: 1 },
+      }),
+    ).toBe(false);
+    expect(
+      isRealtimeSafeControllerEnvelope({
+        ...envelope("configure", {}),
+        projectRevision: { epoch: TEST_UUID, counter: -1 },
+      }),
+    ).toBe(false);
+  });
+
+  it("checks requestId and audioFrame shapes on the processor path", () => {
+    const base = {
+      ...envelope("configure", {}),
+      projectRevision: { epoch: TEST_UUID, counter: 1 },
+    };
+    expect(isRealtimeSafeControllerEnvelope({ ...base, requestId: "request-1" })).toBe(true);
+    expect(isRealtimeSafeControllerEnvelope({ ...base, requestId: "" })).toBe(false);
+    expect(isRealtimeSafeControllerEnvelope({ ...base, requestId: 7 })).toBe(false);
+    expect(isRealtimeSafeControllerEnvelope({ ...base, audioFrame: 128 })).toBe(true);
+    expect(isRealtimeSafeControllerEnvelope({ ...base, audioFrame: -1 })).toBe(false);
+    expect(isRealtimeSafeControllerEnvelope({ ...base, audioFrame: 0.5 })).toBe(false);
+  });
+
+  it("validates the bounded clear frame on both validation paths", () => {
+    // Without a bound the whole queue clears; with one, only the tail drops.
+    expect(isRealtimeSafeControllerEnvelope(envelope("clear-scheduled-events", {}))).toBe(true);
+    expect(
+      isRealtimeSafeControllerEnvelope(envelope("clear-scheduled-events", { fromFrame: 48_000 })),
+    ).toBe(true);
+    expect(
+      isRealtimeSafeControllerEnvelope(envelope("clear-scheduled-events", { fromFrame: -1 })),
+    ).toBe(false);
+    expect(
+      isRealtimeSafeControllerEnvelope(envelope("clear-scheduled-events", { fromFrame: 0.5 })),
+    ).toBe(false);
+    expect(
+      validateEngineMessageEnvelope(envelope("clear-scheduled-events", { fromFrame: 48_000 })).ok,
+    ).toBe(true);
+    expect(
+      validateEngineMessageEnvelope(envelope("clear-scheduled-events", { fromFrame: -1 })).ok,
+    ).toBe(false);
+    expect(
+      validateEngineMessageEnvelope(envelope("clear-scheduled-events", { fromFrame: "48000" }))
+        .ok,
+    ).toBe(false);
+  });
+
+  it("rejects unsafe ordinary payloads on the processor path", () => {
+    const base = {
+      ...envelope("configure", {}),
+      projectRevision: { epoch: TEST_UUID, counter: 1 },
+    };
+    expect(
+      isRealtimeSafeControllerEnvelope({
+        ...base,
+        payload: { text: "x".repeat(ENGINE_PROTOCOL_LIMITS.maximumOrdinaryPayloadBytes) },
+      }),
+    ).toBe(false);
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    expect(isRealtimeSafeControllerEnvelope({ ...base, payload: cyclic })).toBe(false);
+    let deeplyNested: Record<string, unknown> = {};
+    const deepRoot = deeplyNested;
+    for (let depth = 0; depth <= ENGINE_PROTOCOL_LIMITS.maximumOrdinaryPayloadDepth; depth += 1) {
+      const child: Record<string, unknown> = {};
+      deeplyNested.child = child;
+      deeplyNested = child;
+    }
+    expect(isRealtimeSafeControllerEnvelope({ ...base, payload: deepRoot })).toBe(false);
+    expect(
+      isRealtimeSafeControllerEnvelope({
+        ...base,
+        payload: { nested: { value: Number.POSITIVE_INFINITY } },
+      }),
+    ).toBe(false);
+  });
+
   it("accepts a versioned ready envelope", () => {
     const payload: ReadyPayload = { acceptedProtocolVersion: 1 };
     expect(
@@ -38,7 +140,7 @@ describe("worklet protocol envelope validation", () => {
   it("validates ordinary payload sizes without TextEncoder", () => {
     vi.stubGlobal("TextEncoder", undefined);
     expect(
-      validateEngineMessageEnvelope(envelope("configure", { label: "Acid bass \u{1F3B5}" })).ok,
+      validateEngineMessageEnvelope(envelope("configure", { label: "Silver serpent \u{1F3B5}" })).ok,
     ).toBe(true);
   });
 

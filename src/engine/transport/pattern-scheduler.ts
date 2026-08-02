@@ -12,6 +12,12 @@ import {
 export interface ResolvedStep {
   readonly step: PatternStepView;
   readonly patternIndex: number;
+  /**
+   * Position of this step inside its own Pattern. Humanize keys on this rather
+   * than on the absolute step, so a loop replays the same feel every pass
+   * instead of drifting into a new variation on every repeat.
+   */
+  readonly stepInPattern: number;
 }
 
 /**
@@ -32,7 +38,11 @@ export interface PatternTiming {
 
 export interface PatternWindowRequest {
   readonly resolveStep: StepResolver;
-  /** Frames per sixteenth at the current tempo. */
+  /**
+   * Frames per sixteenth at the current tempo. It may be fractional: each
+   * onset rounds the whole product once, so the grid cannot drift by an
+   * accumulated per-step rounding error.
+   */
   readonly stepFrames: number;
   /** 0 is straight; 1 delays every odd step to a 2:1 triplet feel. */
   readonly swing: number;
@@ -49,6 +59,12 @@ export interface PatternWindowRequest {
   /** Fraction of a step a non-slid note holds before releasing. */
   readonly gateRatio?: number;
   readonly maximumEvents?: number;
+  /**
+   * Exclusive lower bound on the absolute step index. Steps at or below it emit
+   * nothing. A timing-change rebuild uses it so a step already preserved at its
+   * old onset cannot fire again at its shifted new onset.
+   */
+  readonly minimumStepExclusive?: number;
 }
 
 const DEFAULT_GATE_RATIO = 0.82;
@@ -77,8 +93,9 @@ export function loopingStepResolver(
   if (steps.length === 0) return () => undefined;
   return (absoluteStep) => {
     if (!Number.isFinite(absoluteStep) || absoluteStep < 0) return undefined;
-    const step = steps[absoluteStep % steps.length];
-    return step === undefined ? undefined : { step, patternIndex };
+    const stepInPattern = absoluteStep % steps.length;
+    const step = steps[stepInPattern];
+    return step === undefined ? undefined : { step, patternIndex, stepInPattern };
   };
 }
 
@@ -98,7 +115,9 @@ export function chainedStepResolver(
     for (const pattern of playable) {
       if (offset < pattern.steps.length) {
         const step = pattern.steps[offset];
-        return step === undefined ? undefined : { step, patternIndex: pattern.patternIndex };
+        return step === undefined
+          ? undefined
+          : { step, patternIndex: pattern.patternIndex, stepInPattern: offset };
       }
       offset -= pattern.steps.length;
     }
@@ -112,13 +131,17 @@ function swingFramesFor(stepFrames: number, swing: number): number {
 }
 
 /**
- * Deterministic hash of (seed, absolute step, salt) into [-1, 1). Pure 32-bit
+ * Deterministic hash of (seed, step in pattern, salt) into [-1, 1). Pure 32-bit
  * integer math, so the same stored seed replays the same variation on every
  * platform and in every render.
+ *
+ * The step index is the position inside the Pattern, never the absolute step.
+ * Keying on the absolute step would give the same beat a new offset on every
+ * repeat, so the loop would never play the same way twice.
  */
-function humanizeUnit(seed: number, absoluteStep: number, salt: number): number {
+function humanizeUnit(seed: number, stepInPattern: number, salt: number): number {
   let hash =
-    ((seed | 0) ^ Math.imul(absoluteStep + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b)) | 0;
+    ((seed | 0) ^ Math.imul(stepInPattern + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b)) | 0;
   hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
   hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
   hash ^= hash >>> 16;
@@ -145,25 +168,32 @@ const VELOCITY_SALT = 1;
 
 function onsetFrame(context: OnsetContext, absoluteStep: number): number {
   const swung = absoluteStep % 2 === 1 ? context.swingFrames : 0;
-  const base = context.patternStartFrame + absoluteStep * context.stepFrames + swung;
+  // One rounding of the whole product per onset. Rounding the step size first
+  // would multiply that error by the step index and drift the audible grid.
+  const base =
+    context.patternStartFrame + Math.round(absoluteStep * context.stepFrames) + swung;
   const resolved = context.resolveStep(absoluteStep);
   if (resolved === undefined) return base;
   const timing = context.patternTiming?.[resolved.patternIndex];
   const humanize = clampHumanize(timing?.humanize);
   if (humanize === 0 || timing === undefined) return base;
-  const unit = humanizeUnit(timing.seed, absoluteStep, context.voiceSalt * 2 + TIMING_SALT);
+  const unit = humanizeUnit(
+    timing.seed,
+    resolved.stepInPattern,
+    context.voiceSalt * 2 + TIMING_SALT,
+  );
   return base + Math.round(unit * humanize * MAXIMUM_HUMANIZE_FRACTION * context.stepFrames);
 }
 
-function humanizedVelocity(
-  context: OnsetContext,
-  absoluteStep: number,
-  resolved: ResolvedStep,
-): number {
+function humanizedVelocity(context: OnsetContext, resolved: ResolvedStep): number {
   const timing = context.patternTiming?.[resolved.patternIndex];
   const humanize = clampHumanize(timing?.humanize);
   if (humanize === 0 || timing === undefined) return resolved.step.velocity;
-  const unit = humanizeUnit(timing.seed, absoluteStep, context.voiceSalt * 2 + VELOCITY_SALT);
+  const unit = humanizeUnit(
+    timing.seed,
+    resolved.stepInPattern,
+    context.voiceSalt * 2 + VELOCITY_SALT,
+  );
   const scaled = resolved.step.velocity * (1 + unit * humanize * MAXIMUM_VELOCITY_FRACTION);
   return Math.min(1, Math.max(0, scaled));
 }
@@ -187,9 +217,10 @@ export function schedulePatternWindow(
     patternStartFrame,
     gateRatio = DEFAULT_GATE_RATIO,
     maximumEvents = DEFAULT_MAXIMUM_EVENTS,
+    minimumStepExclusive,
   } = request;
 
-  if (!Number.isSafeInteger(stepFrames) || stepFrames <= 0) return [];
+  if (!Number.isFinite(stepFrames) || stepFrames <= 0) return [];
   if (windowStartFrame >= windowEndFrame) return [];
 
   const swingFrames = swingFramesFor(stepFrames, swing);
@@ -214,18 +245,21 @@ export function schedulePatternWindow(
 
   const events: ScheduledVoiceEvent[] = [];
   for (let absoluteStep = firstIndex; absoluteStep < lastIndex; absoluteStep += 1) {
-    if (events.length >= maximumEvents) break;
+    if (minimumStepExclusive !== undefined && absoluteStep <= minimumStepExclusive) continue;
     const frame = onsetFrame(context, absoluteStep);
     if (frame < windowStartFrame || frame >= windowEndFrame) continue;
     const resolved = resolveStep(absoluteStep);
     if (resolved?.step.active !== true) continue;
     const step = resolved.step;
+    // A note-off travels with its note-on, so the whole pair must fit under
+    // the cap. Emitting the onset alone would strand a note with no release.
+    if (events.length + (step.slide ? 1 : 2) > maximumEvents) break;
 
     events.push({
       atFrame: frame,
       type: "note-on",
       note: step.note,
-      velocity: humanizedVelocity(context, absoluteStep, resolved),
+      velocity: humanizedVelocity(context, resolved),
       accent: step.accent,
       slide: step.slide,
     });
@@ -242,4 +276,97 @@ export function schedulePatternWindow(
   }
 
   return events.sort(compareScheduledVoiceEvents);
+}
+
+/**
+ * The highest absolute step whose onset lies before `boundaryFrame`, or -1 when
+ * no onset does. Onsets stay in absolute-step order, so the first hit while
+ * scanning down from just past the boundary is the highest.
+ *
+ * A timing change captures the lead window at its old onsets and uses this
+ * value as the exclusive step filter for the rebuild: every step at or below it
+ * either already sounded or travels in the preserved batch, so the rebuild must
+ * not emit it again.
+ */
+export function highestStepBefore(
+  request: Omit<PatternWindowRequest, "windowStartFrame" | "windowEndFrame">,
+  boundaryFrame: number,
+): number {
+  const {
+    resolveStep,
+    stepFrames,
+    swing,
+    patternTiming,
+    voiceSalt = 0,
+    patternStartFrame,
+  } = request;
+  if (!Number.isFinite(stepFrames) || stepFrames <= 0) return -1;
+  const context: OnsetContext = {
+    resolveStep,
+    stepFrames,
+    swingFrames: swingFramesFor(stepFrames, swing),
+    patternStartFrame,
+    patternTiming,
+    voiceSalt: voiceSalt | 0,
+  };
+  const nearest = Math.floor((boundaryFrame - patternStartFrame) / stepFrames) + 3;
+  for (let absoluteStep = nearest; absoluteStep >= 0; absoluteStep -= 1) {
+    if (onsetFrame(context, absoluteStep) < boundaryFrame) return absoluteStep;
+  }
+  return -1;
+}
+
+/**
+ * The clamped gate release still owed for the newest onset at or before
+ * `playheadFrame`, or `undefined` when that note already released or slides.
+ *
+ * A bounded reschedule clears the queued horizon, and that queue held this
+ * note-off. Re-emitting it keeps the sounding voice on its natural release
+ * instead of a blanket cut at the reschedule point.
+ */
+export function pendingReleaseEvent(
+  request: Omit<PatternWindowRequest, "windowStartFrame" | "windowEndFrame">,
+  playheadFrame: number,
+): ScheduledVoiceEvent | undefined {
+  const {
+    resolveStep,
+    stepFrames,
+    swing,
+    patternTiming,
+    voiceSalt = 0,
+    patternStartFrame,
+    gateRatio = DEFAULT_GATE_RATIO,
+  } = request;
+  if (!Number.isFinite(stepFrames) || stepFrames <= 0) return undefined;
+  const swingFrames = swingFramesFor(stepFrames, swing);
+  const gateFrames = Math.max(1, Math.floor(stepFrames * gateRatio));
+  const context: OnsetContext = {
+    resolveStep,
+    stepFrames,
+    swingFrames,
+    patternStartFrame,
+    patternTiming,
+    voiceSalt: voiceSalt | 0,
+  };
+
+  // Onsets stay in absolute-step order, so scan back from just past the
+  // playhead. Once even an unclamped gate has expired, every older onset
+  // released long ago.
+  const nearest = Math.floor((playheadFrame - patternStartFrame) / stepFrames) + 3;
+  for (let absoluteStep = nearest; absoluteStep >= 0; absoluteStep -= 1) {
+    const frame = onsetFrame(context, absoluteStep);
+    if (frame > playheadFrame) continue;
+    if (frame + gateFrames <= playheadFrame) return undefined;
+    const resolved = resolveStep(absoluteStep);
+    if (resolved?.step.active !== true) continue;
+    if (resolved.step.slide) return undefined;
+    const releaseFrame = Math.max(
+      frame + 1,
+      Math.min(frame + gateFrames, onsetFrame(context, absoluteStep + 1) - 1),
+    );
+    return releaseFrame > playheadFrame
+      ? { atFrame: releaseFrame, type: "note-off" }
+      : undefined;
+  }
+  return undefined;
 }

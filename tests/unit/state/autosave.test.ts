@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { browserIdFactory, type ProjectRevision } from "../../../src/contracts";
-import { ACID_BASS_MANIFEST } from "../../../src/engine/public";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/public";
 import {
   createAutosave,
   createDefaultState,
   createMemoryProjectRepository,
+  restoreAutosave,
   type ModuleSeed,
   type ProjectRepositoryPort,
   type PulseState,
@@ -13,7 +14,7 @@ import {
 } from "../../../src/state/public";
 
 const SEED: ModuleSeed = {
-  pluginId: ACID_BASS_MANIFEST.pluginId,
+  pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, resonance: 0.38, waveform: "saw" },
   steps: Array.from({ length: 16 }, () => ({
     active: false,
@@ -30,9 +31,9 @@ const PROJECT_REVISION = {
 } as ProjectRevision;
 
 const PARSE_OPTIONS = {
-  knownPluginIds: [ACID_BASS_MANIFEST.pluginId as string],
+  knownPluginIds: [BASS_MONO_MANIFEST.pluginId as string],
   parameterDescriptorsByPluginId: {
-    [ACID_BASS_MANIFEST.pluginId]: ACID_BASS_MANIFEST.parameters,
+    [BASS_MONO_MANIFEST.pluginId]: BASS_MONO_MANIFEST.parameters,
   },
 };
 
@@ -184,5 +185,62 @@ describe("autosave timing", () => {
     await vi.advanceTimersByTimeAsync(5_000);
 
     expect(saveAutosave).not.toHaveBeenCalled();
+  });
+});
+
+describe("autosave restore", () => {
+  it("restores the snapshot from one stored read and returns its parsed document", async () => {
+    const repository = createMemoryProjectRepository();
+    const autosave = createController(repository);
+    await autosave.flush(stateNamed("Autosaved edit"));
+    autosave.dispose();
+
+    const loadAutosave = vi.spyOn(repository, "loadAutosave");
+    const base = stateNamed("Fresh default");
+    const restored = await restoreAutosave(base, { repository, parseOptions: PARSE_OPTIONS });
+
+    // The caller reuses the returned document, so the stored record is read
+    // once and cannot diverge from the state this restore applied.
+    expect(loadAutosave).toHaveBeenCalledTimes(1);
+    expect(restored.state.project.name).toBe("Autosaved edit");
+    expect(restored.document?.project.name).toBe("Autosaved edit");
+    expect(restored.document?.project.modifiedAt).toBe("2026-07-29T00:00:01.000Z");
+  });
+
+  it("keeps the base state and reports the discard when the snapshot is invalid", async () => {
+    const repository = createMemoryProjectRepository();
+    const autosave = createController(repository);
+    await autosave.flush(stateNamed("Broken snapshot"));
+    autosave.dispose();
+    const stored = await repository.loadAutosave();
+    if (stored === undefined) throw new Error("Test fixture did not store an autosave.");
+    await repository.saveAutosave({
+      ...stored,
+      document: {
+        ...stored.document,
+        project: { ...stored.document.project, tempo: 999 },
+      },
+    });
+
+    const onError = vi.fn();
+    const base = stateNamed("Fresh default");
+    const restored = await restoreAutosave(base, {
+      repository,
+      parseOptions: PARSE_OPTIONS,
+      onError,
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(restored.state).toBe(base);
+    expect(restored.document).toBeUndefined();
+  });
+
+  it("returns the base state untouched when no snapshot exists", async () => {
+    const repository = createMemoryProjectRepository();
+    const base = stateNamed("Fresh default");
+    const restored = await restoreAutosave(base, { repository, parseOptions: PARSE_OPTIONS });
+
+    expect(restored.state).toBe(base);
+    expect(restored.document).toBeUndefined();
   });
 });

@@ -1,8 +1,8 @@
 /**
- * Boom Eight: eight independent synthesized drum voices with a compressed
+ * Soft Thunder: eight independent synthesized drum voices with a compressed
  * mix bus.
  *
- * The large analog-style machine trades Drumline Six's Snap-and-Drive
+ * The large analog-style machine trades Tin Soldier's Snap-and-Drive
  * character for Punch and Compression: a per-voice transient shaper feeding a
  * bus compressor, which is what lets the kick and sub-kick sit together without
  * either disappearing. Every voice is generated, never sampled, so the module
@@ -16,15 +16,16 @@
 import {
   clamp,
   DeterministicNoise,
+  EqualPowerPan,
   mergeVoiceParameters,
   type VoiceParameterUpdate,
   OnePoleLowpass,
-  panGains,
   ParameterGlide,
   PeakCompressor,
   semitoneRatio,
   softClip,
   StateVariableFilter,
+  VoiceMixGates,
 } from "../../dsp/primitives";
 import { BOOM_VOICE_IDS, type BoomVoiceId } from "./voices";
 
@@ -37,6 +38,10 @@ export interface BoomVoiceParameters {
   readonly level: number;
   /** -1 hard left to 1 hard right. */
   readonly pan: number;
+  /** A muted voice keeps rendering but contributes silence to the mix. */
+  readonly mute: boolean;
+  /** While any voice is soloed, only soloed voices reach the mix. */
+  readonly solo: boolean;
 }
 
 export interface BoomEightParameters {
@@ -83,6 +88,8 @@ const DEFAULT_BOOM_VOICE_PARAMETERS: Readonly<Record<BoomVoiceId, BoomVoiceParam
           // Toms and rim spread across the field; the low end stays centred so
           // the kick pair keeps its weight in mono.
           pan: id === "low-tom" ? -0.3 : id === "high-tom" ? 0.3 : id === "rim" ? 0.24 : 0,
+          mute: false,
+          solo: false,
         }),
       ]),
     ) as Record<BoomVoiceId, BoomVoiceParameters>,
@@ -113,6 +120,13 @@ class BoomVoice {
   readonly #sampleRate: number;
   readonly #noise: DeterministicNoise;
   readonly #noiseFilter = new StateVariableFilter();
+  /**
+   * The manifest declares voice level as a smoothed field, so a committed
+   * change on a ringing voice glides instead of stepping in one sample.
+   */
+  readonly #level: ParameterGlide;
+  /** Linear choke over the declared release, never a hard cut. */
+  readonly #chokeStep: number;
   #parameters: BoomVoiceParameters;
   #phase = 0;
   #amplitude = 0;
@@ -128,19 +142,25 @@ class BoomVoice {
     this.#sampleRate = sampleRate;
     this.#parameters = parameters;
     this.#noise = new DeterministicNoise(this.#character.seed);
+    this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
+    this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
   get active(): boolean {
     return this.#active;
   }
 
-  setParameters(parameters: BoomVoiceParameters): void {
+  setParameters(parameters: BoomVoiceParameters, mode: BoomParameterUpdateMode = "smooth"): void {
     this.#parameters = parameters;
+    if (mode === "immediate") this.#level.set(clamp(parameters.level, 0, 1));
   }
 
   trigger(velocity: number, accent: boolean): void {
     this.#noise.reset();
     this.#noiseFilter.reset();
+    // A hit that starts from silence takes the committed level directly; the
+    // glide exists to protect a ringing tail, not to lag a fresh attack.
+    if (!this.#active) this.#level.set(clamp(this.#parameters.level, 0, 1));
     this.#phase = 0;
     this.#elapsed = 0;
     this.#velocity = clamp(velocity, 0, 1);
@@ -167,8 +187,11 @@ class BoomVoice {
 
     const decaySeconds = clamp(this.#parameters.decay, 0.01, 3);
     const decayCoefficient = Math.exp(-1 / (decaySeconds * this.#sampleRate));
-    const chokeCoefficient = Math.exp(-1 / (CHOKE_RELEASE_SECONDS * this.#sampleRate));
-    this.#amplitude *= this.#choking ? chokeCoefficient : decayCoefficient;
+    if (this.#choking) {
+      this.#amplitude = Math.max(0, this.#amplitude - this.#chokeStep);
+    } else {
+      this.#amplitude *= decayCoefficient;
+    }
     if (this.#amplitude < 1e-6) {
       this.silence();
       return 0;
@@ -180,7 +203,7 @@ class BoomVoice {
     const sample = this.#renderVoice(frequency, punch, decaySeconds);
 
     this.#elapsed += 1 / this.#sampleRate;
-    return sample * this.#amplitude * gain * clamp(this.#parameters.level, 0, 1);
+    return sample * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 
   #renderVoice(frequency: number, punch: number, decaySeconds: number): number {
@@ -285,6 +308,10 @@ export class BoomEightDsp {
   readonly #level: ParameterGlide;
   readonly #compression: ParameterGlide;
   readonly #tone: ParameterGlide;
+  readonly #voiceGates: VoiceMixGates;
+  readonly #voicePans: Readonly<Record<BoomVoiceId, EqualPowerPan>>;
+  /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
+  readonly #voiceList: readonly BoomVoice[];
   #parameters: BoomEightParameters = DEFAULT_BOOM_PARAMETERS;
 
   constructor(sampleRate: number) {
@@ -295,12 +322,20 @@ export class BoomEightDsp {
     this.#level = new ParameterGlide(DEFAULT_BOOM_PARAMETERS.level, sampleRate);
     this.#compression = new ParameterGlide(DEFAULT_BOOM_PARAMETERS.compression, sampleRate);
     this.#tone = new ParameterGlide(DEFAULT_BOOM_PARAMETERS.tone, sampleRate);
+    this.#voiceGates = new VoiceMixGates(BOOM_VOICE_IDS.length, sampleRate);
+    this.#voicePans = Object.fromEntries(
+      BOOM_VOICE_IDS.map((id) => [
+        id,
+        new EqualPowerPan(DEFAULT_BOOM_VOICE_PARAMETERS[id].pan, sampleRate),
+      ]),
+    ) as Record<BoomVoiceId, EqualPowerPan>;
     this.#voices = new Map(
       BOOM_VOICE_IDS.map((id) => [
         id,
         new BoomVoice(id, sampleRate, DEFAULT_BOOM_VOICE_PARAMETERS[id]),
       ]),
     );
+    this.#voiceList = [...this.#voices.values()];
   }
 
   setParameters(
@@ -320,8 +355,17 @@ export class BoomEightDsp {
       this.#level.set(this.#parameters.level);
       this.#compression.set(this.#parameters.compression);
       this.#tone.set(this.#parameters.tone);
+      const soloActive = BOOM_VOICE_IDS.some((id) => voices[id].solo);
+      for (const [index, id] of BOOM_VOICE_IDS.entries()) {
+        this.#voiceGates.set(index, voices[id].mute, voices[id].solo, soloActive);
+      }
     }
-    for (const id of BOOM_VOICE_IDS) this.#voices.get(id)?.setParameters(voices[id]);
+    for (const id of BOOM_VOICE_IDS) {
+      this.#voices.get(id)?.setParameters(voices[id], mode);
+      // A smooth update leaves the pan where it is; the render loop glides it
+      // toward the committed value the way every other smoothed field moves.
+      if (mode === "immediate") this.#voicePans[id].set(voices[id].pan);
+    }
   }
 
   getParameterSnapshot(): BoomEightParameters {
@@ -351,6 +395,15 @@ export class BoomEightDsp {
   process(left: Float32Array, right?: Float32Array, start = 0, end = left.length): void {
     const frameEnd = Math.min(left.length, end);
     const target = this.#parameters;
+    // Once per block, not per frame per voice: while any voice is soloed the
+    // mix is exclusive, and mute wins over solo.
+    let soloActive = false;
+    for (const id of BOOM_VOICE_IDS) {
+      if (target.voices[id].solo) {
+        soloActive = true;
+        break;
+      }
+    }
 
     for (let index = Math.max(0, start); index < frameEnd; index += 1) {
       // Per frame, so a knob drag ramps rather than stepping between blocks.
@@ -362,13 +415,30 @@ export class BoomEightDsp {
       let mixLeft = 0;
       let mixRight = 0;
 
-      for (const voice of this.#voices.values()) {
+      // A for-of loop allocates an iterator each frame inside the real-time
+      // render loop, so the index form stays.
+      for (let voiceIndex = 0; voiceIndex < this.#voiceList.length; voiceIndex += 1) {
+        const voice = this.#voiceList[voiceIndex];
+        if (voice === undefined) continue;
+        const voiceParameters = target.voices[voice.id];
+        // The gate and pan advance every frame even for an inactive voice, so
+        // a change made while the voice is silent is already settled when it
+        // next triggers.
+        const gate = this.#voiceGates.advance(
+          voiceIndex,
+          voiceParameters.mute,
+          voiceParameters.solo,
+          soloActive,
+        );
+        const voicePan: EqualPowerPan = this.#voicePans[voice.id];
+        voicePan.advance(voiceParameters.pan);
         if (!voice.active) continue;
+        // Rendered even when gated, so envelopes and chokes keep their place
+        // in time and un-muting mid-tail resumes where the voice really is.
         const sample = voice.render();
-        if (sample === 0) continue;
-        const [leftGain, rightGain] = panGains(this.#parameters.voices[voice.id].pan);
-        mixLeft += sample * leftGain;
-        mixRight += sample * rightGain;
+        if (sample === 0 || gate === 0) continue;
+        mixLeft += sample * gate * voicePan.left;
+        mixRight += sample * gate * voicePan.right;
       }
 
       // Compression before the tone tilt, so the filter smooths whatever

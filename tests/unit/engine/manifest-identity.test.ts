@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { InstrumentPluginManifest } from "../../../src/contracts/plugins";
-import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import { BOOM_EIGHT_MANIFEST } from "../../../src/engine/modules/boom-eight/manifest";
 import { DIGIT_FIVE_MANIFEST } from "../../../src/engine/modules/digit-five/manifest";
 import { DIGIT_SEVEN_MANIFEST } from "../../../src/engine/modules/digit-seven/manifest";
@@ -23,7 +23,7 @@ import {
  * trusted to review.
  */
 const MANIFESTS: readonly InstrumentPluginManifest[] = [
-  ACID_BASS_MANIFEST,
+  BASS_MONO_MANIFEST,
   DRUMLINE_SIX_MANIFEST,
   BOOM_EIGHT_MANIFEST,
   HYBRID_NINE_MANIFEST,
@@ -62,6 +62,23 @@ describe("instrument manifests match the approved identity table", () => {
       expect(label, manifest.productName).toMatch(/^[A-Z]{1,4}$/u);
       expect(isModuleAccentKey(label), `${label} is not an approved short label`).toBe(true);
     }
+  });
+
+  /**
+   * Decision D89: every shipped instrument carries an original icon as its
+   * maker's mark. The grammar assertions mirror the manifest validator, so a
+   * drifted icon fails here with the module named.
+   */
+  it("gives every instrument a distinct original icon within the declared grammar", () => {
+    const paths = MANIFESTS.map((manifest) => {
+      const icon = manifest.ui.icon;
+      expect(icon, `${manifest.productName} declares no icon`).toBeDefined();
+      expect(icon?.viewBox, manifest.productName).toMatch(/^0 0 [1-9]\d{0,2} [1-9]\d{0,2}$/);
+      expect(icon?.path, manifest.productName).toMatch(/^[MmZzLlHhVvCcSsQqTtAa0-9,.\s+-]+$/);
+      expect(icon?.path.length ?? 0, manifest.productName).toBeLessThanOrEqual(2048);
+      return icon?.path ?? "";
+    });
+    expect(new Set(paths).size).toBe(paths.length);
   });
 
   it("gives every instrument a distinct plugin ID and a distinct processor key", () => {

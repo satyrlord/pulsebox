@@ -20,11 +20,12 @@ function isBoomVoiceId(value: string): value is BoomVoiceId {
 const SHAPE = {
   moduleFields: new Set(["level", "compression", "tone"]),
   voiceFields: new Set<string>(["tune", "punch", "decay", "level", "pan"]),
+  booleanVoiceFields: new Set<string>(["mute", "solo"]),
   isVoiceId: isBoomVoiceId,
 } as const;
 
 class BoomEightProcessor extends WorkletVoiceProcessor<PartialParameters> {
-  protected readonly displayName = "Boom Eight";
+  protected readonly displayName = "Soft Thunder";
   readonly #dsp = new BoomEightDsp(sampleRate);
 
   protected decodeParameterObject(value: unknown): PartialParameters | undefined {

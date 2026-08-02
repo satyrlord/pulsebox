@@ -1,19 +1,22 @@
 import { stubMixerNodes } from "./stub-audio-graph";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { IdFactory } from "../../../src/contracts/ids";
+import type { IdFactory, StateRevision } from "../../../src/contracts/ids";
 import type { EngineMessageEnvelope } from "../../../src/contracts/worklet-protocol";
-import { ACID_BASS_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
+import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import { createBassVoiceAdapter } from "../../../src/engine/modules/bass-mono/adapter";
 import {
   TransportRuntime,
   type TransportModule,
 } from "../../../src/engine/transport/transport-runtime";
+import type { VoiceAdapterStatus } from "../../../src/engine/transport/voice-adapter";
+import type { WorkletVoiceAdapter } from "../../../src/engine/worklets/worklet-voice-adapter";
 import { createDefaultState } from "../../../src/state/default-state";
 import { PulseStore } from "../../../src/state/pulse-store";
+import { TEST_UUID } from "../contracts/fixtures";
 
 const seed = {
-  pluginId: ACID_BASS_MANIFEST.pluginId,
+  pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, waveform: "saw", volume: 0.62 },
   steps: Array.from({ length: 16 }, () => ({
     active: true,
@@ -80,7 +83,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("store to Acid Bass worklet projection", () => {
+describe("store to Silver Serpent worklet projection", () => {
   it("uses each accepted store revision and restores one current bounded snapshot", async () => {
     vi.stubGlobal("AudioWorkletNode", ProtocolNode);
     const ids = deterministicIds();
@@ -145,6 +148,93 @@ describe("store to Acid Bass worklet projection", () => {
     });
     expect(recoverySnapshot?.payload.parameters).toMatchObject({ cutoff: 1_200 });
     expect(runtime.projectRevision).toEqual(store.getState().project.revision);
+  });
+});
+
+describe("worklet voice adapter bounds and disposal", () => {
+  const REVISION = { epoch: TEST_UUID, counter: 0 } as StateRevision;
+
+  function adapterContext(): AudioContext {
+    return {
+      audioWorklet: { addModule: vi.fn().mockResolvedValue(undefined) },
+      currentTime: 0,
+      sampleRate: 48_000,
+    } as unknown as AudioContext;
+  }
+
+  it("faults instead of silently dropping an oversized event batch", async () => {
+    vi.stubGlobal("AudioWorkletNode", ProtocolNode);
+    const statuses: VoiceAdapterStatus[] = [];
+    const adapter = createBassVoiceAdapter(adapterContext(), {
+      projectRevision: REVISION,
+      onStatus: (status) => statuses.push(status),
+    });
+    await adapter.prepare();
+    adapter.activate({} as unknown as AudioNode);
+
+    adapter.schedule(
+      Array.from({ length: 257 }, (_, index) => ({
+        atFrame: 1_000 + index,
+        type: "note-on" as const,
+        note: 36,
+        velocity: 0.8,
+        accent: false,
+        slide: false,
+      })),
+    );
+
+    expect(statuses[0]).toMatchObject({
+      state: "recovering",
+      fault: { code: "event-batch-overflow" },
+    });
+  });
+
+  it("faults instead of silently dropping a batch with an invalid event frame", async () => {
+    vi.stubGlobal("AudioWorkletNode", ProtocolNode);
+    const statuses: VoiceAdapterStatus[] = [];
+    const adapter = createBassVoiceAdapter(adapterContext(), {
+      projectRevision: REVISION,
+      onStatus: (status) => statuses.push(status),
+    });
+    await adapter.prepare();
+    adapter.activate({} as unknown as AudioNode);
+
+    adapter.schedule([
+      { atFrame: 1_000, type: "note-on", note: 36, velocity: 0.8, accent: false, slide: false },
+      { atFrame: Number.NaN, type: "note-off" },
+    ]);
+
+    expect(statuses[0]).toMatchObject({
+      state: "recovering",
+      fault: { code: "event-batch-invalid-frame" },
+    });
+  });
+
+  it("rejects a pending prepare when the adapter is disposed mid-handshake", async () => {
+    class SilentNode extends EventTarget {
+      readonly port = {
+        onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
+        postMessage: vi.fn(),
+        close: vi.fn(),
+      };
+
+      readonly connect = vi.fn();
+      readonly disconnect = vi.fn();
+    }
+    vi.stubGlobal("AudioWorkletNode", SilentNode);
+    const adapter = createBassVoiceAdapter(adapterContext(), {
+      projectRevision: REVISION,
+    }) as WorkletVoiceAdapter;
+
+    const pending = adapter.prepare();
+    const expectation = expect(pending).rejects.toThrow("disposed");
+    // The hello envelope is in flight and the silent processor never answers.
+    await vi.waitFor(() => {
+      expect(adapter.pendingMessageCount).toBe(1);
+    });
+    adapter.dispose();
+    await expectation;
+    expect(adapter.state).toBe("disposing");
   });
 });
 

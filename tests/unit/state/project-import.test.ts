@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { browserIdFactory, type ProjectRevision } from "../../../src/contracts";
-import { ACID_BASS_DEFAULT_PARAMETERS, ACID_BASS_MANIFEST } from "../../../src/engine/public";
+import { BASS_MONO_DEFAULT_PARAMETERS, BASS_MONO_MANIFEST } from "../../../src/engine/public";
 import {
   commitPortableProjectImport,
   createDefaultState,
@@ -15,15 +15,15 @@ import {
 } from "../../../src/state/public";
 
 const SEED: ModuleSeed = {
-  pluginId: ACID_BASS_MANIFEST.pluginId,
-  parameters: ACID_BASS_DEFAULT_PARAMETERS,
+  pluginId: BASS_MONO_MANIFEST.pluginId,
+  parameters: BASS_MONO_DEFAULT_PARAMETERS,
   steps: createSilentSteps(),
 };
 
 const PARSE_OPTIONS = {
-  knownPluginIds: [ACID_BASS_MANIFEST.pluginId as string],
+  knownPluginIds: [BASS_MONO_MANIFEST.pluginId as string],
   parameterDescriptorsByPluginId: {
-    [ACID_BASS_MANIFEST.pluginId]: ACID_BASS_MANIFEST.parameters,
+    [BASS_MONO_MANIFEST.pluginId]: BASS_MONO_MANIFEST.parameters,
   },
 };
 

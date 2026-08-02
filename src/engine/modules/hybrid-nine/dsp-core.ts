@@ -1,5 +1,5 @@
 /**
- * Hybrid Nine: nine voices, each blending a synthesized layer with a
+ * Twin Engine: nine voices, each blending a synthesized layer with a
  * runtime-generated one-shot layer.
  *
  * Decision `D05` makes this machine the blended one: its default Blend sits
@@ -17,14 +17,15 @@
 import {
   clamp,
   DeterministicNoise,
+  EqualPowerPan,
   OnePoleLowpass,
-  panGains,
   ParameterGlide,
   mergeVoiceParameters,
   type VoiceParameterUpdate,
   semitoneRatio,
   softClip,
   StateVariableFilter,
+  VoiceMixGates,
 } from "../../dsp/primitives";
 import { HYBRID_VOICE_IDS, type HybridVoiceId } from "./voices";
 
@@ -41,6 +42,10 @@ export interface HybridVoiceParameters {
   readonly level: number;
   /** -1 hard left to 1 hard right. */
   readonly pan: number;
+  /** A muted voice keeps rendering but contributes silence to the mix. */
+  readonly mute: boolean;
+  /** While any voice is soloed, only soloed voices reach the mix. */
+  readonly solo: boolean;
 }
 
 export interface HybridNineParameters {
@@ -136,6 +141,8 @@ const DEFAULT_HYBRID_VOICE_PARAMETERS: Readonly<
                 : id === "rim"
                   ? -0.2
                   : 0,
+        mute: false,
+        solo: false,
       }),
     ]),
   ) as Record<HybridVoiceId, HybridVoiceParameters>,
@@ -217,6 +224,24 @@ class HybridVoice {
   #phase = 0;
   /** Fractional read position into the one-shot layer. */
   #cursor = 0;
+  /**
+   * Automatic 2 ms boundary fade for the one-shot layer. A nonzero Start
+   * offset lands the cursor on an arbitrary mid-buffer value, and the Attack
+   * control defaults to zero, so without this fade every such trigger is a
+   * full-scale step. Spec-004 section 21.5 mandates the fade for start
+   * offsets independent of user tone controls.
+   */
+  #boundaryGain = 0;
+  readonly #boundaryStep: number;
+  /**
+   * The manifest declares voice level and blend as smoothed fields. Both scale
+   * the output directly, so a committed change on a ringing voice glides
+   * instead of stepping in one sample.
+   */
+  readonly #level: ParameterGlide;
+  readonly #blend: ParameterGlide;
+  /** Linear choke: spec-004 section 21.5 mandates a linear 4 ms fade-out. */
+  readonly #chokeStep: number;
   #amplitude = 0;
   #elapsed = 0;
   #velocity = 0;
@@ -236,23 +261,41 @@ class HybridVoice {
     this.#parameters = parameters;
     this.#oneShot = oneShot;
     this.#noise = new DeterministicNoise(this.#character.seed);
+    this.#boundaryStep = 1 / Math.max(1, Math.round(0.002 * sampleRate));
+    this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
+    this.#blend = new ParameterGlide(clamp(parameters.blend, 0, 1), sampleRate);
+    this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
   get active(): boolean {
     return this.#active;
   }
 
-  setParameters(parameters: HybridVoiceParameters): void {
+  setParameters(
+    parameters: HybridVoiceParameters,
+    mode: HybridParameterUpdateMode = "smooth",
+  ): void {
     this.#parameters = parameters;
+    if (mode === "immediate") {
+      this.#level.set(clamp(parameters.level, 0, 1));
+      this.#blend.set(clamp(parameters.blend, 0, 1));
+    }
   }
 
   trigger(velocity: number, accent: boolean): void {
     this.#noise.reset();
     this.#noiseFilter.reset();
+    // A hit that starts from silence takes the committed values directly; the
+    // glides exist to protect a ringing tail, not to lag a fresh attack.
+    if (!this.#active) {
+      this.#level.set(clamp(this.#parameters.level, 0, 1));
+      this.#blend.set(clamp(this.#parameters.blend, 0, 1));
+    }
     this.#phase = 0;
     this.#elapsed = 0;
     // Start is normalized, so it stays meaningful whatever the buffer length.
     this.#cursor = clamp(this.#parameters.start, 0, 1) * (this.#oneShot.length - 1);
+    this.#boundaryGain = 0;
     this.#velocity = clamp(velocity, 0, 1);
     this.#accent = accent ? 1 : 0;
     this.#amplitude = 1;
@@ -277,17 +320,21 @@ class HybridVoice {
 
     const decaySeconds = clamp(this.#parameters.decay, 0.01, 3);
     const decayCoefficient = Math.exp(-1 / (decaySeconds * this.#sampleRate));
-    const chokeCoefficient = Math.exp(-1 / (CHOKE_RELEASE_SECONDS * this.#sampleRate));
-    this.#amplitude *= this.#choking ? chokeCoefficient : decayCoefficient;
+    if (this.#choking) {
+      this.#amplitude = Math.max(0, this.#amplitude - this.#chokeStep);
+    } else {
+      this.#amplitude *= decayCoefficient;
+    }
     if (this.#amplitude < 1e-6) {
       this.silence();
       return 0;
     }
 
     const ratio = semitoneRatio(this.#parameters.tune);
-    const blend = clamp(this.#parameters.blend, 0, 1);
+    const blend = this.#blend.advance(clamp(this.#parameters.blend, 0, 1));
     const synth = blend < 1 ? this.#renderSynthLayer(this.#character.baseFrequency * ratio) : 0;
-    const oneShot = blend > 0 ? this.#renderOneShotLayer(ratio) : 0;
+    this.#boundaryGain = Math.min(1, this.#boundaryGain + this.#boundaryStep);
+    const oneShot = blend > 0 ? this.#renderOneShotLayer(ratio) * this.#boundaryGain : 0;
 
     // Equal-power crossfade, so a mid blend does not dip in level the way a
     // linear mix of two uncorrelated layers would.
@@ -300,7 +347,9 @@ class HybridVoice {
     const gain = this.#velocity * (1 + this.#accent * 0.45);
 
     this.#elapsed += 1 / this.#sampleRate;
-    return mixed * attackGain * this.#amplitude * gain * clamp(this.#parameters.level, 0, 1);
+    return (
+      mixed * attackGain * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1))
+    );
   }
 
   #renderSynthLayer(frequency: number): number {
@@ -350,6 +399,10 @@ export class HybridNineDsp {
   /** Values the mix bus is currently rendering, which chase `#parameters`. */
   readonly #level: ParameterGlide;
   readonly #filter: ParameterGlide;
+  readonly #voiceGates: VoiceMixGates;
+  readonly #voicePans: Readonly<Record<HybridVoiceId, EqualPowerPan>>;
+  /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
+  readonly #voiceList: readonly HybridVoice[];
   #parameters: HybridNineParameters = DEFAULT_HYBRID_PARAMETERS;
 
   constructor(sampleRate: number) {
@@ -359,6 +412,13 @@ export class HybridNineDsp {
     this.#sampleRate = sampleRate;
     this.#level = new ParameterGlide(DEFAULT_HYBRID_PARAMETERS.level, sampleRate);
     this.#filter = new ParameterGlide(DEFAULT_HYBRID_PARAMETERS.filter, sampleRate);
+    this.#voiceGates = new VoiceMixGates(HYBRID_VOICE_IDS.length, sampleRate);
+    this.#voicePans = Object.fromEntries(
+      HYBRID_VOICE_IDS.map((id) => [
+        id,
+        new EqualPowerPan(DEFAULT_HYBRID_VOICE_PARAMETERS[id].pan, sampleRate),
+      ]),
+    ) as Record<HybridVoiceId, EqualPowerPan>;
     this.#voices = new Map(
       HYBRID_VOICE_IDS.map((id) => [
         id,
@@ -370,6 +430,7 @@ export class HybridNineDsp {
         ),
       ]),
     );
+    this.#voiceList = [...this.#voices.values()];
   }
 
   setParameters(
@@ -387,8 +448,17 @@ export class HybridNineDsp {
     if (mode === "immediate") {
       this.#level.set(this.#parameters.level);
       this.#filter.set(this.#parameters.filter);
+      const soloActive = HYBRID_VOICE_IDS.some((id) => voices[id].solo);
+      for (const [index, id] of HYBRID_VOICE_IDS.entries()) {
+        this.#voiceGates.set(index, voices[id].mute, voices[id].solo, soloActive);
+      }
     }
-    for (const id of HYBRID_VOICE_IDS) this.#voices.get(id)?.setParameters(voices[id]);
+    for (const id of HYBRID_VOICE_IDS) {
+      this.#voices.get(id)?.setParameters(voices[id], mode);
+      // A smooth update leaves the pan where it is; the render loop glides it
+      // toward the committed value the way every other smoothed field moves.
+      if (mode === "immediate") this.#voicePans[id].set(voices[id].pan);
+    }
   }
 
   getParameterSnapshot(): HybridNineParameters {
@@ -416,6 +486,15 @@ export class HybridNineDsp {
   process(left: Float32Array, right?: Float32Array, start = 0, end = left.length): void {
     const frameEnd = Math.min(left.length, end);
     const target = this.#parameters;
+    // Once per block, not per frame per voice: while any voice is soloed the
+    // mix is exclusive, and mute wins over solo.
+    let soloActive = false;
+    for (const id of HYBRID_VOICE_IDS) {
+      if (target.voices[id].solo) {
+        soloActive = true;
+        break;
+      }
+    }
 
     for (let index = Math.max(0, start); index < frameEnd; index += 1) {
       // Per frame, so a knob drag ramps rather than stepping between blocks.
@@ -426,13 +505,30 @@ export class HybridNineDsp {
       let mixLeft = 0;
       let mixRight = 0;
 
-      for (const voice of this.#voices.values()) {
+      // A for-of loop allocates an iterator each frame inside the real-time
+      // render loop, so the index form stays.
+      for (let voiceIndex = 0; voiceIndex < this.#voiceList.length; voiceIndex += 1) {
+        const voice = this.#voiceList[voiceIndex];
+        if (voice === undefined) continue;
+        const voiceParameters = target.voices[voice.id];
+        // The gate and pan advance every frame even for an inactive voice, so
+        // a change made while the voice is silent is already settled when it
+        // next triggers.
+        const gate = this.#voiceGates.advance(
+          voiceIndex,
+          voiceParameters.mute,
+          voiceParameters.solo,
+          soloActive,
+        );
+        const voicePan: EqualPowerPan = this.#voicePans[voice.id];
+        voicePan.advance(voiceParameters.pan);
         if (!voice.active) continue;
+        // Rendered even when gated, so envelopes and chokes keep their place
+        // in time and un-muting mid-tail resumes where the voice really is.
         const sample = voice.render();
-        if (sample === 0) continue;
-        const [leftGain, rightGain] = panGains(this.#parameters.voices[voice.id].pan);
-        mixLeft += sample * leftGain;
-        mixRight += sample * rightGain;
+        if (sample === 0 || gate === 0) continue;
+        mixLeft += sample * gate * voicePan.left;
+        mixRight += sample * gate * voicePan.right;
       }
 
       const filteredLeft = this.#filterLeft.process(

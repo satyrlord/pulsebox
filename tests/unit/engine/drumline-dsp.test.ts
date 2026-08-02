@@ -48,15 +48,16 @@ function energyAfter(samples: Float32Array, fromFrame: number): number {
   return total;
 }
 
-describe("Drumline Six manifest", () => {
+describe("Tin Soldier manifest", () => {
   it("is a valid plugin manifest", () => {
     const validation = validatePluginManifest(DRUMLINE_SIX_MANIFEST);
     expect(validation.ok ? [] : validation.issues).toEqual([]);
   });
 
   it("declares one parameter per voice field plus the module controls", () => {
-    // Six voices with five fields each, plus tone, drive, and level.
-    expect(DRUMLINE_SIX_MANIFEST.parameters).toHaveLength(6 * 5 + 3);
+    // Six voices with five fields plus mute and solo each, plus tone, drive,
+    // and level.
+    expect(DRUMLINE_SIX_MANIFEST.parameters).toHaveLength(6 * 7 + 3);
     expect(DRUMLINE_SIX_MANIFEST.voices.map((voice) => voice.id)).toEqual([...DRUM_VOICE_IDS]);
   });
 
@@ -164,17 +165,120 @@ describe("DrumlineSixDsp", () => {
   });
 
   it("pans a voice across the stereo field", () => {
+    // The snapshot path lands the pan without a ramp; the smooth path glides
+    // and has its own regression coverage.
     const left = render((dsp) => {
-      dsp.setParameters({
-        voices: {
-          ...DEFAULT_DRUMLINE_PARAMETERS.voices,
-          kick: { ...DEFAULT_DRUMLINE_PARAMETERS.voices.kick, pan: -1 },
+      dsp.setParameters(
+        {
+          voices: {
+            ...DEFAULT_DRUMLINE_PARAMETERS.voices,
+            kick: { ...DEFAULT_DRUMLINE_PARAMETERS.voices.kick, pan: -1 },
+          },
         },
-      });
+        "immediate",
+      );
       dsp.trigger("kick");
     });
 
     expect(peak(left.left)).toBeGreaterThan(peak(left.right) * 4);
+  });
+
+  it("glides a committed voice level instead of cutting a ringing tail", () => {
+    const dsp = new DrumlineSixDsp(SAMPLE_RATE);
+    dsp.trigger("kick");
+    const before = new Float32Array(1_024);
+    dsp.process(before, new Float32Array(1_024));
+    dsp.setParameters({ voices: { kick: { level: 0 } } });
+    const after = new Float32Array(4_096);
+    dsp.process(after, new Float32Array(4_096));
+
+    // The declared eight-millisecond glide keeps signal flowing while the
+    // level moves; a single-sample cut zeroes this window.
+    expect(energyAfter(after.subarray(0, 384), 0)).toBeGreaterThan(
+      energyAfter(before.subarray(640), 0) * 0.05,
+    );
+    expect(peak(after.subarray(2_048))).toBeLessThan(1e-3);
+  });
+
+  it("glides a committed pan change instead of stepping the channel gains", () => {
+    const dsp = new DrumlineSixDsp(SAMPLE_RATE);
+    dsp.setParameters(
+      {
+        voices: {
+          ...DEFAULT_DRUMLINE_PARAMETERS.voices,
+          kick: { ...DEFAULT_DRUMLINE_PARAMETERS.voices.kick, pan: -1 },
+        },
+      },
+      "immediate",
+    );
+    dsp.trigger("kick");
+    const left1 = new Float32Array(512);
+    const right1 = new Float32Array(512);
+    dsp.process(left1, right1);
+    dsp.setParameters({ voices: { kick: { pan: 1 } } });
+    const left2 = new Float32Array(2_048);
+    const right2 = new Float32Array(2_048);
+    dsp.process(left2, right2);
+
+    // The right channel starts from its glided gain near zero rather than
+    // jumping to the full panned value in one sample.
+    expect(Math.abs(right2[0] ?? 0)).toBeLessThan(0.05);
+    // And the position settles fully right after the ramp.
+    expect(peak(right2.subarray(1_024))).toBeGreaterThan(peak(left2.subarray(1_024)) * 4);
+  });
+
+  it("drops a muted voice from the mix and lets solo isolate another", () => {
+    const muted = render((dsp) => {
+      dsp.setParameters({ voices: { kick: { mute: true } } }, "immediate");
+      dsp.trigger("kick");
+    });
+    expect(peak(muted.left)).toBe(0);
+
+    const soloed = render((dsp) => {
+      dsp.setParameters({ voices: { snare: { solo: true } } }, "immediate");
+      dsp.trigger("kick");
+      dsp.trigger("snare");
+    });
+    expect(peak(soloed.left)).toBeGreaterThan(0.01);
+
+    const bystander = render((dsp) => {
+      dsp.setParameters({ voices: { snare: { solo: true } } }, "immediate");
+      dsp.trigger("kick");
+    });
+    expect(peak(bystander.left)).toBe(0);
+  });
+
+  /**
+   * A mute pressed while the voice rings must ramp, not step. A gate that
+   * branches the voice out of the sum drops a live tail to zero in one frame,
+   * which is an audible click. Compared against the same voice rendered with
+   * no mute, so the machine's own signal jumps are the baseline and only the
+   * gate's contribution is under test.
+   */
+  it("ramps a mute pressed mid-tail rather than cutting the voice", () => {
+    const largestJump = (buffer: Float32Array): number => {
+      let largest = 0;
+      for (let index = 1; index < buffer.length; index += 1) {
+        const jump = Math.abs((buffer[index] ?? 0) - (buffer[index - 1] ?? 0));
+        if (jump > largest) largest = jump;
+      }
+      return largest;
+    };
+    const renderWithMute = (mute: boolean): Float32Array => {
+      const dsp = new DrumlineSixDsp(SAMPLE_RATE);
+      const buffer = new Float32Array(4_096);
+      dsp.trigger("kick");
+      dsp.process(buffer, undefined, 0, 512);
+      if (mute) dsp.setParameters({ voices: { kick: { mute: true } } });
+      dsp.process(buffer, undefined, 512, 4_096);
+      return buffer;
+    };
+
+    const free = renderWithMute(false);
+    const muted = renderWithMute(true);
+    expect(peak(free.subarray(0, 512))).toBeGreaterThan(0.05);
+    expect(largestJump(muted)).toBeLessThanOrEqual(largestJump(free) + 1e-6);
+    expect(peak(muted.subarray(3_072))).toBe(0);
   });
 
   /**

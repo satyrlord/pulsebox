@@ -91,7 +91,6 @@ export interface HistoryAvailability {
 
 export interface UiState {
   readonly selectedModuleId: ModuleInstanceId | undefined;
-  readonly collapsedModuleIds: ReadonlySet<ModuleInstanceId>;
 }
 
 export interface PulseState {

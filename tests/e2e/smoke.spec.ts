@@ -28,17 +28,17 @@ async function startPlayback(page: Page): Promise<void> {
  * rack order, and the last two empty.
  */
 const SEEDED_RACK = [
-  "Acid Bass",
-  "Drumline Six",
-  "Boom Eight",
-  "Hybrid Nine",
-  "Digit Seven",
-  "Digit Five",
+  "Silver Serpent",
+  "Tin Soldier",
+  "Soft Thunder",
+  "Twin Engine",
+  "Gray Ghost",
+  "Dusty Mosaic",
   "Empty",
   "Empty",
 ] as const;
 
-/** The first empty slot, which is where an Add control lives. */
+/** The first empty slot in the seeded rack. */
 const FIRST_EMPTY_SLOT = SEEDED_RACK.indexOf("Empty");
 
 test("boots the production shell with the seeded rack", async ({ page }) => {
@@ -53,23 +53,46 @@ test("boots the production shell with the seeded rack", async ({ page }) => {
 });
 
 test("adds an instrument into an empty slot", async ({ page }) => {
-  await page.getByRole("button", { name: "Add Acid Bass to the first empty rack slot" }).click();
-  await expect(page.locator(`${RACK_MODULE}[data-label='Acid Bass']`)).toHaveCount(2);
+  await page.getByRole("button", { name: "Add Silver Serpent to the first empty rack slot" }).click();
+  await expect(page.locator(`${RACK_MODULE}[data-label='Silver Serpent']`)).toHaveCount(2);
   // Faceplates carry no playback-position output; the Piano Roll and transport
   // clock own that feedback.
   await expect(page.locator('[data-component="activity-indicator"]')).toHaveCount(0);
 });
 
-test("adds the selected Drumline plugin", async ({ page }) => {
-  await page.getByRole("button", { name: "Add Drumline Six to the first empty rack slot" }).click();
-  await expect(page.locator(`${RACK_MODULE}[data-label='Drumline Six']`)).toHaveCount(2);
+test("adds an instrument by double-clicking its complete module card", async ({ page }) => {
+  const card = page
+    .locator('[data-component="module-browser"] article')
+    .filter({ hasText: "Dusty Mosaic" });
+  await card.dblclick();
+  await expect(page.locator(`${RACK_MODULE}[data-label='Dusty Mosaic']`)).toHaveCount(2);
 });
 
-test("duplicates a Drumline module without changing its plugin type", async ({ page }) => {
-  const drumline = page.locator(`${RACK_MODULE}[data-label='Drumline Six']`).first();
-  await drumline.getByRole("button", { name: "Duplicate module" }).click();
-  await expect(page.locator(`${RACK_MODULE}[data-label='Drumline Six']`)).toHaveCount(2);
-  await expect(page.locator(`${RACK_MODULE}[data-label='Acid Bass']`)).toHaveCount(1);
+test("drags a complete module card into a specific empty slot", async ({ page }) => {
+  const card = page
+    .locator('[data-component="module-browser"] article')
+    .filter({ hasText: "Tin Soldier" });
+  const target = page.locator('[data-component="rack-overview"] li').nth(FIRST_EMPTY_SLOT);
+  const cardBox = await card.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (cardBox === null || targetBox === null) throw new Error("Expected visible drag geometry.");
+
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect(page.locator(`${RACK_MODULE}[data-label='Tin Soldier']`)).toHaveCount(2);
+});
+
+test("duplicates a Tin Soldier module without changing its plugin type", async ({ page }) => {
+  // Section 13.2: Duplicate lives in the loaded module's context menu.
+  const drumline = page.locator(`${RACK_MODULE}[data-label='Tin Soldier']`).first();
+  await drumline.getByRole("button", { name: "Tin Soldier module menu" }).click();
+  await page.getByRole("menuitem", { name: "Duplicate" }).click();
+  await expect(page.locator(`${RACK_MODULE}[data-label='Tin Soldier']`)).toHaveCount(2);
+  await expect(page.locator(`${RACK_MODULE}[data-label='Silver Serpent']`)).toHaveCount(1);
 });
 
 test("play activates the AudioWorklet path and Stop is idempotent", async ({ page }) => {
@@ -146,7 +169,7 @@ test("audition sounds only while pointer or keyboard input is held", async ({ pa
         (window as unknown as { __auditionProbe: { created: number; disconnected: number } })
           .__auditionProbe,
     );
-  const audition = page.getByRole("button", { name: "Acid Bass audition" });
+  const audition = page.getByRole("button", { name: "Silver Serpent audition" });
 
   // Activating audio and building the seeded rack takes longer than the default
   // expect timeout allows.
@@ -247,11 +270,14 @@ test("the wheel adjusts a knob and settles into one commit", async ({ page }) =>
 });
 
 test("removing a module announces a non-blocking Undo notice", async ({ page }) => {
-  await page.locator(RACK_MODULE).first().getByRole("button", { name: "Remove module" }).click();
+  // Section 13.2: removal starts from `Delete module` in the context menu.
+  const plate = page.locator(RACK_MODULE).first();
+  await plate.getByRole("button", { name: "Silver Serpent module menu" }).click();
+  await page.getByRole("menuitem", { name: "Delete module" }).click();
   const notice = page.locator(".undo-notice");
-  await expect(notice).toContainText("Removed Acid Bass.");
+  await expect(notice).toContainText("Removed Silver Serpent.");
   await notice.getByRole("button", { name: "Undo" }).click();
-  await expect(page.locator(`${RACK_MODULE}[data-label='Acid Bass']`)).toHaveCount(1);
+  await expect(page.locator(`${RACK_MODULE}[data-label='Silver Serpent']`)).toHaveCount(1);
 });
 
 test("Space toggles playback and Escape stops it", async ({ page }) => {
@@ -434,7 +460,7 @@ test("shows the unsupported-size notice below the editing boundary", async ({ pa
   await expect(notice).toBeVisible();
   await expect(notice.getByRole("status")).toContainText("Autosave remains active");
   await expect(notice.getByRole("button")).toHaveText(["Save", "Export"]);
-  await expect(page.getByRole("button", { name: "Play" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toHaveCount(0);
   await expect(page.getByRole("slider")).toHaveCount(0);
 });
 
@@ -507,17 +533,21 @@ test("playback keeps the heap stable rather than growing without bound", async (
   }
 });
 
-test("Drumline keeps producing audio with Tone driven to its maximum", async ({ page }) => {
+test("Tin Soldier keeps producing audio with Tone driven to its maximum", async ({ page }) => {
   await startPlayback(page);
 
   // Tone drives the mix-bus filter. A conditionally stable topology diverges
   // above its cutoff limit and latches the voice silent for the rest of the
   // session, which the unit fixtures cannot see because they never render
   // through a live worklet.
-  const drumline = page.locator(`${RACK_MODULE}[data-label='Drumline Six']`).first();
+  const drumline = page.locator(`${RACK_MODULE}[data-label='Tin Soldier']`).first();
   const tone = drumline.locator(`${KNOB}[data-parameter='tone'] [role='slider']`);
   await tone.focus();
-  for (let step = 0; step < 120; step += 1) await tone.press("ArrowUp");
+  // End drives the control to its maximum in one gesture. Stepping there with
+  // 120 separate key presses costs more wall clock than the whole test budget
+  // and proves nothing extra: the filter either survives the ceiling or it
+  // does not.
+  await tone.press("End");
   await expect(tone).toHaveAttribute("aria-valuenow", "1");
 
   // The meter reads the signal the processor actually emitted, so a non-zero
@@ -530,7 +560,9 @@ test("Drumline keeps producing audio with Tone driven to its maximum", async ({ 
     .toBeGreaterThan(0);
 
   // Turning it back must keep working rather than leaving a latched filter.
-  for (let step = 0; step < 40; step += 1) await tone.press("ArrowDown");
+  // PageDown moves by the large step, so a few presses cover the same travel
+  // the previous 40 arrow presses did.
+  for (let step = 0; step < 4; step += 1) await tone.press("PageDown");
   await expect
     .poll(async () => Number((await meter.getAttribute("aria-valuenow")) ?? "0"), {
       timeout: 10_000,
@@ -587,20 +619,23 @@ test("each Pattern keeps its own name and selection across reload", async ({ pag
 
   await pattern.selectOption({ label: "Intro" });
   await expect(pattern).toHaveValue("0");
-  await expect(page.getByRole("option", { name: "Breakbeat" })).toBeAttached();
+  await expect(pattern.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 
   await page.waitForTimeout(1_500);
   await page.reload();
 
-  await expect(page.getByRole("combobox", { name: "Selected Pattern" })).toHaveValue("0");
-  await expect(page.getByRole("option", { name: "Breakbeat" })).toBeAttached();
+  const reloaded = page.getByRole("combobox", { name: "Selected Pattern", exact: true });
+  await expect(reloaded).toHaveValue("0");
+  await expect(reloaded.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 });
 
 test("the mixer mutes a channel without stopping the transport", async ({ page }) => {
   await startPlayback(page);
   await page.getByRole("tab", { name: "Mixer" }).click();
 
-  const mute = page.getByRole("button", { name: "Mute Acid Bass" });
+  // The rack faceplate carries the same channel mute under its own name, so
+  // address the mixer strip's key exactly.
+  const mute = page.getByRole("button", { name: "Mute Silver Serpent", exact: true });
   await expect(mute).toHaveAttribute("aria-pressed", "false");
   await mute.click();
   await expect(mute).toHaveAttribute("aria-pressed", "true");
@@ -611,7 +646,7 @@ test("the mixer mutes a channel without stopping the transport", async ({ page }
 
 test("a mixer fader moves by keyboard and persists across a reload", async ({ page }) => {
   await page.getByRole("tab", { name: "Mixer" }).click();
-  const fader = page.getByRole("slider", { name: "Acid Bass level" });
+  const fader = page.getByRole("slider", { name: "Silver Serpent level" });
   const before = Number(await fader.getAttribute("aria-valuenow"));
 
   await fader.focus();
@@ -625,7 +660,7 @@ test("a mixer fader moves by keyboard and persists across a reload", async ({ pa
   await page.getByRole("tab", { name: "Mixer" }).click();
   expect(
     Number(
-      await page.getByRole("slider", { name: "Acid Bass level" }).getAttribute("aria-valuenow"),
+      await page.getByRole("slider", { name: "Silver Serpent level" }).getAttribute("aria-valuenow"),
     ),
   ).toBeCloseTo(after, 2);
 });
@@ -637,7 +672,7 @@ test("a mixer fader moves by keyboard and persists across a reload", async ({ pa
  */
 test("a short mixer well keeps the fader's pointer resolution", async ({ page }) => {
   await page.getByRole("tab", { name: "Mixer" }).click();
-  const fader = page.getByRole("slider", { name: "Acid Bass level" });
+  const fader = page.getByRole("slider", { name: "Silver Serpent level" });
   const surface = await fader.boundingBox();
   if (surface === null) throw new Error("Expected the channel fader to be laid out.");
   // The repair only matters while the well is shorter than the 120px floor.
@@ -662,10 +697,11 @@ test("a short mixer well keeps the fader's pointer resolution", async ({ page })
 
 test("song mode chains Patterns and reports the chain length", async ({ page }) => {
   const playlist = page.locator('[data-component="playlist-summary"]');
-  await expect(playlist).toContainText("The Playlist is empty.");
+  // Decision D92: the default project ships the five-entry section 9.1 chain.
+  await expect(playlist.locator("ol > li")).toHaveCount(5);
   await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
   await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
-  await expect(playlist.locator("ol > li")).toHaveCount(2);
+  await expect(playlist.locator("ol > li")).toHaveCount(7);
 
   const songMode = page.getByRole("button", { name: "Song" });
   await songMode.click();
@@ -681,8 +717,10 @@ test("a saved project reopens from the Open menu", async ({ page }) => {
   await tempo.press("Enter");
 
   const projectMenu = page.locator('[data-component="project-menu"]');
-  await projectMenu.getByRole("button", { name: "Project actions" }).click();
-  await projectMenu.getByRole("menuitem", { name: "Save" }).click();
+  await page
+    .locator('[data-component="workspace-bar"]')
+    .getByRole("button", { name: "Save changes" })
+    .click();
   await expect(projectMenu.getByRole("status")).toContainText("Saved");
 
   await tempo.fill("100");
@@ -695,14 +733,48 @@ test("a saved project reopens from the Open menu", async ({ page }) => {
   await expect(page.locator('[data-field="tempo"]')).toHaveValue("144");
 });
 
+test("creating a starter saves the initial project and copies the default project", async ({
+  page,
+}) => {
+  const projectMenu = page.locator('[data-component="project-menu"]');
+  const selector = projectMenu.getByRole("button", { name: /Project selector/ });
+  const tempo = page.locator('[data-field="tempo"]');
+
+  // Section 9.2: the template copies the section 9.1 default project, so both
+  // carry the same name. Move the working project off its default tempo, so a
+  // fresh copy is provable rather than indistinguishable from the current one.
+  await tempo.fill("101");
+  await tempo.press("Enter");
+  await expect(tempo).toHaveValue("101");
+
+  await selector.click();
+  await projectMenu.getByRole("button", { name: "New: Neon Basement" }).click();
+  await expect(selector).toHaveAccessibleName(/Current project: Neon Basement/);
+
+  // The new project is the section 9.1 content: 128 BPM, eight slots with six
+  // loaded modules and the last two empty.
+  await expect(page.locator('[data-field="tempo"]')).toHaveValue("128");
+  await expect(page.locator(RACK_MODULE)).toHaveCount(8);
+  await expect(page.locator(`${RACK_MODULE}[data-label="Empty"]`)).toHaveCount(2);
+
+  // Both projects are stored: the fresh copy saves at creation so the Save
+  // control never reports phantom unsaved edits. Newest first, the list holds
+  // the 128 BPM copy and then the edited 101 BPM original.
+  await selector.click();
+  const storedProjects = page.getByRole("list", { name: "Stored projects" });
+  await expect(storedProjects.getByRole("button", { name: /Neon Basement/ })).toHaveCount(2);
+  await storedProjects.getByRole("button", { name: /Neon Basement/ }).nth(1).click();
+  await expect(page.locator('[data-field="tempo"]')).toHaveValue("101");
+});
+
 test("portable export produces a ZIP that imports through the validated archive path", async ({
   page,
 }) => {
   const projectMenu = page.locator('[data-component="project-menu"]');
-  await projectMenu.getByRole("button", { name: "Project actions" }).click();
+  await projectMenu.getByRole("button", { name: /Project selector/ }).click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    projectMenu.getByRole("menuitem", { name: "Export" }).click(),
+    projectMenu.getByRole("button", { name: "Export" }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/\.pulsebox$/);
   const path = await download.path();

@@ -70,7 +70,7 @@ describe("architecture source policy", () => {
       { path: "src/state/project.ts", source: "interface Project { readonly node: AudioNode }" },
       {
         path: "src/engine/preview.ts",
-        source: 'import { AcidBassDsp } from "./modules/bass-mono/dsp-core";',
+        source: 'import { BassMonoDsp } from "./modules/bass-mono/dsp-core";',
       },
       { path: "scripts/server.mjs", source: 'const endpoint = "/api/projects";' },
       { path: "src/ui/rack-delete.ts", source: 'if (window.confirm("Delete module?")) remove();' },
@@ -140,7 +140,7 @@ describe("architecture source policy", () => {
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/audits/naming-originality-audit.md",
-        "docs/instruments/acid-bass.md",
+        "docs/instruments/silver-serpent.md",
         "docs/specs/spec-010-quality-and-delivery.md",
       ]),
     ).toEqual([]);
@@ -175,7 +175,7 @@ describe("architecture source policy", () => {
       {
         path: "src/ui/rack.ts",
         source:
-          "declare const ACID_BASS_MANIFEST: { pluginId: string }; declare const pluginId: string; if (pluginId === ACID_BASS_MANIFEST.pluginId) {}",
+          "declare const BASS_MONO_MANIFEST: { pluginId: string }; declare const pluginId: string; if (pluginId === BASS_MONO_MANIFEST.pluginId) {}",
       },
     ];
 

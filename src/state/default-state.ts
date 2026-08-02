@@ -6,7 +6,6 @@ import {
   createProjectLineageId,
   createStateRevisionEpoch,
   type IdFactory,
-  type ModuleInstanceId,
 } from "../contracts/ids";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 import type { PatternStep, PulseState, RackModuleState } from "./model";
@@ -20,10 +19,12 @@ export interface ModuleSeed {
 /** Size of the project Pattern bank. */
 export const PATTERN_SLOT_COUNT = 5;
 export const PATTERN_STEP_COUNT = 16;
+/** Section 9.1: about -8 dB per occupied channel. 0.4 linear is -7.96 dB. */
 export const DEFAULT_MODULE_LEVEL = 0.4;
+/** Section 9.1: about -6 dB on the master. 0.5 linear is -6.02 dB. */
 export const DEFAULT_MASTER_LEVEL = 0.5;
-/** Specification default: Humanize starts at 12 percent. */
-export const DEFAULT_PATTERN_HUMANIZE = 0.12;
+/** Specification default: Humanize starts at 0 percent. */
+export const DEFAULT_PATTERN_HUMANIZE = 0;
 /** Pattern seeds are unsigned 32-bit integers. */
 export const MAXIMUM_PATTERN_SEED = 0xffff_ffff;
 
@@ -40,6 +41,12 @@ function patternSeedFromId(id: string): number {
 
 const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as const;
 
+/**
+ * The section 9.1 default project name. The section 9.2 starter template creates
+ * a copy of that project, so this is also the template's name.
+ */
+export const DEFAULT_PROJECT_NAME = "Neon Basement";
+
 export function createSilentSteps(length = PATTERN_STEP_COUNT): readonly PatternStep[] {
   return Object.freeze(
     Array.from({ length }, () =>
@@ -51,6 +58,9 @@ export function createSilentSteps(length = PATTERN_STEP_COUNT): readonly Pattern
 /**
  * Seeds fill the rack from slot one upward, in order. Passing several is how the
  * default project ships more than one instrument.
+ *
+ * The section 9.1 name and tempo are fixed. Section 9.2 has no separate content,
+ * so no caller overrides them.
  */
 export function createDefaultState(
   idFactory: IdFactory,
@@ -66,9 +76,9 @@ export function createDefaultState(
       id: projectId,
       lineageId,
       revision: Object.freeze({ epoch, counter: 0 }),
-      name: "Neon Basement",
+      name: DEFAULT_PROJECT_NAME,
       tempo: 128,
-      swing: 0.54,
+      swing: 0,
       masterLevel: DEFAULT_MASTER_LEVEL,
       rackSlots: Object.freeze(
         RACK_SLOT_IDS.map((id, index) => {
@@ -90,7 +100,19 @@ export function createDefaultState(
         }),
       ),
       activePatternIndex: 1,
-      song: Object.freeze({ enabled: false, entries: Object.freeze([]) }),
+      // Section 9.1: the bar counts describe the default Song chain. Each
+      // Pattern is one bar of sixteen steps, so a bar count is a repeat count.
+      // The chain ships disabled; enabling Song mode plays the arrangement.
+      song: Object.freeze({
+        enabled: false,
+        entries: Object.freeze([
+          Object.freeze({ patternIndex: 0, repeats: 8 }),
+          Object.freeze({ patternIndex: 1, repeats: 16 }),
+          Object.freeze({ patternIndex: 2, repeats: 8 }),
+          Object.freeze({ patternIndex: 3, repeats: 16 }),
+          Object.freeze({ patternIndex: 4, repeats: 8 }),
+        ]),
+      }),
     }),
     transport: Object.freeze({
       status: "stopped",
@@ -100,7 +122,6 @@ export function createDefaultState(
     }),
     ui: Object.freeze({
       selectedModuleId: modules[0]?.id,
-      collapsedModuleIds: new Set<ModuleInstanceId>(),
     }),
     history: Object.freeze({ canUndo: false, canRedo: false }),
   });

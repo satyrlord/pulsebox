@@ -20,10 +20,35 @@ export interface CompactControlDescriptor {
   readonly parameterId: ParameterId;
 }
 
+/**
+ * A compact control that addresses the voice chosen in the faceplate's voice
+ * selector. The UI binds `<selected-voice-id>-<parameterSuffix>`, so one
+ * descriptor serves every voice. Instruments only.
+ */
+export interface VoiceCompactControlDescriptor {
+  readonly position: number;
+  readonly parameterSuffix: string;
+}
+
 export interface PluginEditorSection {
   readonly id: string;
   readonly name: string;
   readonly parameterIds: readonly ParameterId[];
+}
+
+/**
+ * Declares one parameter whose control the UI disables while a gate parameter
+ * does not hold the declared value. The engine already ignores the gated
+ * parameter in that state, so this makes the faceplate agree with the audio
+ * path instead of showing a control that does nothing.
+ */
+export interface ParameterGateDescriptor {
+  /** The parameter the UI disables while the gate is unmet. */
+  readonly parameterId: ParameterId;
+  /** The parameter whose value decides the disabled state. */
+  readonly gateParameterId: ParameterId;
+  /** The value the gate parameter must hold for the control to be enabled. */
+  readonly gateValue: boolean;
 }
 
 export interface PluginModuleAccent {
@@ -33,10 +58,28 @@ export interface PluginModuleAccent {
   readonly controlRing: string;
 }
 
+/**
+ * Original module iconography as one compound SVG path. The shared UI renders
+ * it inline with `currentColor` and the even-odd fill rule, so subpaths cut
+ * holes. Data only: the grammar admits path data, never markup or script.
+ */
+export interface PluginModuleIcon {
+  /** Origin-anchored SVG viewBox, for example `0 0 24 24`. */
+  readonly viewBox: string;
+  /** One compound path in SVG path-data syntax. */
+  readonly path: string;
+}
+
 export interface PluginUiManifest {
   readonly compactControls: readonly CompactControlDescriptor[];
+  /** Selected-voice fast controls. Instruments with voices only. */
+  readonly voiceCompactControls?: readonly VoiceCompactControlDescriptor[];
+  /** Parameters the UI disables while their gate parameter is unmet. */
+  readonly parameterGates?: readonly ParameterGateDescriptor[];
   readonly detailedEditorSections: readonly PluginEditorSection[];
   readonly moduleAccent: PluginModuleAccent;
+  /** Module iconography for the browser thumbnail and the faceplate badge. */
+  readonly icon?: PluginModuleIcon;
 }
 
 export interface PluginMigrationDescriptor {
@@ -264,6 +307,25 @@ function validateUi(
       message: "Module accent colors must use opaque uppercase six-digit sRGB hex.",
     });
   }
+  const icon = manifest.ui.icon;
+  if (icon !== undefined) {
+    if (!/^0 0 [1-9]\d{0,2} [1-9]\d{0,2}$/.test(icon.viewBox)) {
+      issues.push({
+        path: "ui.icon.viewBox",
+        message: "Module icon viewBox must be origin-anchored, for example `0 0 24 24`.",
+      });
+    }
+    if (
+      icon.path.length === 0 ||
+      icon.path.length > 2048 ||
+      !/^[MmZzLlHhVvCcSsQqTtAa0-9,.\s+-]+$/.test(icon.path)
+    ) {
+      issues.push({
+        path: "ui.icon.path",
+        message: "Module icon path must be non-empty bounded SVG path data with no markup.",
+      });
+    }
+  }
   const positions = manifest.ui.compactControls.map((control) => control.position);
   if (
     positions.some((position) => !Number.isSafeInteger(position) || position < 0) ||
@@ -280,6 +342,38 @@ function validateUi(
         path: arrayPath("ui.compactControls", index, ".parameterId"),
         message: "Compact control must reference a declared parameter.",
       });
+    }
+  }
+
+  const voiceControls = manifest.ui.voiceCompactControls ?? [];
+  if (voiceControls.length > 0) {
+    if (manifest.kind !== "instrument" || manifest.voices.length === 0) {
+      issues.push({
+        path: "ui.voiceCompactControls",
+        message: "Voice compact controls require an instrument with voices.",
+      });
+    } else {
+      const voicePositions = voiceControls.map((control) => control.position);
+      if (
+        voicePositions.some((position) => !Number.isSafeInteger(position) || position < 0) ||
+        new Set(voicePositions).size !== voicePositions.length
+      ) {
+        issues.push({
+          path: "ui.voiceCompactControls",
+          message: "Voice compact control positions must be unique non-negative integers.",
+        });
+      }
+      for (const [index, control] of voiceControls.entries()) {
+        const missing = manifest.voices.some(
+          (voice) => !parameterIds.has(`${voice.id}-${control.parameterSuffix}`),
+        );
+        if (missing) {
+          issues.push({
+            path: arrayPath("ui.voiceCompactControls", index, ".parameterSuffix"),
+            message: "Voice compact control must resolve to a declared parameter on every voice.",
+          });
+        }
+      }
     }
   }
   validateUniqueStrings(
@@ -299,6 +393,32 @@ function validateUi(
       issues.push({
         path: arrayPath("ui.detailedEditorSections", index, ".parameterIds"),
         message: "Editor section references an undeclared parameter.",
+      });
+    }
+  }
+  for (const [index, gate] of (manifest.ui.parameterGates ?? []).entries()) {
+    const path = arrayPath("ui.parameterGates", index);
+    if (gate.parameterId === gate.gateParameterId) {
+      issues.push({ path, message: "A parameter cannot gate itself." });
+    }
+    if (!parameterIds.has(gate.parameterId)) {
+      issues.push({
+        path: `${path}.parameterId`,
+        message: "Gated control must reference a declared parameter.",
+      });
+    }
+    if (!parameterIds.has(gate.gateParameterId)) {
+      issues.push({
+        path: `${path}.gateParameterId`,
+        message: "Parameter gate must reference a declared gate parameter.",
+      });
+      continue;
+    }
+    const gateDescriptor = manifest.parameters.find((one) => one.id === gate.gateParameterId);
+    if (gateDescriptor !== undefined && gateDescriptor.valueType !== "boolean") {
+      issues.push({
+        path: `${path}.gateParameterId`,
+        message: "Parameter gate must reference a boolean parameter.",
       });
     }
   }
@@ -333,6 +453,10 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
     typeof raw.ui.moduleAccent.accentMuted !== "string" ||
     typeof raw.ui.moduleAccent.led !== "string" ||
     typeof raw.ui.moduleAccent.controlRing !== "string" ||
+    (raw.ui.icon !== undefined &&
+      (!isPlainRecord(raw.ui.icon) ||
+        typeof raw.ui.icon.viewBox !== "string" ||
+        typeof raw.ui.icon.path !== "string")) ||
     !Array.isArray(raw.ui.compactControls) ||
     raw.ui.compactControls.some(
       (control) =>
@@ -340,6 +464,23 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
         typeof control.position !== "number" ||
         typeof control.parameterId !== "string",
     ) ||
+    (raw.ui.voiceCompactControls !== undefined &&
+      (!Array.isArray(raw.ui.voiceCompactControls) ||
+        raw.ui.voiceCompactControls.some(
+          (control) =>
+            !isPlainRecord(control) ||
+            typeof control.position !== "number" ||
+            typeof control.parameterSuffix !== "string",
+        ))) ||
+    (raw.ui.parameterGates !== undefined &&
+      (!Array.isArray(raw.ui.parameterGates) ||
+        raw.ui.parameterGates.some(
+          (gate) =>
+            !isPlainRecord(gate) ||
+            typeof gate.parameterId !== "string" ||
+            typeof gate.gateParameterId !== "string" ||
+            typeof gate.gateValue !== "boolean",
+        ))) ||
     !Array.isArray(raw.ui.detailedEditorSections) ||
     raw.ui.detailedEditorSections.some(
       (section) =>

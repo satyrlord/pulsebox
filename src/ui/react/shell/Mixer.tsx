@@ -1,3 +1,4 @@
+import type { ModuleInstanceId } from "../../../contracts";
 import { DEFAULT_MASTER_LEVEL, DEFAULT_MODULE_LEVEL } from "../../../state/public";
 import { Fader } from "../controls/Fader";
 import { Knob } from "../controls/Knob";
@@ -10,12 +11,26 @@ import styles from "./Mixer.module.css";
 
 const SENDS = ["A", "B", "C", "D"] as const;
 
+/**
+ * Leaf meter subscription for one strip. Meter frames arrive per animation
+ * frame, so only this small component re-renders, not the nine-strip mixer.
+ */
+function StripMeter(props: { readonly moduleId: ModuleInstanceId; readonly label: string }) {
+  const level = useAppStore((state) => state.meterLevels[props.moduleId] ?? 0);
+  return <LevelMeter label={props.label} level={level} width={6} stretch />;
+}
+
+/** Leaf meter subscription for the master strip, for the same reason. */
+function MasterStripMeter(props: { readonly masterLevel: number }) {
+  const level = useAppStore((state) => masterMeterLevel(state.meterLevels, props.masterLevel));
+  return <LevelMeter label="Master output" level={level} width={6} stretch />;
+}
+
 export function Mixer() {
   const { visibleSlotCount, manifestFor } = useDependencies();
   const rackSlots = useAppStore((state) => state.project.project.rackSlots);
   const modules = useAppStore((state) => state.project.project.modules);
   const masterLevel = useAppStore((state) => state.project.project.masterLevel);
-  const meterLevels = useAppStore((state) => state.meterLevels);
   const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
   const toggleMute = useAppStore((state) => state.toggleMute);
   const toggleSolo = useAppStore((state) => state.toggleSolo);
@@ -26,14 +41,12 @@ export function Mixer() {
   const previewMasterLevel = useAppStore((state) => state.previewMasterLevel);
   const selectModule = useAppStore((state) => state.selectModule);
   const openSend = useAppStore((state) => state.openSend);
-  const setStudioView = useAppStore((state) => state.setStudioView);
   const visible = rackSlots.slice(0, visibleSlotCount);
   const loaded = visible.flatMap((slot) => {
     const module = slot.moduleId === undefined ? undefined : modules[slot.moduleId];
     return module === undefined ? [] : [module];
   });
   const anySolo = loaded.some((module) => module.solo);
-  const masterMeter = masterMeterLevel(meterLevels, masterLevel);
 
   return (
     <section className={styles.mixer} data-component="mixer" aria-label="Mixer">
@@ -203,12 +216,7 @@ export function Mixer() {
                 onInput={(value) => previewChannelMix(module.id, "level", value)}
                 onCommit={(value, gestureId) => setChannelLevel(module.id, value, gestureId)}
               />
-              <LevelMeter
-                label={`${name} output`}
-                level={meterLevels[module.id] ?? 0}
-                width={6}
-                stretch
-              />
+              <StripMeter moduleId={module.id} label={`${name} output`} />
             </div>
             {/* Solo leads and mute follows. Solo uses warning. Mute uses a neutral cap. */}
             <div className={styles.muteSolo}>
@@ -232,15 +240,9 @@ export function Mixer() {
       })}
 
       <article className={styles.master} aria-label="Master channel" data-component="master-strip">
-        <button
-          type="button"
-          className={styles.channelName}
-          aria-label="Open the master channel"
-          title="Open the master channel."
-          onClick={() => setStudioView("master")}
-        >
+        <span className={styles.channelName}>
           MIX
-        </button>
+        </span>
         <div className={styles.faderWell}>
           <Fader
             label="Master level"
@@ -259,7 +261,7 @@ export function Mixer() {
             onInput={previewMasterLevel}
             onCommit={(value, gestureId) => setMasterLevel(value, gestureId)}
           />
-          <LevelMeter label="Master output" level={masterMeter} width={6} stretch />
+          <MasterStripMeter masterLevel={masterLevel} />
         </div>
       </article>
     </section>

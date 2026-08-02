@@ -11,12 +11,17 @@ import workletUrl from "./hybrid-nine.worklet.ts?worker&url";
  * validating pass-through rather than a rename map: module fields stay flat and
  * per-voice fields keep their `<voice-id>-<field>` form.
  */
-function toHybridParameters(
+export function toHybridParameters(
   values: Readonly<Record<string, ParameterValue>>,
 ): Readonly<Record<string, ParameterValue>> {
-  const result: Record<string, number> = {};
+  const result: Record<string, ParameterValue> = {};
   for (const [parameterId, value] of Object.entries(values)) {
-    if (typeof value === "number" && Number.isFinite(value)) result[parameterId] = value;
+    if (
+      (typeof value === "number" && Number.isFinite(value)) ||
+      typeof value === "boolean"
+    ) {
+      result[parameterId] = value;
+    }
   }
   return result;
 }
@@ -24,7 +29,7 @@ function toHybridParameters(
 const DESCRIPTOR: WorkletVoiceDescriptor = {
   processorName: "pulsebox-hybrid-nine",
   moduleUrl: workletUrl,
-  displayName: "Hybrid Nine",
+  displayName: "Twin Engine",
   mapParameters: toHybridParameters,
 };
 

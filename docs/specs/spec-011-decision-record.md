@@ -551,3 +551,41 @@ contains the normative requirements. This table is the traceability record.
   [product and design foundations](spec-001-product-and-design-foundations.md)
   owns the accent and icon vocabulary. `THEMING.md` section 3.4 owns the token
   values.
+- **D90.** A loaded rack faceplate shows only the module icon as its identity.
+  The short label and the slot number leave the faceplate, because the icon
+  and accent already identify the machine and the number repeats the rack
+  overview. The slot number and full product name stay in the faceplate's
+  accessible name. Empty faceplates keep their slot number and `Empty` label.
+  Short labels remain the identity on rack-overview cards, mixer strips, and
+  the module browser. This refines the faceplate identity rule in section 2.2
+  of [product and design foundations](spec-001-product-and-design-foundations.md),
+  which owns it.
+- **D91.** A parameter descriptor declares a smoothing ramp only when the DSP
+  glides that field. The drum machines glide the module bus fields and the
+  per-voice level, pan, and blend over eight milliseconds. Per-voice tune,
+  punch, snap, decay, noise, start, and attack land as immediate steps. A step
+  on those fields moves pitch or shape, not gain, so it cannot click. Section
+  6.3 of [ARCHITECTURE.md](../ARCHITECTURE.md) owns the
+  descriptor-matches-behavior rule.
+- **D92.** The section 9.1 bar counts describe the default Song chain, not
+  per-Pattern lengths. Each Pattern is one bar of sixteen steps. A bar count
+  is the chain entry's repeat count. The default project ships the chain
+  disabled, and Song mode plays it when the user enables it. Section 9.1 of
+  [rack and instruments](spec-005-rack-and-instruments.md) owns the content.
+- **D93.** A drum voice with the `restart` retrigger policy restarts
+  immediately on a retrigger of the same voice. The new attack transient masks
+  the restart, and a declick ramp would delay the hit and move its frame.
+  Section 21.4 of
+  [audio engine and transport](spec-004-audio-engine-and-transport.md) owns
+  the retrigger rule.
+- **D94.** History entries are full state snapshots and keep their commit
+  order when a gesture coalesces. When two gestures interleave, an undo of the
+  later entry restores the snapshot from that gesture's begin, so the other
+  gesture's mid-gesture value can appear at an intermediate undo step. The
+  final state after both undos is exact. Section 7.4 of
+  [ARCHITECTURE.md](../ARCHITECTURE.md) owns gesture coalescing.
+- **D95.** The `pinned` to `favorite` metadata rename keeps format version 1
+  and adds no lexical repair. The format has not shipped, so only local
+  pre-release documents carry `pinned`. Such a document fails validation, and
+  the application reports the discarded autosave with the non-blocking project
+  notice. [PROJECT-FORMAT.md](../PROJECT-FORMAT.md) owns the schema.

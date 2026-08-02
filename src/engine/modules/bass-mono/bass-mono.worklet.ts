@@ -2,11 +2,11 @@ import type {} from "../../worklets/audio-worklet-globals";
 
 import { isPlainRecord } from "../../../contracts/validation";
 import { WorkletVoiceProcessor } from "../../worklets/worklet-voice-processor";
-import { AcidBassDsp, type BassParameters } from "./dsp-core";
+import { BassMonoDsp, type BassParameters } from "./dsp-core";
 
-class AcidBassProcessor extends WorkletVoiceProcessor<Partial<BassParameters>> {
-  protected readonly displayName = "Acid Bass";
-  readonly #dsp = new AcidBassDsp(sampleRate);
+class BassMonoProcessor extends WorkletVoiceProcessor<Partial<BassParameters>> {
+  protected readonly displayName = "Silver Serpent";
+  readonly #dsp = new BassMonoDsp(sampleRate);
 
   protected decodeParameterObject(value: unknown): Partial<BassParameters> | undefined {
     if (!isPlainRecord(value)) return undefined;
@@ -85,4 +85,4 @@ function setParameter(
   }
 }
 
-registerProcessor("pulsebox-bass-mono", AcidBassProcessor);
+registerProcessor("pulsebox-bass-mono", BassMonoProcessor);

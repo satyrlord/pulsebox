@@ -20,11 +20,12 @@ function isHybridVoiceId(value: string): value is HybridVoiceId {
 const SHAPE = {
   moduleFields: new Set(["level", "filter"]),
   voiceFields: new Set<string>(["tune", "decay", "blend", "start", "attack", "level", "pan"]),
+  booleanVoiceFields: new Set<string>(["mute", "solo"]),
   isVoiceId: isHybridVoiceId,
 } as const;
 
 class HybridNineProcessor extends WorkletVoiceProcessor<PartialParameters> {
-  protected readonly displayName = "Hybrid Nine";
+  protected readonly displayName = "Twin Engine";
   readonly #dsp = new HybridNineDsp(sampleRate);
 
   protected decodeParameterObject(value: unknown): PartialParameters | undefined {

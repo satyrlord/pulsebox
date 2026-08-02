@@ -290,6 +290,17 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Text entry keeps native selection so a name or value can be edited and
+   copied. Everything else in the shell is a control, not document text. */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 html,
@@ -366,7 +377,7 @@ button {
     box-shadow var(--pulse-duration-fast) linear;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled):not([aria-pressed="true"]) {
   color: var(--pulse-color-text-primary, #f3f5f6);
 }
 

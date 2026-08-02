@@ -15,24 +15,31 @@
   cursor: ns-resize;
 }
 
-/* The tooltip and the entry chip share one bubble geometry above the dial, so
-   swapping one for the other during a gesture does not move anything. The
-   shared Tooltip control carries the bubble surface. This rule holds only the
-   knob-specific position and ink, so cascade order against it cannot matter. */
+/* The tooltip and the entry chip share one ink, so swapping one for the other
+   during a gesture changes only the text. The shared Tooltip control carries the
+   bubble surface and floats itself above the dial against the viewport; the chip
+   stays in the knob's own box and keeps the offset here. This rule holds only
+   knob-specific ink, so cascade order against the shared class cannot matter. */
 .tooltip,
 .value {
-  z-index: 6;
-  inset-block-start: -16px;
   color: var(--lcd-ink);
 }
 
 /*
- * Direct numeric entry lives in this chip and stays in the DOM. It appears when
- * the knob is hovered or has keyboard focus. The chip repeats the bubble
- * surface because it is a plain container, not the shared Tooltip.
+ * Direct numeric entry lives in this chip and stays in the DOM. It appears on
+ * keyboard focus. The chip repeats the bubble surface because it is a plain
+ * container, not the shared Tooltip.
+ *
+ * It sits over the lower part of the dial rather than above it. The module packs
+ * its controls into a horizontal scroller, and a scrolling axis forces the cross
+ * axis to clip too, so a chip that overhung the top edge was cut off. Covering
+ * the dial keeps the whole field inside the scroller, and the dial beneath it is
+ * redundant while a value is being typed.
  */
 .value {
   position: absolute;
+  z-index: 6;
+  inset-block-end: 0;
   inset-inline-start: 50%;
   translate: -50% 0;
   min-inline-size: max-content;
@@ -49,7 +56,9 @@
   transition: opacity var(--pulse-duration-fast, 80ms) linear;
 }
 
-.knob:hover .value,
+/* Keyboard focus only. Hover used to reveal this chip too, but it duplicated
+   the dial's native `title` tooltip and, unlike that tooltip, it was laid out
+   inside the module's horizontal scroller, so the panel edge cut it off. */
 .knob:focus-within .value {
   opacity: 1;
   pointer-events: auto;
@@ -238,4 +247,30 @@
   text-transform: uppercase;
   color: var(--pulse-color-text-secondary, #bac2c8);
   text-shadow: 0 1px 0 var(--text-engraved-lo);
+}
+
+/*
+ * A disabled knob keeps its shape and its stored value arc, but loses the grab
+ * cursor and the lit paint. The dimmed face is paired with `aria-disabled` and
+ * removal from the tab sequence, so the state never rests on color alone.
+ */
+.knob[data-disabled="true"] {
+  cursor: default;
+}
+
+.knob[data-disabled="true"] .fill {
+  opacity: 0.22;
+}
+
+.knob[data-disabled="true"] .pointer {
+  opacity: 0.3;
+}
+
+.knob[data-disabled="true"] .cap {
+  opacity: 0.18;
+}
+
+.knob[data-disabled="true"] .label {
+  color: var(--pulse-color-disabled, #7b858d);
+  text-shadow: none;
 }

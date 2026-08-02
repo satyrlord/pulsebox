@@ -122,12 +122,16 @@ Behavior:
 
 - Swing shifts alternating subdivisions.
 - Humanize changes timing and velocity deterministically.
+- Humanize varies each module independently. Its timing offset is at most one quarter step.
 - A stored pattern seed produces repeatable playback.
 - When the user changes the seed, Pulsebox creates a new deterministic variation.
 - Alt-drag temporarily bypasses the 1/16 snap for a pitched note gesture.
 - Timing is audible.
 - Visual playheads reflect timing where practical.
 - The engine supports tempo changes during playback.
+- A pointer move previews Tempo, Swing, or Humanize without a project command.
+  Pointer release commits one command and one Undo entry.
+- Pointer cancel restores the committed timing value and creates no Undo entry.
 - Per-Pattern Swing, selectable grids, triplets, persistent snap-off, per-voice
   grid resolution, tempo automation, and time-signature timelines are post-MVP
   work.
@@ -173,9 +177,20 @@ Behavior:
 - Supports quantized named Pattern launches.
 - Keeps visual playheads separate.
 
-The engine controller may use a scheduling interval around 20 to 30
-milliseconds. It may use a horizon around 80 to 120 milliseconds. The audio
-thread remains authoritative.
+The engine controller uses a 25-millisecond scheduling interval. It keeps a
+500-millisecond event horizon at each processor. The audio thread applies each
+event at its absolute frame and remains authoritative.
+
+The scheduler never sends an expired note-on. After a late pass, all modules
+resume from one shared future boundary. The scheduler keeps the musical grid
+continuous after that boundary. It does not replay missed notes in a burst.
+
+When a module becomes ready during playback, the engine fills that module to
+the end of the current shared horizon. This rule applies after an add, a swap,
+or a processor recovery.
+
+A live step edit replaces the affected module's queued horizon. A quantized
+Pattern launch replaces queued events that cross its selected boundary.
 
 ### 21.3 Worklet and graph messaging
 
@@ -186,6 +201,10 @@ thread remains authoritative.
 - No UI component owns a worklet port directly.
 - Messages include a version.
 - Parameter changes include timestamps where needed.
+- The controller coalesces pointer-rate parameter previews for 16 milliseconds.
+  It keeps the latest value for each parameter.
+- The processor validates normal controller data without serializing JSON on
+  the audio thread.
 
 Custom synthesis and custom DSP use AudioWorklet processors. Native Web Audio
 nodes may implement suitable primitives such as delay, filtering, convolution,
@@ -203,6 +222,12 @@ Each instrument documents:
 - Retrigger policy.
 
 Steal with a short release, never a hard cut.
+
+A drum voice with the `restart` retrigger policy restarts its phase and
+envelope immediately on a retrigger of the same voice. The new attack transient
+masks the restart, so no ramp applies and the hit keeps its exact frame.
+Decision `D93` records this exception. The micro-fade rules in section 21.5
+govern steals, chokes, and sample boundaries, not same-voice restarts.
 
 ### 21.5 Sample boundaries
 
@@ -279,6 +304,10 @@ Target:
 - Use transforms for playheads, meters, and drag previews.
 - Cache geometry for the duration of pointer gestures.
 - Avoid repeated layout measurement inside pointer-move handlers.
+- Keep timing pointer, wheel, and key updates out of project history until the gesture ends.
+- Test an eight-module active rack at 44.1 kHz and 48 kHz.
+- Run performance regression tests without retries.
+- Measure long tasks as run evidence. Do not use a long-task duration as a release gate.
 
 Apart from the functional first-sound metric above, the MVP does not use a
 hardware class as a performance release gate. It also does not use a CPU

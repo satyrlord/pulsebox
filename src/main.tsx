@@ -6,8 +6,8 @@ import {
   type ProjectRevision,
 } from "./contracts";
 import {
-  ACID_BASS_DEFAULT_PARAMETERS,
-  ACID_BASS_MANIFEST,
+  BASS_MONO_DEFAULT_PARAMETERS,
+  BASS_MONO_MANIFEST,
   BOOM_EIGHT_DEFAULT_PARAMETERS,
   BOOM_EIGHT_MANIFEST,
   DIGIT_FIVE_DEFAULT_PARAMETERS,
@@ -20,6 +20,7 @@ import {
   HYBRID_NINE_MANIFEST,
   TransportRuntime,
   auditionNoteFor,
+  playableNotesFor,
   createBassVoiceAdapter,
   createBoomVoiceAdapter,
   createDigitFiveVoiceAdapter,
@@ -27,16 +28,15 @@ import {
   createDrumlineVoiceAdapter,
   createHybridVoiceAdapter,
   createPluginRegistry,
-  drumVoiceNote,
   type TransportModule,
   type VoiceAdapterFactory,
 } from "./engine/public";
 import {
   createAutosave,
   commitPortableProjectImport,
-  createDefaultState,
   createSilentSteps,
   createMemoryProjectRepository,
+  DEFAULT_PROJECT_NAME,
   documentToState,
   nextProjectRevision,
   parseStoredProject,
@@ -45,107 +45,20 @@ import {
   restoreAutosave,
   serializeProject,
   serializePortableProject,
+  validateImportedParameter,
   type ModuleSeed,
   type PulseEngineDelta,
   type PulseState,
   type RackModuleState,
 } from "./state/public";
 import { createIndexedDbProjectRepository } from "./persistence/public";
+import { createDefaultProjectState, toParameterValues } from "./composition/default-project";
 import { mountPulseboxApp, type PulseboxAppHandle } from "./ui/public";
 
 // Section 9.1: the MVP rack is exactly eight slots, six loaded and two empty.
+// The default project content lives in src/composition/default-project.ts, so
+// tests can assert the section 9 contract without mounting the application.
 const visibleSlotCount = 8;
-const initialSteps = Object.freeze(
-  [36, 36, 43, 39, 36, 46, 43, 39, 36, 39, 48, 43, 36, 46, 39, 43].map((note, index) =>
-    Object.freeze({
-      active: index % 4 !== 3,
-      note,
-      velocity: index % 4 === 0 ? 0.92 : 0.68,
-      accent: index % 8 === 0,
-      slide: index === 5 || index === 13,
-    }),
-  ),
-);
-
-// A drum module selects its voice by note number, so a drum pattern is an
-// ordinary note pattern in the shared model. Section 9.1 requires an original
-// coherent demo loop, so each machine below plays one distinct role rather than
-// every machine restating the same backbeat.
-interface DemoHit {
-  /** Voice index within the module's own roster, in rack order. */
-  readonly voice: number;
-  readonly steps: readonly number[];
-  readonly velocity?: number;
-}
-
-function demoSteps(baseNote: number, hits: readonly DemoHit[]) {
-  const byStep = new Map<number, DemoHit>();
-  for (const hit of hits) {
-    for (const step of hit.steps) byStep.set(step, hit);
-  }
-  return Object.freeze(
-    Array.from({ length: 16 }, (_, index) => {
-      const hit = byStep.get(index);
-      return Object.freeze({
-        active: hit !== undefined,
-        note: baseNote + (hit?.voice ?? 0),
-        velocity: hit?.velocity ?? 0.7,
-        accent: index % 8 === 0 && hit !== undefined,
-        slide: false,
-      });
-    }),
-  );
-}
-
-const DRUM_BASE = drumVoiceNote("kick");
-
-/** Drumline Six keeps the backbeat: kick, snare, and a closed-hat pulse. */
-const drumlineSteps = demoSteps(DRUM_BASE, [
-  { voice: 0, steps: [0, 6, 10], velocity: 0.95 },
-  { voice: 1, steps: [4, 12], velocity: 0.85 },
-  { voice: 4, steps: [2, 14], velocity: 0.55 },
-]);
-
-/** Boom Eight adds weight on the downbeats and a tom fill at the turnaround. */
-const boomSteps = demoSteps(DRUM_BASE, [
-  { voice: 1, steps: [0, 8], velocity: 0.9 },
-  { voice: 4, steps: [13], velocity: 0.7 },
-  { voice: 5, steps: [15], velocity: 0.75 },
-]);
-
-/** Hybrid Nine carries the offbeat hat and a ride accent. */
-const hybridSteps = demoSteps(DRUM_BASE, [
-  { voice: 6, steps: [1, 3, 5, 7, 9, 11, 13, 15], velocity: 0.45 },
-  { voice: 8, steps: [4, 12], velocity: 0.5 },
-]);
-
-/** Digit Seven answers with a clap on the backbeat. */
-const digitSevenSteps = demoSteps(DRUM_BASE, [{ voice: 2, steps: [4, 12], velocity: 0.62 }]);
-
-/** Digit Five lays a shaker and clave pattern over the top. */
-const digitFiveSteps = demoSteps(DRUM_BASE, [
-  { voice: 6, steps: [2, 6, 10, 14], velocity: 0.4 },
-  { voice: 7, steps: [3, 11], velocity: 0.5 },
-]);
-
-const seedFor = (
-  manifest: { readonly pluginId: PluginId },
-  defaults: Readonly<Record<string, unknown>>,
-  steps: ReturnType<typeof demoSteps> | typeof initialSteps,
-): ModuleSeed => ({
-  pluginId: manifest.pluginId,
-  parameters: toParameterValues(defaults),
-  steps,
-});
-
-const defaultRack: readonly ModuleSeed[] = [
-  seedFor(ACID_BASS_MANIFEST, ACID_BASS_DEFAULT_PARAMETERS, initialSteps),
-  seedFor(DRUMLINE_SIX_MANIFEST, DRUMLINE_SIX_DEFAULT_PARAMETERS, drumlineSteps),
-  seedFor(BOOM_EIGHT_MANIFEST, BOOM_EIGHT_DEFAULT_PARAMETERS, boomSteps),
-  seedFor(HYBRID_NINE_MANIFEST, HYBRID_NINE_DEFAULT_PARAMETERS, hybridSteps),
-  seedFor(DIGIT_SEVEN_MANIFEST, DIGIT_SEVEN_DEFAULT_PARAMETERS, digitSevenSteps),
-  seedFor(DIGIT_FIVE_MANIFEST, DIGIT_FIVE_DEFAULT_PARAMETERS, digitFiveSteps),
-];
 
 interface RuntimePlugin {
   readonly voiceAdapterFactory: VoiceAdapterFactory;
@@ -162,8 +75,8 @@ const appReference: { current: PulseboxAppHandle | undefined } = { current: unde
  */
 const INSTRUMENTS = [
   {
-    manifest: ACID_BASS_MANIFEST,
-    defaults: ACID_BASS_DEFAULT_PARAMETERS,
+    manifest: BASS_MONO_MANIFEST,
+    defaults: BASS_MONO_DEFAULT_PARAMETERS,
     adapter: createBassVoiceAdapter,
   },
   {
@@ -233,8 +146,22 @@ function createAudioRuntime(): TransportRuntime {
 audio = createAudioRuntime();
 let audioProjectionQueue = Promise.resolve();
 let suppressAudioProjection = false;
+
+/**
+ * Serializes a full projection behind every projection already queued. A
+ * direct `audioProjectionQueue = replaceAudioProjection(...)` would race the
+ * pending chain: two concurrent syncs both pass the adapter-existence check
+ * and one module ends up with two live adapters. The state is read when the
+ * projection runs, so the replacement always projects the newest state.
+ */
+function queueFullAudioProjection(): void {
+  audioProjectionQueue = audioProjectionQueue
+    .catch(() => undefined)
+    .then(() => replaceAudioProjection(store.getState()));
+}
+
 const store = new PulseStore(
-  createDefaultState(browserIdFactory, defaultRack),
+  createDefaultProjectState(browserIdFactory),
   browserIdFactory,
   (pluginId) => registry.get(pluginId)?.factory.moduleSeed,
   (delta) => queueAudioDelta(delta),
@@ -265,12 +192,10 @@ let committedMetadata: {
   createdAt: string;
   modifiedAt: string;
   revision: ProjectRevision;
-  pinned: boolean;
 } = {
   createdAt: initialProjectTimestamp,
   modifiedAt: initialProjectTimestamp,
   revision: nextProjectRevision(undefined, browserIdFactory),
-  pinned: false,
 };
 
 
@@ -279,12 +204,22 @@ const app = mountPulseboxApp({
   addablePluginIds: registry.entries().map(([pluginId]) => pluginId),
   auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) =>
     registry.require(pluginId).factory.auditionNoteForVoice(voiceId),
+  playableNotesFor: (pluginId: PluginId) => playableNotesFor(pluginId),
   audio: {
     getPositionTicks: () => audio.getPositionTicks(),
     pause: () => audio.pause(),
     play: (tempo) => audio.play(tempo),
     previewParameter: (moduleId, parameter, value) => {
       audio.previewParameter(moduleId, parameter, value);
+    },
+    previewTempo: (tempo) => {
+      audio.previewTempo(tempo);
+    },
+    previewSwing: (swing) => {
+      audio.previewSwing(swing);
+    },
+    previewHumanize: (patternIndex, humanize) => {
+      audio.previewPatternHumanize(patternIndex, humanize);
     },
     previewChannelMix: (moduleId, field, value) => {
       audio.previewChannelMix(moduleId, field, value);
@@ -320,6 +255,31 @@ const app = mountPulseboxApp({
   manifestFor: (pluginId) => registry.get(pluginId)?.manifest,
   store,
   visibleSlotCount,
+  templates: [
+    {
+      id: "neon-basement",
+      name: DEFAULT_PROJECT_NAME,
+      // Section 9.2: the built-in starter template replaces the working project
+      // with a fresh copy of the section 9.1 default project, under its own new
+      // project and lineage ID.
+      create: () => {
+        if (store.getState().transport.status !== "stopped") {
+          audio.stop();
+          store.dispatch(store.createCommand("transport-stop", {}));
+        }
+        const next = createDefaultProjectState(browserIdFactory);
+        const loaded = store.loadProject(next.project);
+        if (loaded.status !== "accepted") return;
+        const now = new Date().toISOString();
+        committedMetadata = {
+          createdAt: now,
+          modifiedAt: now,
+          revision: nextProjectRevision(undefined, browserIdFactory),
+        };
+        queueFullAudioProjection();
+      },
+    },
+  ],
   projects: {
     save: async () => {
       const state = store.getState();
@@ -333,7 +293,6 @@ const app = mountPulseboxApp({
             createdAt: committedMetadata.createdAt,
             modifiedAt: now,
             projectRevision: committedMetadata.revision,
-            pinned: committedMetadata.pinned,
           }),
         },
         browserIdFactory,
@@ -342,7 +301,6 @@ const app = mountPulseboxApp({
         createdAt: committed.document.project.createdAt,
         modifiedAt: committed.document.project.modifiedAt,
         revision: projectRevisionFromMetadata(committed.document.project),
-        pinned: committed.document.project.pinned,
       };
     },
     list: async () => {
@@ -352,13 +310,9 @@ const app = mountPulseboxApp({
           id: one.id,
           name: one.name,
           modifiedAt: one.modifiedAt,
-          pinned: one.document.project.pinned,
+          favorite: one.document.project.favorite,
         }))
-        .sort(
-          (left, right) =>
-            Number(right.pinned) - Number(left.pinned) ||
-            right.modifiedAt.localeCompare(left.modifiedAt),
-        );
+        .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
     },
     open: async (id) => {
       const stored = await repository.load(id);
@@ -371,9 +325,8 @@ const app = mountPulseboxApp({
         createdAt: parsed.value.document.project.createdAt,
         modifiedAt: parsed.value.document.project.modifiedAt,
         revision: projectRevisionFromMetadata(parsed.value.document.project),
-        pinned: parsed.value.document.project.pinned,
       };
-      audioProjectionQueue = replaceAudioProjection(store.getState());
+      queueFullAudioProjection();
     },
     exportPortable: () =>
       serializePortableProject(
@@ -381,7 +334,6 @@ const app = mountPulseboxApp({
           createdAt: committedMetadata.createdAt,
           modifiedAt: committedMetadata.modifiedAt,
           projectRevision: committedMetadata.revision,
-          pinned: committedMetadata.pinned,
         }),
       ),
     importPortable: async (bytes) => {
@@ -397,51 +349,13 @@ const app = mountPulseboxApp({
         createdAt: result.committed.document.project.createdAt,
         modifiedAt: result.committed.document.project.modifiedAt,
         revision: projectRevisionFromMetadata(result.committed.document.project),
-        pinned: result.committed.document.project.pinned,
       };
       return { ok: true };
     },
-    setPinned: async (pinned) => {
-      if (pinned === committedMetadata.pinned) return;
-      // The pin persists as project metadata. When a committed head exists, the
-      // flag flips on that head so unsaved working edits are not committed as a
-      // side effect. A never-saved project cannot appear in the selector, so
-      // pinning it saves it once.
-      const state = store.getState();
-      const stored = await repository.load(state.project.id);
-      const now = new Date().toISOString();
-      const candidate =
-        stored === undefined
-          ? {
-              id: state.project.id,
-              name: state.project.name,
-              modifiedAt: now,
-              document: serializeProject(state, {
-                createdAt: committedMetadata.createdAt,
-                modifiedAt: now,
-                projectRevision: committedMetadata.revision,
-                pinned,
-              }),
-            }
-          : {
-              ...stored,
-              document: {
-                ...stored.document,
-                project: { ...stored.document.project, pinned },
-              },
-            };
-      const committed = await repository.save(candidate, browserIdFactory);
-      committedMetadata = {
-        ...committedMetadata,
-        revision: projectRevisionFromMetadata(committed.document.project),
-        pinned: committed.document.project.pinned,
-      };
-    },
-    getPinned: () => committedMetadata.pinned,
   },
 });
 appReference.current = app;
-audioProjectionQueue = replaceAudioProjection(store.getState());
+queueFullAudioProjection();
 
 const autosave = createAutosave({
   repository,
@@ -449,7 +363,10 @@ const autosave = createAutosave({
   now: () => new Date().toISOString(),
   createdAt: () => committedMetadata.createdAt,
   projectRevision: () => committedMetadata.revision,
-  pinned: () => committedMetadata.pinned,
+  onError: (error) => {
+    app.reportProjectNotice("Autosave failed. This browser may be blocking storage.");
+    console.error("Pulsebox could not write the autosave snapshot.", error);
+  },
 });
 
 store.subscribe(
@@ -459,21 +376,50 @@ store.subscribe(
   },
 );
 
-void restoreAutosave(store.getState(), { repository, parseOptions }).then(async (restored) => {
-  if (restored === store.getState()) return;
-  const storedAutosave = await repository.loadAutosave();
-  const parsedAutosave =
-    storedAutosave === undefined ? undefined : parseStoredProject(storedAutosave, parseOptions);
-  if (parsedAutosave?.ok === true) {
-    committedMetadata = {
-      createdAt: parsedAutosave.value.document.project.createdAt,
-      modifiedAt: parsedAutosave.value.document.project.modifiedAt,
-      revision: projectRevisionFromMetadata(parsedAutosave.value.document.project),
-      pinned: parsedAutosave.value.document.project.pinned,
-    };
+const revisionAtMount = store.getState().project.revision;
+void restoreAutosave(store.getState(), {
+  repository,
+  parseOptions,
+  onError: (error) => {
+    // The invalid snapshot is discarded, never partially applied. The user
+    // sees the non-blocking notice; the console keeps the diagnostic detail.
+    app.reportProjectNotice("The autosaved session could not be restored. The project starts new.");
+    console.error("Pulsebox discarded an autosave snapshot that failed validation.", error);
+  },
+}).then((restored) => {
+  if (restored.document === undefined) return;
+  // An edit that landed while the snapshot loaded wins. Loading now would
+  // replace the user's edited project with the snapshot and clear history.
+  const current = store.getState().project.revision;
+  if (current.epoch !== revisionAtMount.epoch || current.counter !== revisionAtMount.counter) {
+    return;
   }
-  store.loadProject(restored.project);
-  audioProjectionQueue = replaceAudioProjection(store.getState());
+  committedMetadata = {
+    createdAt: restored.document.project.createdAt,
+    modifiedAt: restored.document.project.modifiedAt,
+    revision: projectRevisionFromMetadata(restored.document.project),
+  };
+  store.loadProject(restored.state.project);
+  queueFullAudioProjection();
+});
+
+/**
+ * True when the event started inside a text-entry field. Such a field is the
+ * one document-like surface in the shell, so it keeps the native menu with its
+ * Cut, Copy, Paste, Undo, and Select all commands. `src/styles/global.css`
+ * makes the same exemption for text selection.
+ */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.closest("input, textarea, [contenteditable='true']") !== null;
+}
+
+// The app is a workstation shell, not a document. Suppress the native browser
+// context menu on the shell surfaces; the app-owned module context menus
+// prevent the default event themselves and still open.
+window.addEventListener("contextmenu", (event) => {
+  if (isTextEntryTarget(event.target)) return;
+  event.preventDefault();
 });
 
 // `pagehide` also fires when the page enters the back/forward cache, where the
@@ -621,26 +567,7 @@ function validateParameter(
   const descriptor = registry
     .get(module.pluginId)
     ?.manifest.parameters.find((candidate) => candidate.id === parameter);
-  if (descriptor === undefined) return false;
-  if (descriptor.valueType === "enum") {
-    return typeof value === "string" && descriptor.enumValues?.includes(value) === true;
-  }
-  if (descriptor.valueType === "boolean") return typeof value === "boolean";
-  return (
-    typeof value === "number" &&
-    Number.isFinite(value) &&
-    value >= (descriptor.minimum ?? value) &&
-    value <= (descriptor.maximum ?? value)
-  );
-}
-
-function toParameterValues(
-  values: Readonly<Record<string, unknown>>,
-): Readonly<Record<string, ParameterValue>> {
-  return Object.fromEntries(
-    Object.entries(values).filter((entry): entry is [string, ParameterValue] => {
-      const value = entry[1];
-      return typeof value === "number" || typeof value === "boolean" || typeof value === "string";
-    }),
-  );
+  // One validation policy: the descriptor check that guards project import
+  // also guards live commands.
+  return descriptor !== undefined && validateImportedParameter(value, descriptor) === undefined;
 }

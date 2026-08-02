@@ -29,6 +29,35 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = ResizeObserverShim;
 }
 
+/**
+ * jsdom implements no canvas rendering context. Its `getContext` prints a "Not
+ * implemented" notice and returns null, so the level meter takes its
+ * null-context exit and installs none of the animation loop, theme observer, or
+ * visibility listener that these tests check. The stub carries only the members
+ * the meter draws with. A call to any other member must fail loudly here rather
+ * than pass as a silent no-op.
+ */
+function createContext2dStub(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const stub = {
+    canvas,
+    fillStyle: "#000000",
+    shadowBlur: 0,
+    shadowColor: "transparent",
+    clearRect: () => undefined,
+    fillRect: () => undefined,
+    setTransform: () => undefined,
+  };
+  return stub as unknown as CanvasRenderingContext2D;
+}
+
+Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+  configurable: true,
+  writable: true,
+  value: function getContext(this: HTMLCanvasElement, contextId: string): unknown {
+    return contextId === "2d" ? createContext2dStub(this) : null;
+  },
+});
+
 function setSupportedViewport(): void {
   Object.defineProperties(window, {
     innerWidth: { configurable: true, value: SUPPORTED_WIDTH },

@@ -61,8 +61,8 @@ export function createInstrumentManifest(id = "bass-mono"): InstrumentPluginMani
     manifestSchemaVersion: 1,
     pluginId: pluginId(id),
     kind: "instrument",
-    productName: "Acid Bass",
-    shortLabel: "BASS",
+    productName: "Silver Serpent",
+    shortLabel: "ACID",
     pluginVersion: "1.0.0",
     stateSchemaVersion: 1,
     apiVersion: 1,
@@ -72,11 +72,12 @@ export function createInstrumentManifest(id = "bass-mono"): InstrumentPluginMani
     defaultState: { cutoff: 440 },
     ui: {
       moduleAccent: {
-        accent: "#9BE564",
-        accentMuted: "#496B36",
-        led: "#B8FF7A",
-        controlRing: "#79B84D",
+        accent: "#F2D530",
+        accentMuted: "#6E6118",
+        led: "#FFE95E",
+        controlRing: "#C7A81F",
       },
+      icon: { viewBox: "0 0 24 24", path: "M4 4h16v16H4Zm4 4v8h8V8Z" },
       compactControls: [{ position: 0, parameterId: parameter.id }],
       detailedEditorSections: [
         {

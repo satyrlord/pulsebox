@@ -52,9 +52,10 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("currentFrame", 0);
 });
 
-describe("Acid Bass worklet protocol", () => {
+describe("Silver Serpent worklet protocol", () => {
   it("completes hello and ready with full sequenced envelopes and acknowledgement", () => {
     const processor = new Processor();
     processor.port.receive(controllerEnvelope(0, "hello", {}, 7));
@@ -122,6 +123,86 @@ describe("Acid Bass worklet protocol", () => {
     );
     expect(meterFrames).toHaveLength(1);
     expect(meterFrames[0]).toMatchObject({ kind: "meter-frame", payload: { level: 0 } });
+  });
+
+  it("drops an expired onset and renders the next future onset at its frame", () => {
+    const processor = readyProcessor();
+    processor.port.receive(controllerEnvelope(1, "resume", {}, 7));
+    processor.port.receive(
+      controllerEnvelope(
+        2,
+        "event-batch",
+        {
+          events: [
+            {
+              eventId: "expired",
+              audioFrame: 900,
+              priority: 2,
+              data: { type: "note-on", note: 36, velocity: 0.8, accent: false, slide: false },
+            },
+            {
+              eventId: "future",
+              audioFrame: 1_010,
+              priority: 2,
+              data: { type: "note-on", note: 48, velocity: 0.8, accent: false, slide: false },
+            },
+          ],
+        },
+        7,
+      ),
+    );
+    vi.stubGlobal("currentFrame", 1_000);
+    const left = new Float32Array(64);
+    const right = new Float32Array(64);
+
+    expect(processor.process([], [[left, right]], {})).toBe(true);
+    expect(left.slice(0, 10).every((sample) => Math.abs(sample) === 0)).toBe(true);
+    expect(left.slice(11).some((sample) => Math.abs(sample) > 0)).toBe(true);
+  });
+
+  it("keeps events before the bounded clear frame and drops the tail", () => {
+    const processor = readyProcessor();
+    processor.port.receive(controllerEnvelope(1, "resume", {}, 7));
+    processor.port.receive(
+      controllerEnvelope(
+        2,
+        "event-batch",
+        {
+          events: [
+            {
+              eventId: "kept",
+              audioFrame: 40,
+              priority: 2,
+              data: { type: "note-on", note: 36, velocity: 0.8, accent: false, slide: false },
+            },
+            {
+              eventId: "dropped",
+              audioFrame: 200,
+              priority: 2,
+              data: { type: "note-on", note: 48, velocity: 0.8, accent: false, slide: false },
+            },
+          ],
+        },
+        7,
+      ),
+    );
+    // The bounded clear keeps the imminent onset at frame 40 and drops only
+    // the tail at or past frame 100.
+    processor.port.receive(controllerEnvelope(3, "clear-scheduled-events", { fromFrame: 100 }, 7));
+
+    const first = new Float32Array(128);
+    expect(processor.process([], [[first]], {})).toBe(true);
+    expect(first.slice(0, 40).every((sample) => sample === 0)).toBe(true);
+    expect(first.slice(41).some((sample) => Math.abs(sample) > 0)).toBe(true);
+
+    // The dropped onset at frame 200 never sounds: the voice keeps rendering
+    // the kept note's tail with no new attack transient at that frame.
+    vi.stubGlobal("currentFrame", 128);
+    const second = new Float32Array(128);
+    processor.process([], [[second]], {});
+    const attackPeak = Math.max(...first.slice(41, 100).map(Math.abs));
+    const atDropped = Math.max(...second.slice(72, 100).map(Math.abs));
+    expect(atDropped).toBeLessThan(attackPeak);
   });
 
   it("faults and closes the session on a sequence gap", () => {

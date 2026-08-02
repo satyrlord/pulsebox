@@ -8,7 +8,7 @@ import type { InstrumentPluginManifest } from "../../../contracts/plugins";
 import { DEFAULT_BASS_PARAMETERS } from "./dsp-core";
 
 function required<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
-  if (!result.ok) throw new Error("Acid Bass contains an invalid stable identifier.");
+  if (!result.ok) throw new Error("Silver Serpent contains an invalid stable identifier.");
   return result.value;
 }
 
@@ -161,12 +161,12 @@ const parameters: readonly ParameterDescriptor[] = Object.freeze([
   },
 ]);
 
-export const ACID_BASS_MANIFEST = Object.freeze({
+export const BASS_MONO_MANIFEST = Object.freeze({
   manifestSchemaVersion: 1,
   pluginId: required(parsePluginId("bass-mono")),
   kind: "instrument",
-  productName: "Acid Bass",
-  shortLabel: "BASS",
+  productName: "Silver Serpent",
+  shortLabel: "ACID",
   pluginVersion: "1.0.0",
   stateSchemaVersion: 1,
   apiVersion: 1,
@@ -186,14 +186,22 @@ export const ACID_BASS_MANIFEST = Object.freeze({
   },
   ui: {
     moduleAccent: {
-      accent: "#9BE564",
-      accentMuted: "#496B36",
-      led: "#B8FF7A",
-      controlRing: "#79B84D",
+      accent: "#F2D530",
+      accentMuted: "#6E6118",
+      led: "#FFE95E",
+      controlRing: "#C7A81F",
     },
-    compactControls: parameters
-      .filter((parameter) => parameter.id !== "waveform")
-      .map((parameter, position) => ({ position, parameterId: parameter.id })),
+    // Original acid-house smiley, drawn for Pulsebox: a disc with even-odd eye
+    // and smile cutouts. It copies no product artwork.
+    icon: {
+      viewBox: "0 0 24 24",
+      path: "M12 2.2a9.8 9.8 0 1 0 0 19.6 9.8 9.8 0 0 0 0-19.6ZM8.5 8a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2Zm7 0a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2ZM6.4 12.9a5.6 5.6 0 0 0 11.2 0h-1.8a3.8 3.8 0 0 1-7.6 0Z",
+    },
+    // Section 15.1: the waveform selector is part of the compact control set.
+    compactControls: parameters.map((parameter, position) => ({
+      position,
+      parameterId: parameter.id,
+    })),
     detailedEditorSections: [
       { id: "sound", name: "Sound", parameterIds: parameters.map((parameter) => parameter.id) },
     ],
@@ -214,4 +222,4 @@ export const ACID_BASS_MANIFEST = Object.freeze({
   renderCapabilities: { live: true, offline: false },
 } satisfies InstrumentPluginManifest);
 
-export const ACID_BASS_DEFAULT_PARAMETERS = ACID_BASS_MANIFEST.defaultState;
+export const BASS_MONO_DEFAULT_PARAMETERS = BASS_MONO_MANIFEST.defaultState;

@@ -38,6 +38,12 @@ export interface AudioControlPort {
   readonly pause: () => number;
   readonly play: (tempo: number) => Promise<void>;
   readonly previewParameter: (moduleId: ModuleInstanceId, parameter: string, value: number) => void;
+  /** Transient transport tempo while the user moves the tempo field. */
+  readonly previewTempo?: (tempo: number) => void;
+  /** Transient project Swing while the user moves the timing slider. */
+  readonly previewSwing?: (swing: number) => void;
+  /** Transient Pattern Humanize while the user moves the timing slider. */
+  readonly previewHumanize?: (patternIndex: number, humanize: number) => void;
   /**
    * Transient channel level or pan while a fader is moving. The engine ramps it
    * onto the live mixer node; the committed value still arrives as a command at
@@ -69,8 +75,11 @@ export interface SavedProjectSummary {
   readonly id: string;
   readonly name: string;
   readonly modifiedAt: string;
-  /** Pinned projects list first in the project selector. */
-  readonly pinned: boolean;
+  /**
+   * Persisted favorite flag. No MVP control sets it; the post-MVP Favourite
+   * feature owns the interface for it.
+   */
+  readonly favorite: boolean;
 }
 
 /**
@@ -87,10 +96,14 @@ export interface ProjectServicePort {
   importPortable(
     bytes: Uint8Array,
   ): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>;
-  /** Persists the pin flag as project metadata. */
-  setPinned(pinned: boolean): Promise<void>;
-  /** The active project's committed pin flag. */
-  getPinned(): boolean;
+}
+
+/** A built-in starter template the user can create a fresh project from. */
+export interface ProjectTemplate {
+  readonly id: string;
+  readonly name: string;
+  /** Replaces the working project with a fresh template instance. */
+  readonly create: () => void;
 }
 
 export type AppStorePort = Pick<
@@ -105,8 +118,15 @@ export interface AppStoreDependencies {
   /** Plugins an empty slot offers to add, in menu order. */
   readonly addablePluginIds: readonly PluginId[];
   readonly auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) => number;
+  /**
+   * Notes the plugin can sound, or undefined when every note maps. The swap
+   * result panel counts sequence events the swap target cannot map.
+   */
+  readonly playableNotesFor?: (pluginId: PluginId) => ReadonlySet<number> | undefined;
   readonly visibleSlotCount: number;
   readonly projects?: ProjectServicePort;
+  /** Built-in starter templates (section 9.2), in menu order. */
+  readonly templates?: readonly ProjectTemplate[];
   /** Random source for new Pattern variations. Tests inject a fixed one. */
   readonly createPatternSeed?: () => number;
   /** Stored lightweight global UI preferences, wired by the composition root. */
@@ -121,6 +141,15 @@ export interface AppStoreDependencies {
 export interface UndoNotice {
   readonly message: string;
   /** Distinguishes consecutive identical messages so the view can re-announce. */
+  readonly issuedAt: number;
+}
+
+/** Section 14: the non-blocking result panel a swap reports through. */
+export interface SwapReport {
+  readonly fromName: string;
+  readonly toName: string;
+  /** Active sequence events the swap target cannot map to a voice. */
+  readonly unmappedEvents: number;
   readonly issuedAt: number;
 }
 
@@ -140,6 +169,11 @@ export interface AppState {
   readonly meterLevels: Readonly<Record<string, number>>;
   readonly studioView: StudioView;
   readonly editorExpanded: boolean;
+  /**
+   * User-dragged editor row height in CSS pixels. Undefined keeps the CSS
+   * default height, which is also the minimum.
+   */
+  readonly editorSize: number | undefined;
   readonly meterMode: "lr" | "ms";
   readonly metronomeEnabled: boolean;
   readonly selectedSend: "A" | "B" | "C" | "D" | undefined;
@@ -152,8 +186,6 @@ export interface AppState {
   readonly masterPeakHeld: boolean;
   /** Pattern-launch boundary in sixteenth steps. A global UI preference. */
   readonly launchQuantizationSteps: number;
-  /** The active project's committed pin flag. */
-  readonly projectPinned: boolean;
 
   readonly play: () => Promise<void>;
   readonly pause: () => void;
@@ -161,16 +193,18 @@ export interface AppState {
   readonly toggleRecordArm: () => void;
   readonly setTempo: (tempo: number, gestureId?: GestureId) => void;
   readonly setSwing: (swing: number, gestureId?: GestureId) => void;
+  readonly previewTempo: (tempo: number) => void;
+  readonly previewSwing: (swing: number) => void;
   /** Positions the playhead and start marker while not playing. */
   readonly seek: (positionTicks: number) => void;
   readonly setHumanize: (patternIndex: number, humanize: number, gestureId?: GestureId) => void;
+  readonly previewHumanize: (patternIndex: number, humanize: number) => void;
   /** Stores a new random seed, which creates a new deterministic variation. */
   readonly newPatternVariation: (patternIndex: number) => void;
   readonly togglePower: () => Promise<void>;
   readonly setMasterMeterFrame: (frame: MasterMeterView) => void;
   readonly reportAudioRuntimeState: (state: AudioRuntimeStateView) => void;
   readonly setLaunchQuantization: (steps: number) => void;
-  readonly togglePinProject: () => Promise<void>;
   readonly commitParameter: (
     moduleId: ModuleInstanceId,
     parameter: string,
@@ -188,8 +222,10 @@ export interface AppState {
   readonly removeModule: (moduleId: ModuleInstanceId) => void;
   readonly duplicateModule: (moduleId: ModuleInstanceId, slotId: RackSlotId) => void;
   readonly moveModule: (moduleId: ModuleInstanceId, slotId: RackSlotId) => void;
+  readonly swapModule: (moduleId: ModuleInstanceId, pluginId: PluginId) => void;
+  readonly swapReport: SwapReport | undefined;
+  readonly dismissSwapReport: () => void;
   readonly selectModule: (moduleId: ModuleInstanceId | undefined) => void;
-  readonly toggleCollapse: (moduleId: ModuleInstanceId) => void;
   readonly selectVoice: (moduleId: ModuleInstanceId, voiceId: string) => void;
   readonly startAudition: (moduleId: ModuleInstanceId, note?: number) => void;
   readonly stopAudition: (moduleId: ModuleInstanceId) => void;
@@ -198,11 +234,20 @@ export interface AppState {
   readonly setSettingsOpen: (open: boolean) => void;
   readonly setPositionTicks: (ticks: number) => void;
   readonly setMeterLevel: (moduleId: ModuleInstanceId, level: number) => void;
+  /**
+   * Applies a whole frame of meter levels in one store write. Each worklet
+   * posts its own level about 30 times a second, so writing them one at a time
+   * notifies every selector in the tree once per module per frame. That is main
+   * -thread work competing with the scheduler tick, so the composition root
+   * coalesces a frame's levels and commits them here together.
+   */
+  readonly setMeterLevels: (levels: Readonly<Record<string, number>>) => void;
   readonly reportAudioStatus: (status: AudioStatus, message?: string) => void;
   readonly markAudioUnavailable: () => void;
   readonly dismissUndoNotice: () => void;
   readonly setStudioView: (view: StudioView) => void;
   readonly setEditorExpanded: (expanded: boolean) => void;
+  readonly setEditorSize: (size: number | undefined) => void;
   readonly toggleMeterMode: () => void;
   readonly toggleMetronome: () => void;
   readonly openSend: (send: "A" | "B" | "C" | "D") => void;
@@ -228,13 +273,16 @@ export interface AppState {
 
   readonly savedProjects: readonly SavedProjectSummary[];
   readonly projectMessage: string | undefined;
-  readonly saveProject: () => Promise<void>;
+  /** Saves the active project. Returns false when storage rejects the save. */
+  readonly saveProject: () => Promise<boolean>;
   readonly refreshSavedProjects: () => Promise<void>;
   readonly openProject: (id: string) => Promise<void>;
   readonly importProject: (bytes: Uint8Array) => Promise<void>;
   /** Reports a project-surface outcome, such as a refused export. */
   readonly setProjectMessage: (message: string) => void;
   readonly clearProjectMessage: () => void;
+  /** Saves the active project, then replaces it with a built-in template. */
+  readonly createProjectFromTemplate: (id: string) => Promise<void>;
 }
 
 export type AppStore = StoreApi<AppState>;
@@ -275,6 +323,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     meterLevels: {},
     studioView: "mixer",
     editorExpanded: true,
+    editorSize: undefined,
     meterMode: "lr",
     metronomeEnabled: initialMetronome,
     selectedSend: undefined,
@@ -283,7 +332,6 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     masterMeter: SILENT_MASTER_METER,
     masterPeakHeld: false,
     launchQuantizationSteps: initialLaunchQuantization,
-    projectPinned: dependencies.projects?.getPinned() ?? false,
 
     play: async () => {
       if (get().audioUnavailable || playInFlight) return;
@@ -324,6 +372,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       );
     },
 
+    previewTempo: (tempo) => {
+      audio.previewTempo?.(tempo);
+    },
+
     seek: (positionTicks) => {
       store.dispatch(store.createCommand("transport-seek", { positionTicks }));
     },
@@ -337,6 +389,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
           gestureId === undefined ? {} : { gestureId },
         ),
       );
+    },
+
+    previewHumanize: (patternIndex, humanize) => {
+      audio.previewHumanize?.(patternIndex, Math.min(1, Math.max(0, humanize)));
     },
 
     newPatternVariation: (patternIndex) => {
@@ -396,18 +452,6 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       set({ launchQuantizationSteps: steps });
     },
 
-    togglePinProject: async () => {
-      const projects = dependencies.projects;
-      if (projects === undefined) return;
-      try {
-        await projects.setPinned(!get().projectPinned);
-        set({ projectPinned: projects.getPinned() });
-        await get().refreshSavedProjects();
-      } catch {
-        set({ projectMessage: "The pin could not be saved. This browser may block storage." });
-      }
-    },
-
     setSwing: (swing, gestureId) => {
       const clamped = Math.min(1, Math.max(0, swing));
       store.dispatch(
@@ -417,6 +461,12 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
           gestureId === undefined ? {} : { gestureId },
         ),
       );
+    },
+
+    previewSwing: (swing) => {
+      const clamped = Math.min(1, Math.max(0, swing));
+      if (audio.previewSwing !== undefined) audio.previewSwing(clamped);
+      else audio.setSwing?.(clamped);
     },
 
     commitParameter: (moduleId, parameter, value, gestureId) => {
@@ -467,6 +517,43 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(store.createCommand("rack-module-duplicate", { moduleId, slotId }));
     },
 
+    swapReport: undefined,
+
+    swapModule: (moduleId, pluginId) => {
+      const module = get().project.project.modules[moduleId];
+      if (module === undefined) return;
+      const fromName = dependencies.manifestFor(module.pluginId)?.productName ?? "module";
+      const toName = dependencies.manifestFor(pluginId)?.productName ?? "module";
+      const playable = dependencies.playableNotesFor?.(pluginId);
+      const unmappedEvents =
+        playable === undefined
+          ? 0
+          : module.parts.reduce(
+              (total, steps) =>
+                total + steps.filter((step) => step.active && !playable.has(step.note)).length,
+              0,
+            );
+      audio.stopAudition(moduleId);
+      const result = store.dispatch(
+        store.createCommand("rack-module-swap", { moduleId, pluginId }),
+      );
+      if (result.status !== "accepted") return;
+      const issued = notice(`Swapped ${fromName} for ${toName}. Undo is available.`);
+      set((state) => ({
+        undoNotice: issued,
+        swapReport: { fromName, toName, unmappedEvents, issuedAt: issued.issuedAt },
+        // The new plugin has its own voice roster, so a kept selection could
+        // name a voice the plugin lacks and hide the voice fast controls.
+        selectedVoiceByModule: Object.fromEntries(
+          Object.entries(state.selectedVoiceByModule).filter(([id]) => id !== moduleId),
+        ),
+      }));
+    },
+
+    dismissSwapReport: () => {
+      set({ swapReport: undefined });
+    },
+
     moveModule: (moduleId, slotId) => {
       const result = store.dispatch(store.createCommand("rack-module-move", { moduleId, slotId }));
       if (result.status !== "accepted") return;
@@ -480,10 +567,6 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(
         store.createCommand("rack-module-select", moduleId === undefined ? {} : { moduleId }),
       );
-    },
-
-    toggleCollapse: (moduleId) => {
-      store.dispatch(store.createCommand("rack-module-collapse-toggle", { moduleId }));
     },
 
     selectVoice: (moduleId, voiceId) => {
@@ -519,11 +602,13 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     undo: () => {
       store.undo();
-      set({ undoNotice: undefined });
+      // The swap report may describe the swap this undo just reverted.
+      set({ undoNotice: undefined, swapReport: undefined });
     },
 
     redo: () => {
       store.redo();
+      set({ swapReport: undefined });
     },
 
     setSettingsOpen: (settingsOpen) => {
@@ -537,6 +622,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     setMeterLevel: (moduleId, level) => {
       set((state) => ({ meterLevels: { ...state.meterLevels, [moduleId]: level } }));
+    },
+
+    setMeterLevels: (levels) => {
+      set((state) => ({ meterLevels: { ...state.meterLevels, ...levels } }));
     },
 
     reportAudioStatus: (audioStatus, audioMessage) => {
@@ -557,6 +646,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     setEditorExpanded: (editorExpanded) => {
       set({ editorExpanded });
+    },
+
+    setEditorSize: (editorSize) => {
+      set({ editorSize });
     },
 
     toggleMeterMode: () => {
@@ -652,7 +745,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     saveProject: async () => {
       const projects = dependencies.projects;
-      if (projects === undefined) return;
+      if (projects === undefined) return false;
       set({ saveStatus: "saving" });
       try {
         await projects.save();
@@ -661,11 +754,13 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
           saveStatus: "saved",
         });
         await get().refreshSavedProjects();
+        return true;
       } catch {
         set({
           projectMessage: "Saving failed. This browser may be blocking storage.",
           saveStatus: "error",
         });
+        return false;
       }
     },
 
@@ -684,11 +779,8 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (projects === undefined) return;
       try {
         await projects.open(id);
-        set({
-          projectMessage: "Project opened.",
-          saveStatus: "clean",
-          projectPinned: projects.getPinned(),
-        });
+        // The swap report described a module of the replaced project.
+        set({ projectMessage: "Project opened.", saveStatus: "clean", swapReport: undefined });
       } catch {
         set({ projectMessage: "That project could not be opened." });
       }
@@ -701,7 +793,8 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (result.ok) await get().refreshSavedProjects();
       set({
         projectMessage: result.ok ? "Project imported." : result.reason,
-        ...(result.ok ? { projectPinned: projects.getPinned() } : {}),
+        // The swap report described a module of the replaced project.
+        ...(result.ok ? { swapReport: undefined } : {}),
       });
     },
 
@@ -711,6 +804,33 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     clearProjectMessage: () => {
       set({ projectMessage: undefined });
+    },
+
+    createProjectFromTemplate: async (id) => {
+      const template = dependencies.templates?.find((one) => one.id === id);
+      if (template === undefined) return;
+      const projects = dependencies.projects;
+      // With no storage service there is nothing to save into, so the
+      // template still replaces the working project.
+      if (projects !== undefined && !(await get().saveProject())) {
+        set({
+          projectMessage:
+            "The template was not created because the current project could not be saved.",
+        });
+        return;
+      }
+      template.create();
+      // The fresh copy is stored at once, so it appears in the selector and
+      // the Save control reports a saved project, not phantom unsaved edits.
+      // A failed save already reported itself and leaves the copy unsaved.
+      if (projects !== undefined && !(await get().saveProject())) {
+        set({ swapReport: undefined });
+        return;
+      }
+      set({
+        projectMessage: `Created ${template.name} from the built-in template.`,
+        swapReport: undefined,
+      });
     },
   }));
 
