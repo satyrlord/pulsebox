@@ -135,7 +135,7 @@ export const DEFAULT_DIGIT_FIVE_PARAMETERS: DigitFiveParameters = Object.freeze(
   voices: DEFAULT_DIGIT_FIVE_VOICE_PARAMETERS,
 });
 
-/** One pair of hands, one shaker: the percussion voices choke their own kind. */
+/** One player has one pair of hands, so the conga and the bongo choke each other. */
 const CHOKE_GROUPS: readonly (readonly DigitFiveVoiceId[])[] = [["conga", "bongo"]];
 
 export type DigitFiveParameterUpdateMode = "immediate" | "smooth";

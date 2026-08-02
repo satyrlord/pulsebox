@@ -14,7 +14,7 @@ description: >
 2. For an authorized design or repair, use implementation mode.
    Completion criterion: The expected behavior and edit scope are explicit.
 3. For production-build evidence without repair, use verification mode.
-   Completion criterion: The target contracts and browsers are explicit.
+   Completion criterion: The target contracts and Chrome version are explicit.
 
 ## 2. Read the UI contract
 
@@ -33,8 +33,8 @@ description: >
 5. Read [THEMING.md](../../../docs/THEMING.md).
    Completion criterion: You know the token ownership and user-theme rules.
 
-Use `docs/design/claude-mock-up.html` as the approved composition target. Treat
-other files under `docs/design/` as non-normative evidence.
+The documents above are the composition target. Treat files under
+`docs/design/` as non-normative prototypes and visual evidence.
 
 ## 3. Preserve the product language
 

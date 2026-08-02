@@ -443,13 +443,6 @@
   cursor: pointer;
 }
 
-.bar button:focus-visible,
-.bar input:focus-visible {
-  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--pulse-color-focus-outer, #000000);
-}
-
 @media (max-width: 1439px) {
   .bar {
     grid-template-columns: minmax(0, 1fr) 130px minmax(0, 1fr);

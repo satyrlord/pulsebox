@@ -156,7 +156,7 @@ The merged MVP is complete only when:
 62. **AC-062.** Mixer strips use a fixed structure with swappable processing modules and
     insert chains.
 63. **AC-063.** On a warm cache, audible playback begins within three seconds in every run
-    of the five-run, per-browser procedure in section 21.8.
+    of the five-run Chrome procedure in section 21.8.
 64. **AC-064.** The compact Pattern/Song toggle sits left of transport and
     changes transport scope without stopping. The bottom bar's single editor
     toggle collapses and restores the complete lower workspace without changing

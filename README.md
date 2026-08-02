@@ -132,7 +132,7 @@ chain runs through a limiter that is enabled by default. The header meters read
 a non-audible post-limiter analysis branch in `L/R` or `M/S` mode. Playback
 applies the global Swing and the Pattern-owned deterministic Humanize with its
 stored seed. The bundled WAV, AIFF, and FLAC decoder foundation is present.
-Sample-import UI and cross-browser format fixtures remain later work.
+Sample-import UI and format fixtures remain later work.
 
 ## Persistence
 

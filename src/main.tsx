@@ -198,10 +198,9 @@ let committedMetadata: {
   revision: nextProjectRevision(undefined, browserIdFactory),
 };
 
-
 const app = mountPulseboxApp({
   host,
-  addablePluginIds: registry.entries().map(([pluginId]) => pluginId),
+  addablePluginIds: registryEntries.map(([pluginId]) => pluginId),
   auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) =>
     registry.require(pluginId).factory.auditionNoteForVoice(voiceId),
   playableNotesFor: (pluginId: PluginId) => playableNotesFor(pluginId),

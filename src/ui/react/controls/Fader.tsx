@@ -63,7 +63,7 @@ export function Fader({
   onInput,
   onCommit,
 }: FaderProps) {
-  const [dragRange, setDragRange] = useState(120);
+  const [dragRange, setDragRange] = useState(MINIMUM_DRAG_RANGE);
   const {
     displayValue,
     dragging,

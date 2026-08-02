@@ -287,13 +287,13 @@ export interface AppState {
 
 export type AppStore = StoreApi<AppState>;
 
+const PEAK_HOLD_MILLISECONDS = 1_500;
+
 /**
  * Zustand owns everything React reads. The domain store keeps owning commands,
  * undo, revisions, and engine projection, so this layer holds no project truth
  * of its own — it mirrors and dispatches.
  */
-const PEAK_HOLD_MILLISECONDS = 1_500;
-
 export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   const { store, audio } = dependencies;
   let noticeSequence = 0;
@@ -750,7 +750,7 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       try {
         await projects.save();
         set({
-          projectMessage: notice(`Saved ${get().project.project.name}.`).message,
+          projectMessage: `Saved ${get().project.project.name}.`,
           saveStatus: "saved",
         });
         await get().refreshSavedProjects();

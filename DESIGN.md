@@ -29,11 +29,11 @@ colors:
   disabled: "#7b858d"
   focus-inner: "#ffffff"
   focus-outer: "#000000"
-  module-bass: "#9BE564"
-  module-six: "#FFB44A"
+  module-bass: "#F2D530"
+  module-six: "#6FDE76"
   module-boom: "#FF6B5F"
   module-nine: "#B890FF"
-  module-sev: "#5AAEFF"
+  module-sev: "#A9C7E8"
   module-five: "#4ADFC7"
 typography:
   brand:

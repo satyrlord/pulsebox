@@ -8,7 +8,7 @@
  */
 
 import type { IdFactory } from "../contracts/ids";
-import type { PluginId } from "../contracts/parameters";
+import type { ParameterValue, PluginId } from "../contracts/parameters";
 import {
   BASS_MONO_DEFAULT_PARAMETERS,
   BASS_MONO_MANIFEST,
@@ -29,7 +29,6 @@ import {
   type ModuleSeed,
   type PulseState,
 } from "../state/public";
-import type { ParameterValue } from "../contracts/parameters";
 
 /**
  * Narrows a manifest's default-parameter record to the serializable scalars a

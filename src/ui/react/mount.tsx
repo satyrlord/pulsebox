@@ -32,11 +32,6 @@ export interface MountOptions extends AppStoreDependencies {
   readonly host: HTMLElement;
 }
 
-/**
- * The composition root calls this once. StrictMode stays on in development so a
- * double-invoked effect that leaked a listener, a frame loop, or an engine node
- * fails loudly here rather than as an audio dropout later.
- */
 /** Lightweight global UI preferences. Storage keys keep the pulse- prefix. */
 const METRONOME_STORAGE_KEY = "pulse-metronome-enabled";
 const LAUNCH_QUANTIZATION_STORAGE_KEY = "pulse-launch-quantization";
@@ -57,6 +52,11 @@ function writeStoredPreference(key: string, value: string): void {
   }
 }
 
+/**
+ * The composition root calls this once. StrictMode stays on in development so a
+ * double-invoked effect that leaked a listener, a frame loop, or an engine node
+ * fails loudly here rather than as an audio dropout later.
+ */
 export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
   const { host, ...injected } = options;
 

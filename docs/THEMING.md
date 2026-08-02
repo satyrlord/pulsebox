@@ -111,7 +111,7 @@ table. These names are the complete required user-theme allowlist.
 
 These names are the complete optional user-theme allowlist. If omitted, the
 validated `rack` value is used. Any supplied optional value must still validate.
-an invalid known token is never silently replaced.
+An invalid known token is never silently replaced.
 
 | Token                           | Meaning                            |
 | ------------------------------- | ---------------------------------- |
@@ -613,6 +613,6 @@ The current implementation provides the `rack` built-in token set and the
 high-contrast overlay. It provides the appearance preference envelope with its
 cross-tab and storage-failure behavior. It also provides the bounded user-theme
 import validator, numeric contrast checks, and current control primitives. A
-Settings control selects high contrast. User-theme import and deletion are not
-yet exposed in Settings. Visual regression snapshots across later MVP
-components also remain future work.
+Settings control selects high contrast. Settings also exposes user-theme import
+and deletion. Visual regression snapshots across later MVP components remain
+future work.

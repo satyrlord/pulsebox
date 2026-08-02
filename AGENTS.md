@@ -128,7 +128,7 @@ Owning contract documents:
 - Do not add a server, accounts, cloud sync, collaboration, a native wrapper,
   or a PWA.
 - Do not add a service worker or an install flow.
-- Support current stable Chrome. Other browsers are outside MVP support.
+- Support current stable Chrome. Chrome is the only MVP browser.
 - Keep the editable workspace usable from 1280 x 720 CSS pixels upward. Below
   either minimum dimension, use the specified unsupported-size behavior.
 - Keep the MVP at eight rack slots, eight visible instrument mixer strips, and

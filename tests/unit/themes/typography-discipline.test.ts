@@ -8,10 +8,10 @@ import { readCurrentSourceUnits } from "../architecture/source-policy";
 /**
  * Spec-001 section 11.3 typography and icon rules.
  *
- * These floors erode silently: a single hard-coded `font-size: 9px` in one
- * component template is invisible in review but permanently below the legibility
- * floor. Shadow DOM templates live in TypeScript, so component styles are
- * scanned alongside the stylesheets.
+ * These floors erode silently: a single hard-coded `font-size: 9px` is invisible
+ * in review but permanently below the legibility floor. The global and theme
+ * stylesheets and the TypeScript sources are scanned together, so a style
+ * written in a module cannot bypass the floor.
  */
 
 const MINIMUM_TEXT_PX = 10;

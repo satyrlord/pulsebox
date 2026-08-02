@@ -589,3 +589,9 @@ contains the normative requirements. This table is the traceability record.
   pre-release documents carry `pinned`. Such a document fails validation, and
   the application reports the discarded autosave with the non-blocking project
   notice. [PROJECT-FORMAT.md](../PROJECT-FORMAT.md) owns the schema.
+- **D96.** Pulsebox supports the current stable release of Chrome and
+  Chromium. Support applies to that release channel only. All verification
+  runs in the same channel. It extends `D11`, which approved current stable
+  Chrome support. The acceptance evidence in
+  [ARCHITECTURE.md](../ARCHITECTURE.md) records Chrome results. Section 24.6 of
+  [quality and delivery](spec-010-quality-and-delivery.md) owns this behavior.

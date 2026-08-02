@@ -332,7 +332,7 @@ interface BasePluginManifest {
 
 `PluginUiManifest.moduleAccent` declaratively supplies the four fixed module
 accent tokens owned by `THEMING.md`. Shared UI applies those values generically.
-it does not branch on a plugin ID, short label, or instrument name.
+It does not branch on a plugin ID, short label, or instrument name.
 
 The optional `PluginUiManifest.icon` supplies the module's original iconography
 as one origin-anchored viewBox and one compound SVG path. The validator bounds
@@ -717,7 +717,7 @@ An acknowledgment shall identify the highest contiguous applied sequence and
 complete state revision token. That token is the receiver's own current
 revision, which legitimately runs ahead of the acknowledged envelope when that
 envelope was stale. The controller shall therefore not require the two to match.
-it shall treat only an acknowledgment of a sequence it never sent as a fault.
+It shall treat only an acknowledgment of a sequence it never sent as a fault.
 
 An acknowledgment clears the acknowledged envelopes whatever its disposition. A
 `stale` disposition means the receiver deliberately ignored the envelope, so its
@@ -1075,9 +1075,9 @@ Every audio evidence run shall record:
 - produced report and audio artifact hashes.
 
 The release matrix shall use the then-current stable Chrome. The browser shall
-run at 44.1 kHz and 48 kHz where the browser and device allow
-the requested live rate. Unsupported live-rate selection shall be recorded and
-covered with an offline context at that rate rather than reported as a pass.
+run at 44.1 kHz and 48 kHz where the browser and device allow the requested
+live rate. Unsupported live-rate selection shall be recorded and covered with
+an offline context at that rate rather than reported as a pass.
 
 ### 14.2 Deterministic tiers and tolerances
 
@@ -1087,10 +1087,9 @@ The following gates shall apply:
 
 | Contract                     | Fixture and comparison                                                       | Pass limit                                                                                                              |
 | ---------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Decoder determinism          | Canonical decoded Float32 PCM for every format fixture                       | Metadata and SHA-256 PCM hash exactly match on all three browsers                                                       |
+| Decoder determinism          | Canonical decoded Float32 PCM for every format fixture                       | Metadata and SHA-256 PCM hash exactly match in Chrome                                                                   |
 | Custom DSP repeatability     | Two offline renders in the same browser, build, sample rate, state, and seed | Sample-for-sample maximum absolute error at or below `1e-6`; no non-finite samples                                      |
 | Save and reload              | Offline render before Save and after reload in the same browser and build    | Identical event frames; null RMS at or below -120 dBFS and maximum absolute error at or below `1e-6`                    |
-| Cross-browser custom DSP     | Same offline fixture and sample rate, aligned by expected latency            | Maximum absolute error at or below `1e-6`; no non-finite samples                                                        |
 | Native-node adapter behavior | Analytic impulse, sweep, gain, latency, and tail fixtures                    | Latency within 1 frame; gain within 0.1 dB; response within 0.25 dB; declared tail endpoint within 10 ms                |
 | Sample-rate pitch            | Identical musical fixture at 44.1 and 48 kHz                                 | Detected steady pitch differs by at most 1 cent                                                                         |
 | Sample-rate timing           | Expected event frames converted to seconds at 44.1 and 48 kHz                | Every scheduled event differs by at most 1 ms after conversion to seconds                                               |
@@ -1108,7 +1107,7 @@ result.
 
 ### 14.3 Live browser evidence
 
-Each supported browser shall also prove in the production build:
+Chrome shall also prove in the production build:
 
 - audio remains locked until a valid gesture and editing still works while
   locked.
@@ -1164,7 +1163,7 @@ action. No recovery path shall require a destructive confirmation dialog.
 | Project edits       | Atomic typed commands with one history entry per gesture                    | Direct mutation or one history entry per pointer event                           | Command, coalescing, Undo, Redo, and cancellation suites are required                 |
 | Worklet control     | Versioned, sequenced, acknowledged, bounded messages                        | Unversioned objects, unbounded posting, or direct UI ports                       | Protocol fuzzing, queue-limit, stale, duplicate, gap, and recovery tests are required |
 | Bulk audio transfer | Bounded transferable buffers prepared outside `process()`                   | PCM in JSON messages or allocation during real-time processing                   | Transfer ownership, in-flight limit, and allocation checks are required               |
-| Sample import       | Pulsebox-owned bundled WAV, AIFF, and FLAC decoders                         | Browser-format dependence through `decodeAudioData()` or a server decoder        | Cross-browser fixture hashes must match exactly                                       |
+| Sample import       | Pulsebox-owned bundled WAV, AIFF, and FLAC decoders                         | Browser-format dependence through `decodeAudioData()` or a server decoder        | Chrome fixture hashes must match exactly                                              |
 | Monitor             | Exclusive post-insert, pre-fader PFL to the physical output                 | Additive PFL mixed with the program                                              | Destination null tests must prove no doubling or rejected-path leakage                |
 | Worklet transport   | `MessagePort` with explicit bounds                                          | `SharedArrayBuffer` as an MVP requirement                                        | No cross-origin-isolation dependency is allowed without a later contract change       |
 | DSP placement       | AudioWorklet for custom DSP and engine adapters for suitable native nodes   | Main-thread custom DSP or `ScriptProcessorNode`                                  | Dependency, source, and production-browser audits are required                        |

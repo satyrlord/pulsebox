@@ -14,13 +14,6 @@ import {
 } from "../../contracts/worklet-protocol";
 import { isPlainRecord } from "../../contracts/validation";
 
-/**
- * Every worklet-backed voice shares this processor: session handshake, sequence
- * checking, revision disposition, acknowledgement, fault reporting, and the
- * sample-accurate event queue that splits each render block at event boundaries.
- *
- * A concrete voice supplies only its DSP through the abstract members below.
- */
 interface VoiceEvent {
   readonly atFrame: number;
   readonly type: "note-on" | "note-off" | "reset";
@@ -36,6 +29,13 @@ const METER_INTERVAL_SECONDS = 1 / 30;
 const UNKNOWN_SESSION_ID = "unknown-session";
 const UNKNOWN_NODE_ID = "unknown-node";
 
+/**
+ * Every worklet-backed voice shares this processor: session handshake, sequence
+ * checking, revision disposition, acknowledgement, fault reporting, and the
+ * sample-accurate event queue that splits each render block at event boundaries.
+ *
+ * A concrete voice supplies only its DSP through the abstract members below.
+ */
 export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletProcessor {
   readonly #frames = new Float64Array(EVENT_CAPACITY);
   readonly #notes = new Uint8Array(EVENT_CAPACITY);

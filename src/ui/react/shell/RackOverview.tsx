@@ -143,50 +143,45 @@ export function RackOverview() {
                   Empty +
                 </button>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    className={styles.occupiedSlot}
-                    aria-pressed={selected}
-                    aria-label={`Select ${manifest.productName} in rack slot ${slotLabel(index)}`}
-                    style={
-                      { "--module-accent": manifest.ui.moduleAccent.accent } as React.CSSProperties
-                    }
-                    onClick={() => {
-                      selectModule(module.id);
-                      scrollModuleIntoView(index);
-                    }}
-                    onContextMenu={(event) => {
+                <button
+                  type="button"
+                  className={styles.occupiedSlot}
+                  aria-pressed={selected}
+                  aria-label={`Select ${manifest.productName} in rack slot ${slotLabel(index)}`}
+                  style={
+                    { "--module-accent": manifest.ui.moduleAccent.accent } as React.CSSProperties
+                  }
+                  onClick={() => {
+                    selectModule(module.id);
+                    scrollModuleIntoView(index);
+                  }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setOpenMenu({
+                      kind: "module",
+                      slotId: slot.id,
+                      moduleId: module.id,
+                      x: event.clientX,
+                      y: event.clientY,
+                    });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                       event.preventDefault();
+                      const rect = event.currentTarget.getBoundingClientRect();
                       setOpenMenu({
                         kind: "module",
                         slotId: slot.id,
                         moduleId: module.id,
-                        x: event.clientX,
-                        y: event.clientY,
+                        x: rect.left,
+                        y: rect.bottom + 2,
                       });
-                    }}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "ContextMenu" ||
-                        (event.shiftKey && event.key === "F10")
-                      ) {
-                        event.preventDefault();
-                        const rect = event.currentTarget.getBoundingClientRect();
-                        setOpenMenu({
-                          kind: "module",
-                          slotId: slot.id,
-                          moduleId: module.id,
-                          x: rect.left,
-                          y: rect.bottom + 2,
-                        });
-                      }
-                    }}
-                  >
-                    <span className={styles.slotCardMark} aria-hidden="true" />
-                    <strong>{manifest.shortLabel}</strong>
-                  </button>
-                </>
+                    }
+                  }}
+                >
+                  <span className={styles.slotCardMark} aria-hidden="true" />
+                  <strong>{manifest.shortLabel}</strong>
+                </button>
               )}
             </li>
           );

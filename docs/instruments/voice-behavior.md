@@ -22,7 +22,8 @@ Rules:
 - A steal or choke applies the declared release ramp. It never cuts a voice to
   zero in one sample.
 - `group` choke means one voice can silence another voice in its declared choke
-  group. The closed hat chokes the open hat in each drum machine.
+  group. The closed hat chokes the open hat in each drum machine that has both
+  hats. Dusty Mosaic has one hat, so it chokes the conga against the bongo.
 - `restart` retrigger restarts the same fixed voice from its start with the new
   velocity. `legato` retrigger glides the single bass voice without a restart.
 - Each drum machine assigns one fixed voice per drum. Two triggers can only

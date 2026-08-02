@@ -26,7 +26,7 @@ coverage-e2e/
 playwright-report/
 test-results/
 tmp/
-# Test temp directories created by ad-hoc local runs outside the shared .tmp/ root.
+# Test temp directories created by ad-hoc local runs outside the shared tmp/ root.
 tmp-*
 
 # VS Code workspace settings

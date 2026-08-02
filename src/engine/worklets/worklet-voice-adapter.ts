@@ -688,8 +688,6 @@ function sameParameters(
   left: Readonly<Record<string, ParameterValue>>,
   right: Readonly<Record<string, ParameterValue>>,
 ): boolean {
-  const leftRecord = left;
-  const rightRecord = right;
-  const keys = new Set([...Object.keys(leftRecord), ...Object.keys(rightRecord)]);
-  return [...keys].every((key) => Object.is(leftRecord[key], rightRecord[key]));
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return [...keys].every((key) => Object.is(left[key], right[key]));
 }

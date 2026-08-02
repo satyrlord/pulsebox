@@ -58,8 +58,8 @@
 }
 
 .editorResize:focus-visible {
-  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
-  outline-offset: -1px;
+  outline: var(--pulse-focus-width) solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: calc(var(--pulse-focus-gap) * -1);
 }
 
 :global([data-high-contrast="true"]) .app {

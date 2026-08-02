@@ -77,7 +77,8 @@ are the bundled typeface files under `src/styles/fonts/`.
 - The six approved instrument names and IDs remain those in the
   [product and design foundations specification](../specs/spec-001-product-and-design-foundations.md).
 - The current build contains only `index.html`, CSS, the application module, the
-  Silver Serpent worklet asset, and the sample decoder worker.
+  six instrument worklet assets, the sample decoder worker, and the bundled font
+  files.
 - The built-in `rack` theme palette and the high-contrast overlay are original
   token values authored for Pulsebox. They carry no copied color scheme, no
   hardware artwork, and no community theme data.

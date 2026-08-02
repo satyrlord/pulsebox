@@ -391,7 +391,6 @@
   box-shadow: 0 0 4px color-mix(in srgb, var(--k) 55%, transparent);
 }
 
-
 /* Three peer views, so three equal tabs seated in their own recess. The
    selected tab rises out of it and lights its lower edge. */
 .studioTabs {
@@ -878,8 +877,8 @@
 }
 
 .seekSteps > button:focus-visible {
-  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
-  outline-offset: -2px;
+  outline: var(--pulse-focus-width) solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: calc(var(--pulse-focus-width) * -1);
 }
 
 .velocityLane {
@@ -1060,12 +1059,6 @@
   flex: 1;
 }
 
-button,
-select,
-input {
-  font: inherit;
-}
-
 .moduleChoice button,
 .effectCard button,
 .inspectorActions button,
@@ -1074,14 +1067,6 @@ input {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-}
-
-button:focus-visible,
-select:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--pulse-color-focus-outer, #000000);
 }
 
 @media (max-width: 1439px) {
@@ -1105,15 +1090,5 @@ input:focus-visible {
 
   .rollContext {
     display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0ms !important;
-    animation-duration: 0ms !important;
   }
 }

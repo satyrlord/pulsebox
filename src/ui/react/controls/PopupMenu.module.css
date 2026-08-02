@@ -32,9 +32,11 @@
   background: color-mix(in srgb, var(--pulse-color-accent, #7ed9a3) 18%, transparent);
 }
 
+/* A menu item sits flush inside the plate, so the ring is drawn inside the item
+   rather than outside it. The inset equals the ring width. */
 .item:focus-visible {
-  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
-  outline-offset: -2px;
+  outline: var(--pulse-focus-width) solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: calc(var(--pulse-focus-width) * -1);
 }
 
 .item:disabled {

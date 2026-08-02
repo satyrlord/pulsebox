@@ -315,7 +315,6 @@ describe("Mixer", () => {
     }
   });
 
-
   it("renders strip meters through leaf subscriptions that track the store", () => {
     const harness = createHarness();
     renderWithHarness(<Mixer />, harness);

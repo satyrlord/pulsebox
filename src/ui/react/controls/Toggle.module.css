@@ -12,7 +12,7 @@
   font-size: var(--pulse-type-12, 12px);
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--pulse-color-text-muted, #98a0ab);
+  color: var(--pulse-color-text-muted, #919ba3);
   background: linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
   border-radius: 3px;
   box-shadow:
@@ -28,9 +28,11 @@
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
+/* The ring must clear the knurled skirt, so this gap is two times the standard
+   gap. The ring width itself stays the token width. */
 .toggle:focus-visible {
-  outline: 2px solid var(--pulse-color-focus-inner, #ffffff);
-  outline-offset: 2px;
+  outline: var(--pulse-focus-width) solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: calc(var(--pulse-focus-gap) * 2);
 }
 
 .toggle:disabled {

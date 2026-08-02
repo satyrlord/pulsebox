@@ -12,7 +12,7 @@ If the user does not request repair, remain read-only.
 ## 1. Prepare the production build
 
 1. Read `AGENTS.md`, each changed contract, `package.json`, and Playwright configuration.
-   Completion criterion: You know the required browsers, viewports, states, and assertions.
+   Completion criterion: You know the required Chrome version, viewports, states, and assertions.
 2. Build the production output with a repository command.
    Completion criterion: The production output exists.
 3. Serve the output with a repository command.

@@ -210,8 +210,8 @@ normative:
   run manually when automation cannot observe the physical result.
 - Accessibility evidence checks the numeric requirements in section 24.1 at
   every supported viewport, in the `rack` theme and high-contrast mode.
-- The first-sound procedure in section 21.8 passes all five runs in every
-  supported browser on the recorded release host.
+- The first-sound procedure in section 21.8 passes all five runs in Chrome on
+  the recorded release host.
 - Before final release, five people unfamiliar with Pulsebox attempt to start
   the supplied loop from fresh browser storage using only visible product
   guidance. At least four must produce audible playback within one minute
@@ -259,8 +259,8 @@ global stylesheet.
 
 ### 24.6 Browser support
 
-Support the current stable release of Chrome. Other browsers are outside MVP
-support. Run every deterministic browser-specific audio, file, Canvas,
+Support the current stable release of Chrome. Chrome is the only browser in
+MVP support. Run every deterministic browser-specific audio, file, Canvas,
 persistence, and component check in that release channel. Use documented manual
 checks only for physical audio behavior that browser automation cannot observe.
 Record the exact browser version in release evidence.
@@ -348,7 +348,7 @@ Phase 6: The `rack` theme, user theme import, accessibility, default projects,
 visual polish, performance measurements.
 
 Phase 7: Persistence, recovery, project import/export, WAV and stem export,
-final browser matrix.
+final Chrome release matrix.
 
 Phases 1 through 7 end with a runnable application and passing tests for their
 completed scope. The dependency order remains normative. An implementation can

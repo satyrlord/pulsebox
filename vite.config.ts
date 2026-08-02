@@ -16,6 +16,8 @@ export default defineConfig({
   },
   build: {
     emptyOutDir: true,
-    target: ["chrome111", "edge111", "firefox114"],
+    // Decision D96 makes Chrome the only supported browser, so one Chromium
+    // baseline replaces the former multi-engine list.
+    target: "chrome111",
   },
 });

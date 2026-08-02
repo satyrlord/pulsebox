@@ -172,7 +172,7 @@
    full ring would read as a filled value at every setting. */
 .track {
   fill: none;
-  stroke: color-mix(in srgb, var(--pulse-color-control-track, #2b2b2f) 22%, var(--surface-well));
+  stroke: color-mix(in srgb, var(--pulse-color-control-track, #6f7b84) 22%, var(--surface-well));
   stroke-width: 2.2;
   stroke-linecap: butt;
 }
@@ -180,14 +180,14 @@
 /* The lit value arc is a thin ring hugging the cap: bright, not fat. */
 .fill {
   fill: none;
-  stroke: var(--module-control-ring, var(--pulse-color-accent, #9be564));
+  stroke: var(--module-control-ring, var(--pulse-color-accent, #7ed9a3));
   stroke-width: 3.2;
   stroke-linecap: butt;
   filter: drop-shadow(
     0 0 3.5px
       color-mix(
         in srgb,
-        var(--module-control-ring, var(--pulse-color-accent, #9be564)) 60%,
+        var(--module-control-ring, var(--pulse-color-accent, #7ed9a3)) 60%,
         transparent
       )
   );

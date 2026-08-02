@@ -8,9 +8,8 @@ import workletUrl from "./digit-five.worklet.ts?worker&url";
 
 /**
  * Manifest parameter IDs already match the processor's own naming, so this is a
- * validating pass-through rather than a rename map. Unlike the analog machines
- * this module has a boolean control, the lo-fi enable, so booleans survive the
- * filter alongside finite numbers.
+ * validating pass-through rather than a rename map. Booleans survive the filter
+ * alongside finite numbers, because the lo-fi enable is a boolean control.
  */
 function toDigitFiveParameters(
   values: Readonly<Record<string, ParameterValue>>,
