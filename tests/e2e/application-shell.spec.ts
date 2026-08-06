@@ -639,6 +639,9 @@ test("keeps the stopped shell deterministic for visual review", async ({ page })
 });
 
 test("suppresses the native context menu on the shell but not on text entry", async ({ page }) => {
+  // The app root mounts after the load event. Wait for it before the evaluate
+  // runs. On a slow runner, the evaluate can run before the root exists.
+  await expect(page.locator('[data-component="pulse-app"]')).toBeVisible();
   const outcome = await page.evaluate(() => {
     const suppressed = (selector: string) => {
       const element = document.querySelector(selector);
