@@ -39,6 +39,7 @@ Thumbs.db
 # Generated one-off outputs
 logs/
 .claude/
+.codex/
 .agents/
 .impeccable/
 research/

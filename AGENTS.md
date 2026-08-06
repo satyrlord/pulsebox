@@ -89,8 +89,6 @@ Owning contract documents:
 
 - Phase 0 contracts and the Phase 1 foundation are complete. Narrow foundation
   slices from later phases are runnable without marking those phases complete.
-- The repository has a strict TypeScript product source tree, package manifest,
-  unit tests, and production-browser tests.
 - Claim checks only when their current scripts have been run successfully.
 - Later MVP phases remain governed by the indexed specification set under
   `docs/specs/`. Claim only the narrow later-phase slices listed in README.md.
@@ -327,10 +325,6 @@ limited to 100 entries and 64 MiB in total. One entry is limited to 17 MiB.
 ## Commands and verification
 
 - When package.json exists, treat its scripts as the executable command source.
-- The required command surface includes npm install, npm run dev, npm run
-  build, and npm run start.
-- It also includes npm run test, npm run test:e2e, npm run lint, and npm run
-  typecheck.
 - Do not invent a command or quality threshold that the repository has not
   defined.
 - To run one unit file, use
