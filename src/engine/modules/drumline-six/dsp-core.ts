@@ -24,6 +24,7 @@ import {
   StateVariableFilter,
   VoiceMixGates,
 } from "../../dsp/primitives";
+import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { DRUM_VOICE_IDS, type DrumVoiceId } from "./voices";
 
 export { DRUM_VOICE_IDS, type DrumVoiceId };
@@ -196,7 +197,15 @@ class DrumVoice {
     const sample = this.#renderVoice(frequency, snap, decaySeconds);
 
     this.#elapsed += 1 / this.#sampleRate;
-    return sample * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1));
+    return sample * this.#amplitude * gain;
+  }
+
+  /**
+   * Voice level belongs after the insert. This keeps an insert's response
+   * independent from its output gain, before the voice reaches pan and mix.
+   */
+  advanceLevel(): number {
+    return this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 
   #renderVoice(frequency: number, snap: number, decaySeconds: number): number {
@@ -287,6 +296,7 @@ export class DrumlineSixDsp {
   readonly #tone: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<DrumVoiceId, EqualPowerPan>>;
+  readonly #voiceInserts: Readonly<Record<DrumVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly DrumVoice[];
   #parameters: DrumlineSixParameters = DEFAULT_DRUMLINE_PARAMETERS;
@@ -306,6 +316,9 @@ export class DrumlineSixDsp {
         new EqualPowerPan(DEFAULT_DRUM_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<DrumVoiceId, EqualPowerPan>;
+    this.#voiceInserts = Object.fromEntries(
+      DRUM_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
+    ) as Record<DrumVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       DRUM_VOICE_IDS.map((id) => [
         id,
@@ -347,6 +360,17 @@ export class DrumlineSixDsp {
 
   getParameterSnapshot(): DrumlineSixParameters {
     return this.#parameters;
+  }
+
+  setVoiceInserts(
+    configurations: Readonly<Partial<Record<DrumVoiceId, VoiceInsertConfiguration | null>>>,
+  ): boolean {
+    let accepted = true;
+    for (const voiceId of DRUM_VOICE_IDS) {
+      const host = this.#voiceInserts[voiceId];
+      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.active === true) && accepted;
+    }
+    return accepted;
   }
 
   trigger(voiceId: DrumVoiceId, velocity = 1, accent = false): void {
@@ -411,7 +435,8 @@ export class DrumlineSixDsp {
         if (!voice.active) continue;
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
-        const sample = voice.render();
+        const source = voice.render();
+        const sample = this.#voiceInserts[voice.id].process(source) * voice.advanceLevel();
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

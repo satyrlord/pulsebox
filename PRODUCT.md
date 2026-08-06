@@ -8,18 +8,18 @@ product
 
 web
 
-## Users
+## Single-owner use
 
-Browser-first beatmakers who have never operated a hardware groovebox. They make
-music in a browser tab, at a desktop, usually on headphones. They arrive fluent
-in software and illiterate in rack conventions, so the dense short labels
+Pulsebox is for one browser-first beatmaker who has never operated a hardware
+groovebox. You make music in a browser tab, at a desktop, usually on headphones.
+You may know software but not rack conventions. The dense short labels
 (`ACID`, `SNAP`, `BOOM`) and panel logic have to teach themselves through sound
 and response rather than through documentation.
 
 The job is sound design and pattern work: build a groove, shape it, keep it.
-Success for a first-time user is not pressing play on someone else's loop. It is
+Success on first use is not pressing Play on the supplied loop. It is
 **changing a sound and hearing the change** — the first deliberate edit, where
-turning a control produces an audible result the user caused on purpose.
+turning a control produces an audible result that you caused on purpose.
 
 ## Product Purpose
 
@@ -31,8 +31,8 @@ It exists because serious instrument depth and zero-friction access have been
 mutually exclusive. Real workstations demand installation, licensing, and setup;
 browser music tools trade depth for reach. Pulsebox refuses the trade.
 
-Success is a user who opens a tab and operates a real instrument — one that
-keeps playing while they edit, save, load, reorder modules, and switch
+Success means that you open a tab and operate a real instrument — one that
+keeps playing while you edit, save, load, reorder modules, and switch
 appearance.
 
 ## Positioning
@@ -77,7 +77,7 @@ poking at things.
    about what the machine can do.
 2. **Audible changes are visible changes.** Any parameter the ear can detect must
    show a meter, curve, envelope, playhead, waveform, or value. This is how an
-   interface teaches users who arrive without hardware literacy.
+   interface teaches a first-time operator who lacks hardware literacy.
 3. **The machine never stops to do bookkeeping.** Playback continues through
    edits, saves, loads, module reorders, and theme changes. Interruption is a
    defect, not a cost.

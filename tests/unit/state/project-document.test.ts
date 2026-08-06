@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProjectRevision } from "../../../src/contracts";
+import {
+  DISTORTION_EFFECT_PLUGIN_ID,
+  type EffectInstanceId,
+  type ParameterId,
+  type PluginId,
+  type ProjectRevision,
+  type VoiceId,
+} from "../../../src/contracts";
 import { browserIdFactory } from "../../../src/composition/browser-id-factory";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/public";
 import {
@@ -41,6 +48,26 @@ const SEED: ModuleSeed = {
   })),
 };
 
+const voiceId = (value: string): VoiceId => value as VoiceId;
+const parameterId = (value: string): ParameterId => value as ParameterId;
+const DRUM_VOICE_IDS = [voiceId("kick"), voiceId("snare")] as const;
+const EFFECT_ID = "00000000-0000-4000-8000-000000000777" as EffectInstanceId;
+const SINGLE_DRUM_VOICE_ID = voiceId("clap");
+const STATEFUL_EFFECT_ID = "00000000-0000-4000-8000-000000000778" as EffectInstanceId;
+const STATEFUL_EFFECT_PLUGIN_ID = "stateful-drive" as PluginId;
+const DRUM_SEED: ModuleSeed = {
+  pluginId: "drum-analog-small" as PluginId,
+  parameters: {},
+  steps: SEED.steps,
+  voiceIds: DRUM_VOICE_IDS,
+};
+const SINGLE_DRUM_SEED: ModuleSeed = {
+  pluginId: "drum-one-voice" as PluginId,
+  parameters: {},
+  steps: SEED.steps,
+  voiceIds: [SINGLE_DRUM_VOICE_ID],
+};
+
 const OPTIONS = {
   createdAt: "2026-07-28T00:00:00.000Z",
   modifiedAt: "2026-07-28T00:00:00.000Z",
@@ -58,6 +85,53 @@ const PARSE = {
   knownPluginIds: [BASS_MONO_MANIFEST.pluginId as string],
   parameterDescriptorsByPluginId: {
     [BASS_MONO_MANIFEST.pluginId]: BASS_MONO_MANIFEST.parameters,
+  },
+};
+
+const VOICE_INSERT_PARSE = {
+  knownPluginIds: [...PARSE.knownPluginIds, DRUM_SEED.pluginId as string],
+  parameterDescriptorsByPluginId: {
+    ...PARSE.parameterDescriptorsByPluginId,
+    [DRUM_SEED.pluginId]: [],
+  },
+  knownVoiceInsertEffectPluginIds: [DISTORTION_EFFECT_PLUGIN_ID as string],
+  stateSchemaVersionByPluginId: {
+    [BASS_MONO_MANIFEST.pluginId]: 1,
+    [DRUM_SEED.pluginId]: 1,
+    [DISTORTION_EFFECT_PLUGIN_ID]: 1,
+  },
+  voiceInsertEffectsByPluginId: {
+    [DISTORTION_EFFECT_PLUGIN_ID]: {
+      stateSchemaVersion: 1,
+      parameters: [],
+    },
+  },
+  voiceIdsByPluginId: {
+    [DRUM_SEED.pluginId]: DRUM_VOICE_IDS,
+  },
+};
+
+const STATEFUL_VOICE_INSERT_PARSE = {
+  ...VOICE_INSERT_PARSE,
+  knownVoiceInsertEffectPluginIds: [
+    ...VOICE_INSERT_PARSE.knownVoiceInsertEffectPluginIds,
+    STATEFUL_EFFECT_PLUGIN_ID as string,
+  ],
+  stateSchemaVersionByPluginId: {
+    ...VOICE_INSERT_PARSE.stateSchemaVersionByPluginId,
+    [STATEFUL_EFFECT_PLUGIN_ID]: 2,
+  },
+  voiceInsertEffectsByPluginId: {
+    ...VOICE_INSERT_PARSE.voiceInsertEffectsByPluginId,
+    [STATEFUL_EFFECT_PLUGIN_ID]: {
+      stateSchemaVersion: 2,
+      parameters: [
+        { id: parameterId("drive"), valueType: "float", minimum: 0, maximum: 1 },
+        { id: parameterId("enabled"), valueType: "boolean" },
+        { id: parameterId("mode"), valueType: "enum", enumValues: ["soft", "hard"] },
+        { id: parameterId("steps"), valueType: "integer", minimum: 1, maximum: 8 },
+      ] as const,
+    },
   },
 };
 
@@ -109,6 +183,252 @@ describe("project document", () => {
     expect(document().plugins).toEqual([
       { pluginId: BASS_MONO_MANIFEST.pluginId, stateSchemaVersion: 1 },
     ]);
+  });
+
+  it("round-trips a distortion voice insert and its null sibling slots", () => {
+    const base = createDefaultState(browserIdFactory, DRUM_SEED);
+    const moduleId = Object.values(base.project.modules)[0]?.id;
+    if (moduleId === undefined) throw new Error("Test fixture is missing the drum module.");
+    const state = {
+      ...base,
+      project: {
+        ...base.project,
+        effects: {
+          instances: {
+            [EFFECT_ID]: {
+              id: EFFECT_ID,
+              pluginId: DISTORTION_EFFECT_PLUGIN_ID,
+              stateVersion: 1,
+              state: {},
+            },
+          },
+          voiceInserts: {
+            [moduleId]: { kick: EFFECT_ID, snare: null },
+          },
+        },
+      },
+    };
+    const written = serializeProject(state, OPTIONS);
+
+    expect(written.plugins).toEqual([
+      { pluginId: DRUM_SEED.pluginId, stateSchemaVersion: 1 },
+      { pluginId: DISTORTION_EFFECT_PLUGIN_ID, stateSchemaVersion: 1 },
+    ]);
+    expect(written.effects).toEqual({
+      instances: [
+        {
+          id: EFFECT_ID,
+          pluginId: DISTORTION_EFFECT_PLUGIN_ID,
+          stateVersion: 1,
+          state: {},
+        },
+      ],
+      voiceInserts: [
+        { moduleId, voiceId: "kick", effectInstanceId: EFFECT_ID },
+        { moduleId, voiceId: "snare", effectInstanceId: null },
+      ],
+    });
+    const parsed = parseProjectDocument(written, VOICE_INSERT_PARSE);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    const restored = documentToState(parsed.value, base);
+
+    expect(restored.project.effects.voiceInserts[moduleId]).toEqual({
+      kick: EFFECT_ID,
+      snare: null,
+    });
+    expect(restored.project.effects.instances[EFFECT_ID]).toMatchObject({
+      pluginId: DISTORTION_EFFECT_PLUGIN_ID,
+      stateVersion: 1,
+      state: {},
+    });
+  });
+
+  it("provisions and round-trips the one insert slot of a one-voice drum", () => {
+    const base = createDefaultState(browserIdFactory, SINGLE_DRUM_SEED);
+    const moduleId = Object.values(base.project.modules)[0]?.id;
+    if (moduleId === undefined) throw new Error("Test fixture is missing the one-voice drum.");
+    expect(base.project.effects.voiceInserts[moduleId]).toEqual({ clap: null });
+
+    const state = {
+      ...base,
+      project: {
+        ...base.project,
+        effects: {
+          instances: {
+            [EFFECT_ID]: {
+              id: EFFECT_ID,
+              pluginId: DISTORTION_EFFECT_PLUGIN_ID,
+              stateVersion: 1,
+              state: {},
+            },
+          },
+          voiceInserts: { [moduleId]: { clap: EFFECT_ID } },
+        },
+      },
+    };
+    const written = serializeProject(state, OPTIONS);
+    const parsed = parseProjectDocument(written, {
+      ...VOICE_INSERT_PARSE,
+      knownPluginIds: [...PARSE.knownPluginIds, SINGLE_DRUM_SEED.pluginId],
+      parameterDescriptorsByPluginId: {
+        ...PARSE.parameterDescriptorsByPluginId,
+        [SINGLE_DRUM_SEED.pluginId]: [],
+      },
+      stateSchemaVersionByPluginId: {
+        ...VOICE_INSERT_PARSE.stateSchemaVersionByPluginId,
+        [SINGLE_DRUM_SEED.pluginId]: 1,
+      },
+      voiceIdsByPluginId: { [SINGLE_DRUM_SEED.pluginId]: [SINGLE_DRUM_VOICE_ID] },
+    });
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    expect(documentToState(parsed.value, base).project.effects.voiceInserts[moduleId]).toEqual({
+      clap: EFFECT_ID,
+    });
+  });
+
+  it("uses registered schema and state contracts for a future voice insert", () => {
+    const base = createDefaultState(browserIdFactory, DRUM_SEED);
+    const moduleId = Object.values(base.project.modules)[0]?.id;
+    if (moduleId === undefined) throw new Error("Test fixture is missing the drum module.");
+    const state = {
+      ...base,
+      project: {
+        ...base.project,
+        effects: {
+          instances: {
+            [STATEFUL_EFFECT_ID]: {
+              id: STATEFUL_EFFECT_ID,
+              pluginId: STATEFUL_EFFECT_PLUGIN_ID,
+              stateVersion: 2,
+              state: { drive: 0.72, enabled: false, mode: "hard", steps: 4 },
+            },
+          },
+          voiceInserts: { [moduleId]: { kick: STATEFUL_EFFECT_ID, snare: null } },
+        },
+      },
+    };
+    const written = serializeProject(state, {
+      ...OPTIONS,
+      manifestVersionFor: (pluginId) => (pluginId === STATEFUL_EFFECT_PLUGIN_ID ? 2 : 1),
+    });
+    expect(written.plugins).toContainEqual({
+      pluginId: STATEFUL_EFFECT_PLUGIN_ID,
+      stateSchemaVersion: 2,
+    });
+    const parsed = parseProjectDocument(written, STATEFUL_VOICE_INSERT_PARSE);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    expect(parsed.value.effects.instances[0]).toMatchObject({
+      pluginId: STATEFUL_EFFECT_PLUGIN_ID,
+      stateVersion: 2,
+      state: { drive: 0.72, enabled: false, mode: "hard", steps: 4 },
+    });
+  });
+
+  it("rejects voice-insert state outside its registered parameter descriptors", () => {
+    const base = createDefaultState(browserIdFactory, DRUM_SEED);
+    const moduleId = Object.values(base.project.modules)[0]?.id;
+    if (moduleId === undefined) throw new Error("Test fixture is missing the drum module.");
+    const validState = { drive: 0.72, enabled: false, mode: "hard", steps: 4 };
+    const state = {
+      ...base,
+      project: {
+        ...base.project,
+        effects: {
+          instances: {
+            [STATEFUL_EFFECT_ID]: {
+              id: STATEFUL_EFFECT_ID,
+              pluginId: STATEFUL_EFFECT_PLUGIN_ID,
+              stateVersion: 2,
+              state: validState,
+            },
+          },
+          voiceInserts: { [moduleId]: { kick: STATEFUL_EFFECT_ID, snare: null } },
+        },
+      },
+    };
+    const written = serializeProject(state, {
+      ...OPTIONS,
+      manifestVersionFor: (pluginId) => (pluginId === STATEFUL_EFFECT_PLUGIN_ID ? 2 : 1),
+    });
+    const invalidStates = [
+      { ...validState, drive: 1e300 },
+      { ...validState, steps: 1.5 },
+      { ...validState, mode: "unsafe" },
+      { ...validState, extra: true },
+      { enabled: false, mode: "hard", steps: 4 },
+    ];
+
+    for (const invalidState of invalidStates) {
+      const result = parseProjectDocument(
+        {
+          ...written,
+          effects: {
+            ...written.effects,
+            instances: written.effects.instances.map((instance) => ({
+              ...instance,
+              state: invalidState,
+            })),
+          },
+        },
+        STATEFUL_VOICE_INSERT_PARSE,
+      );
+      expect(result.ok, JSON.stringify(invalidState)).toBe(false);
+    }
+  });
+
+  it("reads legacy empty effects as null slots and rejects missing voice slots", () => {
+    const base = createDefaultState(browserIdFactory, DRUM_SEED);
+    const moduleId = Object.values(base.project.modules)[0]?.id;
+    if (moduleId === undefined) throw new Error("Test fixture is missing the drum module.");
+    const written = serializeProject(base, OPTIONS);
+    const legacy = { ...written, effects: {} };
+    const parsedLegacy = parseProjectDocument(legacy, VOICE_INSERT_PARSE);
+    if (!parsedLegacy.ok) throw new Error(JSON.stringify(parsedLegacy.issues));
+    expect(parsedLegacy.value.effects.voiceInserts).toEqual([
+      { moduleId, voiceId: "kick", effectInstanceId: null },
+      { moduleId, voiceId: "snare", effectInstanceId: null },
+    ]);
+
+    const invalid = parseProjectDocument(
+      {
+        ...written,
+        effects: {
+          ...written.effects,
+          voiceInserts: written.effects.voiceInserts.filter((slot) => slot.voiceId !== "snare"),
+        },
+      },
+      VOICE_INSERT_PARSE,
+    );
+    expect(invalid.ok).toBe(false);
+    if (invalid.ok) return;
+    expect(invalid.issues.some((issue) => issue.message.includes("Missing voice insert slot"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects a voice-insert effect used as a rack module", () => {
+    const written = serializeProject(createDefaultState(browserIdFactory, DRUM_SEED), OPTIONS);
+    const result = parseProjectDocument(
+      {
+        ...written,
+        plugins: [
+          ...written.plugins,
+          { pluginId: DISTORTION_EFFECT_PLUGIN_ID, stateSchemaVersion: 1 },
+        ],
+        rack: written.rack.map((slot) =>
+          slot.moduleId === undefined
+            ? slot
+            : { ...slot, pluginId: DISTORTION_EFFECT_PLUGIN_ID, parameters: {} },
+        ),
+      },
+      VOICE_INSERT_PARSE,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(
+      result.issues.some((issue) => issue.message.includes("no parameter validation contract")),
+    ).toBe(true);
   });
 
   it("rejects a document that is not the project format", () => {

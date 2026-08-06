@@ -27,6 +27,8 @@ import {
   StateVariableFilter,
   VoiceMixGates,
 } from "../../dsp/primitives";
+import { SampleBoundaryPlayer } from "../../dsp/sample-boundary-player";
+import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { HYBRID_VOICE_IDS, type HybridVoiceId } from "./voices";
 
 export interface HybridVoiceParameters {
@@ -217,22 +219,11 @@ class HybridVoice {
   readonly id: HybridVoiceId;
   readonly #character: VoiceCharacter;
   readonly #sampleRate: number;
-  readonly #oneShot: Float32Array;
+  readonly #sample: SampleBoundaryPlayer;
   readonly #noise: DeterministicNoise;
   readonly #noiseFilter = new StateVariableFilter();
   #parameters: HybridVoiceParameters;
   #phase = 0;
-  /** Fractional read position into the one-shot layer. */
-  #cursor = 0;
-  /**
-   * Automatic 2 ms boundary fade for the one-shot layer. A nonzero Start
-   * offset lands the cursor on an arbitrary mid-buffer value, and the Attack
-   * control defaults to zero, so without this fade every such trigger is a
-   * full-scale step. Spec-004 section 21.5 mandates the fade for start
-   * offsets independent of user tone controls.
-   */
-  #boundaryGain = 0;
-  readonly #boundaryStep: number;
   /**
    * The manifest declares voice level and blend as smoothed fields. Both scale
    * the output directly, so a committed change on a ringing voice glides
@@ -259,9 +250,8 @@ class HybridVoice {
     this.#character = VOICE_CHARACTER[id];
     this.#sampleRate = sampleRate;
     this.#parameters = parameters;
-    this.#oneShot = oneShot;
+    this.#sample = new SampleBoundaryPlayer([oneShot], sampleRate);
     this.#noise = new DeterministicNoise(this.#character.seed);
-    this.#boundaryStep = 1 / Math.max(1, Math.round(0.002 * sampleRate));
     this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
     this.#blend = new ParameterGlide(clamp(parameters.blend, 0, 1), sampleRate);
     this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
@@ -283,19 +273,23 @@ class HybridVoice {
   }
 
   trigger(velocity: number, accent: boolean): void {
+    const restarting = this.#active;
     this.#noise.reset();
     this.#noiseFilter.reset();
     // A hit that starts from silence takes the committed values directly; the
     // glides exist to protect a ringing tail, not to lag a fresh attack.
-    if (!this.#active) {
+    if (!restarting) {
       this.#level.set(clamp(this.#parameters.level, 0, 1));
       this.#blend.set(clamp(this.#parameters.blend, 0, 1));
     }
     this.#phase = 0;
     this.#elapsed = 0;
     // Start is normalized, so it stays meaningful whatever the buffer length.
-    this.#cursor = clamp(this.#parameters.start, 0, 1) * (this.#oneShot.length - 1);
-    this.#boundaryGain = 0;
+    // Same-voice restarts omit the micro-fade under the approved restart rule.
+    this.#sample.start({
+      startFrame: clamp(this.#parameters.start, 0, 1) * (this.#sample.frameCount - 1),
+      fadeIn: !restarting,
+    });
     this.#velocity = clamp(velocity, 0, 1);
     this.#accent = accent ? 1 : 0;
     this.#amplitude = 1;
@@ -311,6 +305,7 @@ class HybridVoice {
     this.#active = false;
     this.#choking = false;
     this.#amplitude = 0;
+    this.#sample.stop();
     this.#noiseFilter.reset();
   }
 
@@ -333,8 +328,7 @@ class HybridVoice {
     const ratio = semitoneRatio(this.#parameters.tune);
     const blend = this.#blend.advance(clamp(this.#parameters.blend, 0, 1));
     const synth = blend < 1 ? this.#renderSynthLayer(this.#character.baseFrequency * ratio) : 0;
-    this.#boundaryGain = Math.min(1, this.#boundaryGain + this.#boundaryStep);
-    const oneShot = blend > 0 ? this.#renderOneShotLayer(ratio) * this.#boundaryGain : 0;
+    const oneShot = blend > 0 ? this.#renderOneShotLayer(ratio) : 0;
 
     // Equal-power crossfade, so a mid blend does not dip in level the way a
     // linear mix of two uncorrelated layers would.
@@ -347,9 +341,12 @@ class HybridVoice {
     const gain = this.#velocity * (1 + this.#accent * 0.45);
 
     this.#elapsed += 1 / this.#sampleRate;
-    return (
-      mixed * attackGain * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1))
-    );
+    return mixed * attackGain * this.#amplitude * gain;
+  }
+
+  /** The outer machine applies this after the per-voice insert. */
+  advanceLevel(): number {
+    return this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 
   #renderSynthLayer(frequency: number): number {
@@ -377,15 +374,8 @@ class HybridVoice {
    * nearest-neighbour one, which would alias audibly on the metallic voices.
    */
   #renderOneShotLayer(ratio: number): number {
-    const table = this.#oneShot;
-    if (this.#cursor >= table.length - 1) return 0;
-
-    const index = Math.floor(this.#cursor);
-    const fraction = this.#cursor - index;
-    const current = table[index] ?? 0;
-    const next = table[index + 1] ?? 0;
-    this.#cursor += ratio;
-    return current + (next - current) * fraction;
+    this.#sample.render(ratio);
+    return this.#sample.channel(0);
   }
 }
 
@@ -401,6 +391,7 @@ export class HybridNineDsp {
   readonly #filter: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<HybridVoiceId, EqualPowerPan>>;
+  readonly #voiceInserts: Readonly<Record<HybridVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly HybridVoice[];
   #parameters: HybridNineParameters = DEFAULT_HYBRID_PARAMETERS;
@@ -419,6 +410,9 @@ export class HybridNineDsp {
         new EqualPowerPan(DEFAULT_HYBRID_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<HybridVoiceId, EqualPowerPan>;
+    this.#voiceInserts = Object.fromEntries(
+      HYBRID_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
+    ) as Record<HybridVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       HYBRID_VOICE_IDS.map((id) => [
         id,
@@ -463,6 +457,17 @@ export class HybridNineDsp {
 
   getParameterSnapshot(): HybridNineParameters {
     return this.#parameters;
+  }
+
+  setVoiceInserts(
+    configurations: Readonly<Partial<Record<HybridVoiceId, VoiceInsertConfiguration | null>>>,
+  ): boolean {
+    let accepted = true;
+    for (const voiceId of HYBRID_VOICE_IDS) {
+      const host = this.#voiceInserts[voiceId];
+      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.active === true) && accepted;
+    }
+    return accepted;
   }
 
   trigger(voiceId: HybridVoiceId, velocity = 1, accent = false): void {
@@ -525,7 +530,8 @@ export class HybridNineDsp {
         if (!voice.active) continue;
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
-        const sample = voice.render();
+        const source = voice.render();
+        const sample = this.#voiceInserts[voice.id].process(source) * voice.advanceLevel();
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

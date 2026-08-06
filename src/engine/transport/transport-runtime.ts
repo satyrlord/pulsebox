@@ -22,6 +22,7 @@ import type {
   VoiceAdapterPort,
   VoiceAdapterStatus,
   VoiceFault,
+  VoiceInsertRuntime,
 } from "./voice-adapter";
 
 export interface TransportModuleMix {
@@ -35,6 +36,8 @@ export interface TransportModule {
   readonly id: ModuleInstanceId;
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
+  /** Saved per-drum-voice insert instances resolved for the audio thread. */
+  readonly voiceInserts?: Readonly<Record<string, VoiceInsertRuntime | null>>;
   /** One step list per project Pattern slot. */
   readonly parts: readonly (readonly PatternStepView[])[];
   readonly mix: TransportModuleMix;
@@ -52,6 +55,7 @@ export type TransportEngineDelta = EngineDelta<
   | "module-remove"
   | "module-move"
   | "module-swap"
+  | "module-effects-set"
   | "parameter-set"
   | "step-set"
   | "transport"
@@ -566,7 +570,11 @@ export class TransportRuntime {
         this.#modules.set(moduleProjection.id, moduleProjection);
         if (this.#context !== undefined) {
           const adapter = await this.#ensureAdapter(moduleProjection);
-          adapter?.replaceState(moduleProjection.parameters, delta.projectRevision);
+          adapter?.replaceState(
+            moduleProjection.parameters,
+            delta.projectRevision,
+            moduleProjection.voiceInserts,
+          );
           this.#scheduleRecoveredModule(moduleProjection.id);
         }
         return;
@@ -598,9 +606,35 @@ export class TransportRuntime {
         this.#adapters.delete(moduleId);
         if (this.#context !== undefined) {
           const adapter = await this.#ensureAdapter(moduleProjection);
-          adapter?.replaceState(moduleProjection.parameters, delta.projectRevision);
+          adapter?.replaceState(
+            moduleProjection.parameters,
+            delta.projectRevision,
+            moduleProjection.voiceInserts,
+          );
           this.#scheduleRecoveredModule(moduleProjection.id);
         }
+        return;
+      }
+      case "module-effects-set": {
+        if (moduleProjection === undefined) {
+          throw new Error("Voice-insert update requires its bounded module projection.");
+        }
+        this.#setRevision(delta.projectRevision);
+        this.#modules.set(moduleProjection.id, moduleProjection);
+        this.#adapters
+          .get(moduleProjection.id)
+          ?.replaceState(
+            moduleProjection.parameters,
+            delta.projectRevision,
+            moduleProjection.voiceInserts,
+          );
+        this.#auditions
+          .get(moduleProjection.id)
+          ?.adapter?.replaceState(
+            moduleProjection.parameters,
+            delta.projectRevision,
+            moduleProjection.voiceInserts,
+          );
         return;
       }
       case "parameter-set": {
@@ -789,7 +823,7 @@ export class TransportRuntime {
       return;
     }
     adapter.activate(this.#ensureChannel(context, moduleId).input);
-    adapter.replaceState(module.parameters, revision);
+    adapter.replaceState(module.parameters, revision, module.voiceInserts);
     adapter.schedule([
       {
         atFrame: this.#currentFrame(context) + this.#leadFrames(context),
@@ -1232,7 +1266,7 @@ export class TransportRuntime {
     if (revision === undefined) return;
     for (const module of this.#modules.values()) {
       const adapter = await this.#ensureAdapter(module);
-      adapter?.replaceState(module.parameters, revision);
+      adapter?.replaceState(module.parameters, revision, module.voiceInserts);
     }
   }
 

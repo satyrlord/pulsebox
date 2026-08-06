@@ -397,7 +397,7 @@ contains the normative requirements. This table is the traceability record.
   per-step editing. The Piano Roll stays the only Pattern editing surface.
 
   Under the section 15.0 visual constraints, a sixteen-cell row resembles a
-  step sequencer. Users can try to click it. An inoperative surface conflicts
+  step sequencer. It can invite a click. An inoperative surface conflicts
   with the rule that every visible control operates. The Piano Roll playhead,
   Pattern position readout, and transport clock provide playback position
   feedback.

@@ -5,13 +5,21 @@ import type {
   Selector,
   Unsubscribe,
 } from "../contracts/commands";
+import type {
+  EffectInstanceState,
+  EffectsState,
+  VoiceInsertSlots,
+} from "../contracts/effects";
 import {
   createCommandId,
+  createEffectInstanceId,
   createStateRevisionEpoch,
+  type EffectInstanceId,
   type GestureId,
   type IdFactory,
   type ModuleInstanceId,
   type StateRevision,
+  type VoiceId,
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
 import type { PulseCommand } from "./commands";
@@ -48,6 +56,7 @@ export type PulseEngineDelta = EngineDelta<
   | "module-move"
   | "module-swap"
   | "parameter-set"
+  | "module-effects-set"
   | "step-set"
   | "transport"
   | "pattern-select"
@@ -58,6 +67,12 @@ export type PulseEngineDelta = EngineDelta<
   Readonly<Record<string, unknown>>
 >;
 
+/** The composition boundary supplies effect instances from the shared registry. */
+export type VoiceInsertEffectFactory = (
+  id: EffectInstanceId,
+  pluginId: PluginId,
+) => EffectInstanceState | undefined;
+
 export class PulseStore {
   readonly #idFactory: IdFactory;
   readonly #onEngineDelta: (delta: PulseEngineDelta) => void;
@@ -67,6 +82,7 @@ export class PulseStore {
     parameter: string,
     value: number | boolean | string,
   ) => boolean;
+  readonly #createVoiceInsertEffect: VoiceInsertEffectFactory | undefined;
   readonly #subscriptions = new Set<Subscription>();
   readonly #undo: HistoryEntry[] = [];
   readonly #redo: HistoryEntry[] = [];
@@ -85,6 +101,7 @@ export class PulseStore {
       parameter: string,
       value: number | boolean | string,
     ) => boolean,
+    createVoiceInsertEffect?: VoiceInsertEffectFactory,
   ) {
     this.#state = {
       ...initialState,
@@ -97,6 +114,7 @@ export class PulseStore {
         : (pluginId) => (pluginId === moduleSeed.pluginId ? moduleSeed : undefined);
     this.#onEngineDelta = onEngineDelta;
     this.#validateParameter = validateParameter;
+    this.#createVoiceInsertEffect = createVoiceInsertEffect;
   }
 
   getState(): Readonly<PulseState> {
@@ -370,6 +388,12 @@ export class PulseStore {
           command.payload.moduleId,
           command.payload.parameter,
           command.payload.value,
+        );
+      case "voice-insert-set":
+        return this.#setVoiceInsert(
+          command.payload.moduleId,
+          command.payload.voiceId,
+          command.payload.effectPluginId,
         );
       case "pattern-step-toggle":
         return this.#toggleStep(command.payload.moduleId, command.payload.step);
@@ -762,6 +786,7 @@ export class PulseStore {
           candidate.id === slotId ? { ...candidate, moduleId: module.id } : candidate,
         ),
         modules: { ...this.#state.project.modules, [module.id]: module },
+        effects: withNullVoiceInsertSlots(this.#state.project.effects, module.id, seed.voiceIds),
       },
       "module-add",
       [module.id, slotId],
@@ -806,6 +831,7 @@ export class PulseStore {
           candidate.id === slotId ? { ...candidate, moduleId: module.id } : candidate,
         ),
         modules: { ...this.#state.project.modules, [module.id]: module },
+        effects: this.#duplicateVoiceInserts(this.#state.project.effects, moduleId, module.id, seed.voiceIds),
       },
       "module-add",
       [module.id, slotId],
@@ -828,6 +854,7 @@ export class PulseStore {
           slot.moduleId === moduleId ? { id: slot.id } : slot,
         ),
         modules,
+        effects: withoutModuleVoiceInserts(this.#state.project.effects, moduleId),
       },
       "module-remove",
       [moduleId],
@@ -908,6 +935,11 @@ export class PulseStore {
       {
         ...this.#state.project,
         modules: { ...this.#state.project.modules, [moduleId]: nextModule },
+        effects: withNullVoiceInsertSlots(
+          withoutModuleVoiceInserts(this.#state.project.effects, moduleId),
+          moduleId,
+          seed.voiceIds,
+        ),
       },
       "module-swap",
       [moduleId],
@@ -948,6 +980,108 @@ export class PulseStore {
       [moduleId],
       { moduleId, parameter, value: rawValue },
     );
+  }
+
+  #setVoiceInsert(moduleId: ModuleInstanceId, voiceId: VoiceId, effectPluginId: PluginId | null) {
+    if (this.#state.project.modules[moduleId] === undefined) {
+      return {
+        error: rejected("payload.moduleId", "Module does not exist.", "Edit a loaded module."),
+      };
+    }
+    const slots = this.#state.project.effects.voiceInserts[moduleId];
+    if (slots === undefined || !Object.hasOwn(slots, voiceId)) {
+      return {
+        error: rejected(
+          "payload.voiceId",
+          "Voice does not support an insert slot.",
+          "Choose a drum voice with an insert slot.",
+        ),
+      };
+    }
+    const currentEffectId = slots[voiceId] ?? null;
+    const currentEffect =
+      currentEffectId === null ? undefined : this.#state.project.effects.instances[currentEffectId];
+    if (effectPluginId !== null && currentEffect?.pluginId === effectPluginId) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    if (effectPluginId === null && currentEffectId === null) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+
+    const nextSlots: Record<VoiceId, EffectInstanceId | null> = { ...slots };
+    const nextInstances: Record<EffectInstanceId, EffectInstanceState> = {
+      ...this.#state.project.effects.instances,
+    };
+    let nextEffectId: EffectInstanceId | null = null;
+    if (effectPluginId !== null) {
+      const candidateId = createEffectInstanceId(this.#idFactory);
+      const effect = this.#createVoiceInsertEffect?.(candidateId, effectPluginId);
+      if (effect?.id !== candidateId || effect.pluginId !== effectPluginId) {
+        return {
+          error: rejected(
+            "payload.effectPluginId",
+            "Voice insert effect is not registered.",
+            "Choose an available voice insert effect.",
+          ),
+        };
+      }
+      nextEffectId = candidateId;
+      nextInstances[candidateId] = effect;
+    }
+    nextSlots[voiceId] = nextEffectId;
+    const effects = pruneUnreferencedEffects({
+      instances: nextInstances,
+      voiceInserts: { ...this.#state.project.effects.voiceInserts, [moduleId]: nextSlots },
+    });
+    const targetIds =
+      nextEffectId === null
+        ? currentEffectId === null
+          ? [moduleId, voiceId]
+          : [moduleId, voiceId, currentEffectId]
+        : [moduleId, voiceId, nextEffectId];
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      targetIds,
+      { moduleId, voiceId, effectInstanceId: nextEffectId, effectPluginId },
+    );
+  }
+
+  #duplicateVoiceInserts(
+    effects: EffectsState,
+    sourceModuleId: ModuleInstanceId,
+    targetModuleId: ModuleInstanceId,
+    targetVoiceIds: readonly VoiceId[] | undefined,
+  ): EffectsState {
+    const sourceSlots = effects.voiceInserts[sourceModuleId];
+    if (sourceSlots === undefined) {
+      return withNullVoiceInsertSlots(effects, targetModuleId, targetVoiceIds);
+    }
+    const instances: Record<EffectInstanceId, EffectInstanceState> = { ...effects.instances };
+    const slots: Record<VoiceId, EffectInstanceId | null> = {};
+    for (const [rawVoiceId, sourceEffectId] of Object.entries(sourceSlots)) {
+      const voiceId = rawVoiceId as VoiceId;
+      if (sourceEffectId === null) {
+        slots[voiceId] = null;
+        continue;
+      }
+      const sourceEffect = effects.instances[sourceEffectId];
+      if (sourceEffect === undefined) {
+        slots[voiceId] = null;
+        continue;
+      }
+      const cloneId = createEffectInstanceId(this.#idFactory);
+      instances[cloneId] = {
+        ...sourceEffect,
+        id: cloneId,
+        state: { ...sourceEffect.state },
+      };
+      slots[voiceId] = cloneId;
+    }
+    return {
+      instances,
+      voiceInserts: { ...effects.voiceInserts, [targetModuleId]: slots },
+    };
   }
 
   #toggleStep(moduleId: ModuleInstanceId, step: number) {
@@ -1124,10 +1258,52 @@ function sameProjectContent(left: ProjectState, right: ProjectState): boolean {
     left.masterLevel === right.masterLevel &&
     sameStructuredValue(left.rackSlots, right.rackSlots) &&
     sameStructuredValue(left.modules, right.modules) &&
+    sameStructuredValue(left.effects, right.effects) &&
     sameStructuredValue(left.patterns, right.patterns) &&
     left.activePatternIndex === right.activePatternIndex &&
     sameStructuredValue(left.song, right.song)
   );
+}
+
+function withNullVoiceInsertSlots(
+  effects: EffectsState,
+  moduleId: ModuleInstanceId,
+  voiceIds: readonly VoiceId[] | undefined,
+): EffectsState {
+  const voiceInserts: Record<ModuleInstanceId, VoiceInsertSlots> = { ...effects.voiceInserts };
+  if (voiceIds === undefined || voiceIds.length === 0) {
+    return withoutModuleVoiceInserts(effects, moduleId);
+  }
+  const slots: Record<VoiceId, EffectInstanceId | null> = {};
+  for (const voiceId of voiceIds) slots[voiceId] = null;
+  voiceInserts[moduleId] = slots;
+  return pruneUnreferencedEffects({ instances: effects.instances, voiceInserts });
+}
+
+function withoutModuleVoiceInserts(effects: EffectsState, moduleId: ModuleInstanceId): EffectsState {
+  if (effects.voiceInserts[moduleId] === undefined) return effects;
+  const voiceInserts = Object.entries(effects.voiceInserts).reduce<
+    Record<ModuleInstanceId, VoiceInsertSlots>
+  >((next, [rawModuleId, slots]) => {
+    if (rawModuleId !== moduleId) next[rawModuleId as ModuleInstanceId] = slots;
+    return next;
+  }, {});
+  return pruneUnreferencedEffects({ instances: effects.instances, voiceInserts });
+}
+
+function pruneUnreferencedEffects(effects: EffectsState): EffectsState {
+  const referenced = new Set<EffectInstanceId>();
+  for (const slots of Object.values(effects.voiceInserts)) {
+    for (const effectId of Object.values(slots)) {
+      if (effectId !== null) referenced.add(effectId);
+    }
+  }
+  const instances: Record<EffectInstanceId, EffectInstanceState> = {};
+  for (const [rawId, instance] of Object.entries(effects.instances)) {
+    const id = rawId as EffectInstanceId;
+    if (referenced.has(id)) instances[id] = instance;
+  }
+  return { instances, voiceInserts: effects.voiceInserts };
 }
 
 /** Compares immutable project data without serializing the full project. */

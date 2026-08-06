@@ -359,8 +359,8 @@ User-facing status must name the exact implemented slice and its missing
 parent-phase scope.
 
 The current runnable foundation contains Phase 1 and narrow slices for Tin
-Soldier, named Pattern storage, and basic channel mixing. It also contains
-Playlist
+Soldier, named Pattern storage, basic channel mixing, and the drum-voice
+Distortion insert engine and state foundation. It also contains Playlist
 transport, appearance Settings, and browser project persistence. These slices
 verify shared contracts and integration points. They do not complete Phases 2
 through 7 or their acceptance criteria.

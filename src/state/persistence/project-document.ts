@@ -1,14 +1,19 @@
 import {
   RACK_SLOT_IDS,
   isCanonicalUuid,
+  type EffectInstanceId,
+  type ModuleInstanceId,
   type PatternId,
   type ProjectRevision,
+  type VoiceId,
 } from "../../contracts/ids";
+import type { EffectInstanceState, EffectsState } from "../../contracts/effects";
 import {
   parseParameterId,
   parsePluginId,
   type ParameterDescriptor,
   type ParameterValue,
+  type PluginId,
 } from "../../contracts/parameters";
 import { isPlainRecord, type ValidationIssue } from "../../contracts/validation";
 import {
@@ -23,10 +28,8 @@ import type { PatternStep, PulseState, RackModuleState } from "../model";
 /**
  * The on-disk project document, per `docs/PROJECT-FORMAT.md` section 5.
  *
- * Only the areas the application actually implements carry data. Song,
- * automation, mixer, effects, and assets are present and empty so that a
- * document written today stays readable when those features land, and so the
- * validator can already reject unknown root keys.
+ * Only implemented data carries values. The other root fields stay present so
+ * the validator can reject unknown root keys.
  */
 
 export const PROJECT_FORMAT = "pulsebox-project";
@@ -108,6 +111,24 @@ export interface MixerDocument {
   readonly masterLevel?: number;
 }
 
+export interface EffectInstanceDocument {
+  readonly id: string;
+  readonly pluginId: string;
+  readonly stateVersion: number;
+  readonly state: Readonly<Record<string, ParameterValue>>;
+}
+
+export interface VoiceInsertDocument {
+  readonly moduleId: string;
+  readonly voiceId: string;
+  readonly effectInstanceId: string | null;
+}
+
+export interface EffectsDocument {
+  readonly instances: readonly EffectInstanceDocument[];
+  readonly voiceInserts: readonly VoiceInsertDocument[];
+}
+
 export interface MigrationRecord {
   readonly scope: "project" | "plugin";
   readonly id: string;
@@ -128,7 +149,7 @@ export interface ProjectDocument {
   readonly activePatternIndex?: number;
   readonly automation: readonly unknown[];
   readonly mixer: MixerDocument;
-  readonly effects: Readonly<Record<string, unknown>>;
+  readonly effects: EffectsDocument;
   readonly assets: readonly unknown[];
   readonly migrations: readonly MigrationRecord[];
 }
@@ -174,7 +195,8 @@ export function serializeProject(
   const modules = Object.values(project.modules);
   const versionFor = options.manifestVersionFor ?? (() => 1);
 
-  const plugins = [...new Set(modules.map((module) => module.pluginId))].map((pluginId) => ({
+  const effectInstances = Object.values(project.effects.instances);
+  const plugins = [...new Set([...modules.map((module) => module.pluginId), ...effectInstances.map((instance) => instance.pluginId)])].map((pluginId) => ({
     pluginId,
     stateSchemaVersion: versionFor(pluginId),
   }));
@@ -236,7 +258,28 @@ export function serializeProject(
     activePatternIndex: project.activePatternIndex,
     automation: [],
     mixer: { masterLevel: project.masterLevel },
-    effects: {},
+    effects: {
+      instances: effectInstances
+        .toSorted((left, right) => left.id.localeCompare(right.id))
+        .map((instance) => ({
+          id: instance.id,
+          pluginId: instance.pluginId,
+          stateVersion: instance.stateVersion,
+          state: { ...instance.state },
+        })),
+      voiceInserts: Object.entries(project.effects.voiceInserts)
+        .flatMap(([moduleId, slots]) =>
+          Object.entries(slots).map(([voiceId, effectInstanceId]) => ({
+            moduleId,
+            voiceId,
+            effectInstanceId,
+          })),
+        )
+        .toSorted(
+          (left, right) =>
+            left.moduleId.localeCompare(right.moduleId) || left.voiceId.localeCompare(right.voiceId),
+        ),
+    },
     assets: [],
     migrations: [],
   };
@@ -263,18 +306,37 @@ function isStep(value: unknown): value is PatternStep {
 }
 
 export interface ParseOptions {
-  /** Plugin IDs the running build can actually instantiate. */
+  /** Instrument plugin IDs that the running build can place in a rack slot. */
   readonly knownPluginIds: readonly string[];
   /** Data-only parameter contracts copied from each registered plugin manifest. */
   readonly parameterDescriptorsByPluginId: Readonly<
     Record<string, readonly ImportParameterDescriptor[]>
   >;
+  /** Effect IDs that the running build can instantiate in a drum voice slot. */
+  readonly knownVoiceInsertEffectPluginIds?: readonly string[];
+  /** Registered current state schema versions for every installed plugin. */
+  readonly stateSchemaVersionByPluginId?: Readonly<Record<string, number>>;
+  /** State contracts for effects that can occupy a drum voice insert slot. */
+  readonly voiceInsertEffectsByPluginId?: Readonly<
+    Record<string, ImportVoiceInsertEffectDescriptor>
+  >;
+  /** Stable drum voice IDs by instrument plugin. Pitched instruments omit an entry. */
+  readonly voiceIdsByPluginId?: Readonly<Record<string, readonly string[]>>;
 }
 
 export type ImportParameterDescriptor = Pick<
   ParameterDescriptor,
   "id" | "valueType" | "minimum" | "maximum" | "enumValues"
 >;
+
+/**
+ * The data-only effect state contract used at the import boundary. It matches
+ * the persisted scalar state that a voice insert runtime can receive.
+ */
+export interface ImportVoiceInsertEffectDescriptor {
+  readonly stateSchemaVersion: number;
+  readonly parameters: readonly ImportParameterDescriptor[];
+}
 
 const MAXIMUM_REPORTED_ISSUES = 100;
 const TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -313,6 +375,9 @@ const PATTERN_KEYS = new Set([
 ]);
 const STEP_KEYS = new Set(["active", "note", "velocity", "accent", "slide"]);
 const SONG_KEYS = new Set(["patternIndex", "repeats"]);
+const EFFECTS_KEYS = new Set(["instances", "voiceInserts"]);
+const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state"]);
+const VOICE_INSERT_KEYS = new Set(["moduleId", "voiceId", "effectInstanceId"]);
 
 class IssueCollector {
   readonly issues: ValidationIssue[] = [];
@@ -461,6 +526,222 @@ export function createParameterValidator(
   };
 }
 
+interface ParsedEffects {
+  readonly document: EffectsDocument;
+  readonly referencedPluginIds: ReadonlySet<string>;
+}
+
+function voiceSlotKey(moduleId: string, voiceId: string): string {
+  return `${moduleId}\u0000${voiceId}`;
+}
+
+function expectedVoiceInsertDocuments(
+  occupiedModules: ReadonlyMap<string, string>,
+  options: ParseOptions,
+): readonly VoiceInsertDocument[] {
+  const voiceIdsByPluginId = options.voiceIdsByPluginId ?? {};
+  return [...occupiedModules.entries()]
+    .flatMap(([moduleId, pluginId]) =>
+      (voiceIdsByPluginId[pluginId] ?? []).map((voiceId) => ({
+        moduleId,
+        voiceId,
+        effectInstanceId: null,
+      })),
+    )
+    .toSorted(
+      (left, right) =>
+        left.moduleId.localeCompare(right.moduleId) || left.voiceId.localeCompare(right.voiceId),
+    );
+}
+
+function parseEffects(
+  value: unknown,
+  collector: IssueCollector,
+  occupiedModules: ReadonlyMap<string, string>,
+  requirements: ReadonlySet<string>,
+  options: ParseOptions,
+): ParsedEffects {
+  const expectedSlots = expectedVoiceInsertDocuments(occupiedModules, options);
+  const empty: ParsedEffects = {
+    document: { instances: [], voiceInserts: expectedSlots },
+    referencedPluginIds: new Set(),
+  };
+  if (!isPlainRecord(value)) {
+    collector.add("effects", "Effects must be an object.");
+    return empty;
+  }
+  // Existing phase-one documents wrote an empty object. Read it as the new
+  // all-null slot set instead of making saved projects unreadable.
+  if (Object.keys(value).length === 0) return empty;
+
+  collector.exactKeys(value, EFFECTS_KEYS, "effects");
+  const effectDescriptors = options.voiceInsertEffectsByPluginId ?? {};
+  const knownEffectPlugins = new Set([
+    ...(options.knownVoiceInsertEffectPluginIds ?? []),
+    ...Object.keys(effectDescriptors),
+  ]);
+  const instances: EffectInstanceDocument[] = [];
+  const instanceIds = new Set<string>();
+  if (!Array.isArray(value.instances)) {
+    collector.add("effects.instances", "Effect instances must be an array.");
+  } else {
+    for (const [index, instance] of value.instances.entries()) {
+      if (collector.full) break;
+      const path = `effects.instances[${String(index)}]`;
+      if (!isPlainRecord(instance)) {
+        collector.add(path, "Effect instance must be an object.");
+        continue;
+      }
+      collector.exactKeys(instance, EFFECT_INSTANCE_KEYS, path);
+      if (!isCanonicalUuid(instance.id)) {
+        collector.add(`${path}.id`, "Expected a lowercase canonical UUID version 4.");
+      } else if (instanceIds.has(instance.id)) {
+        collector.add(`${path}.id`, "Effect instance IDs must be unique.");
+      } else {
+        instanceIds.add(instance.id);
+      }
+      const pluginId = parsePluginId(instance.pluginId, `${path}.pluginId`);
+      let effectDescriptor: ImportVoiceInsertEffectDescriptor | undefined;
+      if (!pluginId.ok) collector.issues.push(...pluginId.issues);
+      else {
+        if (!knownEffectPlugins.has(pluginId.value)) {
+          collector.add(`${path}.pluginId`, "Effect plugin is not available for a voice insert.");
+        }
+        effectDescriptor = effectDescriptors[pluginId.value];
+        if (effectDescriptor === undefined) {
+          collector.add(
+            `${path}.pluginId`,
+            "Effect plugin has no registered voice-insert state contract.",
+          );
+        }
+        if (!requirements.has(pluginId.value)) {
+          collector.add(`${path}.pluginId`, "Effect plugin has no matching requirement.");
+        }
+      }
+      if (!Number.isSafeInteger(instance.stateVersion) || Number(instance.stateVersion) < 1) {
+        collector.add(`${path}.stateVersion`, "Voice insert state version must be a positive integer.");
+      } else if (
+        effectDescriptor !== undefined &&
+        instance.stateVersion !== effectDescriptor.stateSchemaVersion
+      ) {
+        collector.add(
+          `${path}.stateVersion`,
+          `Voice insert state version must be ${String(effectDescriptor.stateSchemaVersion)}.`,
+        );
+      }
+      if (effectDescriptor !== undefined)
+        validateVoiceInsertEffectState(instance.state, effectDescriptor, `${path}.state`, collector);
+      if (
+        typeof instance.id === "string" &&
+        typeof instance.pluginId === "string" &&
+        typeof instance.stateVersion === "number" &&
+        isPlainRecord(instance.state)
+      ) {
+        instances.push({
+          id: instance.id,
+          pluginId: instance.pluginId,
+          stateVersion: instance.stateVersion,
+          state: instance.state as Readonly<Record<string, ParameterValue>>,
+        });
+      }
+    }
+  }
+
+  const expectedByKey = new Map(
+    expectedSlots.map((slot) => [voiceSlotKey(slot.moduleId, slot.voiceId), slot]),
+  );
+  const voiceInserts: VoiceInsertDocument[] = [];
+  const seenSlots = new Set<string>();
+  const references = new Map<string, number>();
+  if (!Array.isArray(value.voiceInserts)) {
+    collector.add("effects.voiceInserts", "Voice insert slots must be an array.");
+  } else {
+    for (const [index, slot] of value.voiceInserts.entries()) {
+      if (collector.full) break;
+      const path = `effects.voiceInserts[${String(index)}]`;
+      if (!isPlainRecord(slot)) {
+        collector.add(path, "Voice insert slot must be an object.");
+        continue;
+      }
+      collector.exactKeys(slot, VOICE_INSERT_KEYS, path);
+      const key =
+        typeof slot.moduleId === "string" && typeof slot.voiceId === "string"
+          ? voiceSlotKey(slot.moduleId, slot.voiceId)
+          : undefined;
+      if (key === undefined || !expectedByKey.has(key)) {
+        collector.add(path, "Voice insert slot does not resolve to a supported drum voice.");
+      } else if (seenSlots.has(key)) {
+        collector.add(path, "Voice insert slots must be unique.");
+      } else {
+        seenSlots.add(key);
+      }
+      if (slot.effectInstanceId !== null && !isCanonicalUuid(slot.effectInstanceId)) {
+        collector.add(`${path}.effectInstanceId`, "Expected a lowercase canonical UUID version 4 or null.");
+      } else if (typeof slot.effectInstanceId === "string") {
+        if (!instanceIds.has(slot.effectInstanceId)) {
+          collector.add(`${path}.effectInstanceId`, "Voice insert references an unknown effect instance.");
+        }
+        references.set(slot.effectInstanceId, (references.get(slot.effectInstanceId) ?? 0) + 1);
+      }
+      if (
+        typeof slot.moduleId === "string" &&
+        typeof slot.voiceId === "string" &&
+        (slot.effectInstanceId === null || typeof slot.effectInstanceId === "string")
+      ) {
+        voiceInserts.push({
+          moduleId: slot.moduleId,
+          voiceId: slot.voiceId,
+          effectInstanceId: slot.effectInstanceId,
+        });
+      }
+    }
+  }
+  for (const [key, slot] of expectedByKey) {
+    if (!seenSlots.has(key)) {
+      collector.add(
+        "effects.voiceInserts",
+        `Missing voice insert slot for ${slot.moduleId}/${slot.voiceId}.`,
+      );
+    }
+  }
+  for (const instance of instances) {
+    const count = references.get(instance.id) ?? 0;
+    if (count !== 1) {
+      collector.add(
+        "effects.instances",
+        count === 0
+          ? "Each effect instance must have one voice insert reference."
+          : "An effect instance cannot occupy more than one voice insert slot.",
+      );
+    }
+  }
+  return {
+    document: { instances, voiceInserts },
+    referencedPluginIds: new Set(instances.map((instance) => instance.pluginId)),
+  };
+}
+
+function validateVoiceInsertEffectState(
+  value: unknown,
+  descriptor: ImportVoiceInsertEffectDescriptor,
+  path: string,
+  collector: IssueCollector,
+): void {
+  if (!isPlainRecord(value)) {
+    collector.add(path, "Voice insert state must be an object.");
+    return;
+  }
+  collector.exactKeys(value, new Set(descriptor.parameters.map((parameter) => parameter.id)), path);
+  for (const parameter of descriptor.parameters) {
+    if (!Object.hasOwn(value, parameter.id)) {
+      collector.add(`${path}.${parameter.id}`, "Voice insert state is missing a required value.");
+      continue;
+    }
+    const message = validateImportedParameter(value[parameter.id], parameter);
+    if (message !== undefined) collector.add(`${path}.${parameter.id}`, message);
+  }
+}
+
 /**
  * Treats the document as untrusted. Rejects unknown root keys, executable
  * content, over-cap racks, unknown plugins, and out-of-range scalars before any
@@ -519,7 +800,11 @@ export function parseProjectDocument(
       collector.add("project.swing", "Swing must be between 0 and 100 percent.");
   }
 
-  const known = new Set(options.knownPluginIds);
+  const known = new Set([
+    ...options.knownPluginIds,
+    ...(options.knownVoiceInsertEffectPluginIds ?? []),
+    ...Object.keys(options.voiceInsertEffectsByPluginId ?? {}),
+  ]);
   const requirements = new Set<string>();
   if (!Array.isArray(value.plugins)) {
     collector.add("plugins", "Plugins must be an array.");
@@ -533,6 +818,7 @@ export function parseProjectDocument(
       }
       collector.exactKeys(requirement, PLUGIN_KEYS, path);
       const pluginId = parsePluginId(requirement.pluginId, `${path}.pluginId`);
+      let expectedStateSchemaVersion: number | undefined;
       if (!pluginId.ok) collector.issues.push(...pluginId.issues);
       else {
         if (requirements.has(pluginId.value))
@@ -543,6 +829,7 @@ export function parseProjectDocument(
             `${path}.pluginId`,
             `This build cannot open a project that requires plugin ${pluginId.value}.`,
           );
+        expectedStateSchemaVersion = options.stateSchemaVersionByPluginId?.[pluginId.value];
       }
       if (
         !Number.isSafeInteger(requirement.stateSchemaVersion) ||
@@ -551,6 +838,14 @@ export function parseProjectDocument(
         collector.add(
           `${path}.stateSchemaVersion`,
           "State schema version must be a positive safe integer.",
+        );
+      else if (
+        expectedStateSchemaVersion !== undefined &&
+        requirement.stateSchemaVersion !== expectedStateSchemaVersion
+      )
+        collector.add(
+          `${path}.stateSchemaVersion`,
+          `This build requires state schema version ${String(expectedStateSchemaVersion)}.`,
         );
     }
   }
@@ -723,11 +1018,13 @@ export function parseProjectDocument(
   }
   if (stepRecords > DOCUMENT_LIMITS.maximumEventRecords)
     collector.add("patterns", "The document exceeds its total event-record limit.");
+  const effects = parseEffects(value.effects, collector, occupiedModules, requirements, options);
+  const referencedPlugins = new Set([...occupiedModules.values(), ...effects.referencedPluginIds]);
   for (const requirement of requirements) {
-    if (![...occupiedModules.values()].includes(requirement)) {
+    if (!referencedPlugins.has(requirement)) {
       collector.add(
         "plugins",
-        `Plugin requirement ${requirement} is not referenced by a rack module.`,
+        `Plugin requirement ${requirement} is not referenced by a module or effect instance.`,
       );
     }
   }
@@ -787,11 +1084,11 @@ export function parseProjectDocument(
     else if (field.length > 0)
       collector.add(key, `${key} records are not supported by this build.`);
   }
-  if (!isPlainRecord(value.effects) || Object.keys(value.effects).length > 0)
-    collector.add("effects", "Effects must be an empty object in this build.");
-
   return collector.issues.length === 0
-    ? { ok: true, value: migrateDocument(value as unknown as ProjectDocument) }
+    ? {
+        ok: true,
+        value: migrateDocument({ ...(value as unknown as ProjectDocument), effects: effects.document }),
+      }
     : { ok: false, issues: collector.issues.slice(0, MAXIMUM_REPORTED_ISSUES) };
 }
 
@@ -1017,6 +1314,7 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
     (document.activePatternIndex ?? 0) < slotCount
       ? (document.activePatternIndex ?? 0)
       : 0;
+  const effects = effectsStateFromDocument(document.effects);
 
   return Object.freeze({
     ...base,
@@ -1042,6 +1340,7 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
         ),
       ),
       modules: Object.freeze(modules),
+      effects,
       patterns: Object.freeze(
         Array.from({ length: slotCount }, (_, index) => {
           const existing = base.project.patterns[index];
@@ -1086,6 +1385,38 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
       selectedModuleId: firstModuleId,
     }),
   } as PulseState);
+}
+
+function effectsStateFromDocument(document: EffectsDocument): EffectsState {
+  const instances: Record<EffectInstanceId, EffectInstanceState> = {};
+  for (const instance of document.instances) {
+    const id = instance.id as EffectInstanceId;
+    instances[id] = Object.freeze({
+      id,
+      pluginId: instance.pluginId as PluginId,
+      stateVersion: instance.stateVersion,
+      state: Object.freeze({ ...instance.state }),
+    });
+  }
+  const voiceInserts: Record<ModuleInstanceId, Record<VoiceId, EffectInstanceId | null>> = {};
+  for (const slot of document.voiceInserts) {
+    const moduleId = slot.moduleId as ModuleInstanceId;
+    const slots = voiceInserts[moduleId] ?? {};
+    slots[slot.voiceId as VoiceId] =
+      slot.effectInstanceId === null ? null : (slot.effectInstanceId as EffectInstanceId);
+    voiceInserts[moduleId] = slots;
+  }
+  return Object.freeze({
+    instances: Object.freeze(instances),
+    voiceInserts: Object.freeze(
+      Object.fromEntries(
+        Object.entries(voiceInserts).map(([moduleId, slots]) => [
+          moduleId,
+          Object.freeze(slots),
+        ]),
+      ),
+    ),
+  });
 }
 
 function clampUnit(value: unknown, fallback: number, minimum: number): number {

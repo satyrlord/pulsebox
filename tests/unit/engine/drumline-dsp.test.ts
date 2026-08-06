@@ -6,6 +6,7 @@ import {
   DrumlineSixDsp,
   type DrumVoiceId,
 } from "../../../src/engine/modules/drumline-six/dsp-core";
+import { DISTORTION_PLUGIN_ID } from "../../../src/engine/effects";
 import { DRUMLINE_SIX_MANIFEST } from "../../../src/engine/modules/drumline-six/manifest";
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 
@@ -181,6 +182,22 @@ describe("DrumlineSixDsp", () => {
     });
 
     expect(peak(left.left)).toBeGreaterThan(peak(left.right) * 4);
+  });
+
+  it("processes a drum voice through its insert before voice level and pan", () => {
+    const dry = render((dsp) => {
+      dsp.trigger("kick");
+    });
+    const wet = render((dsp) => {
+      expect(
+        dsp.setVoiceInserts({ kick: { pluginId: DISTORTION_PLUGIN_ID, state: {} } }),
+      ).toBe(true);
+      dsp.trigger("kick");
+    });
+
+    expect([...wet.left]).not.toEqual([...dry.left]);
+    expect(peak(wet.left)).toBeLessThanOrEqual(Math.fround(0.98));
+    expect([...wet.left].every((sample) => Number.isFinite(sample))).toBe(true);
   });
 
   it("glides a committed voice level instead of cutting a ringing tail", () => {

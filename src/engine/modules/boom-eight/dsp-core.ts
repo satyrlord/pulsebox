@@ -27,6 +27,7 @@ import {
   StateVariableFilter,
   VoiceMixGates,
 } from "../../dsp/primitives";
+import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { BOOM_VOICE_IDS, type BoomVoiceId } from "./voices";
 
 export interface BoomVoiceParameters {
@@ -112,6 +113,8 @@ const CHOKE_GROUPS: readonly (readonly BoomVoiceId[])[] = [
   ["kick", "sub-kick"],
 ];
 
+// Matches the manifest-declared release and docs/instruments/voice-behavior.md:
+// Soft Thunder releases over 5 ms, never a hard cut.
 const CHOKE_RELEASE_SECONDS = 0.005;
 
 class BoomVoice {
@@ -203,7 +206,12 @@ class BoomVoice {
     const sample = this.#renderVoice(frequency, punch, decaySeconds);
 
     this.#elapsed += 1 / this.#sampleRate;
-    return sample * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1));
+    return sample * this.#amplitude * gain;
+  }
+
+  /** The outer machine applies this after the per-voice insert. */
+  advanceLevel(): number {
+    return this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 
   #renderVoice(frequency: number, punch: number, decaySeconds: number): number {
@@ -310,6 +318,7 @@ export class BoomEightDsp {
   readonly #tone: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<BoomVoiceId, EqualPowerPan>>;
+  readonly #voiceInserts: Readonly<Record<BoomVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly BoomVoice[];
   #parameters: BoomEightParameters = DEFAULT_BOOM_PARAMETERS;
@@ -329,6 +338,9 @@ export class BoomEightDsp {
         new EqualPowerPan(DEFAULT_BOOM_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<BoomVoiceId, EqualPowerPan>;
+    this.#voiceInserts = Object.fromEntries(
+      BOOM_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
+    ) as Record<BoomVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       BOOM_VOICE_IDS.map((id) => [
         id,
@@ -370,6 +382,17 @@ export class BoomEightDsp {
 
   getParameterSnapshot(): BoomEightParameters {
     return this.#parameters;
+  }
+
+  setVoiceInserts(
+    configurations: Readonly<Partial<Record<BoomVoiceId, VoiceInsertConfiguration | null>>>,
+  ): boolean {
+    let accepted = true;
+    for (const voiceId of BOOM_VOICE_IDS) {
+      const host = this.#voiceInserts[voiceId];
+      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.active === true) && accepted;
+    }
+    return accepted;
   }
 
   trigger(voiceId: BoomVoiceId, velocity = 1, accent = false): void {
@@ -435,7 +458,8 @@ export class BoomEightDsp {
         if (!voice.active) continue;
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
-        const sample = voice.render();
+        const source = voice.render();
+        const sample = this.#voiceInserts[voice.id].process(source) * voice.advanceLevel();
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

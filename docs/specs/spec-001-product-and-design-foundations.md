@@ -123,13 +123,13 @@ must be newly created for Pulsebox.
 
 ## 3. Product principles
 
-1. **Editing includes more than step toggles.** Every sequencer lets users paint,
+1. **Editing includes more than step toggles.** Every sequencer lets you paint,
    directly manipulate, perform with the computer keyboard, generate, and
    transform events.
 2. **The system is modular.** Instruments and effects use plugin contracts. Rack
    slots, insert chains, send chains, and the master chain are data-driven.
 3. **Playback remains continuous.** Playback continues without a dropout or
-   click while users edit, save, load compatible data, switch themes, open
+   click while you edit, save, load compatible data, switch themes, open
    editors, and reorder modules.
 4. **Undo recovers user edits.** User edits go through a command layer.
    Continuous gestures coalesce into one history entry. The store limits active

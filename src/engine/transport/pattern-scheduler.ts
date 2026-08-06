@@ -258,6 +258,7 @@ export function schedulePatternWindow(
     events.push({
       atFrame: frame,
       type: "note-on",
+      sourceStep: absoluteStep,
       note: step.note,
       velocity: humanizedVelocity(context, resolved),
       accent: step.accent,

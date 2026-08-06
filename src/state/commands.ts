@@ -1,5 +1,5 @@
 import type { CommandEnvelope } from "../contracts/commands";
-import type { ModuleInstanceId, RackSlotId } from "../contracts/ids";
+import type { ModuleInstanceId, RackSlotId, VoiceId } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
 
 export type PulseCommand =
@@ -29,6 +29,14 @@ export type PulseCommand =
         readonly moduleId: ModuleInstanceId;
         readonly parameter: string;
         readonly value: number | boolean | string;
+      }
+    >
+  | CommandEnvelope<
+      "voice-insert-set",
+      {
+        readonly moduleId: ModuleInstanceId;
+        readonly voiceId: VoiceId;
+        readonly effectPluginId: PluginId | null;
       }
     >
   | CommandEnvelope<

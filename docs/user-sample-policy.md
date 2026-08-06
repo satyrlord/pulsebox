@@ -59,5 +59,5 @@ them.
 
 Samples remain in origin-scoped browser storage and portable files selected by
 the user. Pulsebox uploads nothing and has no cloud service. Factory content
-must be original. Users are responsible for the rights to material they import
+must be original. You are responsible for the rights to material you import
 and export.

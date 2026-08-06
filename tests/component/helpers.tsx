@@ -2,11 +2,18 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
 
-import type { ModuleInstanceId, PluginId, PluginManifest } from "../../src/contracts";
+import {
+  DISTORTION_EFFECT_PLUGIN_ID,
+  type ModuleInstanceId,
+  type PluginId,
+  type PluginManifest,
+  type VoiceId,
+} from "../../src/contracts";
 import { browserIdFactory } from "../../src/composition/browser-id-factory";
 import {
   BASS_MONO_DEFAULT_PARAMETERS,
   BASS_MONO_MANIFEST,
+  BUILT_IN_EFFECTS,
   DRUMLINE_SIX_DEFAULT_PARAMETERS,
   DRUMLINE_SIX_MANIFEST,
   playableNotesFor,
@@ -95,6 +102,7 @@ export function createHarness(
     pluginId: DRUMLINE_SIX_MANIFEST.pluginId,
     parameters: parameterValues(DRUMLINE_SIX_DEFAULT_PARAMETERS),
     steps: TEST_STEPS,
+    voiceIds: DRUMLINE_SIX_MANIFEST.voices.map((voice) => voice.id as VoiceId),
   };
   const seeds = new Map<PluginId, ModuleSeed>([
     [seed.pluginId, seed],
@@ -104,6 +112,9 @@ export function createHarness(
   const manifests = new Map<PluginId, PluginManifest>([
     [BASS_MONO_MANIFEST.pluginId, BASS_MONO_MANIFEST],
     [DRUMLINE_SIX_MANIFEST.pluginId, DRUMLINE_SIX_MANIFEST],
+    ...BUILT_IN_EFFECTS.map(
+      (effect) => [effect.manifest.pluginId, effect.manifest] as const,
+    ),
     ...extraModules.map((module) => [module.manifest.pluginId, module.manifest] as const),
   ]);
 
@@ -132,6 +143,10 @@ export function createHarness(
     () => undefined,
     // The production policy, built from the same manifests the harness serves.
     createParameterValidator((pluginId) => manifests.get(pluginId as PluginId)?.parameters),
+    (id, pluginId) =>
+      pluginId === DISTORTION_EFFECT_PLUGIN_ID
+        ? { id, pluginId, stateVersion: 1, state: {} }
+        : undefined,
   );
 
   const projects = {

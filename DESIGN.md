@@ -287,7 +287,7 @@ fill than their surroundings. Pressing a raised part inverts it: the highlight
 becomes an inset shadow, and the cap reads as depressed.
 
 Only two surfaces in the product genuinely float — the Undo notice and the
-Settings panel — and they are the only users of the panel drop shadow.
+Settings panel — and they are the only surfaces that use the panel drop shadow.
 
 ### Shadow Vocabulary
 

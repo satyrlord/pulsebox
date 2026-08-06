@@ -11,6 +11,8 @@ export interface ScheduledVoiceEvent {
   /** Absolute audio frame, on the same timeline as `AudioContext.currentTime * sampleRate`. */
   readonly atFrame: number;
   readonly type: ScheduledVoiceEventType;
+  /** Absolute Pattern step identity for note-on evidence across timing rebuilds. */
+  readonly sourceStep?: number;
   readonly note?: number;
   readonly velocity?: number;
   readonly accent?: boolean;

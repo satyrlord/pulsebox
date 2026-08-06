@@ -7,7 +7,7 @@
  * recording.
  */
 
-import type { IdFactory } from "../contracts/ids";
+import type { IdFactory, VoiceId } from "../contracts/ids";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 import {
   BASS_MONO_DEFAULT_PARAMETERS,
@@ -41,9 +41,26 @@ export function toParameterValues(
   return Object.fromEntries(
     Object.entries(values).filter((entry): entry is [string, ParameterValue] => {
       const value = entry[1];
-      return typeof value === "number" || typeof value === "boolean" || typeof value === "string";
+      return (
+        (typeof value === "number" && Number.isFinite(value)) ||
+        typeof value === "boolean" ||
+        typeof value === "string"
+      );
     }),
   );
+}
+
+/**
+ * A drum module maps each declared drum voice to a saved voice insert slot.
+ * Pitched instruments may also declare one playable voice, but their `note`
+ * event keeps them outside this routing surface.
+ */
+export function drumVoiceIdsFor(manifest: {
+  readonly acceptedEvents: readonly { readonly id: string }[];
+  readonly voices: readonly { readonly id: string | VoiceId }[];
+}): readonly VoiceId[] {
+  if (manifest.acceptedEvents.some((event) => event.id === "note")) return [];
+  return manifest.voices.map((voice) => voice.id as VoiceId);
 }
 
 /** The default project's Silver Serpent line: a driving sixteenth run with slides. */
@@ -132,14 +149,22 @@ const digitFiveSteps = demoSteps(DRUM_BASE, [
 ]);
 
 const seedFor = (
-  manifest: { readonly pluginId: PluginId },
+  manifest: {
+    readonly pluginId: PluginId;
+    readonly acceptedEvents: readonly { readonly id: string }[];
+    readonly voices: readonly { readonly id: string | VoiceId }[];
+  },
   defaults: Readonly<Record<string, unknown>>,
   steps: ModuleSeed["steps"],
-): ModuleSeed => ({
-  pluginId: manifest.pluginId,
-  parameters: toParameterValues(defaults),
-  steps,
-});
+): ModuleSeed => {
+  const voiceIds = drumVoiceIdsFor(manifest);
+  return {
+    pluginId: manifest.pluginId,
+    parameters: toParameterValues(defaults),
+    steps,
+    ...(voiceIds.length > 0 ? { voiceIds } : {}),
+  };
+};
 
 /** Section 9.1 rack order: six loaded modules, slots seven and eight empty. */
 const DEFAULT_RACK: readonly ModuleSeed[] = [

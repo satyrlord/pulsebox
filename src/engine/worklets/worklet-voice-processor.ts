@@ -64,6 +64,14 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
 
   protected abstract applyParameters(parameters: TParameters, immediate: boolean): void;
 
+  /**
+   * Drum processors override this for their per-voice insert projection. A
+   * processor with no drum voices accepts only an absent insert section.
+   */
+  protected applyVoiceInserts(value: unknown): boolean {
+    return value === undefined;
+  }
+
   protected abstract triggerNoteOn(
     note: number,
     velocity: number,
@@ -225,6 +233,7 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
         const parameters = this.decodeParameterObject(payload.parameters);
         if (parameters === undefined) return this.#pluginPayloadFault(kind);
         this.applyParameters(parameters, true);
+        if (!this.applyVoiceInserts(payload.voiceInserts)) return this.#pluginPayloadFault(kind);
         return true;
       }
       case "parameter-batch": {

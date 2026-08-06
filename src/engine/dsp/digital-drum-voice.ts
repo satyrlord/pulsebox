@@ -26,6 +26,7 @@ import {
   semitoneRatio,
   StateVariableFilter,
 } from "./primitives";
+import { SampleBoundaryPlayer } from "./sample-boundary-player";
 
 /** Generator shape for a voice's stored one-shot. */
 export type DigitalVoiceBody = "tonal" | "noise" | "metallic";
@@ -48,6 +49,11 @@ export interface DigitalVoiceParameters {
   readonly pan: number;
   /** Extra noise blended into the voice. 0 leaves the table untouched. */
   readonly noise?: number;
+}
+
+/** A per-voice processor that runs before the voice output level. */
+export interface DigitalVoiceInsertProcessor {
+  process(input: number): number;
 }
 
 /**
@@ -114,7 +120,7 @@ type DigitalVoiceUpdateMode = "immediate" | "smooth";
 export class DigitalDrumVoice {
   readonly id: string;
   readonly #sampleRate: number;
-  readonly #table: Float32Array;
+  readonly #sample: SampleBoundaryPlayer;
   readonly #noise: DeterministicNoise;
   readonly #crusher = new BitCrusher();
   readonly #highpass = new OnePoleHighpass();
@@ -126,8 +132,6 @@ export class DigitalDrumVoice {
   /** Linear choke: spec-004 section 21.5 mandates a linear 4 ms fade-out. */
   readonly #chokeStep: number;
   #parameters: DigitalVoiceParameters;
-  /** Fractional read position into the stored table. */
-  #cursor = 0;
   #amplitude = 0;
   #velocity = 0;
   #accent = 0;
@@ -144,7 +148,7 @@ export class DigitalDrumVoice {
     this.id = id;
     this.#sampleRate = sampleRate;
     this.#parameters = parameters;
-    this.#table = table;
+    this.#sample = new SampleBoundaryPlayer([table], sampleRate);
     this.#noise = new DeterministicNoise(character.seed);
     this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
     this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
@@ -163,13 +167,16 @@ export class DigitalDrumVoice {
   };
 
   readonly trigger = (velocity: number, accent: boolean): void => {
+    const restarting = this.#active;
     this.#noise.reset();
     this.#crusher.reset();
     this.#highpass.reset();
     // A hit that starts from silence takes the committed level directly; the
     // glide exists to protect a ringing tail, not to lag a fresh attack.
-    if (!this.#active) this.#level.set(clamp(this.#parameters.level, 0, 1));
-    this.#cursor = 0;
+    if (!restarting) this.#level.set(clamp(this.#parameters.level, 0, 1));
+    // Same-voice restarts retain their exact attack frame. New voices use the
+    // mandatory boundary fade before their stored table becomes audible.
+    this.#sample.start({ fadeIn: !restarting });
     this.#velocity = clamp(velocity, 0, 1);
     this.#accent = accent ? 1 : 0;
     this.#amplitude = 1;
@@ -185,6 +192,7 @@ export class DigitalDrumVoice {
     this.#active = false;
     this.#choking = false;
     this.#amplitude = 0;
+    this.#sample.stop();
     this.#crusher.reset();
     this.#highpass.reset();
   }
@@ -196,7 +204,7 @@ export class DigitalDrumVoice {
    * machine crushes together rather than each carrying its own copy of the
    * control.
    */
-  render(bits: number, rate: number): number {
+  render(bits: number, rate: number, insert?: DigitalVoiceInsertProcessor): number {
     if (!this.#active) return 0;
 
     const decaySeconds = clamp(this.#parameters.decay, 0.01, 3);
@@ -211,7 +219,8 @@ export class DigitalDrumVoice {
       return 0;
     }
 
-    const played = this.#readTable(semitoneRatio(this.#parameters.tune));
+    this.#sample.render(semitoneRatio(this.#parameters.tune));
+    const played = this.#sample.channel(0);
     const noiseAmount = clamp(this.#parameters.noise ?? 0, 0, 1);
     const blended =
       noiseAmount === 0 ? played : played * (1 - noiseAmount) + this.#noise.next() * noiseAmount;
@@ -222,25 +231,11 @@ export class DigitalDrumVoice {
     const cleaned = this.#highpass.process(crushed, 28, this.#sampleRate);
 
     const gain = this.#velocity * (1 + this.#accent * 0.45);
-    return cleaned * this.#amplitude * gain * this.#level.advance(clamp(this.#parameters.level, 0, 1));
+    const voiceOutput = cleaned * this.#amplitude * gain;
+    const processed = insert?.process(voiceOutput) ?? voiceOutput;
+    return processed * this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 
   readonly getPan = (): number => this.#parameters.pan;
 
-  /**
-   * Linear interpolation between neighbouring frames. Tune resamples the table,
-   * so a tuned voice needs a fractional read rather than a nearest-neighbour
-   * one, which would alias audibly on the metallic voices.
-   */
-  #readTable(ratio: number): number {
-    const table = this.#table;
-    if (this.#cursor >= table.length - 1) return 0;
-
-    const index = Math.floor(this.#cursor);
-    const fraction = this.#cursor - index;
-    const current = table[index] ?? 0;
-    const next = table[index + 1] ?? 0;
-    this.#cursor += ratio;
-    return current + (next - current) * fraction;
-  }
 }

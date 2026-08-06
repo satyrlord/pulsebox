@@ -163,16 +163,17 @@ The shortcut reference will expand when later editors add commands.
 
 ## Known limitations
 
-- Asset packs, effect processing, advanced editors, and rendered-audio export
-  belong to later roadmap phases.
+- Asset packs, advanced editors, rendered-audio export, and user-facing effect
+  editing belong to later roadmap phases. The drum-voice Distortion engine and
+  state foundation is present.
 - The Pattern bank holds five named Patterns and selects Verse by default. The
   lower editor shows the selected module events with Swing and Humanize
   controls. Complete note, trigger, and automation editing remain planned.
 - Record arms and disarms only. Live recording and its count-in settings belong
   to the specification 006 phase.
 - The mixer covers level, pan, mute, solo, and master level. Send buttons open
-  the applicable empty send-chain summary. Send routing, inserts, master-effects
-  bypass, and the master chain remain planned.
+  the applicable empty send-chain summary. Send routing, module and master
+  inserts, master-effects bypass, and the master chain remain planned.
 - Silver Serpent and Tin Soldier implement their Phase 1 sound and compact-rack
   foundation. Expanded per-module editors remain planned for all six
   instruments: manifests declare editor sections, but no UI reads them yet.
@@ -181,9 +182,12 @@ The shortcut reference will expand when later editors add commands.
   visualization from specification 005 section 15.1. Twin Engine does not yet
   draw its waveform preview.
 - Per-slot enable or bypass and per-slot output routing are not yet
-  implemented. Voice insert slots, sample layers, user choke-group assignment,
-  and per-voice metering remain planned. Per-step probability, micro-timing,
-  flam, and roll wait for the specification 006 editing surface.
+  implemented. Drum voices have one saved Distortion insert slot, but its
+  control waits for the expanded instrument editor. Generated sample layers use
+  click-safe playback boundaries where the drum module uses them. User
+  choke-group assignment and per-voice metering remain planned.
+  Per-step probability, micro-timing, flam, and roll wait for the specification
+  006 editing surface.
 - The default project stores sixteen-step Patterns. The specification 005
   named-Pattern bar lengths, the time-signature field, and a stored
   quantize-strength value remain planned. Default send effects and the master

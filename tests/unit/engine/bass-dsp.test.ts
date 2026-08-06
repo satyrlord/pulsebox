@@ -12,6 +12,44 @@ function render(sampleRate: number, frameCount: number, chunkSize: number): Floa
   return output;
 }
 
+function renderPitchFixture(sampleRate: number): Float32Array {
+  const dsp = new BassMonoDsp(sampleRate);
+  dsp.setParameters(
+    {
+      cutoff: 12_000,
+      resonance: 0,
+      envelopeAmount: 0,
+      decay: 2,
+      accentAmount: 0,
+      waveform: "square",
+      glide: 0,
+      volume: 0.8,
+    },
+    "immediate",
+  );
+  dsp.noteOn(57, 1);
+  const output = new Float32Array(sampleRate);
+  dsp.process(output);
+  return output;
+}
+
+function estimateFrequency(samples: Float32Array, sampleRate: number): number {
+  const start = Math.floor(sampleRate * 0.2);
+  const end = Math.floor(sampleRate * 0.8);
+  const crossings: number[] = [];
+  for (let index = start + 1; index < end; index += 1) {
+    const previous = samples[index - 1] ?? 0;
+    const current = samples[index] ?? 0;
+    if (previous > 0 || current <= 0) continue;
+    const span = current - previous;
+    crossings.push(index - 1 + (span === 0 ? 0 : -previous / span));
+  }
+  if (crossings.length < 2) throw new Error("Expected enough positive crossings to measure pitch.");
+  const first = crossings[0] ?? 0;
+  const last = crossings.at(-1) ?? first;
+  return ((crossings.length - 1) * sampleRate) / (last - first);
+}
+
 describe("BassMonoDsp", () => {
   it("is deterministic and independent of host render quantum", () => {
     const expected = render(48_000, 4096, 128);
@@ -27,6 +65,16 @@ describe("BassMonoDsp", () => {
       expect(output.every(Number.isFinite)).toBe(true);
       expect(Math.max(...output.map(Math.abs))).toBeLessThanOrEqual(0.95);
     }
+  });
+
+  it("keeps oscillator pitch within one cent across 44.1 and 48 kHz", () => {
+    const at44k = estimateFrequency(renderPitchFixture(44_100), 44_100);
+    const at48k = estimateFrequency(renderPitchFixture(48_000), 48_000);
+    const cents = 1_200 * Math.log2(at48k / at44k);
+
+    expect(at44k).toBeGreaterThan(0);
+    expect(at48k).toBeGreaterThan(0);
+    expect(Math.abs(cents)).toBeLessThanOrEqual(1);
   });
 
   it("keeps the filter stable and audible at maximum cutoff and minimum resonance", () => {

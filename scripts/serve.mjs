@@ -15,6 +15,16 @@ const mimeTypes = new Map([
   [".wasm", "application/wasm"],
 ]);
 
+/** @param {string} relativePath @returns {string} */
+function cacheControlFor(relativePath) {
+  const normalizedPath = relativePath.replaceAll("\\", "/");
+  if (normalizedPath === "index.html") return "no-cache";
+  if (/^assets\/.+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/u.test(normalizedPath)) {
+    return "public, max-age=31536000, immutable";
+  }
+  return "no-cache";
+}
+
 if (!existsSync(entry)) {
   console.error("Pulsebox production build is missing. Run npm run build first.");
   process.exit(1);
@@ -50,7 +60,7 @@ const server = createServer((request, response) => {
     if (statSync(filePath).isDirectory()) filePath = join(filePath, "index.html");
     const size = statSync(filePath).size;
     response.writeHead(200, {
-      "Cache-Control": "no-store",
+      "Cache-Control": cacheControlFor(relative(root, filePath)),
       "Content-Length": size,
       "Content-Type": mimeTypes.get(extname(filePath)) ?? "application/octet-stream",
       "X-Content-Type-Options": "nosniff",

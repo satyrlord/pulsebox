@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createGestureId, type IdFactory } from "../../../src/contracts/ids";
+import {
+  DISTORTION_EFFECT_PLUGIN_ID,
+  type EffectInstanceState,
+} from "../../../src/contracts/effects";
+import {
+  createGestureId,
+  type EffectInstanceId,
+  type IdFactory,
+  type VoiceId,
+} from "../../../src/contracts/ids";
 import type { ParameterId, PluginId } from "../../../src/contracts/parameters";
 import { createDefaultState } from "../../../src/state/default-state";
 import {
@@ -22,6 +31,11 @@ const seed = {
 };
 
 const parameterId = (value: string): ParameterId => value as ParameterId;
+const voiceId = (value: string): VoiceId => value as VoiceId;
+const KICK = voiceId("kick");
+const SNARE = voiceId("snare");
+const CLAP = voiceId("clap");
+const DRUM_VOICE_IDS = [KICK, SNARE] as const;
 
 // The store requires the shared descriptor-based validator, so these fixtures
 // declare the exact parameters the tests dispatch.
@@ -48,11 +62,24 @@ function required<T>(value: T | undefined): T {
   return value;
 }
 
+function requiredEffectId(value: EffectInstanceId | null | undefined): EffectInstanceId {
+  if (value === undefined || value === null) throw new Error("Test fixture is missing an effect.");
+  return value;
+}
+
 function deterministicIds(): IdFactory {
   let value = 1;
   return {
     createUuid: () => `00000000-0000-4000-8000-${String(value++).padStart(12, "0")}`,
   };
+}
+
+function createDistortionVoiceInsert(
+  id: EffectInstanceId,
+  pluginId: PluginId,
+): EffectInstanceState | undefined {
+  if (pluginId !== DISTORTION_EFFECT_PLUGIN_ID) return undefined;
+  return { id, pluginId, stateVersion: 1, state: {} };
 }
 
 describe("PulseStore", () => {
@@ -62,6 +89,7 @@ describe("PulseStore", () => {
       pluginId: "drum-analog-small" as PluginId,
       parameters: { tone: 0.45, drive: 0.2 },
       steps: seed.steps.map((step, index) => ({ ...step, note: 36 + (index % 6) })),
+      voiceIds: DRUM_VOICE_IDS,
     };
     const seeds = new Map<PluginId, typeof seed | typeof drumSeed>([
       [seed.pluginId, seed],
@@ -119,6 +147,132 @@ describe("PulseStore", () => {
     // untrusted bytes cannot arrive by bypassing that one validating path.
     expect("importProject" in store).toBe(false);
     expect("exportProject" in store).toBe(false);
+  });
+
+  it("owns null voice slots and clones, clears, and removes a registered voice insert", () => {
+    const ids = deterministicIds();
+    const drumSeed = {
+      pluginId: "drum-analog-small" as PluginId,
+      parameters: { tone: 0.45, drive: 0.2 },
+      steps: seed.steps,
+      voiceIds: DRUM_VOICE_IDS,
+    };
+    const deltas = vi.fn();
+    const store = new PulseStore(
+      createDefaultState(ids, drumSeed),
+      ids,
+      drumSeed,
+      deltas,
+      validateParameter,
+      createDistortionVoiceInsert,
+    );
+    const moduleId = required(store.getState().ui.selectedModuleId);
+
+    expect(store.getState().project.effects.voiceInserts[moduleId]).toEqual({
+      kick: null,
+      snare: null,
+    });
+    expect(
+      store.dispatch(
+        store.createCommand("voice-insert-set", {
+          moduleId,
+          voiceId: KICK,
+          effectPluginId: DISTORTION_EFFECT_PLUGIN_ID,
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    const effectId = requiredEffectId(
+      store.getState().project.effects.voiceInserts[moduleId]?.[KICK],
+    );
+    expect(store.getState().project.effects.instances[effectId]).toMatchObject({
+      id: effectId,
+      pluginId: DISTORTION_EFFECT_PLUGIN_ID,
+      stateVersion: 1,
+      state: {},
+    });
+    expect(deltas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: "module-effects-set",
+        payload: {
+          moduleId,
+          voiceId: "kick",
+          effectInstanceId: effectId,
+          effectPluginId: DISTORTION_EFFECT_PLUGIN_ID,
+        },
+      }),
+    );
+    expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.effects.voiceInserts[moduleId]?.[KICK]).toBeNull();
+    expect(store.getState().project.effects.instances[effectId]).toBeUndefined();
+    expect(store.redo()).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.effects.voiceInserts[moduleId]?.[KICK]).toBe(effectId);
+
+    const targetSlot = required(store.getState().project.rackSlots[1]);
+    store.dispatch(store.createCommand("rack-module-duplicate", { moduleId, slotId: targetSlot.id }));
+    const duplicateId = required(store.getState().project.rackSlots[1]?.moduleId);
+    const duplicateEffectId = requiredEffectId(
+      store.getState().project.effects.voiceInserts[duplicateId]?.[KICK],
+    );
+    expect(duplicateEffectId).not.toBe(effectId);
+    expect(store.getState().project.effects.instances[duplicateEffectId]?.state).toEqual({});
+
+    expect(
+      store.dispatch(
+        store.createCommand("voice-insert-set", {
+          moduleId,
+          voiceId: KICK,
+          effectPluginId: null,
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.effects.voiceInserts[moduleId]?.[KICK]).toBeNull();
+    expect(store.getState().project.effects.instances[effectId]).toBeUndefined();
+    expect(store.getState().project.effects.instances[duplicateEffectId]).toBeDefined();
+
+    expect(
+      store.dispatch(
+        store.createCommand("voice-insert-set", {
+          moduleId,
+          voiceId: KICK,
+          effectPluginId: "unknown-effect" as PluginId,
+        }),
+      ),
+    ).toMatchObject({ status: "rejected", error: { field: "payload.effectPluginId" } });
+
+    store.dispatch(store.createCommand("rack-module-remove", { moduleId: duplicateId }));
+    expect(store.getState().project.effects.voiceInserts[duplicateId]).toBeUndefined();
+    expect(store.getState().project.effects.instances[duplicateEffectId]).toBeUndefined();
+  });
+
+  it("accepts an insert command for the only voice of a drum module", () => {
+    const ids = deterministicIds();
+    const oneVoiceDrumSeed = {
+      pluginId: "drum-one-voice" as PluginId,
+      parameters: {},
+      steps: seed.steps,
+      voiceIds: [CLAP],
+    };
+    const store = new PulseStore(
+      createDefaultState(ids, oneVoiceDrumSeed),
+      ids,
+      oneVoiceDrumSeed,
+      () => undefined,
+      validateParameter,
+      createDistortionVoiceInsert,
+    );
+    const moduleId = required(store.getState().ui.selectedModuleId);
+
+    expect(store.getState().project.effects.voiceInserts[moduleId]).toEqual({ clap: null });
+    expect(
+      store.dispatch(
+        store.createCommand("voice-insert-set", {
+          moduleId,
+          voiceId: CLAP,
+          effectPluginId: DISTORTION_EFFECT_PLUGIN_ID,
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.effects.voiceInserts[moduleId]?.[CLAP]).not.toBeNull();
   });
 
   it("applies one atomic parameter command and supports undo and redo", () => {
@@ -376,6 +530,7 @@ describe("PulseStore", () => {
       pluginId: "drum-analog-small" as PluginId,
       parameters: { tone: 0.45, drive: 0.2 },
       steps: seed.steps,
+      voiceIds: DRUM_VOICE_IDS,
     };
     const seeds = new Map<PluginId, typeof seed | typeof drumSeed>([
       [seed.pluginId, seed],

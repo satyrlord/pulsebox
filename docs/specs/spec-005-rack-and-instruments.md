@@ -142,9 +142,8 @@ Requirements:
 - Two-digit slot number.
 - No persistent Add or Remove buttons below the slot list. The plus control in
   each empty slot is the only visible Add action in the overview.
-- A loaded module's context menu contains Duplicate, Swap, and `Delete module`. Pointer users open it
-  with right-click. Keyboard users open the same menu with the Menu key or
-  Shift+F10.
+- A loaded module's context menu contains Duplicate, Swap, and `Delete module`.
+  Open it with right-click, the Menu key, or Shift+F10.
 - Do not show separate Select, Duplicate, or Swap buttons. Select a module with
   its loaded overview card. The context menu owns Duplicate and Swap.
 - Disabled states are visible and semantic.
@@ -273,8 +272,8 @@ Additional synthesis, sample, voice, insert, and routing parameters live in the
 playback-safe expanded editor. Faceplate pages are not user-configurable in the
 MVP.
 
-Faceplates contain no step grid and no per-step editing. Users edit all Pattern
-events in the Piano Roll, as required by
+Faceplates contain no step grid and no per-step editing. Edit all Pattern events
+in the Piano Roll, as required by
 [pattern editing](spec-006-pattern-editing.md) section 16.1. The horizontal
 space that a faceplate would otherwise spend on a step grid carries the
 promoted fast controls listed for each instrument below.
@@ -391,8 +390,8 @@ Each step supports:
 - Per-voice step resolution.
 - Per-voice pattern length.
 
-Factory sample content is original and project-owned. Users may layer their
-samples without replacing the synthesis engine.
+Factory sample content is original and project-owned. You may layer your samples
+without replacing the synthesis engine.
 
 Default layer balance is machine-specific. Tin Soldier and Soft Thunder are
 synth-heavy. Twin Engine uses a balanced blend. Gray Ghost and Dusty Mosaic are

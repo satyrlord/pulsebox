@@ -20,6 +20,8 @@ export interface AutosaveOptions {
   readonly createdAt: () => string;
   /** Last committed ProjectRevision. Autosave never advances it. */
   readonly projectRevision: () => ProjectRevision;
+  /** Current registered schema version for each persisted plugin. */
+  readonly manifestVersionFor?: (pluginId: string) => number;
   /** Quiet period after the last edit before a snapshot is written. */
   readonly debounceMilliseconds?: number;
   readonly onError?: (error: unknown) => void;
@@ -41,12 +43,18 @@ function toStored(
   createdAt: string,
   now: string,
   projectRevision: ProjectRevision,
+  manifestVersionFor: ((pluginId: string) => number) | undefined,
 ): StoredProject {
   return {
     id: state.project.id,
     name: state.project.name,
     modifiedAt: now,
-    document: serializeProject(state, { createdAt, modifiedAt: now, projectRevision }),
+    document: serializeProject(state, {
+      createdAt,
+      modifiedAt: now,
+      projectRevision,
+      ...(manifestVersionFor === undefined ? {} : { manifestVersionFor }),
+    }),
   };
 }
 
@@ -66,7 +74,13 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
     queue = queue
       .then(() =>
         options.repository.saveAutosave(
-          toStored(state, options.createdAt(), options.now(), options.projectRevision()),
+          toStored(
+            state,
+            options.createdAt(),
+            options.now(),
+            options.projectRevision(),
+            options.manifestVersionFor,
+          ),
         ),
       )
       .catch((error: unknown) => {

@@ -112,12 +112,9 @@ test("play activates the AudioWorklet path and Stop is idempotent", async ({ pag
 });
 
 /**
- * Specification 004 section 21.8: audible playback begins within three seconds
- * of the first Play gesture on a warm cache. The header master meter reads the
- * real post-limiter analysis branch, so a non-zero reading is the deterministic
- * probe for a non-silent output frame. The formal five-run release procedure
- * with its environment record stays a release task; this test guards the bound
- * in CI.
+ * This is the fast one-run guard for the first-sound bound. The five-run
+ * persistent-profile release procedure and its environment record live in
+ * `first-sound-release.spec.ts`.
  */
 test("first Play reaches a non-silent master frame within three seconds", async ({ page }) => {
   await page.getByRole("button", { name: /^play$/i }).click();

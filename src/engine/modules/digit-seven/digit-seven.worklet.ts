@@ -4,6 +4,7 @@ import {
   decodeVoiceParameterChanges,
   decodeVoiceParameterObject,
 } from "../../dsp/voice-parameter-routing";
+import { decodeVoiceInsertConfigurations } from "../../effects";
 import { WorkletVoiceProcessor } from "../../worklets/worklet-voice-processor";
 import {
   DigitSevenDsp,
@@ -77,6 +78,12 @@ class DigitSevenProcessor extends WorkletVoiceProcessor<PartialParameters> {
       // knob drag ramps, so the audible mix-bus controls cannot step or click.
       immediate ? "immediate" : "smooth",
     );
+  }
+
+  protected override applyVoiceInserts(value: unknown): boolean {
+    if (value === undefined) return this.#dsp.setVoiceInserts({});
+    const inserts = decodeVoiceInsertConfigurations(value, isDigitSevenVoiceId);
+    return inserts !== undefined && this.#dsp.setVoiceInserts(inserts);
   }
 
   protected triggerNoteOn(note: number, velocity: number, accent: boolean): void {

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
+import type { PluginId } from "../../../src/contracts/parameters";
 import { ENGINE_PROTOCOL_LIMITS } from "../../../src/contracts/worklet-protocol";
 import { BassMonoAdapter } from "../../../src/engine/modules/bass-mono/adapter";
 import {
@@ -17,6 +18,7 @@ import {
 import type {
   VoiceAdapterPort,
   VoiceAdapterStatus,
+  VoiceInsertRuntime,
 } from "../../../src/engine/transport/voice-adapter";
 import {
   WorkletVoiceAdapter,
@@ -286,6 +288,10 @@ describe("Silver Serpent plugin", () => {
     await adapter.prepare();
     adapter.activate(destination);
     adapter.setParameters({ cutoff: 1_200, resonance: 0.5 }, NEXT_PROJECT_REVISION);
+    const inserts: Readonly<Record<string, VoiceInsertRuntime | null>> = {
+      kick: { pluginId: "distortion" as PluginId, state: {} },
+    };
+    adapter.replaceState({ cutoff: 1_200, resonance: 0.5 }, NEXT_PROJECT_REVISION, inserts);
 
     nodes[0]?.dispatchEvent(new Event("processorerror"));
     await vi.waitFor(() => {
@@ -299,7 +305,7 @@ describe("Silver Serpent plugin", () => {
     ) as
       | {
           readonly projectRevision?: StateRevision;
-          readonly payload?: { readonly parameters?: unknown };
+          readonly payload?: { readonly parameters?: unknown; readonly voiceInserts?: unknown };
         }[]
       | undefined;
     const recoveryHello = nodes[1]?.port.sent[0] as
@@ -313,6 +319,7 @@ describe("Silver Serpent plugin", () => {
       cutoff: 1_200,
       resonance: 0.5,
     });
+    expect(recoverySnapshots?.[1]?.payload?.voiceInserts).toEqual(inserts);
   });
 
   it("reports a terminal fault when automatic processor recovery cannot handshake", async () => {

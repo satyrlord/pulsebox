@@ -271,6 +271,7 @@ A plugin instance contains a stable instance UUID, its plugin ID, its
 `stateVersion`, and a JSON-object `state`. One plugin state is at most 1 MiB in
 canonical JSON. Known plugin state is validated against that plugin's registered
 schema, including parameter IDs, types, ranges, references, and allowed keys.
+Instrument and effect parameters use the same registered descriptor checks.
 
 Every instrument and effect instance is required in format 1. The manifest has
 no optional-plugin mode. Missing, unknown, or incompatible referenced plugins
@@ -730,6 +731,7 @@ The UI swaps to the imported state only after the transaction completes and the
 engine confirms that required plugins can prepare it. Compatible project load
 uses playback-safe graph replacement. A rejected import never appears in the
 project selector and never changes undo history.
+After the swap, the UI reports the accepted engine state from the new runtime.
 
 ### 9.4 Existing project-ID collisions
 

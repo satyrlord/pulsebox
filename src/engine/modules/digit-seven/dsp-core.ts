@@ -29,6 +29,7 @@ import {
   softClip,
   VoiceMixGates,
 } from "../../dsp/primitives";
+import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { DIGIT_SEVEN_VOICE_IDS, type DigitSevenVoiceId } from "./voices";
 
 /**
@@ -137,6 +138,7 @@ export class DigitSevenDsp {
   readonly #compression: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<DigitSevenVoiceId, EqualPowerPan>>;
+  readonly #voiceInserts: Readonly<Record<DigitSevenVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly DigitalDrumVoice[];
   #parameters: DigitSevenParameters = DEFAULT_DIGIT_SEVEN_PARAMETERS;
@@ -155,6 +157,9 @@ export class DigitSevenDsp {
         new EqualPowerPan(DEFAULT_DIGIT_SEVEN_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<DigitSevenVoiceId, EqualPowerPan>;
+    this.#voiceInserts = Object.fromEntries(
+      DIGIT_SEVEN_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
+    ) as Record<DigitSevenVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       DIGIT_SEVEN_VOICE_IDS.map((id) => [
         id,
@@ -203,6 +208,19 @@ export class DigitSevenDsp {
 
   getParameterSnapshot(): DigitSevenParameters {
     return this.#parameters;
+  }
+
+  setVoiceInserts(
+    configurations: Readonly<
+      Partial<Record<DigitSevenVoiceId, VoiceInsertConfiguration | null>>
+    >,
+  ): boolean {
+    let accepted = true;
+    for (const voiceId of DIGIT_SEVEN_VOICE_IDS) {
+      const host = this.#voiceInserts[voiceId];
+      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.isActive() === true) && accepted;
+    }
+    return accepted;
   }
 
   trigger(voiceId: DigitSevenVoiceId, velocity = 1, accent = false): void {
@@ -271,7 +289,7 @@ export class DigitSevenDsp {
         if (!voice.isActive()) continue;
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
-        const sample = voice.render(bits, rate);
+        const sample = voice.render(bits, rate, this.#voiceInserts[voiceId]);
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

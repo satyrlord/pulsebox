@@ -64,6 +64,9 @@ describe("deterministic humanization", () => {
     expect(mechanical.map((event) => event.atFrame)).toEqual(
       Array.from({ length: 16 }, (_, index) => index * 6_000),
     );
+    expect(mechanical.map((event) => event.sourceStep)).toEqual(
+      Array.from({ length: 16 }, (_, index) => index),
+    );
     expect(humanized.map((event) => event.atFrame)).not.toEqual(
       mechanical.map((event) => event.atFrame),
     );

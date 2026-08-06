@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
-import type { GestureId, ModuleInstanceId } from "../../../contracts";
+import { type GestureId, type ModuleInstanceId } from "../../../contracts";
 import { AuditionButton } from "../controls/AuditionButton";
 import { useContinuousGesture } from "../controls/use-gesture-id";
 import { WHEEL_IDLE_MILLISECONDS } from "../controls/use-range-gesture";

@@ -48,6 +48,34 @@ describe("TransportClock", () => {
     expect(new TransportClock(48_000, 120).ticksToFrames(960)).toBe(24_000);
   });
 
+  it("keeps a fractional 127 BPM grid within one millisecond across live rates", () => {
+    const timesByRate = [44_100, 48_000].map((sampleRate) => {
+      const stepFrames = (sampleRate * 60) / (127 * 4);
+      return noteOnFrames(
+        schedulePatternWindow({
+          resolveStep: loopingStepResolver(pattern(16)),
+          stepFrames,
+          swing: 0.37,
+          patternStartFrame: 0,
+          windowStartFrame: 0,
+          windowEndFrame: Math.ceil(stepFrames * 40),
+        }),
+      )
+        .slice(0, 32)
+        .map((frame) => frame / sampleRate);
+    });
+
+    const lowerRate = timesByRate[0] ?? [];
+    const higherRate = timesByRate[1] ?? [];
+    expect(lowerRate).toHaveLength(32);
+    expect(higherRate).toHaveLength(32);
+    for (let index = 0; index < lowerRate.length; index += 1) {
+      expect(Math.abs((lowerRate[index] ?? 0) - (higherRate[index] ?? 0))).toBeLessThanOrEqual(
+        0.001,
+      );
+    }
+  });
+
   it("rejects a tempo outside the supported 40 to 240 BPM range", () => {
     const clock = new TransportClock(48_000, 120);
     expect(() => clock.setTempo(39.9, 0)).toThrow(RangeError);

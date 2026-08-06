@@ -1,5 +1,5 @@
 import type { StateRevision } from "../../contracts/ids";
-import type { ParameterValue } from "../../contracts/parameters";
+import type { ParameterValue, PluginId } from "../../contracts/parameters";
 import type { ScheduledVoiceEvent } from "./scheduled-event";
 
 export interface VoiceFault {
@@ -23,6 +23,15 @@ export interface VoiceAdapterOptions {
 }
 
 /**
+ * Runtime projection of one saved voice-insert instance. The durable instance
+ * ID stays in state. Worklets only need the registered plugin and its state.
+ */
+export interface VoiceInsertRuntime {
+  readonly pluginId: PluginId;
+  readonly state: Readonly<Record<string, ParameterValue>>;
+}
+
+/**
  * The only surface the transport uses to drive a voice. Every method is
  * fire-and-forget except `prepare`, so nothing on the scheduling path awaits.
  *
@@ -37,6 +46,7 @@ export interface VoiceAdapterPort {
   replaceState(
     parameters: Readonly<Record<string, ParameterValue>>,
     projectRevision: StateRevision,
+    voiceInserts?: Readonly<Record<string, VoiceInsertRuntime | null>>,
   ): void;
   setParameters(
     parameters: Readonly<Record<string, ParameterValue>>,

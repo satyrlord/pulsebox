@@ -1,3 +1,4 @@
+import type { EffectsState } from "../contracts/effects";
 import type {
   ModuleInstanceId,
   PatternId,
@@ -72,6 +73,7 @@ export interface ProjectState {
   readonly masterLevel: number;
   readonly rackSlots: readonly RackSlotState[];
   readonly modules: Readonly<Record<ModuleInstanceId, RackModuleState>>;
+  readonly effects: EffectsState;
   readonly patterns: readonly PatternSlotState[];
   readonly activePatternIndex: number;
   readonly song: SongState;

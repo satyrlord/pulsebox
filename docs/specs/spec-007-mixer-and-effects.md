@@ -227,6 +227,11 @@ Build:
 - Transient shaper.
 - Stereo width.
 
+The first shipped slice is Distortion in fixed Drive mode. It occupies the one
+voice-insert slot per drum voice. The rest of the catalog remains planned.
+An insert change on a silent voice applies before its next trigger. A change on
+a sounding voice uses the effect manifest's click-safe transition time.
+
 Effect variants or modes provide the compact default identities:
 
 - Delay in Analog echo mode.
@@ -342,6 +347,9 @@ Distortion:
 
 - Multiple original models.
 - Safe level compensation.
+
+The first fixed Drive mode uses a `3.2` transfer drive and its reciprocal output
+gain. It does not increase the absolute magnitude of an input sample.
 
 Compressor:
 

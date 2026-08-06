@@ -701,6 +701,9 @@ Scheduled event batches shall carry absolute audio-frame targets. Events in one
 batch shall be sorted by frame, then by a deterministic event priority, then by
 stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
+Each Pattern note-on shall also carry its absolute Pattern-step identity. Audio
+processors can ignore this identity, but browser evidence uses it to detect a
+missing or duplicate interior onset across timing rebuilds.
 
 The controller shall keep a 500-millisecond event horizon at each active
 processor. A 25-millisecond interval maintains this horizon. A late pass shall

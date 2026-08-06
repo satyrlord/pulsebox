@@ -304,6 +304,7 @@ describe("transport with several voices", () => {
     expect(replacementReplaceState).toHaveBeenCalledWith(
       { cutoff: 900 },
       expect.objectContaining({ counter: 1 }),
+      undefined,
     );
     // The unrelated drum voice keeps playing on its original adapter.
     expect(drumDispose).not.toHaveBeenCalled();

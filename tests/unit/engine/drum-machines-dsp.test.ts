@@ -88,6 +88,64 @@ it("drives the shared digital voice lifecycle through its concrete port", () => 
   expect(voice.isActive()).toBe(false);
 });
 
+it("fades a fresh shared digital one-shot but preserves an active voice restart", () => {
+  const table = new Float32Array(1_024);
+  for (let index = 0; index < table.length; index += 1) {
+    table[index] = Math.cos((2 * Math.PI * index) / 16);
+  }
+  const voice = new DigitalDrumVoice(
+    "voice",
+    SAMPLE_RATE,
+    { baseFrequency: 180, decay: 0.2, seed: 7, body: "tonal", oneShotSeconds: 0.1 },
+    { tune: 0, decay: 0.2, level: 1, pan: 0 },
+    table,
+  );
+
+  voice.trigger(1, false);
+  expect(Math.abs(voice.render(0, 0))).toBeLessThan(1e-8);
+  for (let frame = 0; frame < Math.round(SAMPLE_RATE * 0.002); frame += 1) {
+    voice.render(0, 0);
+  }
+  expect(Math.abs(voice.render(0, 0))).toBeGreaterThan(0.5);
+
+  voice.trigger(1, false);
+  expect(Math.abs(voice.render(0, 0))).toBeGreaterThan(0.5);
+});
+
+it("sends digital voice velocity and accent gain into the voice insert", () => {
+  const captureInput = (velocity: number, accent: boolean): number => {
+    const table = new Float32Array(1_024);
+    for (let index = 0; index < table.length; index += 1) {
+      table[index] = Math.cos((2 * Math.PI * index) / 16);
+    }
+    const voice = new DigitalDrumVoice(
+      "voice",
+      SAMPLE_RATE,
+      { baseFrequency: 180, decay: 0.2, seed: 7, body: "tonal", oneShotSeconds: 0.1 },
+      { tune: 0, decay: 0.2, level: 1, pan: 0 },
+      table,
+    );
+    let captured = 0;
+    voice.trigger(velocity, accent);
+    for (let frame = 0; frame < 128; frame += 1) {
+      voice.render(16, 1, {
+        process: (input) => {
+          captured = input;
+          return input;
+        },
+      });
+    }
+    return captured;
+  };
+
+  const quiet = captureInput(0.25, false);
+  const loud = captureInput(1, false);
+  const accented = captureInput(1, true);
+  expect(Math.abs(quiet)).toBeGreaterThan(1e-6);
+  expect(loud).toBeCloseTo(quiet * 4, 8);
+  expect(accented).toBeCloseTo(loud * 1.45, 8);
+});
+
 /**
  * The four machines added alongside Tin Soldier. They have different controls
  * and different voices, but they answer to one behavioural contract: bounded

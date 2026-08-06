@@ -155,7 +155,7 @@ The Piano Roll header has no local Play button and no persistent pen or erase
 tools. Pattern playback uses Pattern mode and the global transport Play control.
 Direct pointer gestures create, delete, move, and resize events.
 Right-click deletion is not the only delete path: Delete or Backspace removes
-the selected note for keyboard users.
+the selected note during keyboard operation.
 
 Monophonic pitched mode:
 
@@ -182,7 +182,7 @@ Drum trigger mode:
 - Left-click adds one fixed one-cell trigger.
 - Left-drag paints fixed one-cell triggers.
 - Right-click deletes a trigger with Undo available.
-- Triggers have no duration edge. Users cannot resize them.
+- Triggers have no duration edge. Do not resize them.
 - Voice cycle lengths may differ and wrap independently.
 - Advanced trigger properties remain keyboard-accessible and do not depend on
   a context menu.
@@ -216,9 +216,9 @@ groups:
 
 When the module selection changes, the selector changes its scope. It never
 shows mixer, send, effect, or master parameters because modules do not own them.
-Users arm those lanes from their own surface, as required by
+Arm those lanes from their own surface, as required by
 [mixer and effects](spec-007-mixer-and-effects.md). The lanes then open in this
-same Piano Roll lane. Whatever the source, users edit the lane only here.
+same Piano Roll lane. Regardless of the source, edit the lane only here.
 
 Exactly one lane is active and visible at a time. When the user chooses a
 parameter, it replaces the displayed lane. It never stacks a second lane or
@@ -234,7 +234,7 @@ removes the lane on commit. It does not keep an empty record.
 
 The active lane obeys the automation rules in
 [song and automation](spec-008-song-and-automation.md) section 18.2. It uses
-step-based values on the fixed 1/16 grid. Users can draw, erase, select, move,
+step-based values on the fixed 1/16 grid. You can draw, erase, select, move,
 and scale step values. Note-property lanes edit the selected events, not a
 separate automation record.
 

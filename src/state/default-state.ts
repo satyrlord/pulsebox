@@ -6,7 +6,10 @@ import {
   createProjectLineageId,
   createStateRevisionEpoch,
   type IdFactory,
+  type ModuleInstanceId,
+  type VoiceId,
 } from "../contracts/ids";
+import type { EffectsState } from "../contracts/effects";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 import type { PatternStep, PulseState, RackModuleState } from "./model";
 
@@ -14,6 +17,8 @@ export interface ModuleSeed {
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
   readonly steps: readonly PatternStep[];
+  /** Drum voices that own durable insert slots. Pitched modules omit this. */
+  readonly voiceIds?: readonly VoiceId[];
 }
 
 /** Size of the project Pattern bank. */
@@ -71,6 +76,7 @@ export function createDefaultState(
   const epoch = createStateRevisionEpoch(idFactory);
   const seeds: readonly ModuleSeed[] = seed === undefined ? [] : isSeedList(seed) ? seed : [seed];
   const modules = seeds.slice(0, RACK_SLOT_IDS.length).map((one) => createModule(idFactory, one));
+  const effects = createInitialEffectsState(modules, seeds);
   return Object.freeze({
     project: Object.freeze({
       id: projectId,
@@ -87,6 +93,7 @@ export function createDefaultState(
         }),
       ),
       modules: Object.freeze(Object.fromEntries(modules.map((module) => [module.id, module]))),
+      effects,
       patterns: Object.freeze(
         Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) => {
           const id = createPatternId(idFactory);
@@ -124,6 +131,24 @@ export function createDefaultState(
       selectedModuleId: modules[0]?.id,
     }),
     history: Object.freeze({ canUndo: false, canRedo: false }),
+  });
+}
+
+function createInitialEffectsState(
+  modules: readonly RackModuleState[],
+  seeds: readonly ModuleSeed[],
+): EffectsState {
+  const voiceInserts: Record<ModuleInstanceId, Record<VoiceId, null>> = {};
+  for (const [index, module] of modules.entries()) {
+    const voiceIds = seeds[index]?.voiceIds;
+    if (voiceIds === undefined || voiceIds.length === 0) continue;
+    const slots: Record<VoiceId, null> = {};
+    for (const voiceId of voiceIds) slots[voiceId] = null;
+    voiceInserts[module.id] = Object.freeze(slots);
+  }
+  return Object.freeze({
+    instances: Object.freeze({}),
+    voiceInserts: Object.freeze(voiceInserts),
   });
 }
 
