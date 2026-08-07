@@ -14,29 +14,50 @@ import {
   createCommandId,
   createEffectInstanceId,
   createNoteEventId,
+  createAutomationLaneId,
+  createPatternId,
+  createSongPlacementId,
   createStateRevisionEpoch,
   isCanonicalUuid,
+  type AutomationLaneId,
   type EffectInstanceId,
   type GestureId,
   type IdFactory,
   type ModuleInstanceId,
   type NoteEventId,
+  type PatternId,
+  type SongPlacementId,
   type StateRevision,
   type VoiceId,
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
 import type { PatternEventEdit, PulseCommand } from "./commands";
-import { createModule, MAXIMUM_PATTERN_SEED, type ModuleSeed } from "./default-state";
 import {
+  createEmptyPatternPart,
+  createModule,
+  MAXIMUM_PATTERN_COUNT,
+  MAXIMUM_PATTERN_SEED,
+  MINIMUM_PATTERN_COUNT,
+  PATTERN_STEP_COUNT,
+  type ModuleSeed,
+} from "./default-state";
+import {
+  DEFAULT_PATTERN_EVENT_PROPERTIES,
+  PATTERN_SCALES,
   PATTERN_TICKS_PER_STEP,
   type PatternEvent,
+  type PatternEventData,
+  type AutomationLaneState,
+  type AutomationStepState,
   type PatternPartState,
+  type PatternScale,
+  type PatternState,
   type ProjectState,
   type PulseState,
   type RackModuleState,
+  type VoiceCycleLengthKey,
 } from "./model";
 
-const MAX_SONG_ENTRIES = 128;
 const MAX_SONG_REPEATS = 64;
 const MAX_HISTORY_ENTRIES = 100;
 const MAX_HISTORY_BYTES = 64 * 1024 * 1024;
@@ -106,6 +127,7 @@ export class PulseStore {
     value: number | boolean | string,
   ) => boolean;
   readonly #createVoiceInsertEffect: VoiceInsertEffectFactory | undefined;
+  readonly #now: () => string;
   readonly #subscriptions = new Set<Subscription>();
   readonly #undo: HistoryEntry[] = [];
   readonly #redo: HistoryEntry[] = [];
@@ -125,6 +147,7 @@ export class PulseStore {
       value: number | boolean | string,
     ) => boolean,
     createVoiceInsertEffect?: VoiceInsertEffectFactory,
+    now: () => string = () => new Date().toISOString(),
   ) {
     this.#state = {
       ...initialState,
@@ -138,6 +161,7 @@ export class PulseStore {
     this.#onEngineDelta = onEngineDelta;
     this.#validateParameter = validateParameter;
     this.#createVoiceInsertEffect = createVoiceInsertEffect;
+    this.#now = now;
   }
 
   getState(): Readonly<PulseState> {
@@ -426,13 +450,13 @@ export class PulseStore {
       case "pattern-events-edit":
         return this.#editPatternEvents(
           command.payload.moduleId,
-          command.payload.patternIndex,
+          command.payload.patternId,
           command.payload.edit,
         );
       case "piano-roll-selection-set":
         return this.#setPianoRollSelection(
           command.payload.moduleId,
-          command.payload.patternIndex,
+          command.payload.patternId,
           command.payload.eventIds,
         );
       case "piano-roll-parameter-set":
@@ -440,28 +464,73 @@ export class PulseStore {
       case "transport-swing-set":
         return this.#setSwing(command.payload.swing);
       case "pattern-humanize-set":
-        return this.#setPatternHumanize(command.payload.patternIndex, command.payload.humanize);
+        return this.#setPatternHumanize(command.payload.patternId, command.payload.humanize);
       case "pattern-seed-set":
-        return this.#setPatternSeed(command.payload.patternIndex, command.payload.seed);
+        return this.#setPatternSeed(command.payload.patternId, command.payload.seed);
       case "pattern-select":
-        return this.#selectPattern(command.payload.patternIndex);
+        return this.#selectPattern(command.payload.patternId);
       case "pattern-rename":
-        return this.#renamePattern(command.payload.patternIndex, command.payload.name);
+        return this.#renamePattern(command.payload.patternId, command.payload.name);
+      case "pattern-color-set":
+        return this.#setPatternColor(command.payload.patternId, command.payload.color);
+      case "pattern-duration-set":
+        return this.#setPatternDuration(command.payload.patternId, command.payload.durationBars);
+      case "pattern-scale-set":
+        return this.#setPatternScale(command.payload.patternId, command.payload.scale);
+      case "pattern-add":
+        return this.#addPattern(command.payload.name, command.payload.afterPatternId);
+      case "pattern-duplicate":
+        return this.#duplicatePattern(command.payload.patternId);
+      case "pattern-delete":
+        return this.#deletePattern(command.payload.patternId);
+      case "pattern-reorder":
+        return this.#reorderPattern(command.payload.patternId, command.payload.afterPatternId);
       case "pattern-clear":
-        return this.#clearPattern(command.payload.patternIndex);
-      case "pattern-copy":
-        return this.#copyPattern(command.payload.fromPatternIndex, command.payload.toPatternIndex);
+        return this.#clearPattern(command.payload.patternId);
+      case "pattern-part-events-replace":
+        return this.#replacePatternPartEvents(
+          command.payload.patternId,
+          command.payload.moduleId,
+          command.payload.events,
+          command.payload.length,
+        );
+      case "automation-lane-steps-set":
+        return this.#setAutomationLaneSteps(command.payload);
+      case "pattern-part-length-set":
+        return this.#setPatternPartLength(
+          command.payload.patternId,
+          command.payload.moduleId,
+          command.payload.length,
+        );
+      case "pattern-part-voice-cycle-length-set":
+        return this.#setPatternPartVoiceCycleLength(
+          command.payload.patternId,
+          command.payload.moduleId,
+          command.payload.voiceKey,
+          command.payload.length,
+        );
+      case "pattern-part-events-transfer":
+        return this.#transferPatternPartEvents(command.payload);
       case "song-mode-toggle":
         return this.#setSong({
           ...this.#state.project.song,
           enabled: !this.#state.project.song.enabled,
         });
-      case "song-entry-add":
-        return this.#addSongEntry(command.payload.patternIndex);
-      case "song-entry-remove":
-        return this.#removeSongEntry(command.payload.entryIndex);
-      case "song-entry-repeats-set":
-        return this.#setSongRepeats(command.payload.entryIndex, command.payload.repeats);
+      case "song-placement-add":
+        return this.#addSongPlacement(command.payload.patternId);
+      case "song-placement-remove":
+        return this.#removeSongPlacement(command.payload.placementId);
+      case "song-placement-repeat-count-set":
+        return this.#setSongPlacementRepeatCount(
+          command.payload.placementId,
+          command.payload.repeatCount,
+        );
+      case "song-placement-reorder":
+        return this.#reorderSongPlacement(command.payload.placementId, command.payload.afterPlacementId);
+      case "song-placement-duplicate":
+        return this.#duplicateSongPlacement(command.payload.placementId);
+      case "song-placement-pattern-set":
+        return this.#setSongPlacementPattern(command.payload.placementId, command.payload.patternId);
       case "mixer-mute-toggle":
         return this.#toggleMix(command.payload.moduleId, "muted");
       case "mixer-solo-toggle":
@@ -493,9 +562,9 @@ export class PulseStore {
     return this.#projectTransition({ ...this.#state.project, swing }, "transport", [], { swing });
   }
 
-  #setPatternHumanize(patternIndex: number, rawHumanize: number) {
-    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (indexError !== undefined) return { error: indexError };
+  #setPatternHumanize(patternId: PatternId, rawHumanize: number) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
     if (!Number.isFinite(rawHumanize) || rawHumanize < 0 || rawHumanize > 1) {
       return {
         error: rejected(
@@ -508,25 +577,19 @@ export class PulseStore {
     // The document stores whole percent, so the accepted value snaps to the
     // same grid. Otherwise a saved project would replay a different variation.
     const humanize = Math.round(rawHumanize * 100) / 100;
-    if (humanize === this.#state.project.patterns[patternIndex]?.humanize) {
+    if (humanize === pattern.humanize) {
       return { state: this.#state, projectChanged: false as const };
     }
-    return this.#projectTransition(
-      {
-        ...this.#state.project,
-        patterns: this.#state.project.patterns.map((slot, index) =>
-          index === patternIndex ? { ...slot, humanize } : slot,
-        ),
-      },
+    return this.#replacePattern(
+      { ...pattern, humanize, modifiedAt: this.#now() },
       "pattern-timing-set",
-      [],
-      { patternIndex, humanize },
+      { patternId, humanize },
     );
   }
 
-  #setPatternSeed(patternIndex: number, seed: number) {
-    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (indexError !== undefined) return { error: indexError };
+  #setPatternSeed(patternId: PatternId, seed: number) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
     if (!Number.isSafeInteger(seed) || seed < 0 || seed > MAXIMUM_PATTERN_SEED) {
       return {
         error: rejected(
@@ -536,188 +599,484 @@ export class PulseStore {
         ),
       };
     }
-    if (seed === this.#state.project.patterns[patternIndex]?.seed) {
+    if (seed === pattern.seed) {
       return { state: this.#state, projectChanged: false as const };
     }
-    return this.#projectTransition(
-      {
-        ...this.#state.project,
-        patterns: this.#state.project.patterns.map((slot, index) =>
-          index === patternIndex ? { ...slot, seed } : slot,
-        ),
-      },
+    return this.#replacePattern(
+      { ...pattern, seed, modifiedAt: this.#now() },
       "pattern-timing-set",
-      [],
-      { patternIndex, seed },
+      { patternId, seed },
     );
   }
 
-  #requirePatternIndex(field: string, index: number) {
-    if (!Number.isInteger(index) || index < 0 || index >= this.#state.project.patterns.length) {
-      return rejected(field, "Pattern does not exist.", "Choose a Pattern in the bank.");
+  #requirePattern(field: string, patternId: PatternId): PatternState | { readonly error: CommandResult } {
+    if (!isCanonicalUuid(patternId)) {
+      return { error: rejected(field, "Pattern does not exist.", "Choose a Pattern in the bank.") };
     }
-    return undefined;
+    const pattern = this.#state.project.patterns.find((candidate) => candidate.id === patternId);
+    return pattern ?? { error: rejected(field, "Pattern does not exist.", "Choose a Pattern in the bank.") };
   }
 
-  #selectPattern(patternIndex: number) {
-    const error = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (error !== undefined) return { error };
-    if (patternIndex === this.#state.project.activePatternIndex)
+  #replacePattern(
+    pattern: PatternState,
+    kind: PulseEngineDelta["kind"],
+    payload: Readonly<Record<string, unknown>>,
+    uiPatch: Partial<PulseState["ui"]> = {},
+  ) {
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        patterns: this.#state.project.patterns.map((candidate) =>
+          candidate.id === pattern.id ? pattern : candidate,
+        ),
+      },
+      kind,
+      [],
+      payload,
+      uiPatch,
+    );
+  }
+
+  #selectPattern(patternId: PatternId) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (pattern.id === this.#state.project.activePatternId)
       return { state: this.#state, projectChanged: false as const };
     return this.#projectTransition(
-      { ...this.#state.project, activePatternIndex: patternIndex },
+      { ...this.#state.project, activePatternId: pattern.id },
       "pattern-select",
       [],
-      { patternIndex },
+      { patternId: pattern.id },
       { pianoRollSelection: undefined },
     );
   }
 
-  #renamePattern(patternIndex: number, name: string) {
-    const error = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (error !== undefined) return { error };
-    const trimmed = name.trim();
-    if (trimmed.length === 0 || trimmed.length > 40) {
+  #normalizePatternName(
+    name: string | undefined,
+    patternId?: PatternId,
+  ): { readonly value: string } | { readonly error: CommandResult } {
+    const trimmed = name?.trim() ?? "";
+    if (trimmed.length === 0 || trimmed.length > 256) {
       return {
         error: rejected(
           "payload.name",
-          "A Pattern name must be 1 to 40 characters.",
+          "A Pattern name must be 1 to 256 characters.",
           "Enter a shorter name.",
         ),
       };
     }
-    return this.#projectTransition(
-      {
-        ...this.#state.project,
-        patterns: this.#state.project.patterns.map((slot, index) =>
-          index === patternIndex ? { ...slot, name: trimmed } : slot,
-        ),
-      },
+    const duplicate = this.#state.project.patterns.some(
+      (candidate) => candidate.id !== patternId && candidate.name.localeCompare(trimmed, undefined, { sensitivity: "accent" }) === 0,
+    );
+    return duplicate
+      ? { error: rejected("payload.name", "Pattern names must be unique.", "Choose another Pattern name.") }
+      : { value: trimmed };
+  }
+
+  #renamePattern(patternId: PatternId, name: string) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const normalized = this.#normalizePatternName(name, pattern.id);
+    if ("error" in normalized) return normalized;
+    if (normalized.value === pattern.name) return { state: this.#state, projectChanged: false as const };
+    return this.#replacePattern(
+      { ...pattern, name: normalized.value, modifiedAt: this.#now() },
       "pattern-rename",
-      [],
-      { patternIndex, name: trimmed },
+      { patternId, name: normalized.value },
     );
   }
 
-  #mapParts(patternIndex: number, next: (part: PatternPartState) => PatternPartState) {
-    const modules: Record<string, RackModuleState> = {};
-    for (const [id, module] of Object.entries(this.#state.project.modules)) {
-      modules[id] = {
-        ...module,
-        parts: module.parts.map((part, index) => (index === patternIndex ? next(part) : part)),
-      };
+  #setPatternColor(patternId: PatternId, color: string) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const normalized = color.toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(normalized)) {
+      return { error: rejected("payload.color", "Pattern color must be an opaque six-digit hex color.", "Choose a valid Pattern color.") };
     }
-    return modules;
+    if (normalized === pattern.color) return { state: this.#state, projectChanged: false as const };
+    return this.#replacePattern(
+      { ...pattern, color: normalized, modifiedAt: this.#now() },
+      "pattern-rename",
+      { patternId, color: normalized },
+    );
   }
 
-  #clearPattern(patternIndex: number) {
-    const error = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (error !== undefined) return { error };
-    const modules = this.#mapParts(patternIndex, (part) => ({ ...part, events: [] }));
-    return this.#projectTransition({ ...this.#state.project, modules }, "project-replace", [], {
-      patternIndex,
-    }, { pianoRollSelection: undefined });
+  #setPatternDuration(patternId: PatternId, durationBars: number) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (!Number.isSafeInteger(durationBars) || durationBars < 1) {
+      return { error: rejected("payload.durationBars", "Pattern duration must be a positive whole bar count.", "Enter a positive duration.") };
+    }
+    if (durationBars === pattern.durationBars) return { state: this.#state, projectChanged: false as const };
+    return this.#replacePattern(
+      { ...pattern, durationBars, modifiedAt: this.#now() },
+      "pattern-timing-set",
+      { patternId, durationBars },
+    );
   }
 
-  #copyPattern(fromPatternIndex: number, toPatternIndex: number) {
-    const fromError = this.#requirePatternIndex("payload.fromPatternIndex", fromPatternIndex);
-    if (fromError !== undefined) return { error: fromError };
-    const toError = this.#requirePatternIndex("payload.toPatternIndex", toPatternIndex);
-    if (toError !== undefined) return { error: toError };
-    if (fromPatternIndex === toPatternIndex)
-      return { state: this.#state, projectChanged: false as const };
-    const modules: Record<string, RackModuleState> = {};
-    for (const [id, module] of Object.entries(this.#state.project.modules)) {
-      const source = module.parts[fromPatternIndex];
-      modules[id] =
-        source === undefined
-          ? module
-          : {
-              ...module,
-              parts: module.parts.map((part, index) =>
-                index === toPatternIndex
-                  ? {
-                      length: source.length,
-                      events: source.events.map((event) => ({
-                        ...event,
-                        id: createNoteEventId(this.#idFactory),
-                        data: { ...event.data },
-                      })),
-                    }
-                  : part,
-              ),
-            };
+  #setPatternScale(patternId: PatternId, scale: PatternScale) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (!PATTERN_SCALES.includes(scale)) {
+      return { error: rejected("payload.scale", "Pattern scale is not supported.", "Choose a listed Pattern scale.") };
     }
+    if (scale === pattern.scale) return { state: this.#state, projectChanged: false as const };
+    return this.#replacePattern(
+      { ...pattern, scale, modifiedAt: this.#now() },
+      "pattern-timing-set",
+      { patternId, scale },
+    );
+  }
+
+  #addPattern(name: string | undefined, afterPatternId: PatternId | undefined) {
+    if (this.#state.project.patterns.length >= MAXIMUM_PATTERN_COUNT) {
+      return { error: rejected("payload", `A project holds at most ${String(MAXIMUM_PATTERN_COUNT)} Patterns.`, "Delete a Pattern before adding another.") };
+    }
+    if (afterPatternId !== undefined && "error" in this.#requirePattern("payload.afterPatternId", afterPatternId)) {
+      return { error: rejected("payload.afterPatternId", "Pattern does not exist.", "Choose a Pattern in the bank.") };
+    }
+    const provisional = name ?? `Pattern ${String(this.#state.project.patterns.length + 1)}`;
+    const normalized = this.#normalizePatternName(provisional);
+    if ("error" in normalized) return normalized;
+    const timestamp = this.#now();
+    const id = createPatternId(this.#idFactory);
+    const pattern: PatternState = {
+      id,
+      name: normalized.value,
+      color: "#E6A23C",
+      durationBars: 1,
+      scale: "Chromatic",
+      humanize: 0,
+      seed: seedFromPatternId(id),
+      parts: {},
+      automationLaneIds: [],
+      createdAt: timestamp,
+      modifiedAt: timestamp,
+    };
+    const patterns = insertAfter(this.#state.project.patterns, pattern, afterPatternId, (candidate) => candidate.id);
+    return this.#projectTransition({ ...this.#state.project, patterns }, "project-replace", [], { patternId: id });
+  }
+
+  #duplicatePattern(patternId: PatternId) {
+    const source = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in source) return source;
+    if (this.#state.project.patterns.length >= MAXIMUM_PATTERN_COUNT) {
+      return { error: rejected("payload.patternId", `A project holds at most ${String(MAXIMUM_PATTERN_COUNT)} Patterns.`, "Delete a Pattern before duplicating another.") };
+    }
+    const normalized = this.#normalizePatternName(`${source.name} copy`);
+    if ("error" in normalized) return normalized;
+    const timestamp = this.#now();
+    const id = createPatternId(this.#idFactory);
+    const laneIdMap = new Map<AutomationLaneId, AutomationLaneId>();
+    const automationLanes: Record<AutomationLaneId, AutomationLaneState> = {
+      ...this.#state.project.automationLanes,
+    };
+    for (const sourceLaneId of source.automationLaneIds) {
+      const sourceLane = this.#state.project.automationLanes[sourceLaneId];
+      if (sourceLane === undefined) continue;
+      const laneId = createAutomationLaneId(this.#idFactory);
+      laneIdMap.set(sourceLaneId, laneId);
+      automationLanes[laneId] = cloneAutomationLane(sourceLane, laneId, id, sourceLane.targetId);
+    }
+    const parts = Object.fromEntries(
+      Object.entries(source.parts).map(([moduleId, part]) => [
+        moduleId,
+        clonePart(part, moduleId as ModuleInstanceId, this.#idFactory, laneIdMap),
+      ]),
+    ) as Readonly<Record<ModuleInstanceId, PatternPartState>>;
+    const pattern: PatternState = {
+      ...source,
+      id,
+      name: normalized.value,
+      parts,
+      automationLaneIds: source.automationLaneIds.flatMap((laneId) => {
+        const clonedId = laneIdMap.get(laneId);
+        return clonedId === undefined ? [] : [clonedId];
+      }),
+      createdAt: timestamp,
+      modifiedAt: timestamp,
+    };
+    const patterns = insertAfter(this.#state.project.patterns, pattern, source.id, (candidate) => candidate.id);
     return this.#projectTransition(
-      { ...this.#state.project, modules },
+      { ...this.#state.project, patterns, automationLanes },
       "project-replace",
       [],
-      { fromPatternIndex, toPatternIndex },
+      { patternId: id },
+    );
+  }
+
+  #deletePattern(patternId: PatternId) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (this.#state.project.patterns.length <= MINIMUM_PATTERN_COUNT) {
+      return { error: rejected("payload.patternId", "A project needs at least one Pattern.", "Add a Pattern before deleting this one.") };
+    }
+    const patterns = this.#state.project.patterns.filter((candidate) => candidate.id !== pattern.id);
+    const placements = this.#state.project.song.placements.filter((placement) => placement.patternId !== pattern.id);
+    if (placements.length === 0) {
+      return { error: rejected("payload.patternId", "Deleting this Pattern would empty the Playlist.", "Add a placement for another Pattern first.") };
+    }
+    const automationLanes = Object.fromEntries(
+      Object.entries(this.#state.project.automationLanes).filter(([, lane]) => lane.patternId !== pattern.id),
+    );
+    const firstRemainingPattern = patterns[0];
+    if (firstRemainingPattern === undefined) {
+      return { error: rejected("payload.patternId", "A project needs at least one Pattern.", "Keep one Pattern in the bank.") };
+    }
+    const activePatternId =
+      this.#state.project.activePatternId === pattern.id
+        ? firstRemainingPattern.id
+        : this.#state.project.activePatternId;
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        patterns,
+        activePatternId,
+        automationLanes,
+        song: { ...this.#state.project.song, placements },
+      },
+      "project-replace",
+      [],
+      { patternId },
       { pianoRollSelection: undefined },
+    );
+  }
+
+  #reorderPattern(patternId: PatternId, afterPatternId: PatternId | undefined) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (afterPatternId === pattern.id) {
+      return { error: rejected("payload.afterPatternId", "A Pattern cannot follow itself.", "Choose another Pattern.") };
+    }
+    if (afterPatternId !== undefined && "error" in this.#requirePattern("payload.afterPatternId", afterPatternId)) {
+      return { error: rejected("payload.afterPatternId", "Pattern does not exist.", "Choose a Pattern in the bank.") };
+    }
+    const patterns = insertAfter(
+      this.#state.project.patterns.filter((candidate) => candidate.id !== pattern.id),
+      pattern,
+      afterPatternId,
+      (candidate) => candidate.id,
+    );
+    if (sameStructuredValue(patterns, this.#state.project.patterns)) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    return this.#projectTransition({ ...this.#state.project, patterns }, "project-replace", [], { patternId, afterPatternId });
+  }
+
+  #clearPattern(patternId: PatternId) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const parts = Object.fromEntries(
+      Object.entries(pattern.parts).map(([moduleId, part]) => [
+        moduleId,
+        { ...part, events: [], automationLaneIds: [] },
+      ]),
+    ) as Readonly<Record<ModuleInstanceId, PatternPartState>>;
+    const automationLanes = Object.fromEntries(
+      Object.entries(this.#state.project.automationLanes).filter(
+        ([, lane]) => lane.patternId !== pattern.id,
+      ),
+    ) as Readonly<Record<AutomationLaneId, AutomationLaneState>>;
+    const nextPattern = {
+      ...pattern,
+      parts,
+      automationLaneIds: [],
+      modifiedAt: this.#now(),
+    };
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        patterns: this.#state.project.patterns.map((candidate) =>
+          candidate.id === pattern.id ? nextPattern : candidate,
+        ),
+        automationLanes,
+      },
+      "project-replace",
+      Object.keys(parts) as ModuleInstanceId[],
+      { patternId },
+      { pianoRollSelection: undefined },
+    );
+  }
+
+  #setPatternPartLength(patternId: PatternId, moduleId: ModuleInstanceId, length: number) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (this.#state.project.modules[moduleId] === undefined) {
+      return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
+    }
+    if (!Number.isSafeInteger(length) || length < 1 || length > 64) {
+      return { error: rejected("payload.length", "Pattern part length must be from 1 through 64.", "Enter a valid cycle length.") };
+    }
+    const existing = pattern.parts[moduleId];
+    const part = existing ?? createEmptyPatternPart(moduleId, length);
+    if (existing !== undefined && part.length === length) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    const issue = validatePatternEvents(length, part.events);
+    if (issue !== undefined) return { error: rejected(issue.field, issue.message, issue.recoveryAction) };
+    if (!automationStepsFitPart(part, length, this.#state.project.automationLanes)) {
+      return {
+        error: rejected(
+          "payload.length",
+          "Automation steps would fall outside the shortened Pattern part.",
+          "Move or erase those automation steps before shortening the part.",
+        ),
+      };
+    }
+    return this.#replacePattern(
+      {
+        ...pattern,
+        parts: { ...pattern.parts, [moduleId]: { ...part, length } },
+        modifiedAt: this.#now(),
+      },
+      "pattern-events-set",
+      { patternId, moduleId, length },
+    );
+  }
+
+  #setPatternPartVoiceCycleLength(
+    patternId: PatternId,
+    moduleId: ModuleInstanceId,
+    voiceKey: VoiceCycleLengthKey,
+    length: number | undefined,
+  ) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const module = this.#state.project.modules[moduleId];
+    if (module === undefined) {
+      return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
+    }
+    if (!isVoiceCycleLengthKey(voiceKey)) {
+      return { error: rejected("payload.voiceKey", "Voice cycle key is invalid.", "Choose a module voice or numeric note.") };
+    }
+    const seed = this.#moduleSeedFor(module.pluginId);
+    if (seed !== undefined && (seed.voiceIds === undefined || seed.voiceIds.length === 0)) {
+      return { error: rejected("payload.moduleId", "This module has no drum voices.", "Choose a drum module.") };
+    }
+    if (seed?.voiceIds !== undefined && !seed.voiceIds.includes(voiceKey as VoiceId) && !isNumberNoteKey(voiceKey)) {
+      return { error: rejected("payload.voiceKey", "Voice cycle key does not belong to this module.", "Choose a module voice or numeric note.") };
+    }
+    if (length !== undefined && (!Number.isSafeInteger(length) || length < 1 || length > 64)) {
+      return { error: rejected("payload.length", "Voice cycle length must be from 1 through 64.", "Enter a valid cycle length.") };
+    }
+    const part = pattern.parts[moduleId] ?? createEmptyPatternPart(moduleId);
+    const voiceCycleLengths: Record<VoiceCycleLengthKey, number> =
+      length === undefined
+        ? Object.fromEntries(
+            Object.entries(part.voiceCycleLengths).filter(([key]) => key !== voiceKey),
+          )
+        : { ...part.voiceCycleLengths, [voiceKey]: length };
+    if (sameStructuredValue(voiceCycleLengths, part.voiceCycleLengths)) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    return this.#replacePattern(
+      {
+        ...pattern,
+        parts: { ...pattern.parts, [moduleId]: { ...part, voiceCycleLengths } },
+        modifiedAt: this.#now(),
+      },
+      "pattern-events-set",
+      { patternId, moduleId, voiceKey, length },
     );
   }
 
   #setSong(song: PulseState["project"]["song"]) {
     return this.#projectTransition({ ...this.#state.project, song }, "song-set", [], {
       enabled: song.enabled,
-      entries: song.entries.map((entry) => ({ ...entry })),
+      placements: song.placements.map((placement) => ({ ...placement })),
     });
   }
 
-  #addSongEntry(patternIndex: number) {
-    const error = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (error !== undefined) return { error };
-    if (this.#state.project.song.entries.length >= MAX_SONG_ENTRIES) {
-      return {
-        error: rejected(
-          "payload.patternIndex",
-          `A song holds at most ${String(MAX_SONG_ENTRIES)} steps.`,
-          "Remove a song step before adding another.",
-        ),
-      };
+  #addSongPlacement(patternId: PatternId) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    return this.#setSong({
+      ...this.#state.project.song,
+      placements: [
+        ...this.#state.project.song.placements,
+        { id: createSongPlacementId(this.#idFactory), patternId: pattern.id, repeatCount: 1 },
+      ],
+    });
+  }
+
+  #requireSongPlacement(placementId: SongPlacementId) {
+    const placement = this.#state.project.song.placements.find((candidate) => candidate.id === placementId);
+    return placement ?? { error: rejected("payload.placementId", "Playlist placement does not exist.", "Choose a Playlist placement.") };
+  }
+
+  #removeSongPlacement(placementId: SongPlacementId) {
+    const placement = this.#requireSongPlacement(placementId);
+    if ("error" in placement) return placement;
+    if (this.#state.project.song.placements.length <= 1) {
+      return { error: rejected("payload.placementId", "A Song needs at least one Playlist placement.", "Add another placement before removing this one.") };
     }
     return this.#setSong({
       ...this.#state.project.song,
-      entries: [...this.#state.project.song.entries, { patternIndex, repeats: 1 }],
+      placements: this.#state.project.song.placements.filter((candidate) => candidate.id !== placement.id),
     });
   }
 
-  #requireSongEntry(entryIndex: number) {
-    if (
-      !Number.isInteger(entryIndex) ||
-      entryIndex < 0 ||
-      entryIndex >= this.#state.project.song.entries.length
-    ) {
-      return rejected("payload.entryIndex", "Song step does not exist.", "Choose a song step.");
-    }
-    return undefined;
-  }
-
-  #removeSongEntry(entryIndex: number) {
-    const error = this.#requireSongEntry(entryIndex);
-    if (error !== undefined) return { error };
-    return this.#setSong({
-      ...this.#state.project.song,
-      entries: this.#state.project.song.entries.filter((_, index) => index !== entryIndex),
-    });
-  }
-
-  #setSongRepeats(entryIndex: number, repeats: number) {
-    const error = this.#requireSongEntry(entryIndex);
-    if (error !== undefined) return { error };
-    if (!Number.isInteger(repeats) || repeats < 1 || repeats > MAX_SONG_REPEATS) {
+  #setSongPlacementRepeatCount(placementId: SongPlacementId, repeatCount: number) {
+    const placement = this.#requireSongPlacement(placementId);
+    if ("error" in placement) return placement;
+    if (!Number.isInteger(repeatCount) || repeatCount < 1 || repeatCount > MAX_SONG_REPEATS) {
       return {
         error: rejected(
-          "payload.repeats",
-          `Repeats must be between 1 and ${String(MAX_SONG_REPEATS)}.`,
+          "payload.repeatCount",
+          `Repeat count must be between 1 and ${String(MAX_SONG_REPEATS)}.`,
           "Choose a repeat count in range.",
         ),
       };
     }
+    if (repeatCount === placement.repeatCount) return { state: this.#state, projectChanged: false as const };
     return this.#setSong({
       ...this.#state.project.song,
-      entries: this.#state.project.song.entries.map((entry, index) =>
-        index === entryIndex ? { ...entry, repeats } : entry,
+      placements: this.#state.project.song.placements.map((candidate) =>
+        candidate.id === placement.id ? { ...candidate, repeatCount } : candidate,
+      ),
+    });
+  }
+
+  #reorderSongPlacement(placementId: SongPlacementId, afterPlacementId: SongPlacementId | undefined) {
+    const placement = this.#requireSongPlacement(placementId);
+    if ("error" in placement) return placement;
+    if (afterPlacementId === placement.id) {
+      return { error: rejected("payload.afterPlacementId", "A placement cannot follow itself.", "Choose another placement.") };
+    }
+    if (afterPlacementId !== undefined && "error" in this.#requireSongPlacement(afterPlacementId)) {
+      return { error: rejected("payload.afterPlacementId", "Playlist placement does not exist.", "Choose a Playlist placement.") };
+    }
+    const placements = insertAfter(
+      this.#state.project.song.placements.filter((candidate) => candidate.id !== placement.id),
+      placement,
+      afterPlacementId,
+      (candidate) => candidate.id,
+    );
+    if (sameStructuredValue(placements, this.#state.project.song.placements)) return { state: this.#state, projectChanged: false as const };
+    return this.#setSong({ ...this.#state.project.song, placements });
+  }
+
+  #duplicateSongPlacement(placementId: SongPlacementId) {
+    const placement = this.#requireSongPlacement(placementId);
+    if ("error" in placement) return placement;
+    const copy = { ...placement, id: createSongPlacementId(this.#idFactory) };
+    return this.#setSong({
+      ...this.#state.project.song,
+      placements: insertAfter(this.#state.project.song.placements, copy, placement.id, (candidate) => candidate.id),
+    });
+  }
+
+  #setSongPlacementPattern(placementId: SongPlacementId, patternId: PatternId) {
+    const placement = this.#requireSongPlacement(placementId);
+    if ("error" in placement) return placement;
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    if (placement.patternId === pattern.id) return { state: this.#state, projectChanged: false as const };
+    return this.#setSong({
+      ...this.#state.project.song,
+      placements: this.#state.project.song.placements.map((candidate) =>
+        candidate.id === placement.id ? { ...candidate, patternId: pattern.id } : candidate,
       ),
     });
   }
@@ -875,6 +1234,39 @@ export class PulseStore {
       };
     }
     const module = createModule(this.#idFactory, seed, source);
+    const automationLanes: Record<AutomationLaneId, AutomationLaneState> = {
+      ...this.#state.project.automationLanes,
+    };
+    const patterns = this.#state.project.patterns.map((pattern) => {
+      const sourcePart = pattern.parts[moduleId];
+      if (sourcePart === undefined) return pattern;
+      const laneIdMap = new Map<AutomationLaneId, AutomationLaneId>();
+      for (const sourceLaneId of sourcePart.automationLaneIds) {
+        const sourceLane = this.#state.project.automationLanes[sourceLaneId];
+        if (sourceLane === undefined) continue;
+        const laneId = createAutomationLaneId(this.#idFactory);
+        laneIdMap.set(sourceLaneId, laneId);
+        automationLanes[laneId] = cloneAutomationLane(
+          sourceLane,
+          laneId,
+          pattern.id,
+          module.id,
+        );
+      }
+      const clonedLaneIds = sourcePart.automationLaneIds.flatMap((laneId) => {
+        const clonedId = laneIdMap.get(laneId);
+        return clonedId === undefined ? [] : [clonedId];
+      });
+      return {
+        ...pattern,
+        parts: {
+          ...pattern.parts,
+          [module.id]: clonePart(sourcePart, module.id, this.#idFactory, laneIdMap),
+        },
+        automationLaneIds: [...pattern.automationLaneIds, ...clonedLaneIds],
+        modifiedAt: this.#now(),
+      };
+    });
     return this.#projectTransition(
       {
         ...this.#state.project,
@@ -882,6 +1274,8 @@ export class PulseStore {
           candidate.id === slotId ? { ...candidate, moduleId: module.id } : candidate,
         ),
         modules: { ...this.#state.project.modules, [module.id]: module },
+        patterns,
+        automationLanes,
         effects: this.#duplicateVoiceInserts(this.#state.project.effects, moduleId, module.id, seed.voiceIds),
       },
       "module-add",
@@ -898,6 +1292,26 @@ export class PulseStore {
     const modules = Object.fromEntries(
       Object.entries(this.#state.project.modules).filter(([id]) => id !== moduleId),
     ) as Readonly<Record<ModuleInstanceId, RackModuleState>>;
+    const removedLaneIds = new Set(
+      Object.values(this.#state.project.automationLanes)
+        .filter((lane) => lane.targetId === moduleId)
+        .map((lane) => lane.id),
+    );
+    const automationLanes = Object.fromEntries(
+      Object.entries(this.#state.project.automationLanes).filter(([id]) => !removedLaneIds.has(id as never)),
+    );
+    const patterns = this.#state.project.patterns.map((pattern) => {
+      if (pattern.parts[moduleId] === undefined && removedLaneIds.size === 0) return pattern;
+      const parts = Object.fromEntries(
+        Object.entries(pattern.parts).filter(([id]) => id !== moduleId),
+      ) as Readonly<Record<ModuleInstanceId, PatternPartState>>;
+      return {
+        ...pattern,
+        parts,
+        automationLaneIds: pattern.automationLaneIds.filter((id) => !removedLaneIds.has(id)),
+        modifiedAt: this.#now(),
+      };
+    });
     return this.#projectTransition(
       {
         ...this.#state.project,
@@ -905,6 +1319,8 @@ export class PulseStore {
           slot.moduleId === moduleId ? { id: slot.id } : slot,
         ),
         modules,
+        patterns,
+        automationLanes,
         effects: withoutModuleVoiceInserts(this.#state.project.effects, moduleId),
       },
       "module-remove",
@@ -1141,20 +1557,19 @@ export class PulseStore {
 
   #setPianoRollSelection(
     moduleId: ModuleInstanceId,
-    patternIndex: number,
+    patternId: PatternId,
     eventIds: readonly NoteEventId[],
   ) {
-    const module = this.#state.project.modules[moduleId];
-    if (module === undefined)
+    if (this.#state.project.modules[moduleId] === undefined)
       return {
         error: rejected("payload.moduleId", "Module does not exist.", "Edit a loaded module."),
       };
-    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (indexError !== undefined) return { error: indexError };
-    const part = module.parts[patternIndex];
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const part = pattern.parts[moduleId];
     if (part === undefined)
       return {
-        error: rejected("payload.moduleId", "Pattern does not exist.", "Select a Pattern first."),
+        error: rejected("payload.moduleId", "Pattern part does not exist.", "Select a Pattern part first."),
       };
     const selection = selectEvents(part, eventIds, "payload.eventIds");
     if ("issue" in selection) {
@@ -1169,7 +1584,7 @@ export class PulseStore {
     const nextSelection =
       selection.events.length === 0
         ? undefined
-        : { moduleId, patternIndex, eventIds: selection.events.map((event) => event.id) };
+        : { moduleId, patternId: pattern.id, eventIds: selection.events.map((event) => event.id) };
     if (sameStructuredValue(this.#state.ui.pianoRollSelection, nextSelection)) {
       return { state: this.#state, projectChanged: false as const };
     }
@@ -1207,7 +1622,7 @@ export class PulseStore {
 
   #editPatternEvents(
     moduleId: ModuleInstanceId,
-    patternIndex: number,
+    patternId: PatternId,
     edit: PatternEventEdit,
   ) {
     const module = this.#state.project.modules[moduleId];
@@ -1215,18 +1630,14 @@ export class PulseStore {
       return {
         error: rejected("payload.moduleId", "Module does not exist.", "Edit a loaded module."),
       };
-    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
-    if (indexError !== undefined) return { error: indexError };
-    const current = module.parts[patternIndex];
-    if (current === undefined)
-      return {
-        error: rejected("payload.patternIndex", "Pattern part does not exist.", "Select a Pattern first."),
-      };
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const current = pattern.parts[moduleId] ?? createEmptyPatternPart(moduleId, PATTERN_STEP_COUNT);
     if (edit.type === "create") {
       const moduleSeed = this.#moduleSeedFor(module.pluginId);
       const moduleEventType =
         moduleSeed === undefined
-          ? module.parts.find((part) => part.events.length > 0)?.events[0]?.type
+          ? current.events[0]?.type
           : moduleSeed.voiceIds === undefined || moduleSeed.voiceIds.length === 0
             ? "note"
             : "trigger";
@@ -1253,29 +1664,279 @@ export class PulseStore {
     const selectedEventIds =
       edit.type === "delete" &&
       this.#state.ui.pianoRollSelection?.moduleId === moduleId &&
-      this.#state.ui.pianoRollSelection.patternIndex === patternIndex
+      this.#state.ui.pianoRollSelection.patternId === pattern.id
         ? this.#state.ui.pianoRollSelection.eventIds.filter(
             (eventId) => !edit.eventIds.includes(eventId),
           )
         : result.selectedEventIds;
-    const nextModule: RackModuleState = {
-      ...module,
-      parts: module.parts.map((part, index) => (index === patternIndex ? nextPart : part)),
+    const nextPattern: PatternState = {
+      ...pattern,
+      parts: { ...pattern.parts, [moduleId]: nextPart },
+      modifiedAt: this.#now(),
     };
     return this.#projectTransition(
       {
         ...this.#state.project,
-        modules: { ...this.#state.project.modules, [moduleId]: nextModule },
+        patterns: this.#state.project.patterns.map((candidate) =>
+          candidate.id === pattern.id ? nextPattern : candidate,
+        ),
       },
       "pattern-events-set",
       [moduleId],
-      { moduleId, patternIndex },
+      { moduleId, patternId: pattern.id },
       {
         pianoRollSelection:
           selectedEventIds.length === 0
             ? undefined
-            : { moduleId, patternIndex, eventIds: selectedEventIds },
+            : { moduleId, patternId: pattern.id, eventIds: selectedEventIds },
       },
+    );
+  }
+
+  #replacePatternPartEvents(
+    patternId: PatternId,
+    moduleId: ModuleInstanceId,
+    events: readonly PatternEvent[],
+    length: number | undefined,
+  ) {
+    const pattern = this.#requirePattern("payload.patternId", patternId);
+    if ("error" in pattern) return pattern;
+    const module = this.#state.project.modules[moduleId];
+    if (module === undefined) {
+      return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
+    }
+    const current = pattern.parts[moduleId] ?? createEmptyPatternPart(moduleId, PATTERN_STEP_COUNT);
+    const targetLength = length ?? current.length;
+    if (!Number.isSafeInteger(targetLength) || targetLength < 1 || targetLength > 64) {
+      return { error: rejected("payload.length", "Pattern part length must be from 1 through 64.", "Choose a valid target length.") };
+    }
+    if (!automationStepsFitPart(current, targetLength, this.#state.project.automationLanes)) {
+      return {
+        error: rejected(
+          "payload.length",
+          "Automation steps would fall outside the shortened Pattern part.",
+          "Move or erase those automation steps before shortening the part.",
+        ),
+      };
+    }
+    const issue = validatePatternEvents(targetLength, events);
+    if (issue !== undefined) return { error: rejected(issue.field, issue.message, issue.recoveryAction) };
+    const expectedType = this.#moduleSeedFor(module.pluginId)?.voiceIds;
+    const eventType = expectedType === undefined || expectedType.length === 0 ? "note" : "trigger";
+    if (events.some((event) => event.type !== eventType)) {
+      return {
+        error: rejected(
+          "payload.events",
+          "The replacement events do not match this module.",
+          "Apply events supported by the selected module.",
+        ),
+      };
+    }
+    const nextEvents = sortPatternEvents(events.map((event) => ({ ...event, data: { ...event.data } })));
+    if (sameStructuredValue(nextEvents, current.events) && targetLength === current.length) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    const nextPattern: PatternState = {
+      ...pattern,
+      parts: { ...pattern.parts, [moduleId]: { ...current, length: targetLength, events: nextEvents } },
+      modifiedAt: this.#now(),
+    };
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        patterns: this.#state.project.patterns.map((candidate) =>
+          candidate.id === pattern.id ? nextPattern : candidate,
+        ),
+      },
+      "pattern-events-set",
+      [moduleId],
+      { patternId, moduleId, events: nextEvents, ...(length === undefined ? {} : { length: targetLength }) },
+      { pianoRollSelection: undefined },
+    );
+  }
+
+  #setAutomationLaneSteps(
+    payload: Extract<PulseCommand, { readonly type: "automation-lane-steps-set" }>["payload"],
+  ) {
+    const pattern = this.#requirePattern("payload.patternId", payload.patternId);
+    if ("error" in pattern) return pattern;
+    const module = this.#state.project.modules[payload.moduleId];
+    if (module === undefined) {
+      return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
+    }
+    const existingPart = pattern.parts[payload.moduleId];
+    if (existingPart === undefined && payload.steps.length === 0) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    // A valid imported Pattern can omit a loaded module part. The first
+    // automation step creates the same empty 16-step part that event editing
+    // uses, so every automatable module parameter remains available.
+    const part: PatternPartState = existingPart ?? {
+      moduleId: payload.moduleId,
+      length: 16,
+      voiceCycleLengths: {},
+      events: [],
+      automationLaneIds: [],
+    };
+    const parameterId = payload.parameterId.trim();
+    if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(parameterId)) {
+      return {
+        error: rejected("payload.parameterId", "Automation parameter ID is invalid.", "Choose an automatable module parameter."),
+      };
+    }
+    const seenTicks = new Set<number>();
+    const steps: readonly AutomationStepState[] = payload.steps
+      .map((step) => ({ tick: step.tick, value: step.value }))
+      .sort((left, right) => left.tick - right.tick);
+    for (const [index, step] of steps.entries()) {
+      if (
+        !Number.isSafeInteger(step.tick) ||
+        step.tick < 0 ||
+        step.tick >= part.length * PATTERN_TICKS_PER_STEP ||
+        step.tick % PATTERN_TICKS_PER_STEP !== 0 ||
+        seenTicks.has(step.tick)
+      ) {
+        return {
+          error: rejected(
+            `payload.steps[${String(index)}].tick`,
+            "Automation steps must use unique 1/16 positions inside the Pattern part.",
+            "Use one fixed-grid step inside the Pattern part.",
+          ),
+        };
+      }
+      seenTicks.add(step.tick);
+      if (!this.#validateParameter(module, parameterId, step.value)) {
+        return {
+          error: rejected(
+            `payload.steps[${String(index)}].value`,
+            "Automation value is invalid.",
+            "Use a value within the parameter range.",
+          ),
+        };
+      }
+    }
+    const existing = Object.values(this.#state.project.automationLanes).find(
+      (lane) =>
+        lane.patternId === pattern.id &&
+        lane.targetId === payload.moduleId &&
+        lane.parameterId === parameterId,
+    );
+    if (existing !== undefined && sameStructuredValue(existing.steps, steps)) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    const timestamp = this.#now();
+    let automationLanes = this.#state.project.automationLanes;
+    let automationLaneIds = pattern.automationLaneIds;
+    let partLaneIds = part.automationLaneIds;
+    if (steps.length === 0) {
+      if (existing === undefined) return { state: this.#state, projectChanged: false as const };
+      automationLanes = Object.fromEntries(
+        Object.entries(automationLanes).filter(([id]) => id !== existing.id),
+      );
+      automationLaneIds = automationLaneIds.filter((id) => id !== existing.id);
+      partLaneIds = partLaneIds.filter((id) => id !== existing.id);
+    } else if (existing === undefined) {
+      const id = createAutomationLaneId(this.#idFactory);
+      automationLanes = {
+        ...automationLanes,
+        [id]: {
+          id,
+          scope: "module",
+          targetId: payload.moduleId,
+          parameterId,
+          patternId: pattern.id,
+          stepTicks: PATTERN_TICKS_PER_STEP,
+          steps,
+        },
+      };
+      automationLaneIds = [...automationLaneIds, id];
+      partLaneIds = [...partLaneIds, id];
+    } else {
+      automationLanes = { ...automationLanes, [existing.id]: { ...existing, steps } };
+    }
+    const nextPattern: PatternState = {
+      ...pattern,
+      automationLaneIds,
+      parts: {
+        ...pattern.parts,
+        [payload.moduleId]: { ...part, automationLaneIds: partLaneIds },
+      },
+      modifiedAt: timestamp,
+    };
+    return this.#projectTransition(
+      {
+        ...this.#state.project,
+        automationLanes,
+        patterns: this.#state.project.patterns.map((candidate) =>
+          candidate.id === pattern.id ? nextPattern : candidate,
+        ),
+      },
+      "pattern-events-set",
+      [payload.moduleId],
+      { patternId: pattern.id, moduleId: payload.moduleId, parameterId, steps },
+    );
+  }
+
+  #transferPatternPartEvents(payload: Extract<PulseCommand, { readonly type: "pattern-part-events-transfer" }> ["payload"]) {
+    const sourcePattern = this.#requirePattern("payload.fromPatternId", payload.fromPatternId);
+    if ("error" in sourcePattern) return sourcePattern;
+    const targetPattern = this.#requirePattern("payload.toPatternId", payload.toPatternId);
+    if ("error" in targetPattern) return targetPattern;
+    const sourceModule = this.#state.project.modules[payload.fromModuleId];
+    const targetModule = this.#state.project.modules[payload.toModuleId];
+    if (sourceModule === undefined || targetModule === undefined) {
+      return { error: rejected("payload", "A Pattern part module does not exist.", "Choose loaded modules.") };
+    }
+    if (sourceModule.pluginId !== targetModule.pluginId) {
+      return { error: rejected("payload.toModuleId", "Pattern parts require compatible module plugins.", "Choose a module with the same plugin.") };
+    }
+    if (payload.fromPatternId === payload.toPatternId && payload.fromModuleId === payload.toModuleId) {
+      return { error: rejected("payload", "A Pattern part cannot transfer events to itself.", "Choose another Pattern part.") };
+    }
+    const sourcePart = sourcePattern.parts[payload.fromModuleId];
+    if (sourcePart === undefined) {
+      return { error: rejected("payload.fromModuleId", "Source Pattern part does not exist.", "Choose a participating module.") };
+    }
+    const selected = requireEditedEvents(sourcePart, payload.eventIds, "payload.eventIds");
+    if ("issue" in selected) return { error: rejected(selected.issue.field, selected.issue.message, selected.issue.recoveryAction) };
+    const targetPart = targetPattern.parts[payload.toModuleId] ?? createEmptyPatternPart(payload.toModuleId, sourcePart.length);
+    const transferred = selected.events.map((event) =>
+      payload.mode === "copy" ? cloneEvent(event, this.#idFactory) : event,
+    );
+    const targetEvents = [...targetPart.events, ...transferred];
+    const targetIssue = validatePatternEvents(targetPart.length, targetEvents);
+    if (targetIssue !== undefined) return { error: rejected(targetIssue.field, targetIssue.message, targetIssue.recoveryAction) };
+    const nextTargetPart = { ...targetPart, events: sortPatternEvents(targetEvents) };
+    const timestamp = this.#now();
+    let patterns = this.#state.project.patterns.map((candidate) => {
+      if (candidate.id === targetPattern.id) {
+        return {
+          ...candidate,
+          parts: { ...candidate.parts, [payload.toModuleId]: nextTargetPart },
+          modifiedAt: timestamp,
+        };
+      }
+      return candidate;
+    });
+    if (payload.mode === "move") {
+      const removed = new Set(payload.eventIds);
+      patterns = patterns.map((candidate) => {
+        if (candidate.id !== sourcePattern.id) return candidate;
+        const current = candidate.parts[payload.fromModuleId];
+        if (current === undefined) return candidate;
+        return {
+          ...candidate,
+          parts: { ...candidate.parts, [payload.fromModuleId]: { ...current, events: current.events.filter((event) => !removed.has(event.id)) } },
+          modifiedAt: timestamp,
+        };
+      });
+    }
+    return this.#projectTransition(
+      { ...this.#state.project, patterns },
+      "project-replace",
+      [payload.fromModuleId, payload.toModuleId],
+      payload,
+      { pianoRollSelection: undefined },
     );
   }
 
@@ -1377,6 +2038,95 @@ export class PulseStore {
   }
 }
 
+function normalizePatternEventData(
+  data: Readonly<{
+    note: number;
+    velocity: number;
+    accent: boolean;
+    slide: boolean;
+    probability?: number;
+    microTimingTicks?: number;
+    flam?: number;
+    roll?: number;
+  }>,
+): PatternEventData {
+  return {
+    ...data,
+    ...DEFAULT_PATTERN_EVENT_PROPERTIES,
+    probability: data.probability ?? DEFAULT_PATTERN_EVENT_PROPERTIES.probability,
+    microTimingTicks: data.microTimingTicks ?? DEFAULT_PATTERN_EVENT_PROPERTIES.microTimingTicks,
+    flam: data.flam ?? DEFAULT_PATTERN_EVENT_PROPERTIES.flam,
+    roll: data.roll ?? DEFAULT_PATTERN_EVENT_PROPERTIES.roll,
+  };
+}
+
+function cloneEvent(event: PatternEvent, idFactory: IdFactory): PatternEvent {
+  return {
+    ...event,
+    id: createNoteEventId(idFactory),
+    data: { ...event.data },
+  };
+}
+
+function clonePart(
+  part: PatternPartState,
+  moduleId: ModuleInstanceId,
+  idFactory: IdFactory,
+  laneIdMap: ReadonlyMap<AutomationLaneId, AutomationLaneId> = new Map(),
+): PatternPartState {
+  return {
+    moduleId,
+    length: part.length,
+    voiceCycleLengths: { ...part.voiceCycleLengths },
+    events: part.events.map((event) => cloneEvent(event, idFactory)),
+    automationLaneIds: part.automationLaneIds.flatMap((laneId) => {
+      const clonedId = laneIdMap.get(laneId);
+      return clonedId === undefined ? [] : [clonedId];
+    }),
+  };
+}
+
+function cloneAutomationLane(
+  lane: AutomationLaneState,
+  id: AutomationLaneId,
+  patternId: PatternId,
+  targetId: ModuleInstanceId,
+): AutomationLaneState {
+  return {
+    ...lane,
+    id,
+    patternId,
+    targetId,
+    steps: lane.steps.map((step) => ({ ...step })),
+  };
+}
+
+function seedFromPatternId(patternId: PatternId): number {
+  const parsed = Number.parseInt(patternId.replaceAll("-", "").slice(0, 8), 16);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function isNumberNoteKey(value: string): boolean {
+  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) return false;
+  const note = Number(value);
+  return Number.isSafeInteger(note) && note >= 0 && note <= 127;
+}
+
+function isVoiceCycleLengthKey(value: string): value is VoiceCycleLengthKey {
+  return isNumberNoteKey(value) || /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value);
+}
+
+function insertAfter<Item>(
+  items: readonly Item[],
+  item: Item,
+  afterId: string | undefined,
+  idOf: (value: Item) => string,
+): readonly Item[] {
+  if (afterId === undefined) return [item, ...items];
+  const index = items.findIndex((candidate) => idOf(candidate) === afterId);
+  return index === -1 ? items : [...items.slice(0, index + 1), item, ...items.slice(index + 1)];
+}
+
 function patternEditIssue(field: string, message: string, recoveryAction: string): PatternEditResult {
   return { issue: { field, message, recoveryAction } };
 }
@@ -1457,7 +2207,7 @@ function applyPatternEventEdit(
       const event: PatternEvent = {
         ...edit.event,
         id: createNoteEventId(idFactory),
-        data: { ...edit.event.data },
+        data: normalizePatternEventData(edit.event.data),
       };
       events = [...part.events, event];
       selectedEventIds = [event.id];
@@ -1553,6 +2303,34 @@ function applyPatternEventEdit(
       selectedEventIds = edit.eventIds;
       break;
     }
+    case "properties": {
+      const selected = requireEditedEvents(part, edit.eventIds, "payload.edit.eventIds");
+      if ("issue" in selected) return { issue: selected.issue };
+      const allowed = new Set([
+        "velocity",
+        "accent",
+        "slide",
+        "probability",
+        "microTimingTicks",
+        "flam",
+        "roll",
+      ]);
+      if (Object.keys(edit.values).some((key) => !allowed.has(key))) {
+        return patternEditIssue(
+          "payload.edit.values",
+          "The event property is not supported.",
+          "Choose a supported event property.",
+        );
+      }
+      const changed = new Set(edit.eventIds);
+      events = part.events.map((event) =>
+        changed.has(event.id)
+          ? { ...event, data: { ...event.data, ...edit.values } }
+          : event,
+      );
+      selectedEventIds = edit.eventIds;
+      break;
+    }
   }
 
   const issue = validatePatternEvents(part.length, events);
@@ -1566,7 +2344,7 @@ function validatePatternEvents(
 ): PatternEditIssue | undefined {
   if (!Number.isSafeInteger(partLength) || partLength < 1 || partLength > 64) {
     return {
-      field: "payload.patternIndex",
+      field: "payload.patternId",
       message: "The Pattern part length is outside 1 through 64 steps.",
       recoveryAction: "Use a valid Pattern part.",
     };
@@ -1611,12 +2389,24 @@ function validatePatternEvents(
       event.data.velocity < 0 ||
       event.data.velocity > 1 ||
       typeof event.data.accent !== "boolean" ||
-      typeof event.data.slide !== "boolean"
+      typeof event.data.slide !== "boolean" ||
+      !Number.isFinite(event.data.probability) ||
+      event.data.probability < 0 ||
+      event.data.probability > 1 ||
+      !Number.isInteger(event.data.microTimingTicks) ||
+      event.data.microTimingTicks < -60 ||
+      event.data.microTimingTicks > 60 ||
+      !Number.isInteger(event.data.flam) ||
+      event.data.flam < 0 ||
+      event.data.flam > 3 ||
+      !Number.isInteger(event.data.roll) ||
+      event.data.roll < 0 ||
+      event.data.roll > 7
     ) {
       return {
         field: "payload.edit",
         message: "An event property is outside its supported range.",
-        recoveryAction: "Use a valid note, velocity, accent, and slide value.",
+        recoveryAction: "Use values in the supported event-property ranges.",
       };
     }
     if (event.type === "note") {
@@ -1675,6 +2465,16 @@ function validatePatternEvents(
   return undefined;
 }
 
+function automationStepsFitPart(
+  part: PatternPartState,
+  length: number,
+  lanes: Readonly<Record<string, { readonly steps: readonly { readonly tick: number }[] }>>,
+): boolean {
+  return part.automationLaneIds.every((id) =>
+    (lanes[id] ?? { steps: [] }).steps.every((step) => step.tick < length * PATTERN_TICKS_PER_STEP),
+  );
+}
+
 function sortPatternEvents(events: readonly PatternEvent[]): readonly PatternEvent[] {
   return [...events].sort(
     (left, right) =>
@@ -1711,7 +2511,9 @@ function reconcileUiReferences(project: ProjectState, ui: PulseState["ui"]): Pul
       : undefined;
   const selection = ui.pianoRollSelection;
   const selectedPart =
-    selection === undefined ? undefined : project.modules[selection.moduleId]?.parts[selection.patternIndex];
+    selection === undefined
+      ? undefined
+      : project.patterns.find((pattern) => pattern.id === selection.patternId)?.parts[selection.moduleId];
   const selectedIds = new Set(selectedPart?.events.map((event) => event.id));
   const eventIds = selection?.eventIds.filter((eventId) => selectedIds.has(eventId)) ?? [];
   const pianoRollSelection =
@@ -1733,7 +2535,8 @@ function sameProjectContent(left: ProjectState, right: ProjectState): boolean {
     sameStructuredValue(left.modules, right.modules) &&
     sameStructuredValue(left.effects, right.effects) &&
     sameStructuredValue(left.patterns, right.patterns) &&
-    left.activePatternIndex === right.activePatternIndex &&
+    left.activePatternId === right.activePatternId &&
+    sameStructuredValue(left.automationLanes, right.automationLanes) &&
     sameStructuredValue(left.song, right.song)
   );
 }

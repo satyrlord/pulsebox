@@ -60,6 +60,12 @@
   text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
+.patternCount {
+  margin-inline-start: auto;
+  font: var(--pulse-type-10, 10px) / 1 var(--pulse-font-mono, ui-monospace), monospace;
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
 .statusLamp {
   inline-size: 6px;
   block-size: 6px;
@@ -525,6 +531,24 @@
   margin: 8px;
 }
 
+.patternNavigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 8px 8px 0;
+}
+
+.patternNavigation button {
+  min-block-size: 26px;
+}
+
+.patternInspector input[type="color"] {
+  inline-size: 100%;
+  min-block-size: 28px;
+  padding: 2px;
+  background: var(--surface-well);
+}
+
 .patternInspector select,
 .rollTools select {
   min-block-size: 28px;
@@ -557,7 +581,7 @@
 
 .inspectorActions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -573,6 +597,30 @@
   block-size: 14px;
 }
 
+.patternTools {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 8px 8px;
+  padding-block-start: 0.65rem;
+  border-block-start: 1px solid var(--edge-hairline);
+}
+
+.patternTools label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.patternTools output {
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.patternToolActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .rollTools {
   flex: none;
   min-block-size: 38px;
@@ -584,9 +632,58 @@
   box-shadow: 0 1px 0 var(--edge-highlight);
 }
 
+.pianoRoll {
+  --piano-keybed-width: 76px;
+  --piano-row-height: 16px;
+}
+
 .rollTools > label {
   flex-direction: row;
   align-items: center;
+}
+
+.pageControls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-inline-size: 0;
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.pageControls button {
+  min-inline-size: 0;
+  min-block-size: 24px;
+  padding-inline: 5px;
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.pageControls .pageToggle {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 24px;
+  padding-inline: 4px;
+}
+
+.pageToggle svg {
+  inline-size: 15px;
+  block-size: 15px;
+}
+
+.pageToggle[aria-pressed="true"] {
+  color: var(--pulse-color-accent, #7ed9a3);
+}
+
+.pageControls output {
+  min-inline-size: 4ch;
+  text-align: center;
+}
+
+.pageControls label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
 /* The tapered timing sliders flex, so their low musical range gets the widest
@@ -659,10 +756,12 @@
   flex: 1;
   min-block-size: 0;
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: var(--piano-keybed-width) minmax(0, 1fr);
   grid-template-rows: 24px auto;
   align-items: start;
   overflow-y: auto;
+  isolation: isolate;
+  scroll-padding-block-start: 24px;
   background: var(--surface-well);
 }
 
@@ -683,72 +782,71 @@
   border-inline-end: 1px solid var(--edge-hairline);
 }
 
-/* The keybed and grid use the same 24px chromatic rows. This makes each key a
-   valid target and keeps its sounding pitch aligned with the note row. */
+/* The keybed and grid share one compact chromatic row size. Full-width natural
+   keys and shorter sharp keys preserve piano geometry without reducing pitch
+   alignment or the operable target. */
 .pianoKeybed {
   grid-column: 1;
   grid-row: 2;
   block-size: var(--editor-content-height);
   display: grid;
-  grid-template-rows: repeat(var(--editor-row-count), 24px);
+  grid-template-rows: repeat(var(--editor-row-count), var(--piano-row-height));
   overflow: hidden;
-  background: #070809;
+  background: linear-gradient(90deg, #a8a69f 0, #e8e5dc 42%, #f7f5ed 76%, #c4c1b8 100%);
   box-shadow: inset -1px 0 2px var(--edge-shadow);
 }
 
 .pianoKeybed .pianoKey {
   min-inline-size: 24px;
-  min-block-size: 24px;
-  block-size: 24px;
+  min-block-size: var(--piano-row-height);
+  block-size: var(--piano-row-height);
   padding: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   border-radius: 0;
   font:
     var(--pulse-type-10, 10px) / 1.2 var(--pulse-font-mono, ui-monospace),
     monospace;
   border: 0;
+  background: var(--piano-key-face);
+  box-shadow: var(--piano-key-shadow);
   cursor: pointer;
 }
 
 .naturalKey {
-  inline-size: 78px;
-  color: var(--pulse-color-text-secondary, #bac2c8);
-  background:
-    linear-gradient(90deg, #090b0c 0 15px, transparent 15px),
-    linear-gradient(90deg, #858278 15px, #d8d3c5 46%, #f0ecdf 78%, #b8b3a7 100%);
-  box-shadow:
-    inset 0 1px 0 #ffffffe0,
-    inset 0 -1px 0 #0000008c,
-    inset -1px 0 0 #68655d;
+  --piano-key-face: linear-gradient(90deg, #a8a69f 0, #e8e5dc 42%, #f7f5ed 76%, #c4c1b8 100%);
+  --piano-key-shadow:
+    inset 0 1px 0 #ffffffe0, inset 0 -1px 0 #0000008c, inset -1px 0 0 #68655d;
+
+  inline-size: var(--piano-keybed-width);
+  padding-inline-end: 5px;
+  color: #202328;
 }
 
 .naturalKey > span {
-  inline-size: 15px;
-  overflow: visible;
-  text-align: center;
-  text-shadow: 0 1px 0 #000000;
+  margin-inline-start: auto;
+  color: #4b5963;
+  text-align: end;
+  text-shadow: 0 1px 0 #ffffffa6;
 }
 
 .sharpKey {
-  inline-size: 41px;
-  margin-inline: 15px 22px;
-  background: linear-gradient(90deg, #30343a 0, #171a1e 58%, #090b0d 100%);
-  box-shadow:
-    inset 0 1px 0 #ffffff24,
-    inset 0 -2px 2px #000000,
-    1px 1px 2px #0000008c;
+  --piano-key-face: linear-gradient(90deg, #3a3f45 0, #1b1e22 58%, #080a0c 100%);
+  --piano-key-shadow:
+    inset 0 1px 0 #ffffff24, inset 0 -2px 2px #000000, 1px 1px 2px #0000008c;
+
+  inline-size: 44px;
+  margin-inline-end: calc(var(--piano-keybed-width) - 44px);
 }
 
 .voiceKey {
+  --piano-key-face: linear-gradient(90deg, var(--surface-raised), var(--surface-plate-bot));
+  --piano-key-shadow: inset 0 1px 0 var(--edge-highlight), inset 0 -1px 0 var(--edge-hairline);
+
   inline-size: 78px;
   padding-inline: 6px;
   color: var(--pulse-color-text-secondary, #bac2c8);
-  background: linear-gradient(90deg, var(--surface-raised), var(--surface-plate-bot));
-  box-shadow:
-    inset 0 1px 0 var(--edge-highlight),
-    inset 0 -1px 0 var(--edge-hairline);
 }
 
 .voiceKey > span {
@@ -769,14 +867,19 @@
 }
 
 :global([data-high-contrast="true"]) .naturalKey {
-  color: #ffffff;
-  background: linear-gradient(90deg, #000000 0 15px, #ffffff 15px);
-  box-shadow: inset 0 0 0 2px #000000;
+  --piano-key-face: #ffffff;
+  --piano-key-shadow: inset 0 0 0 2px #000000;
+
+  color: #000000;
+}
+
+:global([data-high-contrast="true"]) .pianoKeybed {
+  background: #ffffff;
 }
 
 :global([data-high-contrast="true"]) .sharpKey {
-  background: #000000;
-  box-shadow: inset 0 0 0 2px #ffffff;
+  --piano-key-face: #000000;
+  --piano-key-shadow: inset 0 0 0 2px #ffffff;
 }
 
 /* The grid is black glass behind the plate, so the notes read as lit. */
@@ -787,7 +890,7 @@
   block-size: var(--editor-content-height);
   display: grid;
   grid-template-columns: repeat(16, minmax(0, 1fr));
-  grid-template-rows: repeat(var(--editor-row-count), 24px);
+  grid-template-rows: repeat(var(--editor-row-count), var(--piano-row-height));
   overflow: hidden;
   background: var(--surface-well);
   box-shadow: var(--sink-2);
@@ -797,7 +900,7 @@
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-rows: repeat(var(--editor-row-count), 24px);
+  grid-template-rows: repeat(var(--editor-row-count), var(--piano-row-height));
   pointer-events: none;
 }
 
@@ -817,8 +920,8 @@
   align-self: center;
   min-inline-size: 0;
   inline-size: calc(100% - 4px + var(--event-resize-x, 0px));
-  min-block-size: 24px;
-  block-size: 24px;
+  min-block-size: 16px;
+  block-size: 16px;
   margin-inline: 2px;
   padding: 0 5px;
   overflow: hidden;
@@ -886,12 +989,44 @@
   background: color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 28%, transparent);
 }
 
+.ghostEvent {
+  z-index: 1;
+  align-self: center;
+  min-inline-size: 0;
+  min-block-size: 12px;
+  margin-inline: 4px;
+  opacity: 0.42;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pulse-color-text-secondary, #bac2c8) 55%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+  border: 1px dashed var(--pulse-color-text-secondary, #bac2c8);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 .gridCursor {
   z-index: 1;
   margin: 1px;
   border: 1px dashed var(--pulse-color-text-secondary, #bac2c8);
   border-radius: var(--pulse-radius-control);
   opacity: 0.55;
+  pointer-events: none;
+}
+
+.unavailableGridStep {
+  z-index: 2;
+  background: color-mix(in srgb, var(--surface-well) 75%, #000000);
+  border-inline-start: 1px solid var(--edge-hairline);
+  cursor: not-allowed;
+}
+
+.marqueeSelection {
+  z-index: 1;
+  border: 1px solid var(--pulse-color-accent, #7ed9a3);
+  background: color-mix(in srgb, var(--pulse-color-accent, #7ed9a3) 14%, transparent);
+  border-radius: 2px;
   pointer-events: none;
 }
 
@@ -922,7 +1057,7 @@
 .seekSteps {
   position: sticky;
   inset-block-start: 0;
-  z-index: 4;
+  z-index: 10;
   grid-column: 2;
   grid-row: 1;
   min-block-size: 24px;
@@ -964,10 +1099,14 @@
 
 .velocityLane {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  min-block-size: 48px;
+  grid-template-columns: var(--piano-keybed-width) minmax(0, 1fr);
+  min-block-size: 64px;
   border-block-start: 1px solid var(--edge-hairline);
   box-shadow: 0 -1px 0 var(--edge-highlight);
+}
+
+.velocityLane[data-lane-kind="toggle"] {
+  min-block-size: 36px;
 }
 
 .velocityLane > span {
@@ -980,13 +1119,13 @@
   color: var(--pulse-color-text-secondary, #bac2c8);
 }
 
-.velocityLane > div {
+.laneGrid {
   display: grid;
   grid-template-columns: repeat(16, 1fr);
   align-items: end;
   justify-items: center;
-  gap: 2px;
-  padding: 4px;
+  gap: 0;
+  padding-block: 4px;
   background: var(--surface-well);
   box-shadow: var(--sink-1);
 }
@@ -1003,9 +1142,138 @@
   accent-color: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
 }
 
+.pointControl {
+  position: relative;
+  align-self: stretch;
+  inline-size: 24px;
+  min-block-size: 52px;
+  block-size: 52px;
+}
+
+.pointControl::before,
+.pointControl::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 50%;
+  pointer-events: none;
+}
+
+.pointControl::before {
+  inset-block-end: 0;
+  inline-size: 2px;
+  block-size: var(--lane-position, 0%);
+  background: var(--module-accent, var(--pulse-color-control-fill, #b0f2ca));
+  transform: translateX(-50%);
+}
+
+.pointControl::after {
+  inset-block-end: clamp(0px, calc(var(--lane-position, 0%) - 5px), calc(100% - 10px));
+  inline-size: 10px;
+  block-size: 10px;
+  border: 2px solid var(--surface-well);
+  border-radius: 50%;
+  background: var(--module-accent, var(--pulse-color-control-fill, #b0f2ca));
+  box-shadow: 0 0 0 1px var(--pulse-color-text-primary, #f3f5f6);
+  transform: translateX(-50%);
+}
+
+.pointInput {
+  position: absolute;
+  inset: 0;
+  width: 24px;
+  height: 52px;
+  margin: 0;
+  opacity: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.pointControl:hover::after,
+.pointControl:focus-within::after {
+  box-shadow: 0 0 0 2px var(--pulse-color-text-primary, #f3f5f6);
+}
+
+:global([data-high-contrast="true"]) .pointControl::before {
+  background: var(--pulse-color-control-fill, #00e5ff);
+}
+
+:global([data-high-contrast="true"]) .pointControl::after {
+  border-color: #000000;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
 .velocityControl[data-selected="true"] {
   outline: 2px solid var(--pulse-color-text-primary, #f3f5f6);
   outline-offset: 1px;
+}
+
+.pointControl[data-selected="true"] {
+  outline: 2px solid var(--pulse-color-text-primary, #f3f5f6);
+  outline-offset: 1px;
+}
+
+.automationBoolean[data-selected="true"],
+.automationSelect[data-selected="true"] {
+  outline: 2px solid var(--pulse-color-text-primary, #f3f5f6);
+  outline-offset: 1px;
+}
+
+.propertyToggle {
+  align-self: center;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 2px;
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.propertyToggle[data-selected="true"] {
+  outline: 2px solid var(--pulse-color-text-primary, #f3f5f6);
+  outline-offset: 1px;
+}
+
+.emptyAutomationLane {
+  align-self: center;
+  max-inline-size: 100%;
+  overflow: hidden;
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-muted, #919ba3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationBoolean,
+.automationSelect {
+  width: 100%;
+  min-height: 1.5rem;
+  border: 1px solid var(--pulse-color-border-default, #6d7881);
+  background: var(--pulse-color-surface-control, #242a30);
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  font: inherit;
+  font-size: 0.68rem;
+}
+
+.automationBoolean[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--pulse-color-accent, #7ed9a3);
+}
+
+.automationActions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, max-content);
+  gap: 2px;
+  align-items: center;
+  padding: 3px;
+  background: var(--surface-raised);
+}
+
+.automationActions > button {
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 2px 4px;
+  font-size: var(--pulse-type-10, 10px);
 }
 
 .velocityStep {
@@ -1023,6 +1291,17 @@
   flex: 0 0 24px;
 }
 
+.unavailableStep {
+  align-self: stretch;
+  inline-size: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--pulse-color-text-muted, #919ba3);
+  background: color-mix(in srgb, var(--surface-well) 75%, #000000);
+  font-size: 0;
+}
+
 .playlist ol {
   flex: 1;
   display: flex;
@@ -1035,8 +1314,45 @@
 
 .playlist li:not(.emptyPlaylist) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto repeat(4, 24px);
   gap: 3px;
+}
+
+.songModeToggle {
+  display: inline-grid;
+  place-items: center;
+  margin-inline-start: auto;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 2px;
+}
+
+.playlistAction {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 2px;
+}
+
+.playlistIcon {
+  display: block;
+  inline-size: 15px;
+  block-size: 15px;
+}
+
+.playlistRepeats {
+  display: grid;
+  gap: 1px;
+  align-content: center;
+  color: var(--pulse-color-text-muted, #919ba3);
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.playlistRepeats input {
+  inline-size: 4.5ch;
+  min-block-size: 24px;
+  padding-inline: 3px;
 }
 
 /* A playlist row is a raised plate. The engaged row lights its perimeter and
@@ -1068,6 +1384,13 @@
     0 0 9px var(--accent-dim);
 }
 
+.playlist li > button:first-child strong {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .playlist small,
 .emptyPlaylist {
   font-size: var(--pulse-type-10, 10px);
@@ -1077,6 +1400,8 @@
 /* An add affordance is a dashed outline, never a raised key: it invites rather
    than claims to be a switch. */
 .addPattern {
+  display: grid;
+  place-items: center;
   min-block-size: 46px;
   margin: 0 8px 8px;
   font-family: var(--type-display);
@@ -1089,6 +1414,11 @@
   box-shadow: none;
 }
 
+.addPattern .playlistIcon {
+  inline-size: 19px;
+  block-size: 19px;
+}
+
 .addPattern:hover:not(:disabled) {
   color: var(--accent-lamp);
   border-color: var(--accent-lamp);
@@ -1098,7 +1428,7 @@
    flush text keys divided by hairlines, not raised caps. */
 .workspaceBar {
   min-inline-size: 0;
-  min-block-size: 52px;
+  min-block-size: 26px;
   display: flex;
   align-items: stretch;
   border-block-start: 1px solid var(--edge-hairline);
@@ -1135,8 +1465,10 @@
 
 .workspaceBar button:disabled {
   background: none;
-  box-shadow: inset 1px 0 0 var(--edge-highlight);
-  opacity: 0.35;
+  color: var(--pulse-color-disabled, #7b858d);
+  box-shadow:
+    inset 1px 0 0 var(--edge-highlight),
+    inset -1px 0 0 var(--edge-hairline);
 }
 
 /* The collapse key is the bar's primary action, so it keeps full-strength ink
@@ -1149,8 +1481,92 @@
   box-shadow: none;
 }
 
-.workspaceBar svg {
-  transition: rotate var(--pulse-duration-standard, 140ms) linear;
+/* The double focus ring is drawn inward so it cannot clip at the screen
+   bottom, where this plate sits flush. */
+.workspaceBar button:focus-visible {
+  outline-offset: calc(var(--pulse-focus-width) * -1);
+  box-shadow: inset 0 0 0 calc(var(--pulse-focus-width) * 2 + var(--pulse-focus-gap))
+    var(--pulse-color-focus-outer, #000000);
+}
+
+/* Save is the bar's consequential action. A decision gap splits it from the
+   history pair, and a lamp carries the save state. */
+.workspaceBar button[data-save-status] {
+  margin-inline-start: 8px;
+}
+
+.workspaceBar button[data-save-status="dirty"],
+.workspaceBar button[data-save-status="error"] {
+  color: var(--pulse-color-text-primary, #f3f5f6);
+}
+
+/* A save lamp: a dark bead in a bezel when idle, a status lamp when it has
+   something to say. The ink above it carries the second state cue. */
+.saveLamp {
+  inline-size: 8px;
+  block-size: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface-well);
+  box-shadow:
+    inset 0 1px 1px #000000cc,
+    0 0 0 1px var(--edge-hairline);
+}
+
+.saveLamp[data-lamp="dirty"],
+.saveLamp[data-lamp="saving"] {
+  background: var(--pulse-color-status-warning, #f2c14e);
+  box-shadow:
+    inset 0 1px 1px #ffffff59,
+    0 0 0 1px var(--edge-hairline);
+}
+
+.saveLamp[data-lamp="saved"] {
+  background: var(--pulse-color-status-success, #62d28a);
+  box-shadow:
+    inset 0 1px 1px #ffffff59,
+    0 0 0 1px var(--edge-hairline);
+}
+
+.saveLamp[data-lamp="error"] {
+  background: var(--pulse-color-status-danger, #ff8178);
+  box-shadow:
+    inset 0 1px 1px #ffffff59,
+    0 0 0 1px var(--edge-hairline);
+}
+
+/* A shortcut hint is an engraved key-cap caption, not a control. */
+.keyHint {
+  flex: none;
+  padding-inline: 4px;
+  padding-block: 1px;
+  border: 1px solid var(--edge-hairline);
+  border-radius: 3px;
+  background: var(--surface-well);
+  font-family: var(--pulse-font-ui);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--pulse-color-text-muted, #919ba3);
+  white-space: nowrap;
+}
+
+.workspaceBar button:disabled .keyHint {
+  color: var(--pulse-color-disabled, #7b858d);
+}
+
+/* The bar announces save status without taking layout space. */
+.visuallyHidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .barSpacer {

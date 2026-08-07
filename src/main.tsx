@@ -6,6 +6,7 @@ import {
   type ProjectRevision,
 } from "./contracts";
 import { browserIdFactory } from "./composition/browser-id-factory";
+import { toTransportDelta } from "./composition/audio-delta-projection";
 import {
   BUILT_IN_MODULES,
   BUILT_IN_EFFECTS,
@@ -293,8 +294,24 @@ const app = mountPulseboxApp({
     previewSwing: (swing) => {
       audio.previewSwing(swing);
     },
-    previewHumanize: (patternIndex, humanize) => {
-      audio.previewPatternHumanize(patternIndex, humanize);
+    previewHumanize: (patternId, humanize) => {
+      const patternIndex = patternIndexFor(store.getState(), patternId);
+      if (patternIndex !== undefined) audio.previewPatternHumanize(patternIndex, humanize);
+    },
+    previewPatternPart: async (moduleId, part, timing) => {
+      const module = store.getState().project.modules[moduleId];
+      if (module === undefined) throw new Error("Cannot preview a missing module.");
+      await audio.previewPatternPart(
+        moduleId,
+        {
+          ...part,
+          voiceCycleLengths: voiceCycleLengthsByNote(
+            module.pluginId,
+            part.voiceCycleLengths,
+          ),
+        },
+        timing,
+      );
     },
     previewChannelMix: (moduleId, field, value) => {
       audio.previewChannelMix(moduleId, field, value);
@@ -440,32 +457,29 @@ window.addEventListener("pagehide", (event) => {
 function queueAudioDelta(delta: PulseEngineDelta): void {
   if (suppressAudioProjection) return;
   const acceptedState = store.getState();
+  const transportDelta = toTransportDelta(delta, acceptedState);
   const moduleId =
-    typeof delta.payload.moduleId === "string"
-      ? (delta.payload.moduleId as ModuleInstanceId)
+    typeof transportDelta.payload.moduleId === "string"
+      ? (transportDelta.payload.moduleId as ModuleInstanceId)
       : undefined;
   const module = moduleId === undefined ? undefined : acceptedState.project.modules[moduleId];
   const moduleProjection =
     module === undefined ? undefined : toAudioModule(acceptedState, module);
   const fullProjection =
-    delta.kind === "project-replace" ? toAudioModules(acceptedState) : undefined;
-
-  // Undo, redo, and loads arrive as one project replacement. The module list
-  // alone does not carry the arrangement, Pattern timing, Swing, or master
-  // level, so those projections travel with the replacement.
-  if (delta.kind === "project-replace") {
-    audio.setArrangement({
-      activePatternIndex: acceptedState.project.activePatternIndex,
-      songEnabled: acceptedState.project.song.enabled,
-      songEntries: acceptedState.project.song.entries,
-    });
-    audio.setPatternTiming(toPatternTiming(acceptedState));
-    audio.setSwing(acceptedState.project.swing);
-    audio.setMasterLevel(acceptedState.project.masterLevel);
-  }
+    transportDelta.kind === "project-replace" ? toAudioModules(acceptedState) : undefined;
 
   audioProjectionQueue = audioProjectionQueue
-    .then(() => audio.project(delta, moduleProjection, fullProjection))
+    .then(async () => {
+      // A full replacement owns every ordered engine view. Keep these updates
+      // in the same queue as its revision so another delta cannot pass them.
+      if (transportDelta.kind === "project-replace") {
+        audio.setArrangement(toAudioArrangement(acceptedState));
+        audio.setPatternTiming(toPatternTiming(acceptedState));
+        audio.setSwing(acceptedState.project.swing);
+        audio.setMasterLevel(acceptedState.project.masterLevel);
+      }
+      await audio.project(transportDelta, moduleProjection, fullProjection);
+    })
     .catch(() => replaceAudioProjection(store.getState()));
 }
 
@@ -475,11 +489,7 @@ async function prepareImportedProject(
   const candidateAudio = createAudioRuntime();
   let activated = false;
   try {
-    candidateAudio.setArrangement({
-      activePatternIndex: candidate.project.activePatternIndex,
-      songEnabled: candidate.project.song.enabled,
-      songEntries: candidate.project.song.entries,
-    });
+    candidateAudio.setArrangement(toAudioArrangement(candidate));
     candidateAudio.setPatternTiming(toPatternTiming(candidate));
     candidateAudio.setSwing(candidate.project.swing);
     candidateAudio.setMasterLevel(candidate.project.masterLevel);
@@ -520,11 +530,7 @@ async function prepareImportedProject(
 
 async function replaceAudioProjection(state: Readonly<PulseState>): Promise<void> {
   try {
-    audio.setArrangement({
-      activePatternIndex: state.project.activePatternIndex,
-      songEnabled: state.project.song.enabled,
-      songEntries: state.project.song.entries,
-    });
+    audio.setArrangement(toAudioArrangement(state));
     audio.setPatternTiming(toPatternTiming(state));
     audio.setSwing(state.project.swing);
     audio.setMasterLevel(state.project.masterLevel);
@@ -549,6 +555,29 @@ function toPatternTiming(state: Readonly<PulseState>) {
   }));
 }
 
+/**
+ * The engine receives an ordered scheduling view only. Project state keeps the
+ * durable Pattern IDs, so a reorder or delete cannot redirect a module part or
+ * Playlist placement. This view is rebuilt from those IDs at each projection.
+ */
+function toAudioArrangement(state: Readonly<PulseState>) {
+  const patternIndex = patternIndexFor(state, state.project.activePatternId) ?? 0;
+  const songEntries = state.project.song.placements.flatMap((placement) => {
+    const index = patternIndexFor(state, placement.patternId);
+    return index === undefined ? [] : [{ patternIndex: index, repeats: placement.repeatCount }];
+  });
+  return {
+    activePatternIndex: patternIndex,
+    songEnabled: state.project.song.enabled,
+    songEntries,
+  };
+}
+
+function patternIndexFor(state: Readonly<PulseState>, patternId: string): number | undefined {
+  const index = state.project.patterns.findIndex((pattern) => pattern.id === patternId);
+  return index < 0 ? undefined : index;
+}
+
 function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): TransportModule {
   const slots = state.project.effects.voiceInserts[module.id];
   const voiceInserts =
@@ -571,7 +600,31 @@ function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): Tr
     pluginId: module.pluginId,
     parameters: module.parameters,
     ...(voiceInserts === undefined ? {} : { voiceInserts }),
-    parts: module.parts,
+    parts: state.project.patterns.map((pattern) => {
+      const part = pattern.parts[module.id];
+      return part === undefined
+        ? { length: 16, durationSteps: pattern.durationBars * 16, events: [] }
+        : {
+            ...part,
+            voiceCycleLengths: voiceCycleLengthsByNote(module.pluginId, part.voiceCycleLengths),
+            durationSteps: pattern.durationBars * 16,
+            automationSteps: part.automationLaneIds
+              .flatMap((laneId) => {
+                const lane = state.project.automationLanes[laneId];
+                if (lane === undefined) return [];
+                return lane.steps.map((step) => ({
+                  parameterId: lane.parameterId,
+                  positionTicks: step.tick,
+                  value: step.value,
+                }));
+              })
+              .sort(
+                (left, right) =>
+                  left.positionTicks - right.positionTicks ||
+                  left.parameterId.localeCompare(right.parameterId),
+              ),
+          };
+    }),
     mix: {
       level: module.level,
       pan: module.pan,
@@ -579,6 +632,27 @@ function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): Tr
       solo: module.solo,
     },
   };
+}
+
+/** The state contract lets a drum part use its stable voice ID. The scheduler
+ * sees notes only, so the composition boundary resolves that ID to its current
+ * manifest note before it crosses into the engine projection. */
+function voiceCycleLengthsByNote(
+  pluginId: PluginId,
+  cycleLengths: Readonly<Record<string, number>>,
+): Readonly<Record<string, number>> {
+  const manifest = registry.get(pluginId)?.manifest;
+  const notesByVoiceId =
+    manifest?.kind === "instrument"
+      ? new Map(manifest.voices.flatMap((voice) => (voice.note === undefined ? [] : [[voice.id, voice.note]])))
+      : new Map<string, number>();
+  return Object.fromEntries(
+    Object.entries(cycleLengths).flatMap(([key, length]) => {
+      const numericNote = Number(key);
+      const note = Number.isInteger(numericNote) ? numericNote : notesByVoiceId.get(key);
+      return note === undefined ? [] : [[String(note), length]];
+    }),
+  );
 }
 
 function requireInstrumentRuntime(pluginId: PluginId): Required<RuntimePlugin> {

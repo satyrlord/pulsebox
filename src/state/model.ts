@@ -2,22 +2,53 @@ import type { EffectsState } from "../contracts/effects";
 import type {
   ModuleInstanceId,
   NoteEventId,
+  AutomationLaneId,
   PatternId,
   ProjectId,
   ProjectLineageId,
   RackSlotId,
+  SongPlacementId,
   StateRevision,
+  VoiceId,
 } from "../contracts/ids";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 
 export const PATTERN_TICKS_PER_STEP = 240;
+export const PATTERN_TICKS_PER_BAR = PATTERN_TICKS_PER_STEP * 16;
+
+export const DEFAULT_PATTERN_EVENT_PROPERTIES = Object.freeze({
+  probability: 1,
+  microTimingTicks: 0,
+  flam: 0,
+  roll: 0,
+});
+
+/** The Pattern inspector offers only these pitch scales in the MVP. */
+export const PATTERN_SCALES = ["Chromatic", "Minor", "Dorian", "Phrygian", "Pentatonic"] as const;
+export type PatternScale = (typeof PATTERN_SCALES)[number];
+
+/** A drum voice ID or a numeric note text key can own an independent cycle length. */
+export type VoiceCycleLengthKey = VoiceId | `${number}`;
 
 export interface PatternEventData {
   readonly note: number;
   readonly velocity: number;
   readonly accent: boolean;
   readonly slide: boolean;
+  /** Chance that this event plays, on the closed unit interval. */
+  readonly probability: number;
+  /** Signed onset shift in ticks. The supported range is -60 through 60. */
+  readonly microTimingTicks: number;
+  /** Extra onset count for a flam. The supported range is 0 through 3. */
+  readonly flam: number;
+  /** Extra onset count for a roll. The supported range is 0 through 7. */
+  readonly roll: number;
 }
+
+/** Input data keeps new event properties optional and normalizes them at the state boundary. */
+export type PatternEventDataInput =
+  & Pick<PatternEventData, "note" | "velocity" | "accent" | "slide">
+  & Partial<Pick<PatternEventData, "probability" | "microTimingTicks" | "flam" | "roll">>;
 
 export type PatternEvent =
   | {
@@ -36,31 +67,39 @@ export type PatternEvent =
     };
 
 export interface PatternPartState {
+  readonly moduleId: ModuleInstanceId;
   readonly length: number;
+  /** Optional drum-voice cycle lengths, keyed by voice ID or numeric note text. */
+  readonly voiceCycleLengths: Readonly<Record<VoiceCycleLengthKey, number>>;
   readonly events: readonly PatternEvent[];
+  readonly automationLaneIds: readonly AutomationLaneId[];
 }
 
-/**
- * One named Pattern in the project bank. The bank is project-level so a Pattern
- * name means the same thing on every module; the steps for it live on each
- * module as the part at the same index.
- */
-export interface PatternSlotState {
+/** One named, complete multi-module Pattern owned by the project. */
+export interface PatternState {
   readonly id: PatternId;
   readonly name: string;
-  readonly length: number;
+  /** Opaque six-digit sRGB color text, such as #E6A23C. */
+  readonly color: string;
+  /** Positive whole bar count. */
+  readonly durationBars: number;
+  /** Pitch scale used by the Pattern editor. */
+  readonly scale: PatternScale;
   /** Pattern-owned deterministic Humanize amount, 0 through 1. */
   readonly humanize: number;
   /** Stored Pattern seed. The same seed replays the same variation. */
   readonly seed: number;
+  /** Pattern-local module parts keyed by durable module instance ID. */
+  readonly parts: Readonly<Record<ModuleInstanceId, PatternPartState>>;
+  readonly automationLaneIds: readonly AutomationLaneId[];
+  readonly createdAt: string;
+  readonly modifiedAt: string;
 }
 
 export interface RackModuleState {
   readonly id: ModuleInstanceId;
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
-  /** One event part per project Pattern slot, indexed in step with it. */
-  readonly parts: readonly PatternPartState[];
   readonly muted: boolean;
   readonly solo: boolean;
   /** Mixer fader position, 0 to 1. */
@@ -69,15 +108,35 @@ export interface RackModuleState {
   readonly pan: number;
 }
 
-export interface SongEntry {
-  readonly patternIndex: number;
-  readonly repeats: number;
+export interface SongPlacement {
+  readonly id: SongPlacementId;
+  readonly patternId: PatternId;
+  readonly repeatCount: number;
 }
 
 export interface SongState {
   /** When false the active Pattern loops; when true the chain plays. */
   readonly enabled: boolean;
-  readonly entries: readonly SongEntry[];
+  readonly placements: readonly SongPlacement[];
+}
+
+export interface AutomationStepState {
+  readonly tick: number;
+  readonly value: ParameterValue;
+}
+
+/**
+ * The minimal Pattern automation record. Later scopes use this same state type
+ * when their owner defines the target contract.
+ */
+export interface AutomationLaneState {
+  readonly id: AutomationLaneId;
+  readonly scope: "module";
+  readonly targetId: ModuleInstanceId;
+  readonly parameterId: string;
+  readonly patternId: PatternId;
+  readonly stepTicks: typeof PATTERN_TICKS_PER_STEP;
+  readonly steps: readonly AutomationStepState[];
 }
 
 export interface RackSlotState {
@@ -97,8 +156,10 @@ export interface ProjectState {
   readonly rackSlots: readonly RackSlotState[];
   readonly modules: Readonly<Record<ModuleInstanceId, RackModuleState>>;
   readonly effects: EffectsState;
-  readonly patterns: readonly PatternSlotState[];
-  readonly activePatternIndex: number;
+  /** Array order is display order only. Pattern IDs own identity. */
+  readonly patterns: readonly PatternState[];
+  readonly activePatternId: PatternId;
+  readonly automationLanes: Readonly<Record<AutomationLaneId, AutomationLaneState>>;
   readonly song: SongState;
 }
 
@@ -119,7 +180,7 @@ export interface UiState {
   readonly pianoRollSelection:
     | {
         readonly moduleId: ModuleInstanceId;
-        readonly patternIndex: number;
+        readonly patternId: PatternId;
         readonly eventIds: readonly NoteEventId[];
       }
     | undefined;

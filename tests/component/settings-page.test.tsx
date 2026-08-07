@@ -113,4 +113,19 @@ describe("settings page appearance controls", () => {
     expect(screen.queryByRole("radio", { name: /User theme/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Delete user theme" })).toBeDisabled();
   });
+
+  it("keeps Tab and Escape available for dialog navigation", () => {
+    const service = createThemeService();
+    const { harness } = renderWithHarness(<SettingsPage themeService={service} />);
+    const mapButton = screen.getByRole("button", { name: /Map semitone 1\./ });
+    const before = harness.store.getState().liveKeyMap;
+
+    expect(fireEvent.keyDown(mapButton, { key: "Tab", code: "Tab" })).toBe(true);
+    expect(harness.store.getState().liveKeyMap).toEqual(before);
+    expect(fireEvent.keyDown(mapButton, { key: "Escape", code: "Escape" })).toBe(true);
+    expect(harness.store.getState().liveKeyMap).toEqual(before);
+
+    expect(fireEvent.keyDown(mapButton, { key: "Enter", code: "Enter" })).toBe(false);
+    expect(screen.getByText("That key is reserved for keyboard navigation.")).toBeVisible();
+  });
 });

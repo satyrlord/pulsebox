@@ -13,6 +13,10 @@ import {
   type ScheduledEventPayload,
 } from "../../contracts/worklet-protocol";
 import { isPlainRecord } from "../../contracts/validation";
+import {
+  SCHEDULED_EVENT_QUEUE_CAPACITY,
+  SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+} from "../transport/scheduled-event";
 
 interface VoiceEvent {
   readonly atFrame: number;
@@ -23,7 +27,8 @@ interface VoiceEvent {
   readonly slide?: boolean;
 }
 
-const EVENT_CAPACITY = 256;
+const EVENT_CAPACITY = SCHEDULED_EVENT_QUEUE_CAPACITY;
+const PARAMETER_CAPACITY = SCHEDULED_PARAMETER_QUEUE_CAPACITY;
 /** 30 frames per second is the protocol ceiling; one frame per 30 ms is under it. */
 const METER_INTERVAL_SECONDS = 1 / 30;
 const UNKNOWN_SESSION_ID = "unknown-session";
@@ -42,6 +47,9 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
   readonly #velocities = new Float32Array(EVENT_CAPACITY);
   readonly #flags = new Uint8Array(EVENT_CAPACITY);
   #eventCount = 0;
+  readonly #parameterFrames = new Float64Array(PARAMETER_CAPACITY);
+  readonly #parameterValues = new Array<TParameters | undefined>(PARAMETER_CAPACITY);
+  #parameterCount = 0;
   #sessionId: string | undefined;
   #nodeId: string | undefined;
   #projectRevision: StateRevision | undefined;
@@ -237,9 +245,38 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
         return true;
       }
       case "parameter-batch": {
-        const parameters = this.decodeParameterChanges(payload.changes);
-        if (parameters === undefined) return this.#pluginPayloadFault(kind);
-        this.applyParameters(parameters, false);
+        if (!Array.isArray(payload.changes)) return this.#pluginPayloadFault(kind);
+        const immediate: unknown[] = [];
+        const scheduled: { readonly frame: number; readonly parameters: TParameters }[] = [];
+        for (const change of payload.changes) {
+          if (!isPlainRecord(change)) return this.#pluginPayloadFault(kind);
+          if (change.audioFrame === undefined) {
+            immediate.push(change);
+            continue;
+          }
+          const audioFrame = change.audioFrame;
+          if (typeof audioFrame !== "number" || !Number.isSafeInteger(audioFrame) || audioFrame < 0) {
+            return this.#pluginPayloadFault(kind);
+          }
+          const parameters = this.decodeParameterChanges([change]);
+          if (parameters === undefined) return this.#pluginPayloadFault(kind);
+          scheduled.push({ frame: audioFrame, parameters });
+        }
+        if (immediate.length > 0) {
+          const parameters = this.decodeParameterChanges(immediate);
+          if (parameters === undefined) return this.#pluginPayloadFault(kind);
+          this.applyParameters(parameters, false);
+        }
+        if (scheduled.length > PARAMETER_CAPACITY - this.#parameterCount) {
+          this.#fault(
+            "parameter-queue-overflow",
+            `The ${this.displayName} parameter queue reached its declared capacity.`,
+            "Silence and replace this processor, then reduce scheduling lookahead.",
+            undefined,
+          );
+          return false;
+        }
+        for (const change of scheduled) this.#enqueueParameters(change.frame, change.parameters);
         return true;
       }
       case "event-batch": {
@@ -266,11 +303,13 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
       case "reset":
         this.resetDsp();
         this.#eventCount = 0;
+        this.#parameterCount = 0;
         return true;
       case "clear-scheduled-events": {
         const { fromFrame } = payload as ClearScheduledEventsPayload;
         if (typeof fromFrame !== "number") {
           this.#eventCount = 0;
+          this.#parameterCount = 0;
           return true;
         }
         // The queue is kept sorted by frame, so a bounded clear truncates the
@@ -280,6 +319,12 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
           (this.#frames[this.#eventCount - 1] ?? 0) >= fromFrame
         ) {
           this.#eventCount -= 1;
+        }
+        while (
+          this.#parameterCount > 0 &&
+          (this.#parameterFrames[this.#parameterCount - 1] ?? 0) >= fromFrame
+        ) {
+          this.#parameterCount -= 1;
         }
         return true;
       }
@@ -385,6 +430,7 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
   #silence(): void {
     this.triggerNoteOff();
     this.#eventCount = 0;
+    this.#parameterCount = 0;
     this.#meterPeak = 0;
     this.#meterFrames = 0;
   }
@@ -421,6 +467,37 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
           ? 2
           : (event.accent ? 4 : 0) | (event.slide ? 8 : 0);
     this.#eventCount += 1;
+  }
+
+  #enqueueParameters(frame: number, parameters: TParameters): void {
+    let insertion = this.#parameterCount;
+    while (
+      insertion > 0 &&
+      (this.#parameterFrames[insertion - 1] ?? 0) > frame
+    ) {
+      this.#parameterFrames[insertion] = this.#parameterFrames[insertion - 1] ?? 0;
+      this.#parameterValues[insertion] = this.#parameterValues[insertion - 1];
+      insertion -= 1;
+    }
+    this.#parameterFrames[insertion] = frame;
+    this.#parameterValues[insertion] = parameters;
+    this.#parameterCount += 1;
+  }
+
+  #applyDueParameters(frame: number): void {
+    while (
+      this.#parameterCount > 0 &&
+      (this.#parameterFrames[0] ?? Number.POSITIVE_INFINITY) <= frame
+    ) {
+      const parameters = this.#parameterValues[0];
+      if (parameters !== undefined) this.applyParameters(parameters, false);
+      this.#parameterCount -= 1;
+      for (let index = 0; index < this.#parameterCount; index += 1) {
+        this.#parameterFrames[index] = this.#parameterFrames[index + 1] ?? 0;
+        this.#parameterValues[index] = this.#parameterValues[index + 1];
+      }
+      this.#parameterValues[this.#parameterCount] = undefined;
+    }
   }
 
   #applyDueEvents(frame: number): void {
@@ -469,12 +546,21 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
 
     let offset = 0;
     while (offset < frameCount) {
+      this.#applyDueParameters(currentFrame + offset);
       this.#applyDueEvents(currentFrame + offset);
       const nextEventFrame =
         this.#eventCount > 0
           ? (this.#frames[0] ?? Number.POSITIVE_INFINITY)
           : Number.POSITIVE_INFINITY;
-      const nextOffset = Math.min(frameCount, Math.max(offset + 1, nextEventFrame - currentFrame));
+      const nextParameterFrame =
+        this.#parameterCount > 0
+          ? (this.#parameterFrames[0] ?? Number.POSITIVE_INFINITY)
+          : Number.POSITIVE_INFINITY;
+      const nextBoundaryFrame = Math.min(nextEventFrame, nextParameterFrame);
+      const nextOffset = Math.min(
+        frameCount,
+        Math.max(offset + 1, nextBoundaryFrame - currentFrame),
+      );
       this.renderBlock(left, right, offset, nextOffset);
       offset = nextOffset;
     }

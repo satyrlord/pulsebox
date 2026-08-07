@@ -7,10 +7,11 @@ import {
   schedulePatternWindow,
 } from "../../../src/engine/transport/pattern-scheduler";
 import { BassMonoDsp } from "../../../src/engine/modules/bass-mono/dsp-core";
-import type {
-  PatternEventView,
-  PatternPartView,
-  ScheduledVoiceEvent,
+import {
+  SCHEDULED_EVENT_QUEUE_CAPACITY,
+  type PatternEventView,
+  type PatternPartView,
+  type ScheduledVoiceEvent,
 } from "../../../src/engine/transport/scheduled-event";
 import { TransportClock } from "../../../src/engine/transport/transport-clock";
 
@@ -168,7 +169,7 @@ describe("schedulePatternWindow", () => {
       windowEndFrame: 20_000,
     });
 
-    expect(events.length).toBeLessThanOrEqual(256);
+    expect(events.length).toBeLessThanOrEqual(SCHEDULED_EVENT_QUEUE_CAPACITY);
     expect(
       events.every(
         (event, index) => index === 0 || event.atFrame >= (events[index - 1]?.atFrame ?? -1),
@@ -371,6 +372,23 @@ describe("schedulePatternWindow", () => {
       [0, 1, 2, 3, 4, 5].map((index) => resolveStep(index)?.events[0]?.data.note),
     ).toEqual([1, 2, 3, 1, 2, 3]);
     expect([0, 1, 2].map((index) => resolveStep(index)?.patternIndex)).toEqual([0, 0, 1]);
+  });
+
+  it("keeps a long voice cycle in phase across one Song placement repeat", () => {
+    const resolveStep = chainedStepResolver([
+      {
+        part: {
+          length: 16,
+          durationSteps: 16,
+          voiceCycleLengths: { "1": 32 },
+          events: [event(0, { note: 1 })],
+        },
+        patternIndex: 0,
+        repeats: 2,
+      },
+    ]);
+
+    expect([0, 16, 32].map((step) => resolveStep(step)?.events.length)).toEqual([1, 0, 1]);
   });
 
   it("treats an empty pattern and an empty chain as silence", () => {

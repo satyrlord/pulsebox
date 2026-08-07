@@ -340,7 +340,7 @@ test("high contrast repaints the rack controls, not only the page behind them", 
         knobValue: read('[data-component="knob"] input', "color"),
         faderSlot: read('[data-component="fader"] [data-part="track"]', "background-color"),
         faderOutline: read('[data-component="fader"] [role="slider"]', "outline-width"),
-        pianoNatural: read('[aria-label="C4 piano key audition"]', "background-image"),
+        pianoNatural: read('[aria-label="C4 piano key audition"]', "background-color"),
         pianoSharp: read('[aria-label="A#3 piano key audition"]', "background-image"),
       };
     });
@@ -374,7 +374,7 @@ test("high contrast repaints the rack controls, not only the page behind them", 
   expect(afterOverlay.knobSkirtBackground).toBe("none");
   expect(afterOverlay.knobSkirtShadow).toBe("rgb(255, 255, 255) 0px 0px 0px 2px inset");
   expect(afterOverlay.faderOutline).toBe("2px");
-  expect(afterOverlay.pianoNatural).toContain("rgb(255, 255, 255)");
+  expect(afterOverlay.pianoNatural).toBe("rgb(255, 255, 255)");
   expect(afterOverlay.pianoSharp).toBe("none");
   await expect
     .poll(() => idleMeter.evaluate((element) => (element as HTMLCanvasElement).toDataURL()))
@@ -607,14 +607,14 @@ test("each Pattern keeps its own name and selection across reload", async ({ pag
   await rename.press("Enter");
 
   await pattern.selectOption({ label: "Intro" });
-  await expect(pattern).toHaveValue("0");
+  expect(await pattern.inputValue()).toMatch(/^[0-9a-f-]{36}$/u);
   await expect(pattern.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 
   await page.waitForTimeout(1_500);
   await page.reload();
 
   const reloaded = page.getByRole("combobox", { name: "Selected Pattern", exact: true });
-  await expect(reloaded).toHaveValue("0");
+  expect(await reloaded.inputValue()).toMatch(/^[0-9a-f-]{36}$/u);
   await expect(reloaded.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 });
 
@@ -661,6 +661,17 @@ test("a mixer fader moves by keyboard and persists across a reload", async ({ pa
  */
 test("a short mixer well keeps the fader's pointer resolution", async ({ page }) => {
   await page.getByRole("tab", { name: "Mixer" }).click();
+  // The mixer well is short only when the lower editor takes most of the
+  // height, so raise the editor until the rack row shrinks the well below
+  // the fader's pointer-resolution floor.
+  const handle = page.locator('[data-component="editor-resize-handle"]');
+  const grip = await handle.boundingBox();
+  if (grip === null) throw new Error("Expected the editor resize handle to be laid out.");
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 100, { steps: 8 });
+  await page.mouse.up();
+
   const fader = page.getByRole("slider", { name: "Silver Serpent level" });
   const surface = await fader.boundingBox();
   if (surface === null) throw new Error("Expected the channel fader to be laid out.");
@@ -692,9 +703,9 @@ test("song mode chains Patterns and reports the chain length", async ({ page }) 
   await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
   await expect(playlist.locator("ol > li")).toHaveCount(7);
 
-  const songMode = page.getByRole("button", { name: "Song" });
+  const songMode = page.getByRole("button", { name: "Pattern playback mode" });
   await songMode.click();
-  await expect(songMode).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Song playback mode" })).toHaveAttribute("aria-pressed", "true");
 
   await startPlayback(page);
   await expect(page.locator(".audio-status")).toHaveText("Audio active");

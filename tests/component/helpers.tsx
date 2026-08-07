@@ -1,6 +1,6 @@
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 
 import {
   DISTORTION_EFFECT_PLUGIN_ID,
@@ -16,6 +16,7 @@ import {
   BUILT_IN_EFFECTS,
   DRUMLINE_SIX_DEFAULT_PARAMETERS,
   DRUMLINE_SIX_MANIFEST,
+  auditionNoteFor as noteForManifest,
   playableNotesFor,
 } from "../../src/engine/public";
 import {
@@ -41,6 +42,7 @@ export interface Harness {
     readonly pause: ReturnType<typeof vi.fn>;
     readonly stop: ReturnType<typeof vi.fn>;
     readonly previewParameter: ReturnType<typeof vi.fn>;
+    readonly previewPatternPart: Mock<NonNullable<AudioControlPort["previewPatternPart"]>>;
     readonly startAudition: ReturnType<typeof vi.fn>;
     readonly stopAudition: ReturnType<typeof vi.fn>;
   };
@@ -136,6 +138,7 @@ export function createHarness(
     previewTempo: vi.fn(),
     previewSwing: vi.fn(),
     previewHumanize: vi.fn(),
+    previewPatternPart: vi.fn(() => Promise.resolve()),
     startAudition: vi.fn(() => Promise.resolve()),
     stopAudition: vi.fn(),
     stop: vi.fn(),
@@ -186,7 +189,10 @@ export function createHarness(
       DRUMLINE_SIX_MANIFEST.pluginId,
       ...extraModules.map((module) => module.manifest.pluginId),
     ],
-    auditionNoteFor: () => 36,
+    auditionNoteFor: (pluginId, voiceId) => {
+      const manifest = manifests.get(pluginId);
+      return manifest?.kind === "instrument" ? noteForManifest(manifest, voiceId) : 36;
+    },
     // The real manifest-declared lookup, so the section 14 result panel counts
     // the events a swap target genuinely cannot sound.
     playableNotesFor: (pluginId: PluginId) => {

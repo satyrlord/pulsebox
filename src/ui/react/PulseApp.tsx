@@ -24,7 +24,7 @@ export interface PulseAppProps {
  * stylesheet changes, keep these values in sync.
  */
 const HEADER_ROW = 58;
-const BAR_ROW = 52;
+const BAR_ROW = 26;
 const HANDLE_ROW = 6;
 const MAIN_ROW_MINIMUM = 350;
 
@@ -296,7 +296,7 @@ export function PulseApp(props: PulseAppProps) {
           tempo: project.tempo,
           moduleCount: Object.keys(project.modules).length,
           patternCount: project.patterns.length,
-          songEntryCount: project.song.entries.length,
+          songEntryCount: project.song.placements.length,
         }}
         projectMessage={projectMessage}
         onSave={() => {

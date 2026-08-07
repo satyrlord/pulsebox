@@ -168,7 +168,7 @@ describe("worklet voice adapter bounds and disposal", () => {
     } as unknown as AudioContext;
   }
 
-  it("faults instead of silently dropping an oversized event batch", async () => {
+  it("splits a complete event horizon into bounded protocol batches", async () => {
     vi.stubGlobal("AudioWorkletNode", ProtocolNode);
     const statuses: VoiceAdapterStatus[] = [];
     const adapter = createBassVoiceAdapter(adapterContext(), {
@@ -189,10 +189,43 @@ describe("worklet voice adapter bounds and disposal", () => {
       })),
     );
 
-    expect(statuses[0]).toMatchObject({
-      state: "recovering",
-      fault: { code: "event-batch-overflow" },
+    const eventBatches = ProtocolNode.instances.at(-1)?.port.sent.filter(
+      (message) => message.kind === "event-batch",
+    );
+    expect(statuses).toEqual([]);
+    expect(eventBatches).toHaveLength(2);
+    expect(eventBatches?.map((message) => (message.payload.events as unknown[]).length)).toEqual([
+      256,
+      1,
+    ]);
+  });
+
+  it("splits scheduled automation into bounded protocol batches", async () => {
+    vi.stubGlobal("AudioWorkletNode", ProtocolNode);
+    const statuses: VoiceAdapterStatus[] = [];
+    const adapter = createBassVoiceAdapter(adapterContext(), {
+      projectRevision: REVISION,
+      onStatus: (status) => statuses.push(status),
     });
+    await adapter.prepare();
+    adapter.activate({} as unknown as AudioNode);
+
+    adapter.scheduleParameters(
+      Array.from({ length: 129 }, (_, index) => ({
+        atFrame: 1_000 + index,
+        parameterId: "cutoff",
+        value: 1_000 + index,
+      })),
+    );
+
+    const parameterBatches = ProtocolNode.instances.at(-1)?.port.sent.filter(
+      (message) => message.kind === "parameter-batch",
+    );
+    expect(statuses).toEqual([]);
+    expect(parameterBatches).toHaveLength(2);
+    expect(
+      parameterBatches?.map((message) => (message.payload.changes as unknown[]).length),
+    ).toEqual([128, 1]);
   });
 
   it("faults instead of silently dropping a batch with an invalid event frame", async () => {
@@ -249,7 +282,16 @@ function toRuntimeModules(state: ReturnType<typeof createDefaultState>): Transpo
     id: module.id,
     pluginId: module.pluginId,
     parameters: module.parameters,
-    parts: module.parts,
+    parts: state.project.patterns.map(
+      (pattern) =>
+        pattern.parts[module.id] ?? {
+          moduleId: module.id,
+          length: 16,
+          voiceCycleLengths: {},
+          events: [],
+          automationLaneIds: [],
+        },
+    ),
     mix: { level: module.level, pan: module.pan, muted: module.muted, solo: module.solo },
   }));
 }

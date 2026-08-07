@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createGestureId, type IdFactory } from "../../../src/contracts/ids";
+import { createGestureId, type IdFactory, type PatternId } from "../../../src/contracts/ids";
 import type { ParameterId, PluginId } from "../../../src/contracts/parameters";
 import { createDefaultState, DEFAULT_PATTERN_HUMANIZE } from "../../../src/state/default-state";
 import {
@@ -44,6 +44,10 @@ function createStore(deltas: PulseEngineDelta[] = []): PulseStore {
   );
 }
 
+function activePatternId(store: PulseStore): PatternId {
+  return store.getState().project.activePatternId;
+}
+
 const parseOptions: ParseOptions = {
   knownPluginIds: ["bass-mono"],
   parameterDescriptorsByPluginId: {
@@ -71,52 +75,58 @@ describe("Pattern timing commands", () => {
   it("sets Pattern Humanize through a validated undoable command", () => {
     const deltas: PulseEngineDelta[] = [];
     const store = createStore(deltas);
+    const patternId = activePatternId(store);
 
     const result = store.dispatch(
-      store.createCommand("pattern-humanize-set", { patternIndex: 1, humanize: 0.4 }),
+      store.createCommand("pattern-humanize-set", { patternId, humanize: 0.4 }),
     );
     expect(result).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.patterns[1]?.humanize).toBe(0.4);
+    expect(store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.humanize).toBe(0.4);
     expect(deltas.at(-1)).toMatchObject({
       kind: "pattern-timing-set",
-      payload: { patternIndex: 1, humanize: 0.4 },
+      payload: { patternId, humanize: 0.4 },
     });
 
     expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.patterns[1]?.humanize).toBe(DEFAULT_PATTERN_HUMANIZE);
+    expect(store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.humanize).toBe(DEFAULT_PATTERN_HUMANIZE);
   });
 
   it("coalesces a Humanize slider gesture into one undo entry", () => {
     const store = createStore();
+    const patternId = activePatternId(store);
     const gestureId = createGestureId(deterministicIds());
     for (const humanize of [0.2, 0.3, 0.5]) {
       store.dispatch(
-        store.createCommand("pattern-humanize-set", { patternIndex: 1, humanize }, { gestureId }),
+        store.createCommand("pattern-humanize-set", { patternId, humanize }, { gestureId }),
       );
     }
-    expect(store.getState().project.patterns[1]?.humanize).toBe(0.5);
+    expect(store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.humanize).toBe(0.5);
     store.undo();
-    expect(store.getState().project.patterns[1]?.humanize).toBe(DEFAULT_PATTERN_HUMANIZE);
+    expect(store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.humanize).toBe(DEFAULT_PATTERN_HUMANIZE);
     expect(store.getState().history.canUndo).toBe(false);
   });
 
   it("rejects an out-of-range Humanize or seed and an unknown Pattern", () => {
     const store = createStore();
+    const patternId = activePatternId(store);
     expect(
       store.dispatch(
-        store.createCommand("pattern-humanize-set", { patternIndex: 1, humanize: 1.5 }),
+        store.createCommand("pattern-humanize-set", { patternId, humanize: 1.5 }),
       ).status,
     ).toBe("rejected");
     expect(
-      store.dispatch(store.createCommand("pattern-humanize-set", { patternIndex: 9, humanize: 0.2 }))
+      store.dispatch(store.createCommand("pattern-humanize-set", {
+        patternId: "00000000-0000-4000-8000-000000000999" as PatternId,
+        humanize: 0.2,
+      }))
         .status,
     ).toBe("rejected");
     expect(
-      store.dispatch(store.createCommand("pattern-seed-set", { patternIndex: 1, seed: -1 })).status,
+      store.dispatch(store.createCommand("pattern-seed-set", { patternId, seed: -1 })).status,
     ).toBe("rejected");
     expect(
       store.dispatch(
-        store.createCommand("pattern-seed-set", { patternIndex: 1, seed: 0x1_0000_0000 }),
+        store.createCommand("pattern-seed-set", { patternId, seed: 0x1_0000_0000 }),
       ).status,
     ).toBe("rejected");
   });
@@ -124,20 +134,21 @@ describe("Pattern timing commands", () => {
   it("stores a new seed as a new deterministic variation", () => {
     const deltas: PulseEngineDelta[] = [];
     const store = createStore(deltas);
-    const before = store.getState().project.patterns[1]?.seed;
+    const patternId = activePatternId(store);
+    const before = store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.seed;
 
     const result = store.dispatch(
-      store.createCommand("pattern-seed-set", { patternIndex: 1, seed: 987_654 }),
+      store.createCommand("pattern-seed-set", { patternId, seed: 987_654 }),
     );
     expect(result).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.patterns[1]?.seed).toBe(987_654);
+    expect(store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.seed).toBe(987_654);
     expect(deltas.at(-1)).toMatchObject({
       kind: "pattern-timing-set",
-      payload: { patternIndex: 1, seed: 987_654 },
+      payload: { patternId, seed: 987_654 },
     });
 
     store.undo();
-    expect(store.getState().project.patterns[1]?.seed).toBe(before);
+    expect(store.getState().project.patterns.find((pattern) => pattern.id === patternId)?.seed).toBe(before);
   });
 });
 
@@ -186,10 +197,11 @@ describe("Pattern timing serialization", () => {
   it("round-trips Humanize and seed through the document", () => {
     const ids = deterministicIds();
     const store = createStore();
+    const patternId = activePatternId(store);
     store.dispatch(
-      store.createCommand("pattern-humanize-set", { patternIndex: 1, humanize: 0.33 }),
+      store.createCommand("pattern-humanize-set", { patternId, humanize: 0.33 }),
     );
-    store.dispatch(store.createCommand("pattern-seed-set", { patternIndex: 1, seed: 42 }));
+    store.dispatch(store.createCommand("pattern-seed-set", { patternId, seed: 42 }));
 
     const document = serializeProject(store.getState(), {
       createdAt: "2026-07-30T00:00:00.000Z",
@@ -201,8 +213,8 @@ describe("Pattern timing serialization", () => {
     if (!parsed.ok) return;
 
     const restored = documentToState(parsed.value, createDefaultState(deterministicIds(), seed));
-    expect(restored.project.patterns[1]?.humanize).toBe(0.33);
-    expect(restored.project.patterns[1]?.seed).toBe(42);
+    expect(restored.project.patterns.find((pattern) => pattern.id === patternId)?.humanize).toBe(0.33);
+    expect(restored.project.patterns.find((pattern) => pattern.id === patternId)?.seed).toBe(42);
   });
 
   it("snaps a committed Swing to the whole-percent grid the document stores", () => {
@@ -225,7 +237,7 @@ describe("Pattern timing serialization", () => {
     expect(restored.project.swing).toBe(committed);
   });
 
-  it("keeps an old document without timing fields mechanical and deterministic", () => {
+  it("rejects a document without required Pattern timing fields", () => {
     const ids = deterministicIds();
     const document = serializeProject(createStore().getState(), {
       createdAt: "2026-07-30T00:00:00.000Z",
@@ -243,17 +255,7 @@ describe("Pattern timing serialization", () => {
     };
 
     const parsed = parseProjectDocument(JSON.parse(JSON.stringify(legacy)), parseOptions);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) return;
-    const restored = documentToState(parsed.value, createDefaultState(deterministicIds(), seed));
-    for (const pattern of restored.project.patterns) {
-      expect(pattern.humanize).toBe(0);
-      expect(Number.isSafeInteger(pattern.seed)).toBe(true);
-    }
-    const again = documentToState(parsed.value, createDefaultState(deterministicIds(), seed));
-    expect(again.project.patterns.map((pattern) => pattern.seed)).toEqual(
-      restored.project.patterns.map((pattern) => pattern.seed),
-    );
+    expect(parsed.ok).toBe(false);
   });
 
   it("rejects an out-of-range serialized Humanize or seed", () => {

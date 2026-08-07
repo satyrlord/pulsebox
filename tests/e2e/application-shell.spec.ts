@@ -97,7 +97,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     const editor = await box(page.locator('[data-component="editor-workspace"]'));
     const footer = await box(page.locator('[data-component="workspace-bar"]'));
     expect(header.height).toBe(58);
-    expect(footer.height).toBe(52);
+    expect(footer.height).toBe(26);
     expect(header.y + header.height).toBeLessThanOrEqual(main.y);
     expect(main.y + main.height).toBeLessThanOrEqual(editor.y);
     expect(editor.y + editor.height).toBeLessThanOrEqual(footer.y);
@@ -263,14 +263,20 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     const sharpKey = keybed.getByRole("button", { name: "A#3 piano key audition" });
     const naturalBox = await box(naturalKey);
     const sharpBox = await box(sharpKey);
-    expect(naturalBox.height).toBeGreaterThanOrEqual(24);
+    expect(naturalBox.height).toBeGreaterThanOrEqual(16);
     expect(sharpBox.width).toBeGreaterThanOrEqual(24);
-    expect(sharpBox.height).toBeGreaterThanOrEqual(24);
+    expect(sharpBox.height).toBeGreaterThanOrEqual(16);
+    expect(naturalBox.width).toBeGreaterThan(sharpBox.width);
+    expect(sharpBox.width / naturalBox.width).toBeLessThanOrEqual(0.6);
+    await expect(naturalKey).toHaveText("C4");
+    await expect(keybed.getByRole("button", { name: "B3 piano key audition" })).toHaveText("B3");
     const keyStyles = await Promise.all([
       naturalKey.evaluate((element) => getComputedStyle(element).backgroundImage),
       sharpKey.evaluate((element) => getComputedStyle(element).backgroundImage),
+      keybed.evaluate((element) => getComputedStyle(element).backgroundImage),
     ]);
     expect(keyStyles[0]).not.toBe(keyStyles[1]);
+    expect(keyStyles[2]).toBe(keyStyles[0]);
     const rollScroll = page.locator('[data-component="piano-roll-scroll"]');
     const scrollState = await rollScroll.evaluate((element) => ({
       clientHeight: element.clientHeight,
@@ -298,6 +304,59 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     }
   });
 }
+
+test("keeps ivory backing visible beside short Piano Roll black keys", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const keybed = page.getByRole("group", { name: "Piano keyboard" });
+  const naturalKey = keybed.getByRole("button", { name: "C4 piano key audition" });
+  const sharpKey = keybed.getByRole("button", { name: "A#3 piano key audition" });
+  const naturalBox = await box(naturalKey);
+  const sharpBox = await box(sharpKey);
+
+  expect(naturalBox.width).toBe(76);
+  expect(sharpBox.width).toBe(44);
+
+  const backing = await page.evaluate(
+    ({ x, y }) => {
+      const keybedElement = document.querySelector('[aria-label="Piano keyboard"]');
+      const naturalElement = document.querySelector('[aria-label="C4 piano key audition"]');
+      const hit = document.elementFromPoint(x, y);
+      return {
+        hitKeybed: hit === keybedElement,
+        backingImage: hit === null ? "" : getComputedStyle(hit).backgroundImage,
+        naturalImage:
+          naturalElement === null ? "" : getComputedStyle(naturalElement).backgroundImage,
+      };
+    },
+    {
+      x: sharpBox.x + sharpBox.width + 4,
+      y: sharpBox.y + sharpBox.height / 2,
+    },
+  );
+
+  expect(backing.hitKeybed).toBe(true);
+  expect(backing.backingImage).toBe(backing.naturalImage);
+});
+
+test("keeps a Piano Roll black key dark when no module is available", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const sharpKey = page
+    .getByRole("group", { name: "Piano keyboard" })
+    .getByRole("button", { name: "A#3 piano key audition" });
+  const activeFace = await sharpKey.evaluate(
+    (element) => getComputedStyle(element).backgroundImage,
+  );
+
+  await sharpKey.evaluate((element) => {
+    (element as HTMLButtonElement).disabled = true;
+  });
+
+  await expect(sharpKey).toBeDisabled();
+  expect(activeFace).not.toBe("none");
+  await expect
+    .poll(() => sharpKey.evaluate((element) => getComputedStyle(element).backgroundImage))
+    .toBe(activeFace);
+});
 
 test("omits redundant rack and module-browser controls", async ({ page }) => {
   const rack = page.locator('[data-component="rack"]');
@@ -489,7 +548,7 @@ test("edits Piano Roll notes with real pointer and keyboard gestures", async ({ 
   await page.setViewportSize({ width: 1536, height: 1024 });
   const scroll = page.locator('[data-component="piano-roll-scroll"]');
   await scroll.evaluate((element) => {
-    element.scrollTop = 12 * 24;
+    element.scrollTop = 12 * 16;
   });
 
   const grid = page.locator('[data-component="piano-roll-grid"]');
@@ -497,7 +556,7 @@ test("edits Piano Roll notes with real pointer and keyboard gestures", async ({ 
   const gridBounds = await box(grid);
   const keyBounds = await box(c3Key);
   const stepWidth = gridBounds.width / 16;
-  await page.mouse.click(
+  await page.mouse.dblclick(
     gridBounds.x + stepWidth * 3.5,
     keyBounds.y + keyBounds.height / 2,
   );
@@ -505,10 +564,44 @@ test("edits Piano Roll notes with real pointer and keyboard gestures", async ({ 
   let created = page.getByRole("button", { name: /C3 note, step 4,/u });
   await expect(created).toBeVisible();
   const velocity = page.getByRole("slider", { name: /C3 note, step 4,.*velocity$/u });
-  await velocity.fill("60");
+  const velocityBounds = await box(velocity);
+  expect(velocityBounds.width).toBeGreaterThanOrEqual(24);
+  expect(velocityBounds.height).toBeGreaterThanOrEqual(48);
+  const pointControl = velocity.locator("..");
+  expect(
+    await pointControl.evaluate((element) => getComputedStyle(element, "::before").height),
+  ).not.toBe("0px");
+  const initialVelocity = Number(await velocity.inputValue());
+  await page.mouse.move(
+    velocityBounds.x + velocityBounds.width / 2,
+    velocityBounds.y + velocityBounds.height * (1 - initialVelocity / 100),
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    velocityBounds.x + velocityBounds.width / 2,
+    velocityBounds.y + velocityBounds.height * 0.5,
+    { steps: 6 },
+  );
+  await page.mouse.up();
   await velocity.blur();
-  created = page.getByRole("button", { name: /C3 note, step 4, 60 percent velocity/u });
+  const pointerVelocity = Number(await velocity.inputValue());
+  expect(pointerVelocity).toBeGreaterThanOrEqual(45);
+  expect(pointerVelocity).toBeLessThanOrEqual(55);
+  created = page.getByRole("button", {
+    name: new RegExp(`C3 note, step 4, ${String(pointerVelocity)} percent velocity`, "u"),
+  });
   await expect(created).toBeVisible();
+
+  await created.focus();
+  const timeline = page.locator('[data-component="piano-roll-scroll"] button').first();
+  const timelineBounds = await box(timeline);
+  expect(
+    await page.evaluate(
+      ({ x, y }) =>
+        document.elementFromPoint(x, y)?.closest('[data-component="piano-roll-event"]') === null,
+      { x: gridBounds.x + stepWidth * 3.5, y: timelineBounds.y + timelineBounds.height / 2 },
+    ),
+  ).toBe(true);
   await created.press("Delete");
   await expect(created).toHaveCount(0);
 
@@ -545,7 +638,9 @@ test("edits Piano Roll notes with real pointer and keyboard gestures", async ({ 
   await expect(page.getByRole("button", { name: /G2 note, step 3,.*3 step duration/u })).toBeVisible();
 });
 
-test("paints drum triggers with one pointer gesture and one Undo entry", async ({ page }) => {
+test("creates a drum trigger by double-click and marquee-selects with a drag", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1536, height: 1024 });
   await page.getByRole("combobox", { name: "Piano Roll module" }).selectOption({
     label: "Tin Soldier",
@@ -553,25 +648,160 @@ test("paints drum triggers with one pointer gesture and one Undo entry", async (
 
   const grid = page.locator('[data-component="piano-roll-grid"]');
   const clap = page.getByRole("button", { name: "Clap voice audition" });
+  const kick = page.getByRole("button", { name: "Kick voice audition" });
   const eventButtons = grid.locator('[data-component="piano-roll-event"]');
   const baseline = await eventButtons.count();
   const gridBounds = await box(grid);
   const clapBounds = await box(clap);
+  const kickBounds = await box(kick);
   const stepWidth = gridBounds.width / 16;
 
-  await page.mouse.move(gridBounds.x + stepWidth * 1.5, clapBounds.y + clapBounds.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(gridBounds.x + stepWidth * 3.5, clapBounds.y + clapBounds.height / 2, {
-    steps: 8,
-  });
-  await page.mouse.up();
+  // A single click on an empty cell creates nothing.
+  await page.mouse.click(gridBounds.x + stepWidth * 1.5, clapBounds.y + clapBounds.height / 2);
+  await expect(eventButtons).toHaveCount(baseline);
 
-  await expect(eventButtons).toHaveCount(baseline + 3);
-  await page.locator('[data-component="workspace-bar"]').getByRole("button", { name: "Undo" }).click();
+  // A double-click creates one fixed one-cell trigger.
+  await page.mouse.dblclick(gridBounds.x + stepWidth * 1.5, clapBounds.y + clapBounds.height / 2);
+  const created = page.getByRole("button", { name: /Clap trigger, step 2/u });
+  await expect(created).toBeVisible();
+  await expect(eventButtons).toHaveCount(baseline + 1);
+
+  // Undo removes the single double-clicked trigger in one entry.
+  await page
+    .locator('[data-component="workspace-bar"]')
+    .getByRole("button", { name: "Undo" })
+    .click();
   await expect(eventButtons).toHaveCount(baseline);
   await expect(
     page.locator('[data-component="workspace-bar"]').getByRole("button", { name: "Undo" }),
   ).toBeDisabled();
+
+  // A drag on an empty cell draws a selection box and creates nothing. The
+  // kick row holds one trigger at step 6, inside the dragged box.
+  const kickStep6 = page.getByRole("button", { name: /Kick trigger, step 7/u });
+  await expect(kickStep6).toHaveAttribute("aria-pressed", "false");
+  await page.mouse.move(gridBounds.x + stepWidth * 2.5, kickBounds.y + kickBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(gridBounds.x + stepWidth * 7.5, kickBounds.y + kickBounds.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await expect(kickStep6).toHaveAttribute("aria-pressed", "true");
+  await expect(eventButtons).toHaveCount(baseline);
+
+  // A trigger has no resize edge. A drag that starts near its left edge moves it.
+  const triggerBounds = await box(kickStep6);
+  await page.mouse.move(triggerBounds.x + 2, triggerBounds.y + triggerBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(triggerBounds.x + 2 + stepWidth, triggerBounds.y + triggerBounds.height / 2, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: /Kick trigger, step 8/u })).toBeVisible();
+});
+
+test("schedules Pattern automation through the production worklet port", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as unknown as {
+      __scheduledAutomation: { audioFrame: number; parameterId: string; value: unknown }[];
+    };
+    target.__scheduledAutomation = [];
+    const NativeAudioWorkletNode = window.AudioWorkletNode;
+    Object.defineProperty(window, "AudioWorkletNode", {
+      configurable: true,
+      value: new Proxy(NativeAudioWorkletNode, {
+        construct(constructor, argumentsList) {
+          const node = Reflect.construct(constructor, argumentsList) as AudioWorkletNode;
+          const nativePost = node.port.postMessage.bind(node.port);
+          node.port.postMessage = ((message: unknown, transfer?: Transferable[]) => {
+            if (typeof message === "object" && message !== null) {
+              const envelope = message as {
+                kind?: string;
+                payload?: {
+                  changes?: { audioFrame?: unknown; parameterId?: unknown; value?: unknown }[];
+                };
+              };
+              if (envelope.kind === "parameter-batch") {
+                for (const change of envelope.payload?.changes ?? []) {
+                  if (
+                    typeof change.audioFrame === "number" &&
+                    typeof change.parameterId === "string"
+                  ) {
+                    target.__scheduledAutomation.push({
+                      audioFrame: change.audioFrame,
+                      parameterId: change.parameterId,
+                      value: change.value,
+                    });
+                  }
+                }
+              }
+            }
+            nativePost(message, transfer ?? []);
+          }) as typeof node.port.postMessage;
+          return node;
+        },
+      }),
+    });
+  });
+  await page.reload();
+  await page.setViewportSize({ width: 1536, height: 1024 });
+
+  await page
+    .getByRole("combobox", { name: "Piano Roll parameter" })
+    .selectOption("cutoff");
+  const step = page.getByRole("slider", { name: "Cutoff, step 1", exact: true });
+  await step.press("ArrowUp");
+  await expect(step).toHaveAttribute("data-automation-step", "true");
+  await page.getByRole("button", { name: /^play$/i }).click();
+  await expect(page.locator(".audio-status")).toHaveText("Audio active");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __scheduledAutomation: unknown[] })
+            .__scheduledAutomation.length,
+      ),
+    )
+    .toBeGreaterThan(0);
+});
+
+test("replaces a note at the move destination in one Undo entry", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const scroll = page.locator('[data-component="piano-roll-scroll"]');
+  await scroll.evaluate((element) => {
+    element.scrollTop = 12 * 16;
+  });
+
+  const grid = page.locator('[data-component="piano-roll-grid"]');
+  const eventButtons = grid.locator('[data-component="piano-roll-event"]');
+  const baseline = await eventButtons.count();
+  const gridBounds = await box(grid);
+  const stepWidth = gridBounds.width / 16;
+
+  // The default part has a G2 note at step 2 and a C2 note at step 1. Drag the
+  // G2 note one step left onto the C2 note. The C2 note is replaced.
+  const moving = page.getByRole("button", { name: /G2 note, step 3,/u });
+  await expect(moving).toBeVisible();
+  const movingBounds = await box(moving);
+  await page.mouse.move(movingBounds.x + movingBounds.width / 2, movingBounds.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(
+    movingBounds.x + movingBounds.width / 2 - stepWidth,
+    movingBounds.y + 8,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+
+  await expect(page.getByRole("button", { name: /G2 note, step 2,/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: /C2 note, step 2,/u })).toHaveCount(0);
+  await expect(eventButtons).toHaveCount(baseline - 1);
+
+  await page
+    .locator('[data-component="workspace-bar"]')
+    .getByRole("button", { name: "Undo" })
+    .click();
+  await expect(eventButtons).toHaveCount(baseline);
+  await expect(page.getByRole("button", { name: /C2 note, step 2,/u })).toBeVisible();
 });
 
 test("changes transport scope without stopping and toggles meter analysis without changing audio", async ({
@@ -579,8 +809,8 @@ test("changes transport scope without stopping and toggles meter analysis withou
 }) => {
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.locator(".audio-status")).toHaveText("Audio active");
-  await page.getByRole("button", { name: "Song" }).click();
-  await expect(page.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Pattern playback mode" }).click();
+  await expect(page.getByRole("button", { name: "Song playback mode" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
 
   const meterMode = page.getByRole("button", { name: "Master meter mode: left and right" });
@@ -589,6 +819,35 @@ test("changes transport scope without stopping and toggles meter analysis withou
     "M/S",
   );
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+});
+
+test("uses icon-only Playlist actions at the compact supported width", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const playlist = page.locator('[data-component="playlist-summary"]');
+  const mode = playlist.getByRole("button", { name: "Pattern playback mode" });
+  await expect(mode.locator("svg")).toBeVisible();
+  await expect(mode).toHaveAttribute("title", /switch to Song/u);
+
+  for (const name of [
+    "Move Playlist row 2 earlier",
+    "Move Playlist row 1 later",
+    "Duplicate Playlist row 1",
+    "Remove Playlist row 1",
+  ] as const) {
+    const action = playlist.getByRole("button", { name });
+    await expect(action.locator("svg")).toBeVisible();
+    await expect(action).toHaveText("");
+    await expect(action).toHaveAttribute("title", /Playlist row/u);
+    const target = await box(action);
+    expect(target.width).toBeGreaterThanOrEqual(24);
+    expect(target.height).toBeGreaterThanOrEqual(24);
+  }
+
+  const add = playlist.getByRole("button", { name: "Add selected Pattern" });
+  await expect(add.locator("svg")).toBeVisible();
+  await expect(add).toHaveText("");
+  await expect(add).toHaveAttribute("title", "Add the selected Pattern to the Playlist.");
+  expect(await playlist.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
 test("collapses and restores the lower editor with its focus and scroll context", async ({

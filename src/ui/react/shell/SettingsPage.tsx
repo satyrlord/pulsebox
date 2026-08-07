@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { importUserTheme, type PulseThemeService, type UserThemeReport } from "../../../themes";
+import { isRemappableLiveKeyCode, remapLiveKey } from "../hooks/live-key-map";
 import { useAppStore } from "../store/app-store-context";
 import styles from "./SettingsPage.module.css";
 
@@ -16,10 +17,19 @@ export function SettingsPage(props: SettingsPageProps) {
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const launchQuantizationSteps = useAppStore((state) => state.launchQuantizationSteps);
   const setLaunchQuantization = useAppStore((state) => state.setLaunchQuantization);
+  const metronomeEnabled = useAppStore((state) => state.metronomeEnabled);
+  const toggleMetronome = useAppStore((state) => state.toggleMetronome);
+  const liveInputQuantizeMode = useAppStore((state) => state.liveInputQuantizeMode);
+  const setLiveInputQuantizeMode = useAppStore((state) => state.setLiveInputQuantizeMode);
+  const liveCountInBars = useAppStore((state) => state.liveCountInBars);
+  const setLiveCountInBars = useAppStore((state) => state.setLiveCountInBars);
+  const liveKeyMap = useAppStore((state) => state.liveKeyMap);
+  const setLiveKeyMap = useAppStore((state) => state.setLiveKeyMap);
   const panelRef = useRef<HTMLElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const [importReport, setImportReport] = useState<UserThemeReport | undefined>(undefined);
   const [appearanceMessage, setAppearanceMessage] = useState<string | undefined>(undefined);
+  const [keyMapMessage, setKeyMapMessage] = useState<string | undefined>(undefined);
 
   const appearance = useSyncExternalStore(
     (listener) => themeService.subscribe(listener),
@@ -186,9 +196,83 @@ export function SettingsPage(props: SettingsPageProps) {
             <option value={4}>One beat</option>
           </select>
         </label>
+        <label className={styles.choice}>
+          <input
+            type="checkbox"
+            checked={metronomeEnabled}
+            onChange={() => {
+              toggleMetronome();
+            }}
+          />
+          <span>Metronome</span>
+        </label>
+      </fieldset>
+
+      <fieldset className={styles.userTheme}>
+        <legend>Live input</legend>
+        <label className={styles.importField}>
+          <span>Record quantize</span>
+          <select
+            aria-label="Record quantize"
+            value={liveInputQuantizeMode}
+            onChange={(event) => {
+              setLiveInputQuantizeMode(event.currentTarget.value as typeof liveInputQuantizeMode);
+            }}
+          >
+            <option value="input">Quantize on input</option>
+            <option value="after">Quantize after recording</option>
+            <option value="off">Do not quantize</option>
+          </select>
+        </label>
+        <label className={styles.importField}>
+          <span>Count-in bars</span>
+          <select
+            aria-label="Count-in bars"
+            value={liveCountInBars}
+            onChange={(event) => {
+              setLiveCountInBars(Number(event.currentTarget.value));
+            }}
+          >
+            <option value={0}>None</option>
+            <option value={1}>One bar</option>
+            <option value={2}>Two bars</option>
+            <option value={4}>Four bars</option>
+          </select>
+        </label>
+        <p>Focus a map key, then press the physical computer key to assign it.</p>
+        <div className={styles.keyMap} role="group" aria-label="Live input key map">
+          {liveKeyMap.map((binding) => (
+            <button
+              key={binding.semitoneOffset}
+              type="button"
+              aria-label={`Map semitone ${String(binding.semitoneOffset + 1)}. Current key ${binding.code}.`}
+              onKeyDown={(event) => {
+                if (!isRemappableLiveKeyCode(event.code)) {
+                  if (event.key !== "Tab" && event.key !== "Escape") {
+                    event.preventDefault();
+                    setKeyMapMessage("That key is reserved for keyboard navigation.");
+                  }
+                  return;
+                }
+                if (event.ctrlKey || event.metaKey || event.altKey) return;
+                event.preventDefault();
+                const result = remapLiveKey(liveKeyMap, binding.semitoneOffset, event.code);
+                if (result.valid) {
+                  setLiveKeyMap(result.map);
+                  setKeyMapMessage(`Mapped semitone ${String(binding.semitoneOffset + 1)} to ${event.code}.`);
+                } else {
+                  setKeyMapMessage("That key is already assigned. Choose a different key.");
+                }
+              }}
+            >
+              {`${String(binding.semitoneOffset + 1)}: ${binding.code}`}
+            </button>
+          ))}
+        </div>
       </fieldset>
 
       <div className={styles.report} role="status" aria-live="polite">
+        {keyMapMessage === undefined ? null : <p>{keyMapMessage}</p>}
         {appearanceMessage === undefined ? null : <p>{appearanceMessage}</p>}
         {importReport === undefined ? null : importReport.applied ? (
           <p>

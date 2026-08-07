@@ -5,6 +5,7 @@ import {
   createPatternId,
   createProjectId,
   createProjectLineageId,
+  createSongPlacementId,
   createStateRevisionEpoch,
   type IdFactory,
   type ModuleInstanceId,
@@ -14,14 +15,26 @@ import type { EffectsState } from "../contracts/effects";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 import type {
   PatternEvent,
+  PatternEventDataInput,
   PatternPartState,
+  PatternState,
   PulseState,
   RackModuleState,
 } from "./model";
 
-export type PatternEventSeed<Event extends PatternEvent = PatternEvent> = Event extends PatternEvent
-  ? Omit<Event, "id">
-  : never;
+export type PatternEventSeed =
+  | {
+      readonly type: "note";
+      readonly positionTicks: number;
+      readonly durationTicks: number;
+      readonly data: PatternEventDataInput;
+    }
+  | {
+      readonly type: "trigger";
+      readonly positionTicks: number;
+      readonly durationTicks?: never;
+      readonly data: PatternEventDataInput;
+    };
 
 export interface ModuleSeed {
   readonly pluginId: PluginId;
@@ -31,8 +44,10 @@ export interface ModuleSeed {
   readonly voiceIds?: readonly VoiceId[];
 }
 
-/** Size of the project Pattern bank. */
-export const PATTERN_SLOT_COUNT = 5;
+/** The supplied project contains five Patterns. Projects can hold 1 through 32. */
+export const DEFAULT_PATTERN_COUNT = 5;
+export const MINIMUM_PATTERN_COUNT = 1;
+export const MAXIMUM_PATTERN_COUNT = 32;
 export const PATTERN_STEP_COUNT = 16;
 /** Section 9.1: about -8 dB per occupied channel. 0.4 linear is -7.96 dB. */
 export const DEFAULT_MODULE_LEVEL = 0.4;
@@ -55,6 +70,7 @@ function patternSeedFromId(id: string): number {
 }
 
 const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as const;
+const DEFAULT_PATTERN_COLORS = ["#E6A23C", "#F26D6D", "#58B8F6", "#A87CFF", "#63C78F"] as const;
 
 /**
  * The section 9.1 default project name. The section 9.2 starter template creates
@@ -62,8 +78,17 @@ const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as co
  */
 export const DEFAULT_PROJECT_NAME = "Neon Basement";
 
-export function createEmptyPatternPart(length = PATTERN_STEP_COUNT): PatternPartState {
-  return Object.freeze({ length, events: Object.freeze([]) });
+export function createEmptyPatternPart(
+  moduleId: ModuleInstanceId,
+  length = PATTERN_STEP_COUNT,
+): PatternPartState {
+  return Object.freeze({
+    moduleId,
+    length,
+    voiceCycleLengths: Object.freeze({}),
+    events: Object.freeze([]),
+    automationLaneIds: Object.freeze([]),
+  });
 }
 
 /**
@@ -76,6 +101,7 @@ export function createEmptyPatternPart(length = PATTERN_STEP_COUNT): PatternPart
 export function createDefaultState(
   idFactory: IdFactory,
   seed?: ModuleSeed | readonly ModuleSeed[],
+  now: () => string = () => new Date().toISOString(),
 ): PulseState {
   const projectId = createProjectId(idFactory);
   const lineageId = createProjectLineageId(idFactory);
@@ -83,6 +109,50 @@ export function createDefaultState(
   const seeds: readonly ModuleSeed[] = seed === undefined ? [] : isSeedList(seed) ? seed : [seed];
   const modules = seeds.slice(0, RACK_SLOT_IDS.length).map((one) => createModule(idFactory, one));
   const effects = createInitialEffectsState(modules, seeds);
+  const timestamp = now();
+  const patterns = Array.from({ length: DEFAULT_PATTERN_COUNT }, (_, index) => {
+    const id = createPatternId(idFactory);
+    const parts: Record<ModuleInstanceId, PatternPartState> = {};
+    if (index === 1) {
+      for (const [moduleIndex, module] of modules.entries()) {
+        const events = seeds[moduleIndex]?.events ?? [];
+        parts[module.id] = Object.freeze({
+          moduleId: module.id,
+          length: PATTERN_STEP_COUNT,
+          voiceCycleLengths: Object.freeze({}),
+          events: Object.freeze(events.map((event) => materializeEvent(idFactory, event))),
+          automationLaneIds: Object.freeze([]),
+        });
+      }
+    }
+    return Object.freeze({
+      id,
+      name: DEFAULT_PATTERN_NAMES[index] ?? `Pattern ${String(index + 1)}`,
+      color: DEFAULT_PATTERN_COLORS[index] ?? "#E6A23C",
+      durationBars: 1,
+      scale: "Chromatic",
+      humanize: DEFAULT_PATTERN_HUMANIZE,
+      seed: patternSeedFromId(id),
+      parts: Object.freeze(parts),
+      automationLaneIds: Object.freeze([]),
+      createdAt: timestamp,
+      modifiedAt: timestamp,
+    } satisfies PatternState);
+  });
+  const verse = patterns[1];
+  if (verse === undefined) throw new Error("The supplied project needs a Verse Pattern.");
+  const intro = patterns[0];
+  const breakPattern = patterns[2];
+  const drop = patterns[3];
+  const outro = patterns[4];
+  if (
+    intro === undefined ||
+    breakPattern === undefined ||
+    drop === undefined ||
+    outro === undefined
+  ) {
+    throw new Error("The supplied project needs five default Patterns.");
+  }
   return Object.freeze({
     project: Object.freeze({
       id: projectId,
@@ -100,30 +170,20 @@ export function createDefaultState(
       ),
       modules: Object.freeze(Object.fromEntries(modules.map((module) => [module.id, module]))),
       effects,
-      patterns: Object.freeze(
-        Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) => {
-          const id = createPatternId(idFactory);
-          return Object.freeze({
-            id,
-            name: DEFAULT_PATTERN_NAMES[index] ?? `Pattern ${String(index + 1)}`,
-            length: PATTERN_STEP_COUNT,
-            humanize: DEFAULT_PATTERN_HUMANIZE,
-            seed: patternSeedFromId(id),
-          });
-        }),
-      ),
-      activePatternIndex: 1,
+      patterns: Object.freeze(patterns),
+      activePatternId: verse.id,
+      automationLanes: Object.freeze({}),
       // Section 9.1: the bar counts describe the default Song chain. Each
       // Pattern is one bar of sixteen steps, so a bar count is a repeat count.
       // The chain ships disabled; enabling Song mode plays the arrangement.
       song: Object.freeze({
         enabled: false,
-        entries: Object.freeze([
-          Object.freeze({ patternIndex: 0, repeats: 8 }),
-          Object.freeze({ patternIndex: 1, repeats: 16 }),
-          Object.freeze({ patternIndex: 2, repeats: 8 }),
-          Object.freeze({ patternIndex: 3, repeats: 16 }),
-          Object.freeze({ patternIndex: 4, repeats: 8 }),
+        placements: Object.freeze([
+          Object.freeze({ id: createSongPlacementId(idFactory), patternId: intro.id, repeatCount: 8 }),
+          Object.freeze({ id: createSongPlacementId(idFactory), patternId: verse.id, repeatCount: 16 }),
+          Object.freeze({ id: createSongPlacementId(idFactory), patternId: breakPattern.id, repeatCount: 8 }),
+          Object.freeze({ id: createSongPlacementId(idFactory), patternId: drop.id, repeatCount: 16 }),
+          Object.freeze({ id: createSongPlacementId(idFactory), patternId: outro.id, repeatCount: 8 }),
         ]),
       }),
     }),
@@ -169,17 +229,16 @@ function freezeEvent(event: PatternEvent): PatternEvent {
 }
 
 function materializeEvent(idFactory: IdFactory, event: PatternEventSeed): PatternEvent {
-  return freezeEvent({ ...event, id: createNoteEventId(idFactory) });
-}
-
-function clonePart(idFactory: IdFactory, part: PatternPartState): PatternPartState {
-  return Object.freeze({
-    length: part.length,
-    events: Object.freeze(
-      part.events.map((event) =>
-        freezeEvent({ ...event, id: createNoteEventId(idFactory), data: { ...event.data } }),
-      ),
-    ),
+  return freezeEvent({
+    ...event,
+    id: createNoteEventId(idFactory),
+    data: {
+      ...event.data,
+      probability: event.data.probability ?? 1,
+      microTimingTicks: event.data.microTimingTicks ?? 0,
+      flam: event.data.flam ?? 0,
+      roll: event.data.roll ?? 0,
+    },
   });
 }
 
@@ -188,24 +247,10 @@ export function createModule(
   seed: ModuleSeed,
   source?: RackModuleState,
 ): RackModuleState {
-  // A duplicated module carries its whole Pattern bank. A fresh module seeds
-  // the default Verse and leaves the other Patterns silent.
-  const parts: readonly PatternPartState[] =
-    source === undefined
-      ? Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) =>
-          index === 1
-            ? Object.freeze({
-                length: PATTERN_STEP_COUNT,
-                events: Object.freeze(seed.events.map((event) => materializeEvent(idFactory, event))),
-              })
-            : createEmptyPatternPart(),
-        )
-      : source.parts.map((part) => clonePart(idFactory, part));
   return Object.freeze({
     id: createModuleInstanceId(idFactory),
     pluginId: source?.pluginId ?? seed.pluginId,
     parameters: Object.freeze({ ...(source?.parameters ?? seed.parameters) }),
-    parts: Object.freeze(parts),
     muted: source?.muted ?? false,
     solo: source?.solo ?? false,
     level: source?.level ?? DEFAULT_MODULE_LEVEL,

@@ -1,6 +1,6 @@
 import type { StateRevision } from "../../contracts/ids";
 import type { ParameterValue, PluginId } from "../../contracts/parameters";
-import type { ScheduledVoiceEvent } from "./scheduled-event";
+import type { ScheduledParameterChange, ScheduledVoiceEvent } from "./scheduled-event";
 
 export interface VoiceFault {
   readonly code: string;
@@ -54,6 +54,8 @@ export interface VoiceAdapterPort {
   ): void;
   /** Transient value during a gesture. Never enters project state or history. */
   previewParameters(parameters: Readonly<Record<string, ParameterValue>>): void;
+  /** Sample-accurate Pattern automation on the shared audio-frame timeline. */
+  scheduleParameters(changes: readonly ScheduledParameterChange[]): void;
   schedule(events: readonly ScheduledVoiceEvent[]): void;
   /**
    * Drops queued events. With `fromFrame`, only events at or past that

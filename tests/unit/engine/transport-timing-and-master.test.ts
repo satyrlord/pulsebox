@@ -10,6 +10,7 @@ import {
 } from "../../../src/engine/transport/pattern-scheduler";
 import type {
   PatternPartView,
+  ScheduledParameterChange,
   ScheduledVoiceEvent,
 } from "../../../src/engine/transport/scheduled-event";
 import {
@@ -209,6 +210,7 @@ function recordingAdapter(): RecordingAdapter {
     setProjectRevision: vi.fn(),
     setParameters: vi.fn(),
     previewParameters: vi.fn(),
+    scheduleParameters: vi.fn(),
     schedule: (events) => batches.push(events),
     clearScheduledEvents: vi.fn(),
     resume: vi.fn(),
@@ -639,6 +641,7 @@ describe("live re-anchor release", () => {
 describe("timing preview during playback", () => {
   interface QueueModelAdapter extends VoiceAdapterPort {
     readonly played: ScheduledVoiceEvent[];
+    readonly playedParameters: ScheduledParameterChange[];
     advanceTo(frame: number): void;
   }
 
@@ -650,14 +653,25 @@ describe("timing preview during playback", () => {
    */
   function queueModelAdapter(): QueueModelAdapter {
     let queue: ScheduledVoiceEvent[] = [];
+    let parameterQueue: ScheduledParameterChange[] = [];
     const played: ScheduledVoiceEvent[] = [];
+    const playedParameters: ScheduledParameterChange[] = [];
     return {
       played,
+      playedParameters,
       advanceTo(frame: number) {
         queue.sort((left, right) => left.atFrame - right.atFrame);
         while (queue.length > 0 && (queue[0]?.atFrame ?? Number.POSITIVE_INFINITY) <= frame) {
           const due = queue.shift();
           if (due !== undefined) played.push(due);
+        }
+        parameterQueue.sort((left, right) => left.atFrame - right.atFrame);
+        while (
+          parameterQueue.length > 0 &&
+          (parameterQueue[0]?.atFrame ?? Number.POSITIVE_INFINITY) <= frame
+        ) {
+          const due = parameterQueue.shift();
+          if (due !== undefined) playedParameters.push(due);
         }
       },
       prepare: vi.fn().mockResolvedValue(undefined),
@@ -666,11 +680,18 @@ describe("timing preview during playback", () => {
       setProjectRevision: vi.fn(),
       setParameters: vi.fn(),
       previewParameters: vi.fn(),
+      scheduleParameters: (changes) => {
+        parameterQueue.push(...changes);
+      },
       schedule: (events) => {
         queue.push(...events);
       },
       clearScheduledEvents: (fromFrame?: number) => {
         queue = fromFrame === undefined ? [] : queue.filter((event) => event.atFrame < fromFrame);
+        parameterQueue =
+          fromFrame === undefined
+            ? []
+            : parameterQueue.filter((change) => change.atFrame < fromFrame);
       },
       resume: vi.fn(),
       suspend: vi.fn(),
@@ -814,6 +835,63 @@ describe("timing preview during playback", () => {
     }
   });
 
+  it("rebuilds only the cleared Flam and Roll occurrences from one source step", async () => {
+    vi.useFakeTimers();
+    const { context } = stubContext();
+    const adapter = queueModelAdapter();
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => () => adapter,
+    });
+    const part: PatternPartView = {
+      length: 16,
+      events: [
+        {
+          id: "split-occurrences",
+          type: "trigger",
+          positionTicks: 240,
+          data: {
+            note: 36,
+            velocity: 0.8,
+            accent: false,
+            slide: false,
+            flam: 2,
+            roll: 3,
+          },
+        },
+      ],
+    };
+    await runtime.replaceFromCurrentState([bassModule([part])], REVISION);
+    await runtime.play(120);
+
+    context.currentTime = 6_500 / 48_000;
+    adapter.advanceTo(6_500);
+    runtime.previewSwing(0.9);
+    await vi.advanceTimersByTimeAsync(25);
+    for (let tick = 1; tick <= 20; tick += 1) {
+      const frame = 6_500 + tick * 1_200;
+      context.currentTime = frame / 48_000;
+      adapter.advanceTo(frame);
+      await vi.advanceTimersByTimeAsync(25);
+    }
+    runtime.dispose();
+    vi.useRealTimers();
+
+    const occurrences = adapter.played
+      .filter((event) => event.type === "note-on")
+      .map((event) => event.occurrenceId)
+      .filter((id): id is string => id !== undefined);
+    expect(occurrences).toEqual([
+      "split-occurrences:1:flam:0",
+      "split-occurrences:1:flam:1",
+      "split-occurrences:1:main",
+      "split-occurrences:1:roll:0",
+      "split-occurrences:1:roll:1",
+      "split-occurrences:1:roll:2",
+    ]);
+    expect(new Set(occurrences).size).toBe(occurrences.length);
+  });
+
   it("rescues a step pulled into the lead window by a swing change", async () => {
     vi.useFakeTimers();
     const { context } = stubContext();
@@ -848,8 +926,95 @@ describe("timing preview during playback", () => {
     const onsets = adapter.played
       .filter((event) => event.type === "note-on")
       .map((event) => event.atFrame);
-    // Step 1 is not dropped: it fires exactly once at its new onset.
-    expect(onsets.filter((frame) => frame >= 6_000 && frame < 12_500)).toEqual([6_960]);
+    // Step 1 is not dropped. The retained old-timing window plays it once at
+    // the queued Swing frame instead of clearing it during the rebuild.
+    expect(onsets.filter((frame) => frame >= 6_000 && frame < 12_500)).toEqual([8_760]);
+  });
+
+  it("keeps a pulled onset when rebuild work crosses the clear boundary", async () => {
+    vi.useFakeTimers();
+    const { context } = stubContext();
+    const queue = queueModelAdapter();
+    const clear = (fromFrame?: number) => queue.clearScheduledEvents(fromFrame);
+    const adapter: QueueModelAdapter = {
+      ...queue,
+      clearScheduledEvents: (fromFrame) => {
+        context.currentTime = 8_000 / 48_000;
+        queue.advanceTo(8_000);
+        clear(fromFrame);
+      },
+    };
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => () => adapter,
+    });
+    await runtime.replaceFromCurrentState([bassModule([steps(36)])], REVISION);
+    runtime.setSwing(0.9);
+    await runtime.play(120);
+
+    context.currentTime = 6_500 / 48_000;
+    queue.advanceTo(6_500);
+    runtime.previewSwing(0);
+    await vi.advanceTimersByTimeAsync(25);
+    for (let tick = 1; tick <= 12; tick += 1) {
+      const frame = 8_000 + tick * 1_200;
+      context.currentTime = frame / 48_000;
+      queue.advanceTo(frame);
+      await vi.advanceTimersByTimeAsync(25);
+    }
+    runtime.dispose();
+    vi.useRealTimers();
+
+    const onsets = queue.played
+      .filter((event) => event.type === "note-on")
+      .map((event) => event.sourceStep);
+    expect(onsets).toContain(1);
+  });
+
+  it("keeps pulled automation when a tempo rebuild crosses its new frame", async () => {
+    vi.useFakeTimers();
+    const { context } = stubContext();
+    const queue = queueModelAdapter();
+    const clear = (fromFrame?: number) => queue.clearScheduledEvents(fromFrame);
+    const adapter: QueueModelAdapter = {
+      ...queue,
+      clearScheduledEvents: (fromFrame) => {
+        context.currentTime = 6_600 / 48_000;
+        queue.advanceTo(6_600);
+        clear(fromFrame);
+      },
+    };
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => () => adapter,
+    });
+    const part: PatternPartView = {
+      length: 16,
+      events: [],
+      automationSteps: [
+        { parameterId: "cutoff", positionTicks: 240, value: 0.25 },
+      ],
+    };
+    await runtime.replaceFromCurrentState([bassModule([part])], REVISION);
+    await runtime.play(120);
+
+    context.currentTime = 5_900 / 48_000;
+    queue.advanceTo(5_900);
+    runtime.setTempo(240);
+    await vi.advanceTimersByTimeAsync(25);
+    for (let tick = 1; tick <= 8; tick += 1) {
+      const frame = 6_600 + tick * 1_200;
+      context.currentTime = frame / 48_000;
+      queue.advanceTo(frame);
+      await vi.advanceTimersByTimeAsync(25);
+    }
+    runtime.dispose();
+    vi.useRealTimers();
+
+    const changes = queue.playedParameters.filter(
+      (change) => change.parameterId === "cutoff" && change.value === 0.25,
+    );
+    expect(changes.map((change) => change.atFrame)).toContain(6_960);
   });
 
   it("splits a timing-change capture at a pending launch boundary", async () => {
@@ -911,6 +1076,7 @@ describe("timing preview during playback", () => {
       expect(slot[0]?.note).toBe(grid < 96_960 ? 36 : 48);
     }
   });
+
 });
 
 describe("exact tempo grid at runtime", () => {

@@ -9,6 +9,11 @@ import {
   type PulseThemeService,
 } from "../../themes";
 import { PulseApp } from "./PulseApp";
+import {
+  DEFAULT_LIVE_KEY_MAP,
+  validateLiveKeyMap,
+  type LiveKeyMap,
+} from "./hooks/live-key-map";
 import { connectDomainStore, createAppStore, type AppStoreDependencies } from "./store/app-store";
 import { AppStoreProvider } from "./store/app-store-context";
 
@@ -35,6 +40,10 @@ export interface MountOptions extends AppStoreDependencies {
 /** Lightweight global UI preferences. Storage keys keep the pulse- prefix. */
 const METRONOME_STORAGE_KEY = "pulse-metronome-enabled";
 const LAUNCH_QUANTIZATION_STORAGE_KEY = "pulse-launch-quantization";
+const LIVE_KEY_MAP_STORAGE_KEY = "pulse-live-key-map";
+const LIVE_INPUT_QUANTIZE_STORAGE_KEY = "pulse-live-input-quantize";
+const LIVE_COUNT_IN_STORAGE_KEY = "pulse-live-count-in-bars";
+const GHOST_NOTES_STORAGE_KEY = "pulse-ghost-notes-enabled";
 
 function readStoredPreference(key: string): string | undefined {
   try {
@@ -52,6 +61,19 @@ function writeStoredPreference(key: string, value: string): void {
   }
 }
 
+function readLiveKeyMap(): LiveKeyMap {
+  const source = readStoredPreference(LIVE_KEY_MAP_STORAGE_KEY);
+  if (source === undefined) return DEFAULT_LIVE_KEY_MAP;
+  try {
+    const candidate: unknown = JSON.parse(source);
+    if (!Array.isArray(candidate)) return DEFAULT_LIVE_KEY_MAP;
+    const map = candidate as LiveKeyMap;
+    return validateLiveKeyMap(map).valid ? map : DEFAULT_LIVE_KEY_MAP;
+  } catch {
+    return DEFAULT_LIVE_KEY_MAP;
+  }
+}
+
 /**
  * The composition root calls this once. StrictMode stays on in development so a
  * double-invoked effect that leaked a listener, a frame loop, or an engine node
@@ -61,6 +83,8 @@ export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
   const { host, ...injected } = options;
 
   const storedLaunchQuantization = Number(readStoredPreference(LAUNCH_QUANTIZATION_STORAGE_KEY));
+  const storedCountIn = Number(readStoredPreference(LIVE_COUNT_IN_STORAGE_KEY));
+  const storedQuantizeMode = readStoredPreference(LIVE_INPUT_QUANTIZE_STORAGE_KEY);
   const dependencies: AppStoreDependencies = {
     ...injected,
     preferences: {
@@ -68,11 +92,31 @@ export function mountPulseboxApp(options: MountOptions): PulseboxAppHandle {
       ...(Number.isSafeInteger(storedLaunchQuantization) && storedLaunchQuantization >= 1
         ? { launchQuantizationSteps: storedLaunchQuantization }
         : {}),
+      liveKeyMap: readLiveKeyMap(),
+      ...(storedQuantizeMode === "input" || storedQuantizeMode === "after" || storedQuantizeMode === "off"
+        ? { liveInputQuantizeMode: storedQuantizeMode }
+        : {}),
+      ...(Number.isSafeInteger(storedCountIn) && storedCountIn >= 0 && storedCountIn <= 4
+        ? { liveCountInBars: storedCountIn }
+        : {}),
+      ghostNotesEnabled: readStoredPreference(GHOST_NOTES_STORAGE_KEY) !== "false",
       onMetronomeChange: (enabled) => {
         writeStoredPreference(METRONOME_STORAGE_KEY, String(enabled));
       },
       onLaunchQuantizationChange: (steps) => {
         writeStoredPreference(LAUNCH_QUANTIZATION_STORAGE_KEY, String(steps));
+      },
+      onLiveKeyMapChange: (map) => {
+        writeStoredPreference(LIVE_KEY_MAP_STORAGE_KEY, JSON.stringify(map));
+      },
+      onLiveInputQuantizeModeChange: (mode) => {
+        writeStoredPreference(LIVE_INPUT_QUANTIZE_STORAGE_KEY, mode);
+      },
+      onLiveCountInBarsChange: (bars) => {
+        writeStoredPreference(LIVE_COUNT_IN_STORAGE_KEY, String(bars));
+      },
+      onGhostNotesEnabledChange: (enabled) => {
+        writeStoredPreference(GHOST_NOTES_STORAGE_KEY, String(enabled));
       },
     },
   };

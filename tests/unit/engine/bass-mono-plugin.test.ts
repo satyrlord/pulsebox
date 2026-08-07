@@ -438,6 +438,7 @@ describe("Silver Serpent plugin", () => {
       setProjectRevision: vi.fn(),
       setParameters: vi.fn(),
       previewParameters: vi.fn(),
+      scheduleParameters: vi.fn(),
       schedule: (events) => scheduleBatches.push(events),
       clearScheduledEvents,
       resume: vi.fn(),

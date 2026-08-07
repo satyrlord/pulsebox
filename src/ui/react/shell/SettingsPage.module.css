@@ -98,6 +98,17 @@
   color: var(--pulse-color-text-primary, #f3f5f6);
 }
 
+.keyMap {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.keyMap button {
+  min-block-size: 2rem;
+  font: inherit;
+}
+
 .report p {
   margin: 0;
 }

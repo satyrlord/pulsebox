@@ -2,6 +2,7 @@ export * from "./commands";
 export * from "./default-state";
 export * from "./edit-policy";
 export * from "./model";
+export * from "./pattern-transforms";
 export * from "./pulse-store";
 export * from "./persistence/project-document";
 export * from "./persistence/project-repository";

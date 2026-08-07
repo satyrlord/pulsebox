@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { IdFactory } from "../../../src/contracts/ids";
 import { createDefaultProjectState } from "../../../src/composition/default-project";
-import { DEFAULT_PROJECT_NAME } from "../../../src/state/default-state";
+import { DEFAULT_PATTERN_COUNT, DEFAULT_PROJECT_NAME } from "../../../src/state/default-state";
 
 function deterministicIds(): IdFactory {
   let value = 1;
@@ -15,6 +15,11 @@ function decibels(gain: number): number {
   return 20 * Math.log10(gain);
 }
 
+function required<Value>(value: Value | undefined): Value {
+  if (value === undefined) throw new Error("The default project is missing required content.");
+  return value;
+}
+
 /** Section 9.1: the supplied default project. */
 describe("default project", () => {
   const state = createDefaultProjectState(deterministicIds());
@@ -22,28 +27,32 @@ describe("default project", () => {
   const modulesInRackOrder = project.rackSlots.map((slot) =>
     slot.moduleId === undefined ? undefined : project.modules[slot.moduleId],
   );
+  const verse = required(project.patterns.find((pattern) => pattern.name === "Verse"));
 
-  it("pins the default tempo, timing amounts, and 16-step patterns", () => {
-    expect(project.name).toBe("Neon Basement");
+  it("pins the default timing and Pattern model", () => {
+    expect(project.name).toBe(DEFAULT_PROJECT_NAME);
     expect(project.tempo).toBe(128);
     expect(project.swing).toBe(0);
     expect(state.transport.status).toBe("stopped");
+    expect(project.patterns).toHaveLength(DEFAULT_PATTERN_COUNT);
     for (const pattern of project.patterns) {
       expect(pattern.humanize).toBe(0);
-      expect(pattern.length).toBe(16);
+      expect(pattern.durationBars).toBe(1);
+      expect(pattern.scale).toBe("Chromatic");
     }
   });
 
-  // Decision D92: the section 9.1 bar counts are the default Song chain, and a
-  // bar count is the entry's repeat count. The chain ships disabled.
-  it("ships the section 9.1 Song chain, disabled", () => {
+  it("ships the named, ID-based Song playlist disabled", () => {
     expect(project.song.enabled).toBe(false);
-    expect(project.song.entries).toEqual([
-      { patternIndex: 0, repeats: 8 },
-      { patternIndex: 1, repeats: 16 },
-      { patternIndex: 2, repeats: 8 },
-      { patternIndex: 3, repeats: 16 },
-      { patternIndex: 4, repeats: 8 },
+    expect(project.song.placements.map((placement) => ({
+      name: required(project.patterns.find((pattern) => pattern.id === placement.patternId)).name,
+      repeatCount: placement.repeatCount,
+    }))).toEqual([
+      { name: "Intro", repeatCount: 8 },
+      { name: "Verse", repeatCount: 16 },
+      { name: "Break", repeatCount: 8 },
+      { name: "Drop", repeatCount: 16 },
+      { name: "Outro", repeatCount: 8 },
     ]);
   });
 
@@ -61,7 +70,7 @@ describe("default project", () => {
     ]);
   });
 
-  it("names the five default Patterns and selects Verse", () => {
+  it("names the five default Patterns, selects Verse, and keeps data on Pattern parts", () => {
     expect(project.patterns.map((pattern) => pattern.name)).toEqual([
       "Intro",
       "Verse",
@@ -69,52 +78,33 @@ describe("default project", () => {
       "Drop",
       "Outro",
     ]);
-    expect(project.activePatternIndex).toBe(1);
-  });
-
-  it("leaves master headroom: about -8 dB per channel, about -6 dB master", () => {
-    expect(decibels(project.masterLevel)).toBeCloseTo(-6, 0);
-    for (const module of modulesInRackOrder) {
-      if (module === undefined) continue;
-      expect(decibels(module.level)).toBeCloseTo(-8, 0);
-    }
-  });
-
-  it("ships an original coherent demo loop with a distinct role per machine", () => {
+    expect(project.activePatternId).toBe(verse.id);
     const verseParts = modulesInRackOrder
       .filter((module) => module !== undefined)
-      .map((module) => module.parts[1]);
-    for (const part of verseParts) {
-      expect(part?.events.length).toBeGreaterThan(0);
+      .map((module) => verse.parts[module.id]);
+    for (const part of verseParts) expect(part?.events.length).toBeGreaterThan(0);
+    expect(project.patterns.filter((pattern) => pattern.id !== verse.id).every((pattern) => Object.keys(pattern.parts).length === 0)).toBe(true);
+  });
+
+  it("leaves the required master and module headroom", () => {
+    expect(decibels(project.masterLevel)).toBeCloseTo(-6, 0);
+    for (const module of modulesInRackOrder) {
+      if (module !== undefined) expect(decibels(module.level)).toBeCloseTo(-8, 0);
     }
-    // Every machine plays its own pattern, not a restated copy.
-    const signatures = verseParts.map((part) =>
-      JSON.stringify(part?.events.map((event) => [event.positionTicks, event.data.note])),
-    );
-    expect(new Set(signatures).size).toBe(signatures.length);
   });
 });
 
-/**
- * Section 9.2: the starter template creates a fresh copy of the section 9.1
- * default project. It owns no rack order, tempo, or note data of its own, so
- * these assertions guard against the template drifting away from section 9.1.
- */
 describe("starter template", () => {
-  // One shared factory, so a repeated ID is a real collision rather than two
-  // independent counters restarting at the same value.
   const ids = deterministicIds();
   const first = createDefaultProjectState(ids).project;
   const second = createDefaultProjectState(ids).project;
 
-  it("carries the section 9.1 name, tempo, and rack order", () => {
+  it("carries the default name, tempo, and rack order", () => {
     expect(first.name).toBe(DEFAULT_PROJECT_NAME);
     expect(first.tempo).toBe(128);
-    expect(
-      first.rackSlots.map((slot) =>
-        slot.moduleId === undefined ? undefined : first.modules[slot.moduleId]?.pluginId,
-      ),
-    ).toEqual([
+    expect(first.rackSlots.map((slot) =>
+      slot.moduleId === undefined ? undefined : first.modules[slot.moduleId]?.pluginId,
+    )).toEqual([
       "bass-mono",
       "drum-analog-small",
       "drum-analog-large",
@@ -126,32 +116,23 @@ describe("starter template", () => {
     ]);
   });
 
-  it("repeats the same note data on every call", () => {
-    const notes = (project: typeof first) =>
-      project.rackSlots.map((slot) =>
-        slot.moduleId === undefined
-          ? undefined
-          : project.modules[slot.moduleId]?.parts.map((part) => ({
-              length: part.length,
-              events: part.events.map((event) => ({
-                type: event.type,
-                positionTicks: event.positionTicks,
-                ...(event.durationTicks === undefined
-                  ? {}
-                  : { durationTicks: event.durationTicks }),
-                data: event.data,
-              })),
-            })),
-      );
-    expect(JSON.stringify(notes(second))).toBe(JSON.stringify(notes(first)));
+  it("repeats the same Pattern event content on every call", () => {
+    const events = (project: typeof first) => project.patterns.map((pattern) => ({
+      name: pattern.name,
+      parts: Object.values(pattern.parts).map((part) => part.events.map((event) => ({
+        type: event.type,
+        positionTicks: event.positionTicks,
+        ...(event.durationTicks === undefined ? {} : { durationTicks: event.durationTicks }),
+        data: event.data,
+      }))),
+    }));
+    expect(events(second)).toEqual(events(first));
   });
 
-  it("gives each new project its own project, lineage, and module IDs", () => {
+  it("gives each new project new project, lineage, module, Pattern, and placement IDs", () => {
     expect(second.id).not.toBe(first.id);
     expect(second.lineageId).not.toBe(first.lineageId);
-    const moduleIds = (project: typeof first) => project.rackSlots.map((slot) => slot.moduleId);
-    for (const id of moduleIds(second)) {
-      if (id !== undefined) expect(moduleIds(first)).not.toContain(id);
-    }
+    expect(second.patterns.map((pattern) => pattern.id)).not.toEqual(first.patterns.map((pattern) => pattern.id));
+    expect(second.song.placements.map((placement) => placement.id)).not.toEqual(first.song.placements.map((placement) => placement.id));
   });
 });

@@ -117,7 +117,9 @@ async function assertFreshProfileGuidance(page: Page): Promise<void> {
     "title",
     "Play. Space.",
   );
-  await expect(page.getByRole("combobox", { name: "Selected Pattern" })).toHaveValue("1");
+  expect(await page.getByRole("combobox", { name: "Selected Pattern" }).inputValue()).toMatch(
+    /^[0-9a-f-]{36}$/u,
+  );
   await expect(page.getByRole("group", { name: /Silver Serpent events in Verse/u })).toBeVisible();
   await expect(page.locator('[data-component="piano-roll-event"]').first()).toHaveAccessibleName(
     /note, step [0-9]+,/u,

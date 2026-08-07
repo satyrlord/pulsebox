@@ -17,6 +17,7 @@ import {
   DIGIT_FIVE_MANIFEST,
   DRUMLINE_SIX_MANIFEST,
 } from "../../src/engine/public";
+import { PATTERN_TICKS_PER_STEP } from "../../src/state/public";
 import {
   createHarness,
   firstModuleId,
@@ -34,7 +35,7 @@ function makeHistory(harness: ReturnType<typeof createHarness>, step: number): v
   domain.dispatch(
     domain.createCommand("pattern-events-edit", {
       moduleId: firstModuleId(harness),
-      patternIndex: 1,
+      patternId: domain.getState().project.activePatternId,
       edit: {
         type: "create",
         event: {
@@ -408,9 +409,12 @@ describe("Rack", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Swap to Tin Soldier" }));
 
     const module = harness.domain.getState().project.modules[moduleId];
+    const activePattern = harness.domain.getState().project.patterns.find(
+      (pattern) => pattern.id === harness.domain.getState().project.activePatternId,
+    );
     expect(module?.pluginId).toBe("drum-analog-small");
     // The module keeps its identity and Pattern parts across the swap.
-    expect(module?.parts[1]?.events.length).toBeGreaterThan(0);
+    expect(activePattern?.parts[moduleId]?.events.length).toBeGreaterThan(0);
     expect(harness.domain.getState().history.canUndo).toBe(true);
   });
 
@@ -677,6 +681,55 @@ describe("PulseApp under StrictMode", () => {
     expect(harness.domain.getState().history.canUndo).toBe(false);
   });
 
+  it("finalizes an armed live key on blur at the Song-local second loop", () => {
+    const harness = createHarness();
+    const moduleId = firstModuleId(harness);
+    const intro = harness.domain.getState().project.patterns[0];
+    if (intro === undefined) throw new Error("Expected the Intro Pattern.");
+    act(() => {
+      harness.domain.dispatch(
+        harness.domain.createCommand("pattern-events-edit", {
+          moduleId,
+          patternId: intro.id,
+          edit: {
+            type: "create",
+            event: {
+              type: "note",
+              positionTicks: 0,
+              durationTicks: PATTERN_TICKS_PER_STEP,
+              data: { note: 36, velocity: 0.8, accent: false, slide: false },
+            },
+          },
+        }),
+      );
+      harness.store.getState().toggleSongMode();
+      harness.store.getState().toggleRecordArm();
+      harness.store.getState().setPositionTicks(17 * PATTERN_TICKS_PER_STEP);
+    });
+    const before = harness.domain.getState().project.patterns.find(
+      (pattern) => pattern.id === intro.id,
+    )?.parts[moduleId]?.events;
+    renderWithHarness(<PulseApp themeService={memoryThemeService()} />, harness);
+
+    fireEvent.keyDown(window, { code: "KeyZ" });
+    expect(harness.audio.startAudition).toHaveBeenCalledWith(moduleId, 48);
+    act(() => harness.store.getState().setPositionTicks(18 * PATTERN_TICKS_PER_STEP));
+    act(() => {
+      window.dispatchEvent(new Event("blur"));
+    });
+
+    const events = harness.domain.getState().project.patterns.find(
+      (pattern) => pattern.id === intro.id,
+    )?.parts[moduleId]?.events;
+    expect(events).toHaveLength((before?.length ?? 0) + 1);
+    expect(events?.some((event) => event.positionTicks === PATTERN_TICKS_PER_STEP && event.data.note === 48)).toBe(true);
+    expect(harness.audio.stopAudition).toHaveBeenCalledWith(moduleId);
+    act(() => harness.store.getState().undo());
+    expect(
+      harness.domain.getState().project.patterns.find((pattern) => pattern.id === intro.id)?.parts[moduleId]?.events,
+    ).toEqual(before);
+  });
+
   it("shows an Undo notice after Delete module in the context menu, with no dialog", () => {
     const harness = createHarness();
     renderWithHarness(<PulseApp themeService={memoryThemeService()} />, harness);
@@ -712,8 +765,10 @@ describe("PulseApp under StrictMode", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
 
     const moduleId = firstModuleId(harness);
-    const parts = harness.domain.getState().project.modules[moduleId]?.parts;
-    expect(parts?.[1]?.events.some((event) => event.data.note === UNMAPPABLE_TEST_NOTE)).toBe(true);
+    const activePattern = harness.domain.getState().project.patterns.find(
+      (pattern) => pattern.id === harness.domain.getState().project.activePatternId,
+    );
+    expect(activePattern?.parts[moduleId]?.events.some((event) => event.data.note === UNMAPPABLE_TEST_NOTE)).toBe(true);
   });
 
   it("clears the swap result panel on its timer and on undo", () => {

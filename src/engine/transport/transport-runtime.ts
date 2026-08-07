@@ -3,17 +3,22 @@ import type { ModuleInstanceId, StateRevision } from "../../contracts/ids";
 import type { ParameterValue, PluginId } from "../../contracts/parameters";
 import {
   chainedStepResolver,
-  highestStepBefore,
   loopingStepResolver,
   pendingReleaseEvent,
+  schedulePatternAutomationWindow,
   schedulePatternWindow,
+  withoutExcludedOccurrences,
+  withoutExcludedParameterOccurrences,
   type PatternTiming,
   type PatternWindowRequest,
   type StepResolver,
 } from "./pattern-scheduler";
 import {
   compareScheduledVoiceEvents,
+  SCHEDULED_EVENT_QUEUE_CAPACITY,
+  SCHEDULED_PARAMETER_QUEUE_CAPACITY,
   type PatternPartView,
+  type ScheduledParameterChange,
   type ScheduledVoiceEvent,
 } from "./scheduled-event";
 import { TransportClock } from "./transport-clock";
@@ -119,6 +124,7 @@ const SCHEDULER_TICK_MILLISECONDS = 25;
  * tick from stamping an event the processor has already passed.
  */
 const SCHEDULER_LEAD_SECONDS = 0.02;
+const TIMING_REBUILD_LEAD_SECONDS = 0.1;
 
 /** A sixteenth at 960 ticks per quarter. */
 const TICKS_PER_STEP = 240;
@@ -151,6 +157,7 @@ export interface TransportRuntimeOptions {
 
 interface AuditionSession {
   adapter?: VoiceAdapterPort;
+  cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
 /**
@@ -159,12 +166,20 @@ interface AuditionSession {
  * processor queue: the clear keeps everything before the rebuild frame.
  */
 interface CapturedLeadWindow {
-  /**
-   * Highest absolute step per module whose onset under the captured timing lies
-   * before the rebuild frame. A timing-change rebuild emits only steps above
-   * it, so every step across the change fires exactly once.
-   */
-  readonly lastStepBefore: ReadonlyMap<ModuleInstanceId, number>;
+  /** Onsets that the bounded clear keeps before the rebuild frame. */
+  readonly keptOccurrences: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>;
+  /** Automation steps that the bounded clear keeps before the rebuild frame. */
+  readonly keptParameterOccurrences: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>;
+  /** Old-timing events cleared at the bound, keyed by stable occurrence ID. */
+  readonly fallbackOccurrences: ReadonlyMap<
+    ModuleInstanceId,
+    ReadonlyMap<string, readonly ScheduledVoiceEvent[]>
+  >;
+  /** Old-timing automation cleared at the bound, keyed by stable occurrence ID. */
+  readonly fallbackParameterOccurrences: ReadonlyMap<
+    ModuleInstanceId,
+    ReadonlyMap<string, readonly ScheduledParameterChange[]>
+  >;
   /**
    * The one release per module that the bounded clear drops: the note-off owed
    * by the newest kept onset when that note-off lies at or past the rebuild
@@ -195,6 +210,8 @@ export class TransportRuntime {
   readonly #onStateChange: (state: AudioRuntimeState) => void;
   readonly #modules = new Map<ModuleInstanceId, TransportModule>();
   readonly #adapters = new Map<ModuleInstanceId, VoiceAdapterPort>();
+  readonly #queuedEvents = new Map<ModuleInstanceId, ScheduledVoiceEvent[]>();
+  readonly #queuedParameters = new Map<ModuleInstanceId, ScheduledParameterChange[]>();
   readonly #auditions = new Map<ModuleInstanceId, AuditionSession>();
   readonly #channels = new Map<ModuleInstanceId, MixerChannel>();
   /**
@@ -255,13 +272,12 @@ export class TransportRuntime {
   }
 
   /**
-   * Chooses the resolver for the current arrangement. Song mode expands each
-   * chain entry by its repeat count; otherwise the active Pattern loops.
+   * Chooses the resolver for the current arrangement. Song mode keeps each
+   * placement repeat count with its part; otherwise the active Pattern loops.
    *
-   * Cached per module: this runs for every module on every scheduler tick, and
-   * expanding a long chain by its repeat counts allocates in proportion to the
-   * whole song. Rebuilding that forty times a second is work the arrangement
-   * does not need, so the cache is cleared whenever the inputs change.
+   * Cached per module: this runs for every module on every scheduler tick.
+   * Rebuilding the chain forty times a second is work the arrangement does not
+   * need, so the cache is cleared whenever the inputs change.
    */
   #resolverFor(
     module: TransportModule,
@@ -280,14 +296,15 @@ export class TransportRuntime {
           ? () => undefined
           : loopingStepResolver(part, activePatternIndex);
     } else {
-      const chain: { readonly part: PatternPartView; readonly patternIndex: number }[] =
-        [];
+      const chain: {
+        readonly part: PatternPartView;
+        readonly patternIndex: number;
+        readonly repeats: number;
+      }[] = [];
       for (const entry of songEntries) {
         const part = module.parts[entry.patternIndex];
         if (part === undefined) continue;
-        for (let repeat = 0; repeat < entry.repeats; repeat += 1) {
-          chain.push({ part, patternIndex: entry.patternIndex });
-        }
+        chain.push({ part, patternIndex: entry.patternIndex, repeats: entry.repeats });
       }
       resolve = chainedStepResolver(chain);
     }
@@ -297,10 +314,11 @@ export class TransportRuntime {
 
   setArrangement(arrangement: TransportArrangement): void {
     const current = this.#pendingArrangement ?? this.#arrangement;
+    const sameEntries = sameSongEntries(arrangement.songEntries, current.songEntries);
     const changed =
       arrangement.activePatternIndex !== current.activePatternIndex ||
       arrangement.songEnabled !== current.songEnabled ||
-      arrangement.songEntries !== current.songEntries;
+      !sameEntries;
     if (!changed) {
       // Same content: keep the newest object so later identity checks hold.
       if (this.#pendingArrangement !== undefined) this.#pendingArrangement = arrangement;
@@ -321,7 +339,7 @@ export class TransportRuntime {
       playing &&
       !arrangement.songEnabled &&
       !current.songEnabled &&
-      arrangement.songEntries === current.songEntries &&
+      sameEntries &&
       arrangement.activePatternIndex !== current.activePatternIndex;
     if (patternLaunchOnly) {
       const frame = this.#currentFrame(context);
@@ -347,8 +365,8 @@ export class TransportRuntime {
           this.#moduleWindowRequest(module, stepFrames, frame + 1, boundary),
           boundary,
         );
-        adapter.clearScheduledEvents(boundary);
-        if (release !== undefined) adapter.schedule([release]);
+        this.#clearAdapterQueue(moduleId, adapter, boundary);
+        if (release !== undefined) this.#scheduleAdapterEvents(moduleId, adapter, [release]);
         this.#scheduleModuleWindow(
           module,
           adapter,
@@ -499,6 +517,8 @@ export class TransportRuntime {
     } catch (error) {
       for (const adapter of this.#adapters.values()) adapter.dispose();
       this.#adapters.clear();
+      this.#queuedEvents.clear();
+      this.#queuedParameters.clear();
       this.#stopAllAuditions();
       if (this.#context !== undefined) {
         audioContextEvents(this.#context).removeEventListener?.(
@@ -533,13 +553,22 @@ export class TransportRuntime {
     projectRevision: StateRevision,
   ): Promise<void> {
     this.#stopAllAuditions();
+    const context = this.#context;
+    const clock = this.#clock;
+    const wasPlaying =
+      context !== undefined &&
+      clock?.getSnapshot(this.#currentFrame(context)).status === "playing";
     this.#projectRevision = projectRevision;
     this.#modules.clear();
     this.#resolvers.clear();
     for (const module of modules) this.#modules.set(module.id, module);
-    if (this.#context !== undefined) {
+    if (context !== undefined) {
       await this.#syncFullProjection();
       this.#applyMix();
+      if (wasPlaying) {
+        const frame = this.#currentFrame(context);
+        this.#reanchor(context, clock, frame, clock.getSnapshot(frame).positionTicks);
+      }
     }
   }
 
@@ -591,6 +620,8 @@ export class TransportRuntime {
         this.#resolvers.delete(moduleId);
         this.#adapters.get(moduleId)?.dispose();
         this.#adapters.delete(moduleId);
+        this.#queuedEvents.delete(moduleId);
+        this.#queuedParameters.delete(moduleId);
         this.#disposeChannel(moduleId);
         this.#applyMix();
         return;
@@ -608,6 +639,8 @@ export class TransportRuntime {
         this.#resolvers.delete(moduleId);
         this.#adapters.get(moduleId)?.dispose();
         this.#adapters.delete(moduleId);
+        this.#queuedEvents.delete(moduleId);
+        this.#queuedParameters.delete(moduleId);
         if (this.#context !== undefined) {
           const adapter = await this.#ensureAdapter(moduleProjection);
           adapter?.replaceState(
@@ -695,13 +728,15 @@ export class TransportRuntime {
       case "song-set": {
         this.#setRevision(delta.projectRevision);
         const entries = delta.payload.entries;
+        // Stable-ID Playlist payloads are projected by the composition root.
+        // Keep the current engine view when this legacy numeric payload is
+        // absent, rather than replacing a valid chain with an empty one.
+        if (!Array.isArray(entries)) return;
         const base = this.#pendingArrangement ?? this.#arrangement;
         this.setArrangement({
           ...base,
           songEnabled: delta.payload.enabled === true,
-          songEntries: Array.isArray(entries)
-            ? (entries as TransportArrangement["songEntries"])
-            : [],
+          songEntries: entries as TransportArrangement["songEntries"],
         });
         return;
       }
@@ -831,9 +866,97 @@ export class TransportRuntime {
     ]);
   }
 
+  /** Plays one transformed Pattern part through a transient module adapter. */
+  async previewPatternPart(
+    moduleId: ModuleInstanceId,
+    part: PatternPartView,
+    timing: {
+      readonly tempo: number;
+      readonly swing: number;
+      readonly humanize: number;
+      readonly seed: number;
+    },
+  ): Promise<void> {
+    if (!Number.isFinite(timing.tempo) || timing.tempo < 40 || timing.tempo > 240) {
+      throw new RangeError("Pattern preview tempo must be from 40 through 240 BPM.");
+    }
+    const initialModule = this.#modules.get(moduleId);
+    if (initialModule === undefined) throw new Error("Cannot preview a missing module.");
+    const factory = this.#adapterFactoryFor(initialModule.pluginId);
+    if (factory === undefined) throw new Error("Cannot preview an unregistered plugin.");
+
+    this.stopAudition(moduleId);
+    const session: AuditionSession = {};
+    this.#auditions.set(moduleId, session);
+    await this.activate();
+    if (this.#auditions.get(moduleId) !== session) return;
+
+    const context = this.#requiredContext();
+    const module = this.#modules.get(moduleId);
+    const revision = this.#projectRevision;
+    if (module === undefined || revision === undefined) {
+      this.stopAudition(moduleId);
+      return;
+    }
+    const adapter = factory(context, {
+      projectRevision: revision,
+      onStatus: (status) => {
+        if (status.state !== "recovered") this.stopAudition(moduleId);
+      },
+      onMeter: (level) => this.#onMeter(moduleId, level),
+    });
+    session.adapter = adapter;
+    try {
+      await adapter.prepare();
+    } catch (error) {
+      if (this.#auditions.get(moduleId) !== session) return;
+      throw error;
+    }
+    if (this.#auditions.get(moduleId) !== session) {
+      adapter.dispose();
+      return;
+    }
+    adapter.activate(this.#ensureChannel(context, moduleId).input);
+    adapter.replaceState(module.parameters, revision, module.voiceInserts);
+
+    const patternStartFrame = this.#currentFrame(context) + this.#leadFrames(context);
+    const stepFrames =
+      (TICKS_PER_STEP * 60 * context.sampleRate) / (timing.tempo * TICKS_PER_QUARTER);
+    const durationSteps =
+      Number.isSafeInteger(part.durationSteps) && (part.durationSteps ?? 0) > 0
+        ? (part.durationSteps ?? part.length)
+        : part.length;
+    const windowEndFrame = patternStartFrame + Math.ceil(durationSteps * stepFrames);
+    const request: PatternWindowRequest = {
+      resolveStep: loopingStepResolver({ ...part, durationSteps }, 0),
+      stepFrames,
+      swing: timing.swing,
+      patternTiming: [{ humanize: timing.humanize, seed: timing.seed }],
+      voiceSalt: voiceSaltFor(moduleId),
+      windowStartFrame: patternStartFrame,
+      windowEndFrame,
+      patternStartFrame,
+    };
+    const parameters = schedulePatternAutomationWindow(request);
+    const events = schedulePatternWindow(request);
+    adapter.scheduleParameters(parameters);
+    adapter.schedule(events);
+    const latestFrame = Math.max(
+      windowEndFrame,
+      ...parameters.map((change) => change.atFrame),
+      ...events.map((event) => event.atFrame),
+    );
+    const cleanupMilliseconds =
+      Math.max(0, ((latestFrame - this.#currentFrame(context)) / context.sampleRate) * 1_000) + 50;
+    session.cleanupTimer = setTimeout(() => {
+      if (this.#auditions.get(moduleId) === session) this.stopAudition(moduleId);
+    }, cleanupMilliseconds);
+  }
+
   stopAudition(moduleId: ModuleInstanceId): void {
     const session = this.#auditions.get(moduleId);
     if (session === undefined) return;
+    if (session.cleanupTimer !== undefined) clearTimeout(session.cleanupTimer);
     session.adapter?.dispose();
     this.#auditions.delete(moduleId);
   }
@@ -890,7 +1013,14 @@ export class TransportRuntime {
     // listener hears now, so they must survive the rebuild.
     const preserved =
       snapshot.status === "playing"
-        ? this.#captureLeadWindow(context, clock, frame)
+        ? this.#captureLeadWindow(
+            context,
+            clock,
+            frame,
+            tempoChanged
+              ? this.#leadFrames(context)
+              : this.#timingRebuildLeadFrames(context),
+          )
         : undefined;
     if (tempoChanged) clock.setTempo(change.tempo ?? snapshot.tempo, frame);
     this.#swing = nextSwing;
@@ -997,6 +1127,8 @@ export class TransportRuntime {
     this.#stopAllAuditions();
     for (const adapter of this.#adapters.values()) adapter.dispose();
     this.#adapters.clear();
+    this.#queuedEvents.clear();
+    this.#queuedParameters.clear();
     for (const moduleId of [...this.#channels.keys()]) this.#disposeChannel(moduleId);
     this.#master?.disconnect();
     this.#master = undefined;
@@ -1059,6 +1191,96 @@ export class TransportRuntime {
     return Math.max(1, Math.ceil(context.sampleRate * SCHEDULER_LEAD_SECONDS));
   }
 
+  #timingRebuildLeadFrames(context: AudioContext): number {
+    return Math.max(1, Math.ceil(context.sampleRate * TIMING_REBUILD_LEAD_SECONDS));
+  }
+
+  #scheduleAdapterEvents(
+    moduleId: ModuleInstanceId,
+    adapter: VoiceAdapterPort,
+    events: readonly ScheduledVoiceEvent[],
+  ): void {
+    adapter.schedule(events);
+    if (events.length === 0) return;
+    const queued = this.#queuedEvents.get(moduleId) ?? [];
+    queued.push(...events);
+    this.#queuedEvents.set(moduleId, queued);
+  }
+
+  #scheduleAdapterParameters(
+    moduleId: ModuleInstanceId,
+    adapter: VoiceAdapterPort,
+    parameters: readonly ScheduledParameterChange[],
+  ): void {
+    adapter.scheduleParameters(parameters);
+    if (parameters.length === 0) return;
+    const queued = this.#queuedParameters.get(moduleId) ?? [];
+    queued.push(...parameters);
+    this.#queuedParameters.set(moduleId, queued);
+  }
+
+  #pruneQueueLedgers(frame: number, historyFrames: number): void {
+    const oldestFrame = frame - historyFrames;
+    for (const moduleId of this.#modules.keys()) {
+      const events = this.#boundedLedgerEntries(
+        this.#queuedEvents.get(moduleId) ?? [],
+        oldestFrame,
+        frame,
+        SCHEDULED_EVENT_QUEUE_CAPACITY,
+      );
+      const parameters = this.#boundedLedgerEntries(
+        this.#queuedParameters.get(moduleId) ?? [],
+        oldestFrame,
+        frame,
+        SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+      );
+      if (events.length === 0) this.#queuedEvents.delete(moduleId);
+      else this.#queuedEvents.set(moduleId, events);
+      if (parameters.length === 0) this.#queuedParameters.delete(moduleId);
+      else this.#queuedParameters.set(moduleId, parameters);
+    }
+  }
+
+  #boundedLedgerEntries<T extends { readonly atFrame: number }>(
+    entries: readonly T[],
+    oldestFrame: number,
+    frame: number,
+    capacity: number,
+  ): T[] {
+    const recent = entries
+      .filter((entry) => entry.atFrame > oldestFrame && entry.atFrame <= frame)
+      .sort((left, right) => left.atFrame - right.atFrame)
+      .slice(-capacity);
+    const future = entries
+      .filter((entry) => entry.atFrame > frame)
+      .sort((left, right) => left.atFrame - right.atFrame)
+      .slice(0, capacity);
+    return [...recent, ...future];
+  }
+
+  #clearAdapterQueue(
+    moduleId: ModuleInstanceId,
+    adapter: VoiceAdapterPort,
+    fromFrame?: number,
+  ): void {
+    adapter.clearScheduledEvents(fromFrame);
+    if (fromFrame === undefined) {
+      this.#queuedEvents.delete(moduleId);
+      this.#queuedParameters.delete(moduleId);
+      return;
+    }
+    this.#queuedEvents.set(
+      moduleId,
+      (this.#queuedEvents.get(moduleId) ?? []).filter((event) => event.atFrame < fromFrame),
+    );
+    this.#queuedParameters.set(
+      moduleId,
+      (this.#queuedParameters.get(moduleId) ?? []).filter(
+        (parameter) => parameter.atFrame < fromFrame,
+      ),
+    );
+  }
+
   /**
    * Re-pins the pattern grid to the musical position the clock reports now and
    * drops anything already queued past the playhead, so a tempo or swing change
@@ -1085,18 +1307,24 @@ export class TransportRuntime {
     preserved?: CapturedLeadWindow,
     repinGrid = true,
   ): void {
-    const releaseFrame = frame + this.#leadFrames(context);
+    const releaseFrame =
+      frame +
+      (preserved !== undefined && !repinGrid
+        ? this.#timingRebuildLeadFrames(context)
+        : this.#leadFrames(context));
     if (preserved === undefined) {
-      for (const adapter of this.#adapters.values()) {
-        adapter.clearScheduledEvents();
-        adapter.schedule([{ atFrame: releaseFrame, type: "note-off" }]);
+      for (const [moduleId, adapter] of this.#adapters) {
+        this.#clearAdapterQueue(moduleId, adapter);
+        this.#scheduleAdapterEvents(moduleId, adapter, [
+          { atFrame: releaseFrame, type: "note-off" },
+        ]);
       }
       this.#stopScheduledClicks(frame);
     } else {
       // The kept lead window still sounds, so only the events and clicks at
       // or past the rebuild point are replaced.
-      for (const adapter of this.#adapters.values()) {
-        adapter.clearScheduledEvents(releaseFrame);
+      for (const [moduleId, adapter] of this.#adapters) {
+        this.#clearAdapterQueue(moduleId, adapter, releaseFrame);
       }
       this.#stopScheduledClicks(releaseFrame);
     }
@@ -1120,7 +1348,7 @@ export class TransportRuntime {
     // The filter matters only inside this first rebuilt window: a shifted step
     // near the boundary cannot move past the current lookahead horizon, and
     // every later window holds only higher step indexes.
-    this.#schedule(preserved?.lastStepBefore);
+    this.#schedule(preserved?.keptOccurrences, preserved?.keptParameterOccurrences);
   }
 
   /**
@@ -1138,39 +1366,97 @@ export class TransportRuntime {
     releaseFrame: number,
   ): void {
     const batches: {
+      readonly moduleId: ModuleInstanceId;
       readonly adapter: VoiceAdapterPort;
       readonly events: readonly ScheduledVoiceEvent[];
+      readonly parameters: readonly ScheduledParameterChange[];
     }[] = [];
     for (const [moduleId, adapter] of this.#adapters) {
       const module = this.#modules.get(moduleId);
-      const minimumStep = preserved.lastStepBefore.get(moduleId);
       const events: ScheduledVoiceEvent[] = [];
+      let parameters: readonly ScheduledParameterChange[] = [];
       const release = preserved.releases.get(moduleId);
       if (release !== undefined) events.push(release);
-      if (module !== undefined && minimumStep !== undefined) {
+      if (module !== undefined) {
+        const request = this.#moduleWindowRequest(
+          module,
+          stepFrames,
+          frame + 1,
+          releaseFrame,
+          this.#arrangement,
+        );
         events.push(
-          ...schedulePatternWindow(
-            this.#moduleWindowRequest(
-              module,
-              stepFrames,
-              frame + 1,
-              releaseFrame,
-              this.#arrangement,
-              minimumStep,
-            ),
+          ...withoutExcludedOccurrences(
+            schedulePatternWindow(request),
+            preserved.keptOccurrences.get(moduleId),
           ),
+        );
+        parameters = withoutExcludedParameterOccurrences(
+          schedulePatternAutomationWindow(request),
+          preserved.keptParameterOccurrences.get(moduleId),
         );
       }
       events.sort(compareScheduledVoiceEvents);
-      batches.push({ adapter, events });
+      batches.push({ moduleId, adapter, events, parameters });
     }
     // Use one cutoff for all modules. A loaded main thread can cross an onset
     // while it builds the batches. It must not send that onset to only the
     // adapters visited before the clock boundary.
     const sendFrame = this.#currentFrame(context);
-    for (const { adapter, events } of batches) {
-      const due = withoutExpiredOnsets(events, sendFrame);
-      if (due.length > 0) adapter.schedule(due);
+    for (const { moduleId, adapter, events, parameters } of batches) {
+      const expiredParameterOccurrenceIds = new Set(
+        parameters.flatMap((change) =>
+          change.atFrame < sendFrame && change.occurrenceId !== undefined
+            ? [change.occurrenceId]
+            : [],
+        ),
+      );
+      const dueParameters = parameters.filter(
+        (change) =>
+          change.atFrame >= sendFrame &&
+          (change.occurrenceId === undefined ||
+            !expiredParameterOccurrenceIds.has(change.occurrenceId)),
+      );
+      const parameterFallbacks = preserved.fallbackParameterOccurrences.get(moduleId);
+      for (const occurrenceId of expiredParameterOccurrenceIds) {
+        const fallback = parameterFallbacks?.get(occurrenceId);
+        if (fallback?.some((change) => change.atFrame >= sendFrame) === true) {
+          dueParameters.push(...fallback);
+        }
+      }
+      dueParameters.sort(
+        (left, right) =>
+          left.atFrame - right.atFrame || left.parameterId.localeCompare(right.parameterId),
+      );
+      if (dueParameters.length > 0) {
+        this.#scheduleAdapterParameters(moduleId, adapter, dueParameters);
+      }
+      const expiredOccurrenceIds = new Set(
+        events.flatMap((event) =>
+          event.type === "note-on" &&
+          event.atFrame < sendFrame &&
+          event.occurrenceId !== undefined
+            ? [event.occurrenceId]
+            : [],
+        ),
+      );
+      const due = [...withoutExpiredOnsets(events, sendFrame)].filter(
+        (event) =>
+          event.occurrenceId === undefined || !expiredOccurrenceIds.has(event.occurrenceId),
+      );
+      const fallbacks = preserved.fallbackOccurrences.get(moduleId);
+      for (const occurrenceId of expiredOccurrenceIds) {
+        const fallback = fallbacks?.get(occurrenceId);
+        if (
+          fallback?.some(
+            (event) => event.type === "note-on" && event.atFrame >= sendFrame,
+          ) === true
+        ) {
+          due.push(...fallback);
+        }
+      }
+      due.sort(compareScheduledVoiceEvents);
+      if (due.length > 0) this.#scheduleAdapterEvents(moduleId, adapter, due);
     }
   }
 
@@ -1199,35 +1485,99 @@ export class TransportRuntime {
   }
 
   /**
-   * The old-timing facts a bounded queue clear still needs. Computed from the
-   * current timing, so call this before a change mutates that state. The
-   * imminent events themselves are not captured: the bounded clear keeps them
-   * in each processor queue exactly as they were sent, which also keeps a
-   * pending Pattern launch's boundary split intact.
+   * The old-timing facts a bounded queue clear still needs. The controller
+   * ledger contains exactly what it sent to each processor. This avoids
+   * inferring a kept occurrence that an earlier rebuild did not queue.
    */
   #captureLeadWindow(
     context: AudioContext,
     clock: TransportClock,
     frame: number,
+    leadFrames: number,
   ): CapturedLeadWindow {
-    const releaseFrame = frame + this.#leadFrames(context);
+    const releaseFrame = frame + leadFrames;
     const stepFrames = this.#exactStepFrames(context, clock, frame);
+    this.#pruneQueueLedgers(frame, 2 * stepFrames);
     const launchBoundaryInside =
       this.#pendingArrangement !== undefined &&
       this.#pendingArrangementFrame !== undefined &&
       this.#pendingArrangementFrame < releaseFrame;
-    const lastStepBefore = new Map<ModuleInstanceId, number>();
+    const keptOccurrences = new Map<ModuleInstanceId, ReadonlySet<string>>();
+    const keptParameterOccurrences = new Map<ModuleInstanceId, ReadonlySet<string>>();
+    const fallbackOccurrences = new Map<
+      ModuleInstanceId,
+      ReadonlyMap<string, readonly ScheduledVoiceEvent[]>
+    >();
+    const fallbackParameterOccurrences = new Map<
+      ModuleInstanceId,
+      ReadonlyMap<string, readonly ScheduledParameterChange[]>
+    >();
     const releases = new Map<ModuleInstanceId, ScheduledVoiceEvent>();
     for (const module of this.#modules.values()) {
       if (!this.#adapters.has(module.id)) continue;
+      const queuedEvents = this.#queuedEvents.get(module.id) ?? [];
+      const queuedParameters = this.#queuedParameters.get(module.id) ?? [];
       const request = this.#moduleWindowRequest(
         module,
         stepFrames,
-        frame + 1,
+        frame - 2 * stepFrames,
         releaseFrame,
         this.#arrangement,
       );
-      lastStepBefore.set(module.id, highestStepBefore(request, releaseFrame));
+      keptOccurrences.set(
+        module.id,
+        new Set(
+          queuedEvents.flatMap((event) =>
+            event.type === "note-on" &&
+            event.atFrame < releaseFrame &&
+            event.occurrenceId !== undefined
+              ? [event.occurrenceId]
+              : [],
+          ),
+        ),
+      );
+      const fallbackIds = new Set(
+        queuedEvents.flatMap((event) =>
+          event.type === "note-on" &&
+          event.atFrame >= releaseFrame &&
+          event.occurrenceId !== undefined
+            ? [event.occurrenceId]
+            : [],
+        ),
+      );
+      const byOccurrence = new Map<string, ScheduledVoiceEvent[]>();
+      for (const event of queuedEvents) {
+        const occurrenceId = event.occurrenceId;
+        if (occurrenceId === undefined || !fallbackIds.has(occurrenceId)) continue;
+        const events = byOccurrence.get(occurrenceId);
+        if (events === undefined) byOccurrence.set(occurrenceId, [event]);
+        else events.push(event);
+      }
+      fallbackOccurrences.set(module.id, byOccurrence);
+      const fallbackParameterIds = new Set(
+        queuedParameters
+          .filter((change) => change.atFrame >= releaseFrame)
+          .map((change) => change.occurrenceId)
+          .filter((id): id is string => id !== undefined),
+      );
+      const parametersByOccurrence = new Map<string, ScheduledParameterChange[]>();
+      for (const change of queuedParameters) {
+        const occurrenceId = change.occurrenceId;
+        if (occurrenceId === undefined || !fallbackParameterIds.has(occurrenceId)) continue;
+        const changes = parametersByOccurrence.get(occurrenceId);
+        if (changes === undefined) parametersByOccurrence.set(occurrenceId, [change]);
+        else changes.push(change);
+      }
+      fallbackParameterOccurrences.set(module.id, parametersByOccurrence);
+      keptParameterOccurrences.set(
+        module.id,
+        new Set(
+          queuedParameters
+            .filter((change) => change.atFrame < releaseFrame)
+            .map((change) => change.occurrenceId)
+            .filter((id): id is string => id !== undefined),
+        ),
+      );
       // The one note-off the bounded clear drops: the release owed by the
       // newest kept onset when it lands at or past the rebuild frame. The
       // sounding note predates any pending launch, so its release always
@@ -1235,7 +1585,14 @@ export class TransportRuntime {
       const release = pendingReleaseEvent(request, releaseFrame);
       if (release !== undefined) releases.set(module.id, release);
     }
-    return { lastStepBefore, releases, launchBoundaryInside };
+    return {
+      keptOccurrences,
+      keptParameterOccurrences,
+      fallbackOccurrences,
+      fallbackParameterOccurrences,
+      releases,
+      launchBoundaryInside,
+    };
   }
 
   #setRevision(projectRevision: StateRevision): void {
@@ -1257,6 +1614,8 @@ export class TransportRuntime {
       if (!this.#modules.has(id)) {
         adapter.dispose();
         this.#adapters.delete(id);
+        this.#queuedEvents.delete(id);
+        this.#queuedParameters.delete(id);
       }
     }
     if (revision === undefined) return;
@@ -1378,11 +1737,16 @@ export class TransportRuntime {
     this.#timer = undefined;
   }
 
-  #schedule(minimumSteps?: ReadonlyMap<ModuleInstanceId, number>): void {
+  #schedule(
+    excludedOccurrences?: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>,
+    excludedParameterOccurrences?: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>,
+  ): void {
     const context = this.#context;
     const clock = this.#clock;
     if (context === undefined || clock === undefined) return;
     const currentFrame = this.#currentFrame(context);
+    const stepFrames = this.#exactStepFrames(context, clock, currentFrame);
+    this.#pruneQueueLedgers(currentFrame, 2 * stepFrames);
     // A late pass starts at one shared future boundary. It never replays an
     // expired sequence at the first sample of the next render block. All module
     // adapters receive the same boundary, so recovery cannot split the rack.
@@ -1394,10 +1758,16 @@ export class TransportRuntime {
       currentFrame + Math.ceil(context.sampleRate * SCHEDULER_LOOKAHEAD_SECONDS);
     if (windowStart >= windowEnd) return;
 
-    const stepFrames = this.#exactStepFrames(context, clock, currentFrame);
     const pending = this.#pendingArrangement;
     if (pending === undefined) {
-      this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, minimumSteps);
+      this.#scheduleWindow(
+        stepFrames,
+        windowStart,
+        windowEnd,
+        this.#arrangement,
+        excludedOccurrences,
+        excludedParameterOccurrences,
+      );
     } else {
       // A queued Pattern launch applies exactly at its quantization boundary:
       // the old arrangement fills the window up to the boundary, the new one
@@ -1406,19 +1776,20 @@ export class TransportRuntime {
       const boundary = this.#pendingArrangementFrame ?? windowEnd;
       if (currentFrame >= boundary) {
         this.#applyArrangementNow(pending);
-        this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, minimumSteps);
+        this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, excludedOccurrences, excludedParameterOccurrences);
       } else if (boundary >= windowEnd) {
-        this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, minimumSteps);
+        this.#scheduleWindow(stepFrames, windowStart, windowEnd, this.#arrangement, excludedOccurrences, excludedParameterOccurrences);
       } else {
         if (boundary > windowStart) {
-          this.#scheduleWindow(stepFrames, windowStart, boundary, this.#arrangement, minimumSteps);
+          this.#scheduleWindow(stepFrames, windowStart, boundary, this.#arrangement, excludedOccurrences, excludedParameterOccurrences);
         }
         this.#scheduleWindow(
           stepFrames,
           Math.max(windowStart, boundary),
           windowEnd,
           pending,
-          minimumSteps,
+          excludedOccurrences,
+          excludedParameterOccurrences,
         );
       }
     }
@@ -1431,7 +1802,8 @@ export class TransportRuntime {
     windowStart: number,
     windowEnd: number,
     arrangement: TransportArrangement = this.#arrangement,
-    minimumSteps?: ReadonlyMap<ModuleInstanceId, number>,
+    excludedOccurrences?: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>,
+    excludedParameterOccurrences?: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>,
   ): void {
     for (const module of this.#modules.values()) {
       const adapter = this.#adapters.get(module.id);
@@ -1443,7 +1815,8 @@ export class TransportRuntime {
         windowStart,
         windowEnd,
         arrangement,
-        minimumSteps?.get(module.id),
+        excludedOccurrences?.get(module.id),
+        excludedParameterOccurrences?.get(module.id),
       );
     }
   }
@@ -1454,7 +1827,6 @@ export class TransportRuntime {
     windowStart: number,
     windowEnd: number,
     arrangement: TransportArrangement = this.#arrangement,
-    minimumStepExclusive?: number,
   ): PatternWindowRequest {
     return {
       resolveStep: this.#resolverFor(module, arrangement),
@@ -1465,7 +1837,11 @@ export class TransportRuntime {
       windowStartFrame: windowStart,
       windowEndFrame: windowEnd,
       patternStartFrame: this.#patternStartFrame,
-      ...(minimumStepExclusive === undefined ? {} : { minimumStepExclusive }),
+      // An explicit bound makes the scheduler truncate a dense window at the
+      // queue capacity instead of throwing inside a playback tick. A throw here
+      // would wedge a playing transport: the tick dies before the window
+      // advances, so earlier modules re-send and later modules go silent.
+      maximumEvents: SCHEDULED_EVENT_QUEUE_CAPACITY,
     };
   }
 
@@ -1476,19 +1852,28 @@ export class TransportRuntime {
     windowStart: number,
     windowEnd: number,
     arrangement: TransportArrangement = this.#arrangement,
-    minimumStepExclusive?: number,
+    excludedOccurrences?: ReadonlySet<string>,
+    excludedParameterOccurrences?: ReadonlySet<string>,
   ): void {
-    adapter.schedule(
-      schedulePatternWindow(
-        this.#moduleWindowRequest(
-          module,
-          stepFrames,
-          windowStart,
-          windowEnd,
-          arrangement,
-          minimumStepExclusive,
-        ),
+    const request = this.#moduleWindowRequest(
+      module,
+      stepFrames,
+      windowStart,
+      windowEnd,
+      arrangement,
+    );
+    this.#scheduleAdapterParameters(
+      module.id,
+      adapter,
+      withoutExcludedParameterOccurrences(
+        schedulePatternAutomationWindow(request),
+        excludedParameterOccurrences,
       ),
+    );
+    this.#scheduleAdapterEvents(
+      module.id,
+      adapter,
+      withoutExcludedOccurrences(schedulePatternWindow(request), excludedOccurrences),
     );
   }
 
@@ -1574,6 +1959,8 @@ export class TransportRuntime {
       this.stopAudition(moduleId);
       this.#adapters.get(moduleId)?.dispose();
       this.#adapters.delete(moduleId);
+      this.#queuedEvents.delete(moduleId);
+      this.#queuedParameters.delete(moduleId);
     } else if (status.state === "recovered") {
       this.#scheduleRecoveredModule(moduleId);
     }
@@ -1652,12 +2039,19 @@ export class TransportRuntime {
     // drop the imminent onsets and cut the sounding tail.
     const request = this.#moduleWindowRequest(module, stepFrames, frame + 1, releaseFrame);
     const events = [...schedulePatternWindow(request)];
+    const parameters = schedulePatternAutomationWindow(request);
     const release = pendingReleaseEvent(request, frame);
     if (release !== undefined) events.push(release);
     events.sort(compareScheduledVoiceEvents);
-    adapter.clearScheduledEvents();
+    this.#clearAdapterQueue(moduleId, adapter);
+    const parameterFrame = this.#currentFrame(context);
+    this.#scheduleAdapterParameters(
+      moduleId,
+      adapter,
+      parameters.filter((change) => change.atFrame >= parameterFrame),
+    );
     const due = withoutExpiredOnsets(events, this.#currentFrame(context));
-    if (due.length > 0) adapter.schedule(due);
+    if (due.length > 0) this.#scheduleAdapterEvents(moduleId, adapter, due);
     this.#scheduleRecoveredModule(moduleId);
   }
 
@@ -1739,6 +2133,20 @@ function samePatternTiming(
     }
   }
   return true;
+}
+
+function sameSongEntries(
+  left: TransportArrangement["songEntries"],
+  right: TransportArrangement["songEntries"],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((entry, index) => {
+    const rightEntry = right.at(index);
+    return (
+      entry.patternIndex === rightEntry?.patternIndex &&
+      entry.repeats === rightEntry.repeats
+    );
+  });
 }
 
 /** Deterministic 32-bit salt from a stable module ID string. */

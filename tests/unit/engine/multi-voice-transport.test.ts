@@ -54,6 +54,7 @@ function recordingAdapter(): RecordingAdapter {
     setProjectRevision: vi.fn(),
     setParameters: (parameters) => parameterWrites.push(parameters),
     previewParameters: (parameters) => parameterWrites.push(parameters),
+    scheduleParameters: vi.fn(),
     schedule: (events) => batches.push(events),
     clearScheduledEvents: vi.fn(),
     resume: vi.fn(),

@@ -20,8 +20,8 @@ const DISTORTION_PLUGIN_ID = "distortion";
 const DRUMLINE_PLUGIN_ID = "drum-analog-small";
 const EFFECT_INSTANCE_ID = "00000000-0000-4000-8000-000000000991";
 
-function fixtureEventId(patternIndex: number, step: number): NoteEventId {
-  const suffix = (patternIndex * 16 + step + 1).toString(16).padStart(12, "0");
+function fixtureEventId(patternIndex: number, partIndex: number, step: number): NoteEventId {
+  const suffix = (patternIndex * 128 + partIndex * 16 + step + 1).toString(16).padStart(12, "0");
   return `00000000-0000-4000-8000-${suffix}` as NoteEventId;
 }
 const SOURCE_REVISION = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
@@ -145,14 +145,28 @@ function distortionFixture(document: ProjectDocument): {
       })),
       patterns: document.patterns.map((pattern, patternIndex) => ({
         ...pattern,
-        events: targetModules.has(pattern.moduleId)
-          ? Array.from({ length: pattern.length }, (_, step) => ({
-              id: fixtureEventId(patternIndex, step),
-              type: "trigger" as const,
-              positionTicks: step * 240,
-              data: { note: 36, velocity: 0.8, accent: false, slide: false },
-            }))
-          : [],
+        parts: pattern.parts.map((part, partIndex) =>
+          targetModules.has(part.moduleId)
+            ? {
+                ...part,
+                events: Array.from({ length: part.length }, (_, step) => ({
+                  id: fixtureEventId(patternIndex, partIndex, step),
+                  type: "trigger" as const,
+                  positionTicks: step * 240,
+                  data: {
+                    note: 36,
+                    velocity: 0.8,
+                    accent: false,
+                    slide: false,
+                    probability: 1,
+                    microTimingTicks: 0,
+                    flam: 0,
+                    roll: 0,
+                  },
+                })),
+              }
+            : part,
+        ),
       })),
       effects: {
         instances: [
@@ -1142,15 +1156,10 @@ test("saved Distortion reaches the production worklet and transitions while soun
       comparisonMethod:
         "Compare real worklet meter frames for identical dry and inserted Kick patterns before, during, and after a sounding bypass transition.",
       context: "live",
-      deterministicPatternSeeds: fixture.document.patterns
-        .filter((pattern) =>
-          pattern.moduleId === fixture.dryModuleId || pattern.moduleId === fixture.insertedModuleId,
-        )
-        .map((pattern) => ({
-          moduleId: pattern.moduleId,
-          patternIndex: pattern.patternIndex ?? 0,
-          seed: pattern.seed ?? 0,
-        })),
+      deterministicPatternSeeds: fixture.document.patterns.map((pattern) => ({
+        patternId: pattern.id,
+        seed: pattern.seed,
+      })),
       effect: "Distortion on one Tin Soldier kick voice, with live bypass and restore.",
       fixture: "Two identical Tin Soldier modules with every step assigned to Kick.",
       operatingSystem: `${platform()} ${release()} ${arch()}`,

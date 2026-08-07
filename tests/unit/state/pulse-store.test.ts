@@ -61,6 +61,21 @@ function required<T>(value: T | undefined): T {
   return value;
 }
 
+function defaultPatternId(store: PulseStore) {
+  return required(store.getState().project.patterns[1]).id;
+}
+
+function part(store: PulseStore, moduleId: string) {
+  return required(store.getState().project.patterns[1]?.parts[moduleId as never]);
+}
+
+function moduleParts(store: PulseStore, moduleId: string) {
+  return store.getState().project.patterns.flatMap((pattern) => {
+    const value = pattern.parts[moduleId as never];
+    return value === undefined ? [] : [value];
+  });
+}
+
 function requiredEffectId(value: EffectInstanceId | null | undefined): EffectInstanceId {
   if (value === undefined || value === null) throw new Error("Test fixture is missing an effect.");
   return value;
@@ -82,57 +97,291 @@ function createDistortionVoiceInsert(
 }
 
 describe("PulseStore", () => {
+  it("creates, updates, removes, and undoes a Pattern-owned automation lane", () => {
+    const store = createStore(deterministicIds());
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const patternId = defaultPatternId(store);
+    const steps = [{ tick: 0, value: 840 }];
+
+    expect(
+      store.dispatch(
+        store.createCommand("automation-lane-steps-set", {
+          moduleId,
+          patternId,
+          parameterId: "cutoff",
+          steps,
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+
+    const pattern = required(store.getState().project.patterns.find((candidate) => candidate.id === patternId));
+    const laneId = required(pattern.parts[moduleId]?.automationLaneIds[0]);
+    expect(pattern.automationLaneIds).toEqual([laneId]);
+    expect(store.getState().project.automationLanes[laneId]).toMatchObject({
+      patternId,
+      targetId: moduleId,
+      parameterId: "cutoff",
+      steps,
+    });
+
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        moduleId,
+        patternId,
+        parameterId: "cutoff",
+        steps: [],
+      }),
+    );
+    expect(store.getState().project.automationLanes[laneId]).toBeUndefined();
+    expect(required(store.getState().project.patterns.find((candidate) => candidate.id === patternId)).automationLaneIds).toEqual([]);
+
+    store.undo();
+    expect(store.getState().project.automationLanes[laneId]?.steps).toEqual(steps);
+  });
+
+  it("creates an empty Pattern part for the first automation step", () => {
+    const ids = deterministicIds();
+    const initial = createDefaultState(ids, seed);
+    const moduleId = required(initial.ui.selectedModuleId);
+    const pattern = required(initial.project.patterns[1]);
+    const store = new PulseStore(
+      {
+        ...initial,
+        project: {
+          ...initial.project,
+          patterns: initial.project.patterns.map((candidate) =>
+            candidate.id === pattern.id
+              ? {
+                  ...candidate,
+                  parts: Object.fromEntries(
+                    Object.entries(candidate.parts).filter(([id]) => id !== moduleId),
+                  ),
+                }
+              : candidate,
+          ),
+        },
+      },
+      ids,
+      seed,
+      () => undefined,
+      validateParameter,
+    );
+
+    expect(
+      store.dispatch(
+        store.createCommand("automation-lane-steps-set", {
+          moduleId,
+          patternId: pattern.id,
+          parameterId: "cutoff",
+          steps: [{ tick: 0, value: 840 }],
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    expect(
+      required(
+        store.getState().project.patterns.find((candidate) => candidate.id === pattern.id),
+      ).parts[moduleId],
+    ).toMatchObject({ length: 16, events: [], automationLaneIds: [expect.any(String)] });
+  });
+
+  it("clears Pattern events and automation as one restorable project replacement", () => {
+    const deltas = vi.fn();
+    const store = createStore(deterministicIds(), deltas);
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const patternId = defaultPatternId(store);
+    const originalEvents = part(store, moduleId).events;
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        moduleId,
+        patternId,
+        parameterId: "cutoff",
+        steps: [{ tick: 0, value: 840 }],
+      }),
+    );
+    const laneId = required(part(store, moduleId).automationLaneIds[0]);
+
+    expect(store.dispatch(store.createCommand("pattern-clear", { patternId }))).toMatchObject({
+      status: "accepted",
+      changed: true,
+    });
+    expect(part(store, moduleId)).toMatchObject({ events: [], automationLaneIds: [] });
+    expect(store.getState().project.automationLanes[laneId]).toBeUndefined();
+    expect(deltas).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "project-replace", targetIds: [moduleId] }),
+    );
+
+    expect(store.undo()).toMatchObject({ status: "accepted", changed: true });
+    expect(part(store, moduleId).events).toEqual(originalEvents);
+    expect(part(store, moduleId).automationLaneIds).toEqual([laneId]);
+    expect(store.getState().project.automationLanes[laneId]?.steps).toEqual([
+      { tick: 0, value: 840 },
+    ]);
+  });
+
+  it("duplicates a Pattern with fresh automation lane and event IDs", () => {
+    const store = createStore(deterministicIds());
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const patternId = defaultPatternId(store);
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        moduleId,
+        patternId,
+        parameterId: "cutoff",
+        steps: [{ tick: 0, value: 840 }],
+      }),
+    );
+    const sourcePart = part(store, moduleId);
+    const sourceLaneId = required(sourcePart.automationLaneIds[0]);
+
+    store.dispatch(store.createCommand("pattern-duplicate", { patternId }));
+    const copy = required(
+      store.getState().project.patterns.find((pattern) => pattern.name === "Verse copy"),
+    );
+    const copyPart = required(copy.parts[moduleId]);
+    const copyLaneId = required(copyPart.automationLaneIds[0]);
+    expect(copyLaneId).not.toBe(sourceLaneId);
+    expect(copy.automationLaneIds).toEqual([copyLaneId]);
+    expect(copyPart.events.map((event) => event.id)).not.toEqual(
+      sourcePart.events.map((event) => event.id),
+    );
+    expect(store.getState().project.automationLanes[copyLaneId]).toMatchObject({
+      id: copyLaneId,
+      patternId: copy.id,
+      targetId: moduleId,
+      parameterId: "cutoff",
+      steps: [{ tick: 0, value: 840 }],
+    });
+  });
+
+  it("duplicates a module with fresh automation lanes targeted at the copy", () => {
+    const store = createStore(deterministicIds());
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const patternId = defaultPatternId(store);
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        moduleId,
+        patternId,
+        parameterId: "cutoff",
+        steps: [{ tick: 0, value: 840 }],
+      }),
+    );
+    const sourceLaneId = required(part(store, moduleId).automationLaneIds[0]);
+    const targetSlot = required(store.getState().project.rackSlots[1]);
+
+    store.dispatch(
+      store.createCommand("rack-module-duplicate", { moduleId, slotId: targetSlot.id }),
+    );
+    const copyModuleId = required(store.getState().project.rackSlots[1]?.moduleId);
+    const pattern = required(
+      store.getState().project.patterns.find((candidate) => candidate.id === patternId),
+    );
+    const copyPart = required(pattern.parts[copyModuleId]);
+    const copyLaneId = required(copyPart.automationLaneIds[0]);
+    expect(copyLaneId).not.toBe(sourceLaneId);
+    expect(pattern.automationLaneIds).toEqual([sourceLaneId, copyLaneId]);
+    expect(store.getState().project.automationLanes[copyLaneId]).toMatchObject({
+      id: copyLaneId,
+      patternId,
+      targetId: copyModuleId,
+      parameterId: "cutoff",
+      steps: [{ tick: 0, value: 840 }],
+    });
+  });
+
+  it("rejects a shortened part when its automation would leave the valid grid", () => {
+    const store = createStore(deterministicIds());
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const patternId = defaultPatternId(store);
+    store.dispatch(
+      store.createCommand("pattern-part-events-replace", {
+        moduleId,
+        patternId,
+        events: [],
+      }),
+    );
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        moduleId,
+        patternId,
+        parameterId: "cutoff",
+        steps: [{ tick: 15 * 240, value: 840 }],
+      }),
+    );
+
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-part-length-set", { moduleId, patternId, length: 8 }),
+      ),
+    ).toMatchObject({
+      status: "rejected",
+      error: { message: "Automation steps would fall outside the shortened Pattern part." },
+    });
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-part-events-replace", {
+          moduleId,
+          patternId,
+          events: [],
+          length: 8,
+        }),
+      ),
+    ).toMatchObject({
+      status: "rejected",
+      error: { message: "Automation steps would fall outside the shortened Pattern part." },
+    });
+  });
+
   it("edits note duration and velocity through one undoable event command", () => {
     const ids = deterministicIds();
     const deltas = vi.fn();
     const store = createStore(ids, deltas);
     const moduleId = required(store.getState().ui.selectedModuleId);
-    const eventId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
+    const eventId = required(part(store, moduleId).events[0]?.id);
 
     expect(
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: { type: "resize", eventId, durationTicks: 480 },
         }),
       ),
     ).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.durationTicks).toBe(480);
+    expect(part(store, moduleId).events[0]?.durationTicks).toBe(480);
     expect(deltas).toHaveBeenLastCalledWith(
       expect.objectContaining({
         kind: "pattern-events-set",
         targetIds: [moduleId],
-        payload: { moduleId, patternIndex: 1 },
+        payload: { moduleId, patternId: defaultPatternId(store) },
       }),
     );
 
     store.undo();
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.durationTicks).toBe(240);
+    expect(part(store, moduleId).events[0]?.durationTicks).toBe(240);
     store.redo();
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.durationTicks).toBe(480);
+    expect(part(store, moduleId).events[0]?.durationTicks).toBe(480);
 
     expect(
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: { type: "resize", eventId, positionTicks: 240, durationTicks: 240 },
         }),
       ),
     ).toMatchObject({ status: "accepted", changed: true });
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]).toMatchObject({
+    expect(part(store, moduleId).events[0]).toMatchObject({
       positionTicks: 240,
       durationTicks: 240,
     });
 
     store.undo();
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]).toMatchObject({
+    expect(part(store, moduleId).events[0]).toMatchObject({
       positionTicks: 0,
       durationTicks: 480,
     });
     store.redo();
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]).toMatchObject({
+    expect(part(store, moduleId).events[0]).toMatchObject({
       positionTicks: 240,
       durationTicks: 240,
     });
@@ -140,7 +389,7 @@ describe("PulseStore", () => {
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: { type: "resize", eventId, positionTicks: 240, durationTicks: 480 },
         }),
       ),
@@ -152,24 +401,24 @@ describe("PulseStore", () => {
     store.dispatch(
       store.createCommand("pattern-events-edit", {
         moduleId,
-        patternIndex: 1,
+        patternId: defaultPatternId(store),
         edit: { type: "velocity", eventIds: [eventId], velocity: 0.35 },
       }),
     );
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.data.velocity).toBe(0.35);
+    expect(part(store, moduleId).events[0]?.data.velocity).toBe(0.35);
   });
 
   it("rejects overlapping monophonic notes", () => {
     const ids = deterministicIds();
     const store = createStore(ids);
     const moduleId = required(store.getState().ui.selectedModuleId);
-    const eventId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
+    const eventId = required(part(store, moduleId).events[0]?.id);
 
     expect(
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: { type: "move", eventIds: [eventId], deltaTicks: 480, deltaNote: 0 },
         }),
       ),
@@ -196,7 +445,7 @@ describe("PulseStore", () => {
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: {
             type: "create",
             event: {
@@ -212,7 +461,7 @@ describe("PulseStore", () => {
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: {
             type: "create",
             event: {
@@ -234,24 +483,24 @@ describe("PulseStore", () => {
       status: "rejected",
       error: { message: "A drum voice already has a trigger at this step." },
     });
-    expect(store.getState().project.modules[moduleId]?.parts[1]?.events).toHaveLength(2);
+    expect(part(store, moduleId).events).toHaveLength(2);
   });
 
   it("duplicates on the next grid step and filters deleted event selections", () => {
     const ids = deterministicIds();
     const store = createStore(ids);
     const moduleId = required(store.getState().ui.selectedModuleId);
-    const firstId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
-    const secondId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[1]?.id);
+    const firstId = required(part(store, moduleId).events[0]?.id);
+    const secondId = required(part(store, moduleId).events[1]?.id);
 
     store.dispatch(
       store.createCommand("pattern-events-edit", {
         moduleId,
-        patternIndex: 1,
+        patternId: defaultPatternId(store),
         edit: { type: "duplicate", eventIds: [firstId] },
       }),
     );
-    const duplicate = store.getState().project.modules[moduleId]?.parts[1]?.events.find(
+    const duplicate = part(store, moduleId).events.find(
       (event) => event.positionTicks === 240,
     );
     expect(duplicate?.id).not.toBe(firstId);
@@ -259,14 +508,14 @@ describe("PulseStore", () => {
     store.dispatch(
       store.createCommand("piano-roll-selection-set", {
         moduleId,
-        patternIndex: 1,
+        patternId: defaultPatternId(store),
         eventIds: [firstId, secondId],
       }),
     );
     store.dispatch(
       store.createCommand("pattern-events-edit", {
         moduleId,
-        patternIndex: 1,
+        patternId: defaultPatternId(store),
         edit: { type: "delete", eventIds: [firstId] },
       }),
     );
@@ -309,6 +558,22 @@ describe("PulseStore", () => {
     const drumId = required(store.getState().project.rackSlots[1]?.moduleId);
     const drum = required(store.getState().project.modules[drumId]);
     expect(drum).toMatchObject({ pluginId: drumSeed.pluginId, parameters: drumSeed.parameters });
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId: drumId,
+          patternId: defaultPatternId(store),
+          edit: {
+            type: "create",
+            event: {
+              type: "trigger",
+              positionTicks: 0,
+              data: { note: 36, velocity: 0.8, accent: false, slide: false },
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
 
     const thirdSlot = required(store.getState().project.rackSlots[2]);
     store.dispatch(
@@ -319,11 +584,11 @@ describe("PulseStore", () => {
     expect(duplicateId).not.toBe(drumId);
     expect(duplicate.pluginId).toBe(drumSeed.pluginId);
     expect(duplicate.parameters).toEqual(drum.parameters);
-    expect(duplicate.parts.map((part) => part.events.length)).toEqual(
-      drum.parts.map((part) => part.events.length),
+    expect(moduleParts(store, duplicateId).map((item) => item.events.length)).toEqual(
+      moduleParts(store, drumId).map((item) => item.events.length),
     );
-    expect(duplicate.parts.flatMap((part) => part.events).map((event) => event.id)).not.toEqual(
-      drum.parts.flatMap((part) => part.events).map((event) => event.id),
+    expect(moduleParts(store, duplicateId).flatMap((item) => item.events).map((event) => event.id)).not.toEqual(
+      moduleParts(store, drumId).flatMap((item) => item.events).map((event) => event.id),
     );
   });
 
@@ -641,14 +906,14 @@ describe("PulseStore", () => {
       validateParameter,
     );
     const moduleId = required(store.getState().ui.selectedModuleId);
-    const eventId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
+    const eventId = required(part(store, moduleId).events[0]?.id);
     const snapshot = store.getState();
 
     expect(
       store.dispatch(
         store.createCommand("pattern-events-edit", {
           moduleId,
-          patternIndex: 1,
+          patternId: defaultPatternId(store),
           edit: { type: "velocity", eventIds: [eventId], velocity: 0.9 },
         }),
       ),
@@ -765,6 +1030,7 @@ describe("PulseStore", () => {
     const moduleId = required(store.getState().ui.selectedModuleId);
     store.dispatch(store.createCommand("mixer-level-set", { moduleId, level: 0.8 }));
     const before = required(store.getState().project.modules[moduleId]);
+    const beforeParts = moduleParts(store, moduleId);
 
     expect(
       store.dispatch(
@@ -775,7 +1041,7 @@ describe("PulseStore", () => {
     expect(after.id).toBe(moduleId);
     expect(after.pluginId).toBe(drumSeed.pluginId);
     expect(after.parameters).toEqual(drumSeed.parameters);
-    expect(after.parts).toEqual(before.parts);
+    expect(moduleParts(store, moduleId)).toEqual(beforeParts);
     expect(after.level).toBe(0.8);
     expect(deltas).toHaveBeenLastCalledWith(
       expect.objectContaining({

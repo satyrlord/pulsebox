@@ -23,6 +23,7 @@ import {
   parsePortableProject,
   parseStoredProject,
   portableProjectFilename,
+  restoreAutosave,
   serializeProject,
   serializePortableProject,
   serializeProjectToJson,
@@ -88,6 +89,11 @@ const TEST_ID_FACTORY = {
   createUuid: () => "c050f0fb-b0f2-4e7a-9e02-92fd6f5fe9bd",
 };
 
+function required<Value>(value: Value | undefined): Value {
+  if (value === undefined) throw new Error("Expected a test fixture value.");
+  return value;
+}
+
 const PARSE = {
   knownPluginIds: [BASS_MONO_MANIFEST.pluginId as string],
   parameterDescriptorsByPluginId: {
@@ -146,13 +152,94 @@ function document(seed: ModuleSeed = SEED): ProjectDocument {
   return serializeProject(createDefaultState(browserIdFactory, seed), OPTIONS);
 }
 
+function formatOneDocument(): Readonly<Record<string, unknown>> {
+  const current = document();
+  const patternIndexById = new Map(
+    current.patterns.map((pattern, index) => [pattern.id, index]),
+  );
+  const moduleIds = current.rack.flatMap((slot) =>
+    slot.moduleId === undefined ? [] : [slot.moduleId],
+  );
+  return {
+    format: current.format,
+    formatVersion: 1,
+    project: current.project,
+    plugins: current.plugins,
+    rack: current.rack,
+    patterns: current.patterns.flatMap((pattern, patternIndex) =>
+      moduleIds.map((moduleId) => {
+        const part = pattern.parts.find((candidate) => candidate.moduleId === moduleId);
+        return {
+          id: `${pattern.id}:${moduleId}`,
+          moduleId,
+          name: pattern.name,
+          length: part?.length ?? 16,
+          patternIndex,
+          humanize: pattern.humanize,
+          seed: pattern.seed,
+          events: (part?.events ?? []).map((event) => ({
+            id: event.id,
+            type: event.type,
+            positionTicks: event.positionTicks,
+            ...(event.durationTicks === undefined ? {} : { durationTicks: event.durationTicks }),
+            data: {
+              note: event.data.note,
+              velocity: event.data.velocity,
+              accent: event.data.accent,
+              slide: event.data.slide,
+            },
+          })),
+        };
+      }),
+    ),
+    song: current.song.playlist.map((placement) => ({
+      patternIndex: patternIndexById.get(placement.patternId) ?? -1,
+      repeats: placement.repeatCount,
+    })),
+    songEnabled: current.song.enabled,
+    activePatternIndex: patternIndexById.get(current.activePatternId) ?? 0,
+    automation: [],
+    mixer: current.mixer,
+    effects: current.effects,
+    assets: [],
+    migrations: [],
+  };
+}
+
+function firstEventPart(written: ProjectDocument) {
+  for (const [patternIndex, pattern] of written.patterns.entries()) {
+    for (const [partIndex, part] of pattern.parts.entries()) {
+      if (part.events.length > 0) return { pattern, patternIndex, part, partIndex };
+    }
+  }
+  throw new Error("Test fixture has no Pattern event.");
+}
+
+function withPartEvents(
+  written: ProjectDocument,
+  patternIndex: number,
+  partIndex: number,
+  events: readonly unknown[],
+) {
+  return written.patterns.map((pattern, currentPatternIndex) =>
+    currentPatternIndex !== patternIndex
+      ? pattern
+      : {
+          ...pattern,
+          parts: pattern.parts.map((part, currentPartIndex) =>
+            currentPartIndex === partIndex ? { ...part, events } : part,
+          ),
+        },
+  );
+}
+
 describe("project document", () => {
   it("writes the specified root record", () => {
     const written = document();
     expect(written.format).toBe(PROJECT_FORMAT);
     expect(written.formatVersion).toBe(PROJECT_FORMAT_VERSION);
     expect(Object.keys(written).sort()).toEqual([
-      "activePatternIndex",
+      "activePatternId",
       "assets",
       "automation",
       "effects",
@@ -165,7 +252,6 @@ describe("project document", () => {
       "project",
       "rack",
       "song",
-      "songEnabled",
     ]);
   });
 
@@ -181,7 +267,7 @@ describe("project document", () => {
 
     expect(after?.pluginId).toBe(before?.pluginId);
     expect(after?.parameters).toEqual(before?.parameters);
-    expect(after?.parts).toEqual(before?.parts);
+    expect(restored.project.patterns).toEqual(state.project.patterns);
     expect(restored.project.tempo).toBe(state.project.tempo);
     expect(restored.project.rackSlots).toHaveLength(state.project.rackSlots.length);
   });
@@ -498,36 +584,51 @@ describe("project document", () => {
 
   it("accepts simultaneous trigger voices and rejects duplicate voice triggers", () => {
     const written = document(DRUM_SEED);
-    const first = written.patterns[0];
-    if (first === undefined) throw new Error("Test fixture has no Pattern part.");
+    const { patternIndex, partIndex } = firstEventPart(written);
     const triggers = [
       {
         id: "00000000-0000-4000-8000-000000000901" as never,
         type: "trigger" as const,
         positionTicks: 0,
-        data: { note: 36, velocity: 0.8, accent: false, slide: false },
+        data: {
+          note: 36,
+          velocity: 0.8,
+          accent: false,
+          slide: false,
+          probability: 1,
+          microTimingTicks: 0,
+          flam: 0,
+          roll: 0,
+        },
       },
       {
         id: "00000000-0000-4000-8000-000000000902" as never,
         type: "trigger" as const,
         positionTicks: 0,
-        data: { note: 38, velocity: 0.7, accent: false, slide: false },
+        data: {
+          note: 38,
+          velocity: 0.7,
+          accent: false,
+          slide: false,
+          probability: 1,
+          microTimingTicks: 0,
+          flam: 0,
+          roll: 0,
+        },
       },
     ];
-    const patterns = written.patterns.map((pattern, index) =>
-      index === 0 ? { ...pattern, events: triggers } : pattern,
-    );
+    const patterns = withPartEvents(written, patternIndex, partIndex, triggers);
     expect(parseProjectDocument({ ...written, patterns }, VOICE_INSERT_PARSE).ok).toBe(true);
 
+    const firstTrigger = triggers[0];
+    if (firstTrigger === undefined) throw new Error("Test fixture has no first trigger.");
     const secondTrigger = triggers[1];
     if (secondTrigger === undefined) throw new Error("Test fixture has no second trigger.");
     const duplicateVoice = [
-      triggers[0],
+      firstTrigger,
       { ...secondTrigger, data: { ...secondTrigger.data, note: 36 } },
     ];
-    const invalidPatterns = written.patterns.map((pattern, index) =>
-      index === 0 ? { ...pattern, events: duplicateVoice } : pattern,
-    );
+    const invalidPatterns = withPartEvents(written, patternIndex, partIndex, duplicateVoice);
     expect(parseProjectDocument({ ...written, patterns: invalidPatterns }, VOICE_INSERT_PARSE).ok).toBe(
       false,
     );
@@ -535,50 +636,30 @@ describe("project document", () => {
 
   it("rejects an event type that the module does not support", () => {
     const bass = document();
-    const bassPart = bass.patterns.find((pattern) => pattern.events.length > 0);
-    const bassEvent = bassPart?.events[0];
-    if (bassPart === undefined || bassEvent === undefined) {
-      throw new Error("Test fixture has no bass event.");
-    }
-    const bassPatterns = bass.patterns.map((pattern) =>
-      pattern.id === bassPart.id
-        ? {
-            ...pattern,
-            events: [
-              {
-                id: bassEvent.id,
-                type: "trigger" as const,
-                positionTicks: bassEvent.positionTicks,
-                data: bassEvent.data,
-              },
-            ],
-          }
-        : pattern,
-    );
+    const bassPart = firstEventPart(bass);
+    const bassEvent = required(bassPart.part.events[0]);
+    const bassPatterns = withPartEvents(bass, bassPart.patternIndex, bassPart.partIndex, [
+      {
+        id: bassEvent.id,
+        type: "trigger" as const,
+        positionTicks: bassEvent.positionTicks,
+        data: bassEvent.data,
+      },
+    ]);
     expect(parseProjectDocument({ ...bass, patterns: bassPatterns }, PARSE).ok).toBe(false);
 
     const drum = document(DRUM_SEED);
-    const drumPart = drum.patterns.find((pattern) => pattern.events.length > 0);
-    const drumEvent = drumPart?.events[0];
-    if (drumPart === undefined || drumEvent === undefined) {
-      throw new Error("Test fixture has no drum event.");
-    }
-    const drumPatterns = drum.patterns.map((pattern) =>
-      pattern.id === drumPart.id
-        ? {
-            ...pattern,
-            events: [
-              {
-                id: drumEvent.id,
-                type: "note" as const,
-                positionTicks: drumEvent.positionTicks,
-                durationTicks: 240,
-                data: drumEvent.data,
-              },
-            ],
-          }
-        : pattern,
-    );
+    const drumPart = firstEventPart(drum);
+    const drumEvent = required(drumPart.part.events[0]);
+    const drumPatterns = withPartEvents(drum, drumPart.patternIndex, drumPart.partIndex, [
+      {
+        id: drumEvent.id,
+        type: "note" as const,
+        positionTicks: drumEvent.positionTicks,
+        durationTicks: 240,
+        data: drumEvent.data,
+      },
+    ]);
     expect(parseProjectDocument({ ...drum, patterns: drumPatterns }, VOICE_INSERT_PARSE).ok).toBe(
       false,
     );
@@ -586,19 +667,17 @@ describe("project document", () => {
 
   it("rejects overlapping note envelopes and a duration on a trigger", () => {
     const written = document();
-    const first = written.patterns.find((pattern) => pattern.events.length > 0);
-    const source = first?.events[0];
-    if (first === undefined || source === undefined) {
-      throw new Error("Test fixture has no Pattern event.");
-    }
+    const first = firstEventPart(written);
+    const source = required(first.part.events[0]);
     const overlap = {
       ...source,
       id: "00000000-0000-4000-8000-000000000903" as never,
       positionTicks: source.positionTicks,
     };
-    const overlapPatterns = written.patterns.map((pattern) =>
-      pattern.id === first.id ? { ...pattern, events: [...pattern.events, overlap] } : pattern,
-    );
+    const overlapPatterns = withPartEvents(written, first.patternIndex, first.partIndex, [
+      ...first.part.events,
+      overlap,
+    ]);
     expect(parseProjectDocument({ ...written, patterns: overlapPatterns }, PARSE).ok).toBe(false);
 
     const triggerWithDuration = {
@@ -606,9 +685,9 @@ describe("project document", () => {
       type: "trigger" as const,
       durationTicks: 240,
     };
-    const durationPatterns = written.patterns.map((pattern) =>
-      pattern.id === first.id ? { ...pattern, events: [triggerWithDuration] } : pattern,
-    );
+    const durationPatterns = withPartEvents(written, first.patternIndex, first.partIndex, [
+      triggerWithDuration,
+    ]);
     expect(parseProjectDocument({ ...written, patterns: durationPatterns }, PARSE).ok).toBe(false);
   });
 
@@ -652,13 +731,27 @@ describe("project document", () => {
 
   it("rejects pattern references to modules outside the rack", () => {
     const written = document();
-    const patterns = written.patterns.map((pattern, index) =>
-      index === 0 ? { ...pattern, moduleId: "4b50c90c-4e3c-4c92-a0f1-668291d20c25" } : pattern,
+    const { patternIndex, partIndex } = firstEventPart(written);
+    const patterns = written.patterns.map((pattern, currentPatternIndex) =>
+      currentPatternIndex !== patternIndex
+        ? pattern
+        : {
+            ...pattern,
+            parts: pattern.parts.map((part, currentPartIndex) =>
+              currentPartIndex === partIndex
+                ? { ...part, moduleId: "4b50c90c-4e3c-4c92-a0f1-668291d20c25" }
+                : part,
+            ),
+          },
     );
     const result = parseProjectDocument({ ...written, patterns }, PARSE);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.issues.some((issue) => issue.path === "patterns[0].moduleId")).toBe(true);
+    expect(
+      result.issues.some(
+        (issue) => issue.path === `patterns[${String(patternIndex)}].parts[${String(partIndex)}].moduleId`,
+      ),
+    ).toBe(true);
   });
 
   it("rejects duplicate object keys at any JSON nesting level before schema validation", () => {
@@ -910,17 +1003,29 @@ describe("legacy saved data", () => {
   });
 });
 
-describe("format 1 documents", () => {
+describe("format 2 documents", () => {
   it("round-trips the full bank, mixer, and song through JSON", () => {
     const base = createDefaultState(browserIdFactory, SEED);
+    const activePattern = required(base.project.patterns[2]);
+    const songPattern = required(base.project.patterns[1]);
+    const firstPlacement = required(base.project.song.placements[0]);
     const state = {
       ...base,
       project: {
         ...base.project,
         swing: 0.4,
         masterLevel: 0.55,
-        activePatternIndex: 2,
-        song: { enabled: true, entries: [{ patternIndex: 1, repeats: 3 }] },
+        activePatternId: activePattern.id,
+        song: {
+          enabled: true,
+          placements: [
+            {
+              ...firstPlacement,
+              patternId: songPattern.id,
+              repeatCount: 3,
+            },
+          ],
+        },
       },
     };
 
@@ -931,11 +1036,87 @@ describe("format 1 documents", () => {
 
     expect(restored.project.swing).toBe(0.4);
     expect(restored.project.masterLevel).toBe(0.55);
-    expect(restored.project.activePatternIndex).toBe(2);
+    expect(restored.project.activePatternId).toBe(activePattern.id);
     expect(restored.project.song).toEqual({
       enabled: true,
-      entries: [{ patternIndex: 1, repeats: 3 }],
+      placements: [
+        {
+          ...firstPlacement,
+          patternId: songPattern.id,
+          repeatCount: 3,
+        },
+      ],
     });
+  });
+
+  it("migrates a released format-1 project for import, open, and autosave recovery", async () => {
+    const legacy = formatOneDocument();
+    const parsed = parseProjectJson(JSON.stringify(legacy), PARSE);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+
+    expect(parsed.value.formatVersion).toBe(2);
+    expect(parsed.value.migrations).toEqual([
+      {
+        scope: "project",
+        id: "project-format-1-to-2-pattern-bank",
+        fromVersion: 1,
+        toVersion: 2,
+        implementation: "1.0.0",
+      },
+    ]);
+    const migratedEvent = parsed.value.patterns
+      .flatMap((pattern) => pattern.parts)
+      .flatMap((part) => part.events)[0];
+    expect(migratedEvent?.data).toMatchObject({
+      probability: 1,
+      microTimingTicks: 0,
+      flam: 0,
+      roll: 0,
+    });
+
+    const metadata = parsed.value.project;
+    const stored = {
+      id: metadata.id,
+      name: metadata.name,
+      modifiedAt: metadata.modifiedAt,
+      document: legacy as unknown as ProjectDocument,
+    };
+    const opened = parseStoredProject(stored, PARSE);
+    expect(opened.ok && opened.value.document.formatVersion).toBe(2);
+
+    const repository = createMemoryProjectRepository();
+    await repository.saveAutosave(stored);
+    const base = createDefaultState(browserIdFactory, SEED);
+    const restored = await restoreAutosave(base, { repository, parseOptions: PARSE });
+    expect(restored.document?.formatVersion).toBe(2);
+    expect(restored.state.project.patterns[0]?.id).toBe(parsed.value.patterns[0]?.id);
+  });
+
+  it("repairs valid format-1 projects with an empty Song or empty rack", () => {
+    const legacy = formatOneDocument();
+    const withoutSong = parseProjectDocument({ ...legacy, song: [] }, PARSE);
+    if (!withoutSong.ok) throw new Error(JSON.stringify(withoutSong.issues));
+    expect(withoutSong.value.song.playlist).toEqual([
+      expect.objectContaining({
+        patternId: withoutSong.value.activePatternId,
+        repeatCount: 1,
+      }),
+    ]);
+
+    const rack = (legacy.rack as readonly Readonly<Record<string, unknown>>[]).map((slot) => ({
+      id: slot.id,
+    }));
+    const emptyRack = parseProjectDocument(
+      { ...legacy, plugins: [], rack, patterns: [] },
+      PARSE,
+    );
+    if (!emptyRack.ok) throw new Error(JSON.stringify(emptyRack.issues));
+    expect(emptyRack.value.patterns.length).toBeGreaterThan(0);
+    expect(
+      emptyRack.value.song.playlist.every((placement) =>
+        emptyRack.value.patterns.some((pattern) => pattern.id === placement.patternId),
+      ),
+    ).toBe(true);
   });
 });
 

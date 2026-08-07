@@ -18,11 +18,11 @@ export function clampUnitInterval(value: number): number {
  * on a pitched instrument.
  */
 export function countUnmappedEvents(
-  parts: readonly PatternPartState[],
+  parts: Iterable<PatternPartState>,
   playableNotes: ReadonlySet<number> | undefined,
 ): number {
   if (playableNotes === undefined) return 0;
-  return parts.reduce(
+  return [...parts].reduce(
     (total, part) =>
       total + part.events.filter((event) => !playableNotes.has(event.data.note)).length,
     0,

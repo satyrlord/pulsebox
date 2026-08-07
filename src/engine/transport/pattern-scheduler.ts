@@ -1,7 +1,10 @@
 import {
   compareScheduledVoiceEvents,
+  SCHEDULED_EVENT_QUEUE_CAPACITY,
+  type PatternAutomationStepView,
   type PatternEventView,
   type PatternPartView,
+  type ScheduledParameterChange,
   type ScheduledVoiceEvent,
 } from "./scheduled-event";
 
@@ -11,6 +14,7 @@ const PATTERN_STEP_TICKS = 240;
 /** All events that begin at one resolved Pattern step. */
 export interface ResolvedStep {
   readonly events: readonly PatternEventView[];
+  readonly automationSteps?: readonly PatternAutomationStepView[];
   readonly patternIndex: number;
   /** Position inside the source Pattern, used for deterministic Humanize. */
   readonly stepInPattern: number;
@@ -46,11 +50,15 @@ export interface PatternWindowRequest {
 }
 
 const DEFAULT_GATE_RATIO = 0.82;
-const DEFAULT_MAXIMUM_EVENTS = 256;
+const DEFAULT_MAXIMUM_EVENTS = SCHEDULED_EVENT_QUEUE_CAPACITY;
 const MAXIMUM_SWING_FRACTION = 1 / 3;
 const MAXIMUM_HUMANIZE_FRACTION = 0.25;
 const MAXIMUM_VELOCITY_FRACTION = 0.25;
 const MAXIMUM_PATTERN_STEPS = 64;
+const MAXIMUM_MICRO_TIMING_TICKS = PATTERN_STEP_TICKS / 4;
+const MAXIMUM_FLAM_COUNT = 3;
+const MAXIMUM_ROLL_COUNT = 7;
+const FLAM_WINDOW_FRACTION = 1 / 8;
 
 function eventBuckets(part: PatternPartView): ReadonlyMap<number, readonly PatternEventView[]> {
   const mutable = new Map<number, PatternEventView[]>();
@@ -62,17 +70,60 @@ function eventBuckets(part: PatternPartView): ReadonlyMap<number, readonly Patte
   return mutable;
 }
 
+function validCycleLength(value: number | undefined, fallback: number): number {
+  return Number.isSafeInteger(value) && value !== undefined && value > 0 ? value : fallback;
+}
+
+function eventsAtPatternStep(
+  part: PatternPartView,
+  buckets: ReadonlyMap<number, readonly PatternEventView[]>,
+  patternStep: number,
+): readonly PatternEventView[] {
+  const overrides = part.voiceCycleLengths;
+  const partStep = patternStep % part.length;
+  const direct = (buckets.get(partStep * PATTERN_STEP_TICKS) ?? []).filter(
+    (event) => validCycleLength(overrides?.[String(event.data.note)], part.length) === part.length,
+  );
+  if (overrides === undefined) return direct;
+  // Resolve an overridden voice against the unwrapped Pattern position. This
+  // lets a 32-step voice run independently inside a 16-step module part.
+  const included = new Map(direct.map((event) => [event.id, event]));
+  for (const event of part.events) {
+    const voiceCycle = validCycleLength(overrides[String(event.data.note)], part.length);
+    if (voiceCycle === part.length) continue;
+    const eventStep = Math.floor(event.positionTicks / PATTERN_STEP_TICKS);
+    if (patternStep % voiceCycle === eventStep % voiceCycle) included.set(event.id, event);
+  }
+  return [...included.values()];
+}
+
+function automationBuckets(
+  part: PatternPartView,
+): ReadonlyMap<number, readonly PatternAutomationStepView[]> {
+  const mutable = new Map<number, PatternAutomationStepView[]>();
+  for (const step of part.automationSteps ?? []) {
+    const bucket = mutable.get(step.positionTicks);
+    if (bucket === undefined) mutable.set(step.positionTicks, [step]);
+    else bucket.push(step);
+  }
+  return mutable;
+}
+
 export function loopingStepResolver(
   part: PatternPartView,
   patternIndex = 0,
 ): StepResolver {
   if (!Number.isSafeInteger(part.length) || part.length <= 0) return () => undefined;
   const eventsByPosition = eventBuckets(part);
+  const automationByPosition = automationBuckets(part);
+  const duration = validCycleLength(part.durationSteps, part.length);
   return (absoluteStep) => {
     if (!Number.isSafeInteger(absoluteStep) || absoluteStep < 0) return undefined;
-    const stepInPattern = absoluteStep % part.length;
+    const stepInPattern = absoluteStep % duration;
+    const partStep = stepInPattern % part.length;
     return {
-      events: eventsByPosition.get(stepInPattern * PATTERN_STEP_TICKS) ?? [],
+      events: eventsAtPatternStep(part, eventsByPosition, absoluteStep),
+      automationSteps: automationByPosition.get(partStep * PATTERN_STEP_TICKS) ?? [],
       patternIndex,
       stepInPattern,
     };
@@ -81,26 +132,43 @@ export function loopingStepResolver(
 
 /** Plays each part in order, then repeats the whole chain. */
 export function chainedStepResolver(
-  patterns: readonly { readonly part: PatternPartView; readonly patternIndex: number }[],
+  patterns: readonly {
+    readonly part: PatternPartView;
+    readonly patternIndex: number;
+    readonly repeats?: number;
+  }[],
 ): StepResolver {
   const playable = patterns.filter((pattern) => pattern.part.length > 0);
-  const total = playable.reduce((sum, pattern) => sum + pattern.part.length, 0);
+  const total = playable.reduce(
+    (sum, pattern) =>
+      sum +
+      validCycleLength(pattern.part.durationSteps, pattern.part.length) *
+        Math.max(1, pattern.repeats ?? 1),
+    0,
+  );
   if (total === 0) return () => undefined;
   const buckets = playable.map((pattern) => eventBuckets(pattern.part));
+  const automation = playable.map((pattern) => automationBuckets(pattern.part));
   return (absoluteStep) => {
     if (!Number.isSafeInteger(absoluteStep) || absoluteStep < 0) return undefined;
     let offset = absoluteStep % total;
     for (let index = 0; index < playable.length; index += 1) {
       const pattern = playable[index];
       if (pattern === undefined) continue;
-      if (offset < pattern.part.length) {
+      const duration = validCycleLength(pattern.part.durationSteps, pattern.part.length);
+      const placementDuration = duration * Math.max(1, pattern.repeats ?? 1);
+      if (offset < placementDuration) {
+        const stepInPattern = offset % duration;
+        const stepInPart = stepInPattern % pattern.part.length;
         return {
-          events: buckets[index]?.get(offset * PATTERN_STEP_TICKS) ?? [],
+          events: eventsAtPatternStep(pattern.part, buckets[index] ?? new Map(), offset),
+          automationSteps:
+            automation[index]?.get(stepInPart * PATTERN_STEP_TICKS) ?? [],
           patternIndex: pattern.patternIndex,
-          stepInPattern: offset,
+          stepInPattern,
         };
       }
-      offset -= pattern.part.length;
+      offset -= placementDuration;
     }
     return undefined;
   };
@@ -136,6 +204,32 @@ interface OnsetContext {
 
 const TIMING_SALT = 0;
 const VELOCITY_SALT = 1;
+const PROBABILITY_SALT = 2;
+
+function eventSalt(id: string): number {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (Math.imul(hash, 31) + id.charCodeAt(index)) | 0;
+  }
+  return hash;
+}
+
+function probabilityFor(event: PatternEventView): number {
+  const probability = event.data.probability;
+  if (probability === undefined || !Number.isFinite(probability)) return 1;
+  return Math.min(1, Math.max(0, probability));
+}
+
+function boundedCount(value: number | undefined, maximum: number): number {
+  if (value === undefined || !Number.isSafeInteger(value)) return 0;
+  return Math.min(maximum, Math.max(0, value));
+}
+
+function microTimingTicksFor(event: PatternEventView): number {
+  const offset = event.data.microTimingTicks;
+  if (offset === undefined || !Number.isSafeInteger(offset)) return 0;
+  return Math.min(MAXIMUM_MICRO_TIMING_TICKS, Math.max(-MAXIMUM_MICRO_TIMING_TICKS, offset));
+}
 
 function onsetFrame(context: OnsetContext, absoluteStep: number): number {
   const swung = absoluteStep % 2 === 1 ? context.swingFrames : 0;
@@ -151,6 +245,48 @@ function onsetFrame(context: OnsetContext, absoluteStep: number): number {
     context.voiceSalt * 2 + TIMING_SALT,
   );
   return base + Math.round(unit * humanize * MAXIMUM_HUMANIZE_FRACTION * context.stepFrames);
+}
+
+function eventOnsetFrame(
+  context: OnsetContext,
+  event: PatternEventView,
+  absoluteStep: number,
+): number {
+  return (
+    onsetFrame(context, absoluteStep) +
+    Math.round((microTimingTicksFor(event) / PATTERN_STEP_TICKS) * context.stepFrames)
+  );
+}
+
+function earliestEventOnsetFrame(
+  context: OnsetContext,
+  events: readonly PatternEventView[],
+  absoluteStep: number,
+): number {
+  return events.reduce(
+    (earliest, event) => Math.min(earliest, eventOnsetFrame(context, event, absoluteStep)),
+    Number.POSITIVE_INFINITY,
+  );
+}
+
+function playsEvent(
+  context: OnsetContext,
+  resolved: ResolvedStep,
+  event: PatternEventView,
+): boolean {
+  const probability = probabilityFor(event);
+  if (probability <= 0) return false;
+  if (probability >= 1) return true;
+  const seed = context.patternTiming?.[resolved.patternIndex]?.seed ?? 0;
+  const unit = (humanizeUnit(seed, resolved.stepInPattern, context.voiceSalt * 3 + PROBABILITY_SALT + eventSalt(event.id)) + 1) / 2;
+  return unit < probability;
+}
+
+function playedEvents(
+  context: OnsetContext,
+  resolved: ResolvedStep,
+): readonly PatternEventView[] {
+  return resolved.events.filter((event) => playsEvent(context, resolved, event));
 }
 
 function humanizedVelocity(
@@ -185,9 +321,12 @@ function adjacentSlidNote(
   const durationSteps = event.durationTicks / PATTERN_STEP_TICKS;
   if (!Number.isSafeInteger(durationSteps) || durationSteps <= 0) return undefined;
   const nextAbsoluteStep = absoluteStep + durationSteps;
-  const next = context.resolveStep(nextAbsoluteStep)?.events.find(
-    (candidate) => candidate.type === "note" && candidate.data.slide,
-  );
+  const resolved = context.resolveStep(nextAbsoluteStep);
+  const next = resolved === undefined
+    ? undefined
+    : playedEvents(context, resolved).find(
+        (candidate) => candidate.type === "note" && candidate.data.slide,
+      );
   return next === undefined ? undefined : { event: next, absoluteStep: nextAbsoluteStep };
 }
 
@@ -204,8 +343,13 @@ function releaseFrameFor(
   const nominalRelease = onset + Math.max(1, Math.round(durationSteps * context.stepFrames));
   const endStep = absoluteStep + durationSteps;
   const end = context.resolveStep(endStep);
-  if (end === undefined || end.events.length === 0) return nominalRelease;
-  return Math.max(onset + 1, Math.min(nominalRelease, onsetFrame(context, endStep) - 1));
+  if (end === undefined) return nominalRelease;
+  const sounding = playedEvents(context, end);
+  if (sounding.length === 0) return nominalRelease;
+  return Math.max(
+    onset + 1,
+    Math.min(nominalRelease, earliestEventOnsetFrame(context, sounding, endStep) - 1),
+  );
 }
 
 function terminalReleaseFor(
@@ -230,13 +374,82 @@ function terminalReleaseFor(
     if (release !== undefined) return { frame: release, note: currentEvent.data.note };
     const next = adjacentSlidNote(context, currentEvent, currentStep);
     if (next === undefined) return undefined;
-    const nextOnset = onsetFrame(context, next.absoluteStep);
+    const nextOnset = eventOnsetFrame(context, next.event, next.absoluteStep);
     if (nextOnset > latestStartedFrame) return undefined;
     currentEvent = next.event;
     currentStep = next.absoluteStep;
     currentOnset = nextOnset;
   }
   return undefined;
+}
+
+interface ScheduledOnset {
+  readonly event: PatternEventView;
+  readonly atFrame: number;
+  readonly occurrenceId: string;
+}
+
+function expandedOnsets(
+  event: PatternEventView,
+  onset: number,
+  stepFrames: number,
+  absoluteStep: number,
+): readonly ScheduledOnset[] {
+  if (event.type !== "trigger") {
+    return [{ event, atFrame: onset, occurrenceId: `${event.id}:${String(absoluteStep)}:main` }];
+  }
+  const flam = boundedCount(event.data.flam, MAXIMUM_FLAM_COUNT);
+  const roll = boundedCount(event.data.roll, MAXIMUM_ROLL_COUNT);
+  const flamSpacing = Math.max(
+    1,
+    Math.floor((stepFrames * FLAM_WINDOW_FRACTION) / (flam + 1)),
+  );
+  const rollSpacing = Math.max(1, Math.floor(stepFrames / (roll + 1)));
+  return [
+    ...Array.from({ length: flam }, (_, index) => ({
+      event,
+      atFrame: onset - (flam - index) * flamSpacing,
+      occurrenceId: `${event.id}:${String(absoluteStep)}:flam:${String(index)}`,
+    })),
+    { event, atFrame: onset, occurrenceId: `${event.id}:${String(absoluteStep)}:main` },
+    ...Array.from({ length: roll }, (_, index) => ({
+      event,
+      atFrame: onset + (index + 1) * rollSpacing,
+      occurrenceId: `${event.id}:${String(absoluteStep)}:roll:${String(index)}`,
+    })),
+  ];
+}
+
+function nextTriggerOnsetFrame(
+  context: OnsetContext,
+  event: PatternEventView,
+  absoluteStep: number,
+  onset: number,
+  stepFrames: number,
+): number | undefined {
+  let earliest = Number.POSITIVE_INFINITY;
+  for (let step = absoluteStep; step <= absoluteStep + 1; step += 1) {
+    const resolved = context.resolveStep(step);
+    if (resolved === undefined) continue;
+    for (const candidate of resolved.events) {
+      if (
+        candidate.type !== "trigger" ||
+        candidate.data.note !== event.data.note ||
+        !playsEvent(context, resolved, candidate)
+      ) {
+        continue;
+      }
+      for (const candidateOnset of expandedOnsets(
+        candidate,
+        eventOnsetFrame(context, candidate, step),
+        stepFrames,
+        step,
+      )) {
+        if (candidateOnset.atFrame > onset) earliest = Math.min(earliest, candidateOnset.atFrame);
+      }
+    }
+  }
+  return Number.isFinite(earliest) ? earliest : undefined;
 }
 
 /** Emits each persisted event whose onset lands in the requested frame window. */
@@ -278,28 +491,53 @@ export function schedulePatternWindow(
   const events: ScheduledVoiceEvent[] = [];
   for (let absoluteStep = firstIndex; absoluteStep < lastIndex; absoluteStep += 1) {
     if (minimumStepExclusive !== undefined && absoluteStep <= minimumStepExclusive) continue;
-    const frame = onsetFrame(context, absoluteStep);
-    if (frame < windowStartFrame || frame >= windowEndFrame) continue;
     const resolved = resolveStep(absoluteStep);
     if (resolved === undefined || resolved.events.length === 0) continue;
-    const releases = resolved.events.map((event) =>
-      releaseFrameFor(context, event, absoluteStep, frame, triggerGateFrames),
+    const candidateOnsets = resolved.events.flatMap((event) => {
+      if (!playsEvent(context, resolved, event)) return [];
+      return expandedOnsets(
+        event,
+        eventOnsetFrame(context, event, absoluteStep),
+        stepFrames,
+        absoluteStep,
+      );
+    });
+    const onsets = candidateOnsets.filter(
+      ({ atFrame }) => atFrame >= windowStartFrame && atFrame < windowEndFrame,
     );
-    const requiredEvents = releases.reduce<number>(
-      (count, release) => count + 1 + (release === undefined ? 0 : 1),
-      0,
-    );
+    if (onsets.length === 0) continue;
+    const releases = onsets.map(({ event, atFrame }) => {
+      if (event.type !== "trigger") {
+        return releaseFrameFor(context, event, absoluteStep, atFrame, triggerGateFrames);
+      }
+      const nextRetrigger = nextTriggerOnsetFrame(
+        context,
+        event,
+        absoluteStep,
+        atFrame,
+        stepFrames,
+      );
+      return nextRetrigger === undefined
+        ? atFrame + triggerGateFrames
+        : Math.max(atFrame + 1, Math.min(atFrame + triggerGateFrames, nextRetrigger - 1));
+    });
+    const requiredEvents = onsets.length + releases.filter((release) => release !== undefined).length;
     // Keep all simultaneous triggers together. A note that leads into a Slide
     // has no release in this group because its adjacent note keeps the gate open.
-    if (events.length + requiredEvents > maximumEvents) break;
+    if (events.length + requiredEvents > maximumEvents) {
+      if (request.maximumEvents !== undefined) break;
+      throw new RangeError("The Pattern window exceeds the bounded event queue capacity.");
+    }
 
-    for (let index = 0; index < resolved.events.length; index += 1) {
-      const event = resolved.events[index];
-      if (event === undefined) continue;
+    for (let index = 0; index < onsets.length; index += 1) {
+      const onset = onsets[index];
+      if (onset === undefined) continue;
+      const { event, atFrame, occurrenceId } = onset;
       events.push({
-        atFrame: frame,
+        atFrame,
         type: "note-on",
         sourceStep: absoluteStep,
+        occurrenceId,
         note: event.data.note,
         velocity: humanizedVelocity(context, resolved, event),
         accent: event.data.accent,
@@ -307,7 +545,12 @@ export function schedulePatternWindow(
       });
       const release = releases[index];
       if (release !== undefined) {
-        events.push({ atFrame: release, type: "note-off", note: event.data.note });
+        events.push({
+          atFrame: release,
+          type: "note-off",
+          occurrenceId,
+          note: event.data.note,
+        });
       }
     }
   }
@@ -315,13 +558,23 @@ export function schedulePatternWindow(
   return events.sort(compareScheduledVoiceEvents);
 }
 
-export function highestStepBefore(
-  request: Omit<PatternWindowRequest, "windowStartFrame" | "windowEndFrame">,
-  boundaryFrame: number,
-): number {
-  const { resolveStep, stepFrames, swing, patternTiming, voiceSalt = 0, patternStartFrame } =
-    request;
-  if (!Number.isFinite(stepFrames) || stepFrames <= 0) return -1;
+/** Emits each module automation step whose frame lands in the requested window. */
+export function schedulePatternAutomationWindow(
+  request: PatternWindowRequest,
+): readonly ScheduledParameterChange[] {
+  const {
+    resolveStep,
+    stepFrames,
+    swing,
+    patternTiming,
+    voiceSalt = 0,
+    windowStartFrame,
+    windowEndFrame,
+    patternStartFrame,
+    minimumStepExclusive,
+  } = request;
+  if (!Number.isFinite(stepFrames) || stepFrames <= 0) return [];
+  if (windowStartFrame >= windowEndFrame) return [];
   const context: OnsetContext = {
     resolveStep,
     stepFrames,
@@ -330,11 +583,54 @@ export function highestStepBefore(
     patternTiming,
     voiceSalt: voiceSalt | 0,
   };
-  const nearest = Math.floor((boundaryFrame - patternStartFrame) / stepFrames) + 3;
-  for (let absoluteStep = nearest; absoluteStep >= 0; absoluteStep -= 1) {
-    if (onsetFrame(context, absoluteStep) < boundaryFrame) return absoluteStep;
+  const firstIndex = Math.max(
+    0,
+    Math.floor((windowStartFrame - patternStartFrame) / stepFrames) - 2,
+  );
+  const lastIndex = Math.ceil((windowEndFrame - patternStartFrame) / stepFrames) + 2;
+  const changes: ScheduledParameterChange[] = [];
+  for (let absoluteStep = firstIndex; absoluteStep < lastIndex; absoluteStep += 1) {
+    if (minimumStepExclusive !== undefined && absoluteStep <= minimumStepExclusive) continue;
+    const resolved = resolveStep(absoluteStep);
+    if (resolved === undefined || resolved.automationSteps?.length === 0) continue;
+    const atFrame = onsetFrame(context, absoluteStep);
+    if (atFrame < windowStartFrame || atFrame >= windowEndFrame) continue;
+    for (const step of resolved.automationSteps ?? []) {
+      changes.push({
+        atFrame,
+        occurrenceId: `${String(resolved.patternIndex)}:${step.parameterId}:${String(absoluteStep)}`,
+        parameterId: step.parameterId,
+        value: step.value,
+      });
+    }
   }
-  return -1;
+  return changes.sort(
+    (left, right) =>
+      left.atFrame - right.atFrame || left.parameterId.localeCompare(right.parameterId),
+  );
+}
+
+/** Removes every endpoint for an onset occurrence already retained in a queue. */
+export function withoutExcludedOccurrences(
+  events: readonly ScheduledVoiceEvent[],
+  occurrenceIds: ReadonlySet<string> | undefined,
+): readonly ScheduledVoiceEvent[] {
+  if (occurrenceIds === undefined || occurrenceIds.size === 0) return events;
+  return events.filter(
+    (event) => event.occurrenceId === undefined || !occurrenceIds.has(event.occurrenceId),
+  );
+}
+
+/** Removes automation occurrences already retained in a processor queue. */
+export function withoutExcludedParameterOccurrences(
+  changes: readonly ScheduledParameterChange[],
+  occurrenceIds: ReadonlySet<string> | undefined,
+): readonly ScheduledParameterChange[] {
+  if (occurrenceIds === undefined || occurrenceIds.size === 0) return changes;
+  return changes.filter(
+    (change) =>
+      change.occurrenceId === undefined || !occurrenceIds.has(change.occurrenceId),
+  );
 }
 
 /** Returns the duration-based release that a bounded queue rebuild must retain. */
@@ -364,12 +660,12 @@ export function pendingReleaseEvent(
   const nearest = Math.floor((playheadFrame - patternStartFrame) / stepFrames) + 3;
   const oldest = Math.max(0, nearest - MAXIMUM_PATTERN_STEPS - 3);
   for (let absoluteStep = nearest; absoluteStep >= oldest; absoluteStep -= 1) {
-    const frame = onsetFrame(context, absoluteStep);
-    if (frame > playheadFrame) continue;
     const resolved = resolveStep(absoluteStep);
     if (resolved === undefined) continue;
-    const note = resolved.events.find((event) => event.type === "note");
+    const note = playedEvents(context, resolved).find((event) => event.type === "note");
     if (note === undefined) continue;
+    const frame = eventOnsetFrame(context, note, absoluteStep);
+    if (frame > playheadFrame) continue;
     const release = terminalReleaseFor(
       context,
       note,

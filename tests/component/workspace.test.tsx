@@ -1,8 +1,10 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { createGestureId } from "../../src/contracts";
 import { DRUMLINE_SIX_MANIFEST } from "../../src/engine/public";
-import { DEFAULT_MASTER_LEVEL } from "../../src/state/public";
+import { browserIdFactory } from "../../src/composition/browser-id-factory";
+import { DEFAULT_MASTER_LEVEL, PATTERN_TICKS_PER_STEP } from "../../src/state/public";
 import { EditorWorkspace } from "../../src/ui/react/shell/EditorWorkspace";
 import { EffectsBank } from "../../src/ui/react/shell/EffectsBank";
 import { MasterPanel } from "../../src/ui/react/shell/MasterPanel";
@@ -13,11 +15,26 @@ import { WorkspaceBar } from "../../src/ui/react/shell/WorkspaceBar";
 import { masterMeterFrameFor, SILENT_MASTER_METER } from "../../src/ui/react/store/app-store";
 import { createHarness, firstModuleId, renderWithHarness } from "./helpers";
 
+function activePattern(harness: ReturnType<typeof createHarness>) {
+  const pattern = harness.domain
+    .getState()
+    .project.patterns.find((candidate) => candidate.id === harness.domain.getState().project.activePatternId);
+  if (pattern === undefined) throw new Error("The test project has no active Pattern.");
+  return pattern;
+}
+
+function activePart(harness: ReturnType<typeof createHarness>, moduleId: string) {
+  return activePattern(harness).parts[moduleId as never];
+}
+
 describe("EditorWorkspace", () => {
   it("opens on Verse without Pattern or Song subtabs", () => {
-    renderWithHarness(<EditorWorkspace />);
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
 
-    expect(screen.getByRole("combobox", { name: "Selected Pattern" })).toHaveValue("1");
+    expect(screen.getByRole("combobox", { name: "Selected Pattern" })).toHaveValue(
+      activePattern(harness).id,
+    );
     expect(screen.getByRole<HTMLOptionElement>("option", { name: "Verse" }).selected).toBe(true);
     expect(screen.queryByRole("tab", { name: "Pattern" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Song" })).toBeNull();
@@ -28,13 +45,15 @@ describe("EditorWorkspace", () => {
     renderWithHarness(<EditorWorkspace />, harness);
     const moduleId = firstModuleId(harness);
 
+    const pattern = harness.domain.getState().project.patterns[0];
+    if (pattern === undefined) throw new Error("The test project has no Pattern.");
     fireEvent.change(screen.getByRole("combobox", { name: "Selected Pattern" }), {
-      target: { value: "0" },
+      target: { value: pattern.id },
     });
     fireEvent.click(screen.getByRole("button", { name: "Clear the Pattern" }));
 
-    expect(harness.domain.getState().project.activePatternIndex).toBe(0);
-    expect(harness.domain.getState().project.modules[moduleId]?.parts[0]?.events).toHaveLength(0);
+    expect(harness.domain.getState().project.activePatternId).toBe(pattern.id);
+    expect(activePart(harness, moduleId)).toBeUndefined();
     expect(harness.store.getState().undoNotice?.message).toContain("Undo is available");
   });
 
@@ -77,31 +96,53 @@ describe("EditorWorkspace", () => {
     renderWithHarness(<EditorWorkspace />, harness);
     const moduleId = firstModuleId(harness);
     const eventButton = screen.getByRole("button", { name: /^C2 note, step 1,/ });
-    const eventId = harness.domain.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id;
+    const eventId = activePart(harness, moduleId)?.events[0]?.id;
 
     expect(eventId).toBeDefined();
     fireEvent.keyDown(eventButton, { key: "ArrowRight" });
 
     expect(
-      harness.domain.getState().project.modules[moduleId]?.parts[1]?.events.find(
+      activePart(harness, moduleId)?.events.find(
         (event) => event.id === eventId,
       )?.positionTicks,
     ).toBe(240);
     expect(harness.domain.getState().history.canUndo).toBe(true);
   });
 
-  it("shows Velocity as the only available Piano Roll parameter", () => {
-    renderWithHarness(<EditorWorkspace />);
+  it("shows note-property and step-automation Piano Roll lanes", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
     const selector = screen.getByRole("combobox", { name: "Piano Roll parameter" });
 
-    expect(within(selector).getAllByRole("option")).toHaveLength(1);
+    expect(within(selector).getAllByRole("option")).toHaveLength(16);
     expect(
       within(selector).getByRole<HTMLOptionElement>("option", { name: "Velocity" }).selected,
     ).toBe(true);
+    for (const name of ["Accent", "Slide", "Probability", "Micro timing"]) {
+      expect(within(selector).getByRole("option", { name })).toBeInTheDocument();
+    }
     expect(screen.getByRole("group", { name: "Velocity lane" })).toBeVisible();
+
+    fireEvent.change(selector, { target: { value: "cutoff" } });
+    const automationStep = screen.getByRole("slider", { name: "Cutoff, step 1" });
+    fireEvent.pointerDown(automationStep, { button: 0, pointerId: 52 });
+    fireEvent.change(automationStep, { target: { value: "840" } });
+    fireEvent.pointerUp(automationStep);
+    expect(Object.values(harness.domain.getState().project.automationLanes)).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move right" }));
+    expect(Object.values(harness.domain.getState().project.automationLanes)[0]?.steps).toEqual([
+      { tick: 240, value: 840 },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Scale up" }));
+    expect(Object.values(harness.domain.getState().project.automationLanes)[0]?.steps).toEqual([
+      { tick: 240, value: 841 },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Erase step" }));
+    expect(Object.values(harness.domain.getState().project.automationLanes)).toHaveLength(0);
   });
 
-  it("coalesces one drum paint drag into one Undo entry", () => {
+  function drumHarness() {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
     const emptySlot = harness.domain.getState().project.rackSlots.find(
@@ -116,8 +157,7 @@ describe("EditorWorkspace", () => {
     )?.moduleId;
     if (drumModuleId === undefined) throw new Error("The drum module was not added.");
     act(() => harness.store.getState().selectModule(drumModuleId));
-    const part = harness.domain.getState().project.modules[drumModuleId]?.parts[1];
-    const baseline = part?.events.length ?? 0;
+    const part = activePart(harness, drumModuleId);
     const grid = screen.getByRole("group", { name: /Tin Soldier events in Verse/ });
     Object.assign(grid, {
       setPointerCapture: vi.fn(),
@@ -135,19 +175,56 @@ describe("EditorWorkspace", () => {
       height: 144,
       toJSON: () => ({}),
     });
+    return { harness, drumModuleId, grid, baseline: part?.events.length ?? 0 };
+  }
+
+  it("does not create a trigger from a single click on an empty cell", () => {
+    const { harness, drumModuleId, grid, baseline } = drumHarness();
 
     fireEvent.pointerDown(grid, { button: 0, pointerId: 37, clientX: 150, clientY: 84 });
-    fireEvent.pointerMove(grid, { pointerId: 37, clientX: 250, clientY: 84 });
-    fireEvent.pointerMove(grid, { pointerId: 37, clientX: 350, clientY: 84 });
-    fireEvent.pointerUp(grid, { pointerId: 37, clientX: 350, clientY: 84 });
+    fireEvent.pointerUp(grid, { pointerId: 37, clientX: 150, clientY: 84 });
 
-    expect(harness.domain.getState().project.modules[drumModuleId]?.parts[1]?.events).toHaveLength(
-      baseline + 3,
-    );
+    expect(activePart(harness, drumModuleId)?.events.length ?? 0).toBe(baseline);
+  });
+
+  it("creates one drum trigger from a double-click in one Undo entry", () => {
+    const { harness, drumModuleId, grid, baseline } = drumHarness();
+
+    fireEvent.dblClick(grid, { button: 0, clientX: 350, clientY: 84 });
+
+    expect(activePart(harness, drumModuleId)?.events).toHaveLength(baseline + 1);
     act(() => harness.store.getState().undo());
-    expect(harness.domain.getState().project.modules[drumModuleId]?.parts[1]?.events).toHaveLength(
-      baseline,
-    );
+    expect(activePart(harness, drumModuleId)?.events.length ?? 0).toBe(baseline);
+  });
+
+  it("selects the notes inside a marquee drag", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const grid = screen.getByRole("group", { name: /Silver Serpent events in Verse/ });
+    Object.assign(grid, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    });
+    vi.spyOn(grid, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 1600,
+      bottom: 400,
+      width: 1600,
+      height: 400,
+      toJSON: () => ({}),
+    });
+
+    // Covers steps 0 through 6 and rows 12 through 24. The test part holds two
+    // C2 notes at steps 0 and 4, both on the bottom row.
+    fireEvent.pointerDown(grid, { button: 0, pointerId: 41, clientX: 50, clientY: 200 });
+    fireEvent.pointerMove(grid, { pointerId: 41, clientX: 650, clientY: 400 });
+    fireEvent.pointerUp(grid, { pointerId: 41, clientX: 650, clientY: 400 });
+
+    expect(harness.domain.getState().ui.pianoRollSelection?.eventIds).toHaveLength(2);
   });
 
   it("keeps same-step velocity controls separate and keyboard reachable", () => {
@@ -156,7 +233,7 @@ describe("EditorWorkspace", () => {
     const moduleId = firstModuleId(harness);
 
     act(() => {
-      harness.store.getState().editPatternEvents(moduleId, 1, {
+      harness.store.getState().editPatternEvents(moduleId, activePattern(harness).id, {
         type: "create",
         event: {
           type: "note",
@@ -173,6 +250,17 @@ describe("EditorWorkspace", () => {
       .filter((control) => control.getAttribute("aria-label")?.includes("step 1"));
     expect(firstStepControls).toHaveLength(2);
     expect(firstStepControls.every((control) => control.tabIndex >= 0)).toBe(true);
+    expect(
+      firstStepControls.every(
+        (control) => control.parentElement?.dataset.component === "piano-roll-point-control",
+      ),
+    ).toBe(true);
+    expect(
+      firstStepControls.every(
+        (control) =>
+          control.parentElement?.style.getPropertyValue("--lane-position") !== "",
+      ),
+    ).toBe(true);
   });
 
   it("adds the selected Pattern to the compact Playlist", () => {
@@ -181,14 +269,41 @@ describe("EditorWorkspace", () => {
 
     // Decision D92: the default project ships a five-entry Song chain, so the
     // added entry lands after it.
-    const baseline = harness.domain.getState().project.song.entries;
+    const baseline = harness.domain.getState().project.song.placements;
     fireEvent.click(screen.getByRole("button", { name: "Add selected Pattern" }));
 
-    expect(harness.domain.getState().project.song.entries).toEqual([
+    expect(harness.domain.getState().project.song.placements).toEqual([
       ...baseline,
-      expect.objectContaining({ patternIndex: 1, repeats: 1 }),
+      expect.objectContaining({ patternId: activePattern(harness).id, repeatCount: 1 }),
     ]);
     expect(screen.getAllByRole("button", { name: /Verse/ }).length).toBeGreaterThan(0);
+  });
+
+  it("uses compact SVG icons with accessible names for Playlist actions", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const playlist = screen.getByRole("complementary", { name: "Playlist" });
+    const mode = within(playlist).getByRole("button", { name: "Pattern playback mode" });
+
+    expect(mode.querySelector("svg")).toBeInTheDocument();
+    expect(mode).toHaveAttribute("title", expect.stringContaining("switch to Song"));
+
+    for (const [name, text] of [
+      ["Move Playlist row 2 earlier", "Earlier"],
+      ["Move Playlist row 1 later", "Later"],
+      ["Duplicate Playlist row 1", "Duplicate"],
+      ["Remove Playlist row 1", "Remove"],
+    ] as const) {
+      const action = within(playlist).getByRole("button", { name });
+      expect(action.querySelector("svg")).toBeInTheDocument();
+      expect(action.textContent.trim()).not.toContain(text);
+      expect(action).toHaveAttribute("title");
+    }
+
+    const add = within(playlist).getByRole("button", { name: "Add selected Pattern" });
+    expect(add.querySelector("svg")).toBeInTheDocument();
+    expect(add.textContent.trim()).toBe("");
+    expect(add).toHaveAttribute("title", "Add the selected Pattern to the Playlist.");
   });
 
   it("edits the active Pattern's Humanize through the tapered header slider", () => {
@@ -201,10 +316,14 @@ describe("EditorWorkspace", () => {
     // The track is tapered: position 60 of 100 is the 30 percent value.
     fireEvent.change(slider, { target: { value: "60" } });
 
-    expect(harness.domain.getState().project.patterns[1]?.humanize).toBeCloseTo(0.3, 6);
+    expect(activePattern(harness).humanize).toBeCloseTo(0.3, 6);
     expect(slider).toHaveAttribute("aria-valuetext", "30 percent");
     // Humanize is Pattern-owned: the other Patterns keep their own value.
-    expect(harness.domain.getState().project.patterns[0]?.humanize).toBe(0);
+    expect(
+      harness.domain
+        .getState()
+        .project.patterns.find((pattern) => pattern.id !== activePattern(harness).id)?.humanize,
+    ).toBe(0);
   });
 
   it("previews Humanize during a pointer gesture and commits once on release", () => {
@@ -217,18 +336,18 @@ describe("EditorWorkspace", () => {
     fireEvent.change(slider, { target: { value: "60" } });
 
     expect(slider).toHaveAttribute("aria-valuetext", "30 percent");
-    expect(harness.audio.previewHumanize).toHaveBeenLastCalledWith(1, 0.3);
-    expect(harness.domain.getState().project.patterns[1]?.humanize).toBe(0);
+    expect(harness.audio.previewHumanize).toHaveBeenLastCalledWith(activePattern(harness).id, 0.3);
+    expect(activePattern(harness).humanize).toBe(0);
     expect(harness.domain.getState().history.canUndo).toBe(false);
 
     fireEvent.pointerUp(slider, { button: 0, pointerId: 21 });
 
-    expect(harness.domain.getState().project.patterns[1]?.humanize).toBeCloseTo(0.3, 6);
+    expect(activePattern(harness).humanize).toBeCloseTo(0.3, 6);
     expect(harness.domain.getState().history.canUndo).toBe(true);
     act(() => {
       harness.store.getState().undo();
     });
-    expect(harness.domain.getState().project.patterns[1]?.humanize).toBe(0);
+    expect(activePattern(harness).humanize).toBe(0);
     expect(harness.domain.getState().history.canUndo).toBe(false);
   });
 
@@ -344,6 +463,152 @@ describe("EditorWorkspace", () => {
     expect(Number.isSafeInteger(after)).toBe(true);
   });
 
+  it("keeps a generator preview out of project state until one atomic Apply", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const moduleId = firstModuleId(harness);
+    const before = activePart(harness, moduleId)?.events;
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(activePart(harness, moduleId)?.events).toEqual(before);
+    const previewCall = harness.audio.previewPatternPart.mock.calls[0];
+    expect(previewCall?.[0]).toBe(moduleId);
+    expect(previewCall?.[1].events).toHaveLength(before?.length ?? 0);
+    expect(previewCall?.[1].length).toBe(16);
+    expect(previewCall?.[2]).toMatchObject({ tempo: 128, swing: 0 });
+    expect(harness.audio.startAudition).not.toHaveBeenCalled();
+    expect(screen.getByText(/preview events/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+    act(() => harness.store.getState().undo());
+    expect(activePart(harness, moduleId)?.events).toEqual(before);
+  });
+
+  it("stops and clears a Pattern preview when its owner changes", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const moduleId = firstModuleId(harness);
+    const otherPattern = harness.domain.getState().project.patterns[0];
+    if (otherPattern === undefined) throw new Error("Expected another Pattern.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Selected Pattern" }), {
+      target: { value: otherPattern.id },
+    });
+
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(harness.audio.stopAudition).toHaveBeenCalledWith(moduleId);
+  });
+
+  it("generates Euclidean triggers for the selected drum voice and cancels stale previews", () => {
+    const { harness, drumModuleId } = drumHarness();
+    const drumModule = harness.domain.getState().project.modules[drumModuleId];
+    const clap = DRUMLINE_SIX_MANIFEST.voices.find((voice) => voice.name === "Clap");
+    if (drumModule === undefined || clap === undefined) throw new Error("Expected a drum module and Clap voice.");
+    act(() => {
+      harness.domain.dispatch(
+        harness.domain.createCommand("pattern-events-edit", {
+          moduleId: drumModule.id,
+          patternId: harness.domain.getState().project.activePatternId,
+          edit: {
+            type: "create",
+            event: {
+              type: "trigger",
+              positionTicks: 0,
+              data: { note: clap.note, velocity: 0.8, accent: false, slide: false },
+            },
+          },
+        }),
+      );
+    });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Generator or transform" }), {
+      target: { value: "euclidean" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Euclidean drum voice" }), {
+      target: { value: clap.id },
+    });
+    expect(screen.getByRole("slider", { name: "Euclidean rhythm amount" })).toHaveValue("4");
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    const previewPart = harness.audio.previewPatternPart.mock.calls.at(-1)?.[1];
+    expect(previewPart?.events).toHaveLength(4);
+    expect(previewPart?.events.every((event) => event.data.note === clap.note)).toBe(true);
+
+    fireEvent.change(screen.getByRole("slider", { name: "Euclidean rhythm amount" }), {
+      target: { value: "5" },
+    });
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(harness.audio.stopAudition).toHaveBeenCalledWith(drumModule.id);
+  });
+
+  it("records an armed parameter commit at the current Song-local step with one Undo", () => {
+    const harness = createHarness();
+    const moduleId = firstModuleId(harness);
+    const state = harness.domain.getState();
+    const intro = state.project.patterns[0];
+    if (intro === undefined) throw new Error("Expected the Intro Pattern.");
+    act(() => {
+      harness.domain.dispatch(
+        harness.domain.createCommand("pattern-events-edit", {
+          moduleId,
+          patternId: intro.id,
+          edit: {
+            type: "create",
+            event: {
+              type: "note",
+              positionTicks: 0,
+              durationTicks: PATTERN_TICKS_PER_STEP,
+              data: { note: 36, velocity: 0.8, accent: false, slide: false },
+            },
+          },
+        }),
+      );
+      harness.store.getState().toggleSongMode();
+      harness.store.getState().toggleRecordArm();
+      harness.store.getState().setPositionTicks(17 * PATTERN_TICKS_PER_STEP);
+    });
+    const beforeValue = harness.domain.getState().project.modules[moduleId]?.parameters.cutoff;
+
+    act(() => harness.store.getState().commitParameter(moduleId, "cutoff", 1_200));
+
+    const lane = Object.values(harness.domain.getState().project.automationLanes).find(
+      (candidate) =>
+        candidate.patternId === intro.id &&
+        candidate.targetId === moduleId &&
+        candidate.parameterId === "cutoff",
+    );
+    expect(lane?.steps).toEqual([{ tick: PATTERN_TICKS_PER_STEP, value: 1_200 }]);
+    expect(harness.domain.getState().project.modules[moduleId]?.parameters.cutoff).toBe(1_200);
+
+    act(() => harness.store.getState().undo());
+    expect(harness.domain.getState().project.modules[moduleId]?.parameters.cutoff).toBe(beforeValue);
+    expect(
+      Object.values(harness.domain.getState().project.automationLanes).some(
+        (candidate) => candidate.parameterId === "cutoff" && candidate.patternId === intro.id,
+      ),
+    ).toBe(false);
+  });
+
+  it("records one keyboard take as a single Undo entry", () => {
+    const harness = createHarness();
+    const moduleId = firstModuleId(harness);
+    const before = activePart(harness, moduleId)?.events;
+    const gestureId = createGestureId(browserIdFactory);
+
+    act(() => {
+      harness.store.getState().toggleRecordArm();
+      harness.store.getState().recordLivePatternEvent(moduleId, 48, 240, 480, gestureId);
+      harness.store.getState().recordLivePatternEvent(moduleId, 50, 720, 960, gestureId);
+    });
+
+    expect(activePart(harness, moduleId)?.events).toHaveLength((before?.length ?? 0) + 2);
+    act(() => harness.store.getState().undo());
+    expect(activePart(harness, moduleId)?.events).toEqual(before);
+  });
+
   it("positions the playhead and start marker from a step target while stopped", () => {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
@@ -363,6 +628,39 @@ describe("EditorWorkspace", () => {
     });
 
     expect(screen.getByRole("button", { name: "Set the start marker to step 5" })).toBeDisabled();
+  });
+
+  it("disables the tail of a partial final Pattern page", () => {
+    const harness = createHarness();
+    const moduleId = firstModuleId(harness);
+    const patternId = harness.domain.getState().project.activePatternId;
+    act(() => {
+      harness.domain.dispatch(
+        harness.domain.createCommand("pattern-part-length-set", {
+          moduleId,
+          patternId,
+          length: 17,
+        }),
+      );
+    });
+    renderWithHarness(<EditorWorkspace />, harness);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next Pattern page" }));
+    expect(screen.getByRole("button", { name: "Set the start marker to step 17" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Set the start marker to step 18" })).toBeDisabled();
+    expect(screen.getAllByText("Outside cycle")).toHaveLength(15);
+  });
+
+  it("disables Add when the Pattern bank reaches its limit", () => {
+    const harness = createHarness();
+    act(() => {
+      while (harness.domain.getState().project.patterns.length < 32) {
+        harness.store.getState().addPattern();
+      }
+    });
+    renderWithHarness(<EditorWorkspace />, harness);
+
+    expect(screen.getByRole("button", { name: "Add Pattern" })).toBeDisabled();
   });
 });
 
@@ -635,6 +933,50 @@ describe("WorkspaceBar", () => {
     expect(harness.store.getState().projectMessage).toBe(
       "Earlier changes were saved. New edits are not saved.",
     );
+  });
+
+  it("announces save completion and failure through a live region", async () => {
+    const harness = createHarness();
+    renderWithHarness(<WorkspaceBar onToggleEditor={() => undefined} />, harness);
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("");
+
+    // A successful save announces completion.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await Promise.resolve();
+    });
+    expect(status.textContent).toBe("Saved.");
+
+    // A new edit returns the bar to dirty and clears the announcement.
+    harness.projects.save.mockResolvedValueOnce({
+      snapshotRevision: harness.domain.getState().project.revision,
+      durable: false,
+    });
+    act(() => {
+      harness.store.getState().setTempo(132);
+    });
+    expect(status.textContent).toBe("");
+
+    // A failed save announces the failure.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      await Promise.resolve();
+    });
+    expect(status.textContent).toBe("Save failed.");
+  });
+
+  it("shows keyboard hints without changing the button names", () => {
+    const harness = createHarness();
+    renderWithHarness(<WorkspaceBar onToggleEditor={() => undefined} />, harness);
+
+    for (const hint of ["Ctrl+Alt+E", "Ctrl+Z", "Ctrl+Y", "Ctrl+S"]) {
+      expect(screen.getByText(hint)).toHaveAttribute("aria-hidden", "true");
+    }
+    expect(screen.getByRole("button", { name: "Collapse editor" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Redo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 });
 

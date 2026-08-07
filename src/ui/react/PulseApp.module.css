@@ -3,14 +3,14 @@
 
   /* Row four is the editor. Its default clamp is also its minimum: the resize
      handle raises --editor-size, and the calc cap keeps the rack row at
-     350px or more (58 + 52 + 6 + 350 = 466). The row constants are mirrored in
+     350px or more (58 + 26 + 6 + 350 = 440). The row constants are mirrored in
      PulseApp.tsx. */
   grid-template-rows:
     58px
     minmax(350px, 1fr)
     6px
-    clamp(clamp(230px, 30vh, 300px), var(--editor-size, 0px), calc(100vh - 466px))
-    52px;
+    clamp(clamp(230px, 30vh, 300px), var(--editor-size, 0px), calc(100vh - 440px))
+    26px;
   inline-size: 100vw;
   block-size: 100vh;
   min-height: 0;
@@ -23,7 +23,7 @@
 }
 
 .app[data-editor-expanded="false"] {
-  grid-template-rows: 58px minmax(0, 1fr) 0 0 52px;
+  grid-template-rows: 58px minmax(0, 1fr) 0 0 26px;
 }
 
 .editorResize {

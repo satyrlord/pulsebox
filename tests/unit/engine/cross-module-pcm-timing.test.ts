@@ -144,6 +144,76 @@ describe("voice output meter", () => {
   });
 });
 
+describe("scheduled module parameters", () => {
+  it("applies a parameter at its exact frame inside a render block", async () => {
+    vi.stubGlobal("sampleRate", 48_000);
+    vi.stubGlobal("currentFrame", 10_000);
+    const { WorkletVoiceProcessor } = await import(
+      "../../../src/engine/worklets/worklet-voice-processor"
+    );
+
+    class ParameterProcessor extends WorkletVoiceProcessor<{ readonly level: number }> {
+      protected readonly displayName = "Parameter Probe";
+      #level = 0;
+
+      protected decodeParameterObject(value: unknown): { readonly level: number } | undefined {
+        return this.#decode(value);
+      }
+
+      protected decodeParameterChanges(value: unknown): { readonly level: number } | undefined {
+        if (!Array.isArray(value)) return undefined;
+        const change = value[0] as { readonly parameterId?: unknown; readonly value?: unknown } | undefined;
+        return change?.parameterId === "level" ? this.#decode({ level: change.value }) : undefined;
+      }
+
+      #decode(value: unknown): { readonly level: number } | undefined {
+        const level = (value as { readonly level?: unknown } | undefined)?.level;
+        return typeof level === "number" ? { level } : undefined;
+      }
+
+      protected applyParameters(parameters: { readonly level: number }): void {
+        this.#level = parameters.level;
+      }
+
+      protected triggerNoteOn(): void {
+        // This probe renders its parameter state without a note gate.
+      }
+      protected triggerNoteOff(): void {
+        // This probe renders its parameter state without a note gate.
+      }
+      protected resetDsp(): void {
+        this.#level = 0;
+      }
+
+      protected renderBlock(
+        left: Float32Array,
+        right: Float32Array | undefined,
+        start: number,
+        end: number,
+      ): void {
+        for (let index = start; index < end; index += 1) {
+          left[index] = this.#level;
+          if (right !== undefined) right[index] = this.#level;
+        }
+      }
+    }
+
+    const processor = new ParameterProcessor() as unknown as TestProcessor;
+    processor.port.receive(controllerEnvelope("parameter-node", 0, "hello", {}));
+    processor.port.receive(controllerEnvelope("parameter-node", 1, "resume", {}));
+    processor.port.receive(
+      controllerEnvelope("parameter-node", 2, "parameter-batch", {
+        changes: [{ parameterId: "level", value: 0.75, audioFrame: 10_032 }],
+      }),
+    );
+    const left = new Float32Array(128);
+
+    expect(processor.process([], [[left, new Float32Array(128)]], {})).toBe(true);
+    expect([...left.slice(0, 32)]).toEqual(Array.from({ length: 32 }, () => 0));
+    expect([...left.slice(32)]).toEqual(Array.from({ length: 96 }, () => 0.75));
+  });
+});
+
 function createReadyProcessor(name: string, nodeId: string): TestProcessor {
   const Processor = processors.get(name);
   if (Processor === undefined) throw new Error(`Processor ${name} was not registered.`);

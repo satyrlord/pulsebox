@@ -1,24 +1,34 @@
 import { createStore, type StoreApi } from "zustand";
 
-import type {
-  GestureId,
-  IdFactory,
-  ModuleInstanceId,
-  NoteEventId,
-  ParameterValue,
-  PluginId,
-  PluginManifest,
-  RackSlotId,
+import {
+  createGestureId,
+  type GestureId,
+  type IdFactory,
+  type ModuleInstanceId,
+  type NoteEventId,
+  type PatternId,
+  type ParameterValue,
+  type PluginId,
+  type PluginManifest,
+  type RackSlotId,
+  type SongPlacementId,
 } from "../../../contracts";
 import {
   clampUnitInterval,
   countUnmappedEvents,
+  PATTERN_TICKS_PER_BAR,
+  PATTERN_TICKS_PER_STEP,
   type PatternEventEdit,
+  type PatternEvent,
+  type AutomationStepState,
+  type PatternPartState,
+  type PatternScale,
   type ProjectSaveResult,
   type PulseState,
   type PulseStore,
   type TemplateCreateResult,
 } from "../../../state/public";
+import { DEFAULT_LIVE_KEY_MAP, type LiveKeyMap } from "../hooks/live-key-map";
 
 export type AudioStatus = "faulted" | "recovered" | "recovering";
 
@@ -79,7 +89,18 @@ export interface AudioControlPort {
   /** Transient project Swing while the user moves the timing slider. */
   readonly previewSwing?: (swing: number) => void;
   /** Transient Pattern Humanize while the user moves the timing slider. */
-  readonly previewHumanize?: (patternIndex: number, humanize: number) => void;
+  readonly previewHumanize?: (patternId: PatternId, humanize: number) => void;
+  /** Auditions one complete transformed Pattern part without changing project state. */
+  readonly previewPatternPart?: (
+    moduleId: ModuleInstanceId,
+    part: PatternPartState,
+    timing: {
+      readonly tempo: number;
+      readonly swing: number;
+      readonly humanize: number;
+      readonly seed: number;
+    },
+  ) => Promise<void>;
   /**
    * Transient channel level or pan while a fader is moving. The engine ramps it
    * onto the live mixer node; the committed value still arrives as a command at
@@ -106,6 +127,7 @@ export interface AudioControlPort {
 
 export type StudioView = "mixer" | "effects" | "master";
 export type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
+export type LiveInputQuantizeMode = "input" | "after" | "off";
 
 export interface SavedProjectSummary {
   readonly id: string;
@@ -175,8 +197,16 @@ export interface AppStoreDependencies {
   readonly preferences?: {
     readonly metronomeEnabled?: boolean;
     readonly launchQuantizationSteps?: number;
+    readonly liveKeyMap?: LiveKeyMap;
+    readonly liveInputQuantizeMode?: LiveInputQuantizeMode;
+    readonly liveCountInBars?: number;
+    readonly ghostNotesEnabled?: boolean;
     readonly onMetronomeChange?: (enabled: boolean) => void;
     readonly onLaunchQuantizationChange?: (steps: number) => void;
+    readonly onLiveKeyMapChange?: (map: LiveKeyMap) => void;
+    readonly onLiveInputQuantizeModeChange?: (mode: LiveInputQuantizeMode) => void;
+    readonly onLiveCountInBarsChange?: (bars: number) => void;
+    readonly onGhostNotesEnabledChange?: (enabled: boolean) => void;
   };
 }
 
@@ -230,6 +260,11 @@ export interface AppState {
   readonly masterPeakHeld: boolean;
   /** Pattern-launch boundary in sixteenth steps. A global UI preference. */
   readonly launchQuantizationSteps: number;
+  /** Keyboard-capture mode. It is local UI state, never project data. */
+  readonly liveInputQuantizeMode: LiveInputQuantizeMode;
+  readonly liveCountInBars: number;
+  readonly liveKeyMap: LiveKeyMap;
+  readonly ghostNotesEnabled: boolean;
 
   readonly play: () => Promise<void>;
   readonly pause: () => void;
@@ -241,14 +276,18 @@ export interface AppState {
   readonly previewSwing: (swing: number) => void;
   /** Positions the playhead and start marker while not playing. */
   readonly seek: (positionTicks: number) => void;
-  readonly setHumanize: (patternIndex: number, humanize: number, gestureId?: GestureId) => void;
-  readonly previewHumanize: (patternIndex: number, humanize: number) => void;
+  readonly setHumanize: (patternId: PatternId, humanize: number, gestureId?: GestureId) => void;
+  readonly previewHumanize: (patternId: PatternId, humanize: number) => void;
   /** Stores a new random seed, which creates a new deterministic variation. */
-  readonly newPatternVariation: (patternIndex: number) => void;
+  readonly newPatternVariation: (patternId: PatternId) => void;
   readonly togglePower: () => Promise<void>;
   readonly setMasterMeterFrame: (frame: MasterMeterView) => void;
   readonly reportAudioRuntimeState: (state: AudioRuntimeStateView) => void;
   readonly setLaunchQuantization: (steps: number) => void;
+  readonly setLiveInputQuantizeMode: (mode: LiveInputQuantizeMode) => void;
+  readonly setLiveCountInBars: (bars: number) => void;
+  readonly setLiveKeyMap: (map: LiveKeyMap) => void;
+  readonly setGhostNotesEnabled: (enabled: boolean) => void;
   readonly commitParameter: (
     moduleId: ModuleInstanceId,
     parameter: string,
@@ -296,26 +335,58 @@ export interface AppState {
   readonly toggleMetronome: () => void;
   readonly openSend: (send: "A" | "B" | "C" | "D") => void;
 
-  readonly selectPattern: (patternIndex: number) => void;
-  readonly renamePattern: (patternIndex: number, name: string) => void;
-  readonly clearPattern: (patternIndex: number) => void;
-  readonly copyPattern: (fromPatternIndex: number, toPatternIndex: number) => void;
+  readonly selectPattern: (patternId: PatternId) => void;
+  readonly addPattern: (name?: string, afterPatternId?: PatternId) => void;
+  readonly duplicatePattern: (patternId: PatternId) => void;
+  readonly deletePattern: (patternId: PatternId) => void;
+  readonly reorderPattern: (patternId: PatternId, afterPatternId?: PatternId) => void;
+  readonly renamePattern: (patternId: PatternId, name: string) => void;
+  readonly setPatternColor: (patternId: PatternId, color: string) => void;
+  readonly setPatternScale: (patternId: PatternId, scale: PatternScale) => void;
+  readonly setPatternDuration: (patternId: PatternId, durationBars: number) => void;
+  readonly clearPattern: (patternId: PatternId) => void;
   readonly selectPianoRollEvents: (
     moduleId: ModuleInstanceId,
-    patternIndex: number,
+    patternId: PatternId,
     eventIds: readonly NoteEventId[],
   ) => void;
   readonly setPianoRollParameter: (parameter: string) => void;
   readonly editPatternEvents: (
     moduleId: ModuleInstanceId,
-    patternIndex: number,
+    patternId: PatternId,
     edit: PatternEventEdit,
     gestureId?: GestureId,
   ) => void;
+  /** Commits one captured computer-keyboard event into the active Pattern. */
+  readonly recordLivePatternEvent: (
+    moduleId: ModuleInstanceId,
+    note: number,
+    startedAtTicks: number,
+    endedAtTicks: number,
+    gestureId: GestureId,
+  ) => void;
+  /** Replaces one Pattern part after a confirmed generator or transform preview. */
+  readonly replacePatternPartEvents: (
+    moduleId: ModuleInstanceId,
+    patternId: PatternId,
+    events: readonly PatternEvent[],
+    length?: number,
+  ) => void;
+  readonly setAutomationLaneSteps: (
+    moduleId: ModuleInstanceId,
+    patternId: PatternId,
+    parameterId: string,
+    steps: readonly AutomationStepState[],
+  ) => void;
   readonly toggleSongMode: () => void;
-  readonly addSongEntry: (patternIndex: number) => void;
-  readonly removeSongEntry: (entryIndex: number) => void;
-  readonly setSongRepeats: (entryIndex: number, repeats: number) => void;
+  readonly addSongPlacement: (patternId: PatternId) => void;
+  readonly removeSongPlacement: (placementId: SongPlacementId) => void;
+  readonly setSongPlacementRepeats: (placementId: SongPlacementId, repeats: number) => void;
+  readonly reorderSongPlacement: (
+    placementId: SongPlacementId,
+    afterPlacementId?: SongPlacementId,
+  ) => void;
+  readonly duplicateSongPlacement: (placementId: SongPlacementId) => void;
 
   readonly toggleMute: (moduleId: ModuleInstanceId) => void;
   readonly toggleSolo: (moduleId: ModuleInstanceId) => void;
@@ -357,6 +428,8 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   const { store, audio } = dependencies;
   let noticeSequence = 0;
   let lastPeakAt = 0;
+  /** First transport tick that may write an armed live take after its count-in. */
+  let recordCaptureAfterTicks: number | undefined;
   /** Blocks a second Play while the first is still activating the engine. */
   let playInFlight = false;
 
@@ -368,6 +441,11 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   const initialMetronome = dependencies.preferences?.metronomeEnabled ?? false;
   const initialLaunchQuantization =
     dependencies.preferences?.launchQuantizationSteps ?? DEFAULT_LAUNCH_QUANTIZATION_STEPS;
+  const initialLiveInputQuantizeMode =
+    dependencies.preferences?.liveInputQuantizeMode ?? "input";
+  const initialLiveCountInBars = clampCountInBars(dependencies.preferences?.liveCountInBars ?? 0);
+  const initialLiveKeyMap = dependencies.preferences?.liveKeyMap ?? DEFAULT_LIVE_KEY_MAP;
+  const initialGhostNotesEnabled = dependencies.preferences?.ghostNotesEnabled ?? true;
   audio.setMetronomeEnabled?.(initialMetronome);
   audio.setLaunchQuantization?.(initialLaunchQuantization);
 
@@ -393,6 +471,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     masterMeter: SILENT_MASTER_METER,
     masterPeakHeld: false,
     launchQuantizationSteps: initialLaunchQuantization,
+    liveInputQuantizeMode: initialLiveInputQuantizeMode,
+    liveCountInBars: initialLiveCountInBars,
+    liveKeyMap: initialLiveKeyMap,
+    ghostNotesEnabled: initialGhostNotesEnabled,
 
     play: async () => {
       if (get().audioUnavailable || playInFlight) return;
@@ -420,6 +502,11 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     toggleRecordArm: () => {
+      const current = get();
+      const arming = !current.project.transport.recordArmed;
+      recordCaptureAfterTicks = arming
+        ? current.positionTicks + current.liveCountInBars * PATTERN_TICKS_PER_BAR
+        : undefined;
       store.dispatch(store.createCommand("transport-record-toggle", {}));
     },
 
@@ -441,25 +528,25 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(store.createCommand("transport-seek", { positionTicks }));
     },
 
-    setHumanize: (patternIndex, humanize, gestureId) => {
+    setHumanize: (patternId, humanize, gestureId) => {
       const clamped = clampUnitInterval(humanize);
       store.dispatch(
         store.createCommand(
           "pattern-humanize-set",
-          { patternIndex, humanize: clamped },
+          { patternId, humanize: clamped },
           gestureId === undefined ? {} : { gestureId },
         ),
       );
     },
 
-    previewHumanize: (patternIndex, humanize) => {
-      audio.previewHumanize?.(patternIndex, clampUnitInterval(humanize));
+    previewHumanize: (patternId, humanize) => {
+      audio.previewHumanize?.(patternId, clampUnitInterval(humanize));
     },
 
-    newPatternVariation: (patternIndex) => {
+    newPatternVariation: (patternId) => {
       const seed =
         dependencies.createPatternSeed?.() ?? Math.floor(Math.random() * 0x1_0000_0000);
-      store.dispatch(store.createCommand("pattern-seed-set", { patternIndex, seed }));
+      store.dispatch(store.createCommand("pattern-seed-set", { patternId, seed }));
     },
 
     togglePower: async () => {
@@ -513,6 +600,28 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       set({ launchQuantizationSteps: steps });
     },
 
+    setLiveInputQuantizeMode: (liveInputQuantizeMode) => {
+      if (!isLiveInputQuantizeMode(liveInputQuantizeMode)) return;
+      dependencies.preferences?.onLiveInputQuantizeModeChange?.(liveInputQuantizeMode);
+      set({ liveInputQuantizeMode });
+    },
+
+    setLiveCountInBars: (liveCountInBars) => {
+      const bars = clampCountInBars(liveCountInBars);
+      dependencies.preferences?.onLiveCountInBarsChange?.(bars);
+      set({ liveCountInBars: bars });
+    },
+
+    setLiveKeyMap: (liveKeyMap) => {
+      dependencies.preferences?.onLiveKeyMapChange?.(liveKeyMap);
+      set({ liveKeyMap: [...liveKeyMap] });
+    },
+
+    setGhostNotesEnabled: (ghostNotesEnabled) => {
+      dependencies.preferences?.onGhostNotesEnabledChange?.(ghostNotesEnabled);
+      set({ ghostNotesEnabled });
+    },
+
     setSwing: (swing, gestureId) => {
       const clamped = clampUnitInterval(swing);
       store.dispatch(
@@ -531,11 +640,59 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     commitParameter: (moduleId, parameter, value, gestureId) => {
-      store.dispatch(
+      const current = get();
+      const module = current.project.project.modules[moduleId];
+      const descriptor =
+        module === undefined
+          ? undefined
+          : dependencies.manifestFor(module.pluginId)?.parameters.find(
+              (candidate) => candidate.id === parameter,
+            );
+      const recordingTarget = current.project.transport.recordArmed
+        ? recordingTargetFor(current.project, moduleId, current.positionTicks)
+        : undefined;
+      const commandGestureId =
+        recordingTarget !== undefined && descriptor?.automation === "step"
+          ? (gestureId ?? createGestureId(dependencies.idFactory))
+          : gestureId;
+      const result = store.dispatch(
         store.createCommand(
           "rack-parameter-set",
           { moduleId, parameter, value },
-          gestureId === undefined ? {} : { gestureId },
+          commandGestureId === undefined ? {} : { gestureId: commandGestureId },
+        ),
+      );
+      if (
+        result.status !== "accepted" ||
+        recordingTarget === undefined ||
+        descriptor?.automation !== "step" ||
+        commandGestureId === undefined
+      ) {
+        return;
+      }
+      const lane = Object.values(current.project.project.automationLanes).find(
+        (candidate) =>
+          candidate.patternId === recordingTarget.patternId &&
+          candidate.targetId === moduleId &&
+          candidate.parameterId === parameter,
+      );
+      const tick =
+        Math.floor(recordingTarget.localTicks / PATTERN_TICKS_PER_STEP) *
+        PATTERN_TICKS_PER_STEP;
+      const steps = [
+        ...(lane?.steps.filter((step) => step.tick !== tick) ?? []),
+        { tick, value },
+      ].sort((left, right) => left.tick - right.tick);
+      store.dispatch(
+        store.createCommand(
+          "automation-lane-steps-set",
+          {
+            moduleId,
+            patternId: recordingTarget.patternId,
+            parameterId: parameter,
+            steps,
+          },
+          { gestureId: commandGestureId },
         ),
       );
     },
@@ -587,7 +744,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       const toName = dependencies.manifestFor(pluginId)?.productName ?? "module";
       // The count is state-owned section 14 policy; this layer only reports it.
       const unmappedEvents = countUnmappedEvents(
-        module.parts,
+        Object.values(get().project.project.patterns)
+          .map((pattern) => pattern.parts[moduleId])
+          .filter((part): part is NonNullable<typeof part> => part !== undefined),
         dependencies.playableNotesFor?.(pluginId),
       );
       audio.stopAudition(moduleId);
@@ -724,30 +883,64 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       set({ selectedSend, studioView: "effects" });
     },
 
-    selectPattern: (patternIndex) => {
-      store.dispatch(store.createCommand("pattern-select", { patternIndex }));
+    selectPattern: (patternId) => {
+      store.dispatch(store.createCommand("pattern-select", { patternId }));
     },
 
-    renamePattern: (patternIndex, name) => {
-      store.dispatch(store.createCommand("pattern-rename", { patternIndex, name }));
+    addPattern: (name, afterPatternId) => {
+      store.dispatch(
+        store.createCommand(
+          "pattern-add",
+          { ...(name === undefined ? {} : { name }), ...(afterPatternId === undefined ? {} : { afterPatternId }) },
+        ),
+      );
     },
 
-    clearPattern: (patternIndex) => {
-      const name = get().project.project.patterns[patternIndex]?.name ?? "Pattern";
-      const result = store.dispatch(store.createCommand("pattern-clear", { patternIndex }));
+    duplicatePattern: (patternId) => {
+      store.dispatch(store.createCommand("pattern-duplicate", { patternId }));
+    },
+
+    deletePattern: (patternId) => {
+      store.dispatch(store.createCommand("pattern-delete", { patternId }));
+    },
+
+    reorderPattern: (patternId, afterPatternId) => {
+      store.dispatch(
+        store.createCommand(
+          "pattern-reorder",
+          afterPatternId === undefined ? { patternId } : { patternId, afterPatternId },
+        ),
+      );
+    },
+
+    renamePattern: (patternId, name) => {
+      store.dispatch(store.createCommand("pattern-rename", { patternId, name }));
+    },
+
+    setPatternColor: (patternId, color) => {
+      store.dispatch(store.createCommand("pattern-color-set", { patternId, color }));
+    },
+
+    setPatternScale: (patternId, scale) => {
+      store.dispatch(store.createCommand("pattern-scale-set", { patternId, scale }));
+    },
+
+    setPatternDuration: (patternId, durationBars) => {
+      store.dispatch(store.createCommand("pattern-duration-set", { patternId, durationBars }));
+    },
+
+    clearPattern: (patternId) => {
+      const name = get().project.project.patterns.find((pattern) => pattern.id === patternId)?.name ?? "Pattern";
+      const result = store.dispatch(store.createCommand("pattern-clear", { patternId }));
       if (result.status !== "accepted") return;
       set({ undoNotice: notice(`Cleared ${name}. Undo is available.`) });
     },
 
-    copyPattern: (fromPatternIndex, toPatternIndex) => {
-      store.dispatch(store.createCommand("pattern-copy", { fromPatternIndex, toPatternIndex }));
-    },
-
-    selectPianoRollEvents: (moduleId, patternIndex, eventIds) => {
+    selectPianoRollEvents: (moduleId, patternId, eventIds) => {
       store.dispatch(
         store.createCommand("piano-roll-selection-set", {
           moduleId,
-          patternIndex,
+          patternId,
           eventIds,
         }),
       );
@@ -757,11 +950,11 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(store.createCommand("piano-roll-parameter-set", { parameter }));
     },
 
-    editPatternEvents: (moduleId, patternIndex, edit, gestureId) => {
+    editPatternEvents: (moduleId, patternId, edit, gestureId) => {
       const result = store.dispatch(
         store.createCommand(
           "pattern-events-edit",
-          { moduleId, patternIndex, edit },
+          { moduleId, patternId, edit },
           gestureId === undefined ? {} : { gestureId },
         ),
       );
@@ -777,20 +970,115 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       set({ undoNotice: notice(message) });
     },
 
+    recordLivePatternEvent: (moduleId, note, startedAtTicks, endedAtTicks, gestureId) => {
+      const state = get();
+      if (!state.project.transport.recordArmed) return;
+      if (
+        recordCaptureAfterTicks !== undefined &&
+        Math.max(startedAtTicks, endedAtTicks) < recordCaptureAfterTicks
+      ) {
+        return;
+      }
+      const module = state.project.project.modules[moduleId];
+      if (module === undefined) return;
+      const target = recordingTargetFor(state.project, moduleId, startedAtTicks);
+      if (target === undefined) return;
+      const patternId = target.patternId;
+      const manifest = dependencies.manifestFor(module.pluginId);
+      const pitched =
+        manifest?.kind === "instrument" && manifest.acceptedEvents.some((event) => event.id === "note");
+      const cycleTicks = target.part.length * PATTERN_TICKS_PER_STEP;
+      const quantizedStart = quantizeRecordedTicks(target.localTicks, state.liveInputQuantizeMode);
+      const start = {
+        ...quantizedStart,
+        positionTicks: quantizedStart.positionTicks % cycleTicks,
+      };
+      const rawDuration = Math.max(PATTERN_TICKS_PER_STEP, endedAtTicks - startedAtTicks);
+      const duration = Math.min(
+        cycleTicks - start.positionTicks,
+        quantizeRecordedDuration(rawDuration, state.liveInputQuantizeMode),
+      );
+      const edit: PatternEventEdit = pitched
+        ? {
+            type: "create",
+            event: {
+              type: "note",
+              positionTicks: start.positionTicks,
+              durationTicks: duration,
+              data: {
+                note,
+                velocity: 0.8,
+                accent: false,
+                slide: false,
+                microTimingTicks: start.microTimingTicks,
+              },
+            },
+          }
+        : {
+            type: "create",
+            event: {
+              type: "trigger",
+              positionTicks: start.positionTicks,
+              data: {
+                note,
+                velocity: 0.8,
+                accent: false,
+                slide: false,
+                microTimingTicks: start.microTimingTicks,
+              },
+            },
+          };
+      get().editPatternEvents(moduleId, patternId, edit, gestureId);
+    },
+
+    replacePatternPartEvents: (moduleId, patternId, events, length) => {
+      const result = store.dispatch(
+        store.createCommand(
+          "pattern-part-events-replace",
+          length === undefined ? { moduleId, patternId, events } : { moduleId, patternId, events, length },
+        ),
+      );
+      if (result.status !== "accepted") return;
+      set({ undoNotice: notice("Applied the Pattern transform. Undo is available.") });
+    },
+
+    setAutomationLaneSteps: (moduleId, patternId, parameterId, steps) => {
+      const result = store.dispatch(
+        store.createCommand("automation-lane-steps-set", { moduleId, patternId, parameterId, steps }),
+      );
+      if (result.status !== "accepted") return;
+      set({ undoNotice: notice("Updated the automation lane. Undo is available.") });
+    },
+
     toggleSongMode: () => {
       store.dispatch(store.createCommand("song-mode-toggle", {}));
     },
 
-    addSongEntry: (patternIndex) => {
-      store.dispatch(store.createCommand("song-entry-add", { patternIndex }));
+    addSongPlacement: (patternId) => {
+      store.dispatch(store.createCommand("song-placement-add", { patternId }));
     },
 
-    removeSongEntry: (entryIndex) => {
-      store.dispatch(store.createCommand("song-entry-remove", { entryIndex }));
+    removeSongPlacement: (placementId) => {
+      store.dispatch(store.createCommand("song-placement-remove", { placementId }));
     },
 
-    setSongRepeats: (entryIndex, repeats) => {
-      store.dispatch(store.createCommand("song-entry-repeats-set", { entryIndex, repeats }));
+    setSongPlacementRepeats: (placementId, repeatCount) => {
+      store.dispatch(
+        store.createCommand("song-placement-repeat-count-set", { placementId, repeatCount }),
+      );
+    },
+
+    reorderSongPlacement: (placementId, afterPlacementId) => {
+      store.dispatch(
+        store.createCommand(
+          "song-placement-reorder",
+          afterPlacementId === undefined ? { placementId } : { placementId, afterPlacementId },
+        ),
+      );
+    },
+
+    duplicateSongPlacement: (placementId) => {
+      store.dispatch(store.createCommand("song-placement-duplicate", { placementId }));
     },
 
     toggleMute: (moduleId) => {
@@ -977,4 +1265,89 @@ function manifestForModule(
 ): PluginManifest | undefined {
   const module = state.project.modules[moduleId];
   return module === undefined ? undefined : dependencies.manifestFor(module.pluginId);
+}
+
+function isLiveInputQuantizeMode(value: string): value is LiveInputQuantizeMode {
+  return value === "input" || value === "after" || value === "off";
+}
+
+function clampCountInBars(value: number): number {
+  if (!Number.isSafeInteger(value)) return 0;
+  return Math.min(4, Math.max(0, value));
+}
+
+interface RecordingTarget {
+  readonly patternId: PatternId;
+  readonly part: PatternPartState;
+  readonly localTicks: number;
+}
+
+/** Maps the absolute transport clock to the part that is audible at that tick. */
+function recordingTargetFor(
+  state: PulseState,
+  moduleId: ModuleInstanceId,
+  absoluteTicks: number,
+): RecordingTarget | undefined {
+  const ticks = Math.max(0, Number.isFinite(absoluteTicks) ? Math.round(absoluteTicks) : 0);
+  if (!state.project.song.enabled || state.project.song.placements.length === 0) {
+    const pattern = state.project.patterns.find(
+      (candidate) => candidate.id === state.project.activePatternId,
+    );
+    const part = pattern?.parts[moduleId];
+    if (pattern === undefined || part === undefined) return undefined;
+    return {
+      patternId: pattern.id,
+      part,
+      localTicks: ticks % (part.length * PATTERN_TICKS_PER_STEP),
+    };
+  }
+
+  const entries = state.project.song.placements.flatMap((placement) => {
+    const pattern = state.project.patterns.find(
+      (candidate) => candidate.id === placement.patternId,
+    );
+    if (pattern === undefined) return [];
+    return [{ pattern, repeats: placement.repeatCount }];
+  });
+  const songTicks = entries.reduce(
+    (total, entry) =>
+      total + entry.pattern.durationBars * PATTERN_TICKS_PER_BAR * entry.repeats,
+    0,
+  );
+  if (songTicks <= 0) return undefined;
+  let offset = ticks % songTicks;
+  for (const entry of entries) {
+    const patternTicks = entry.pattern.durationBars * PATTERN_TICKS_PER_BAR;
+    const placementTicks = patternTicks * entry.repeats;
+    if (offset < placementTicks) {
+      const part = entry.pattern.parts[moduleId];
+      if (part === undefined) return undefined;
+      return {
+        patternId: entry.pattern.id,
+        part,
+        localTicks: (offset % patternTicks) % (part.length * PATTERN_TICKS_PER_STEP),
+      };
+    }
+    offset -= placementTicks;
+  }
+  return undefined;
+}
+
+function quantizeRecordedTicks(
+  value: number,
+  mode: LiveInputQuantizeMode,
+): { readonly positionTicks: number; readonly microTimingTicks: number } {
+  const ticks = Math.max(0, Number.isFinite(value) ? value : 0);
+  const grid = Math.round(ticks / PATTERN_TICKS_PER_STEP) * PATTERN_TICKS_PER_STEP;
+  if (mode !== "off") return { positionTicks: grid, microTimingTicks: 0 };
+  return {
+    positionTicks: grid,
+    microTimingTicks: Math.min(60, Math.max(-60, Math.round(ticks - grid))),
+  };
+}
+
+function quantizeRecordedDuration(value: number, mode: LiveInputQuantizeMode): number {
+  const ticks = Math.max(PATTERN_TICKS_PER_STEP, Number.isFinite(value) ? value : 0);
+  if (mode === "off") return Math.max(PATTERN_TICKS_PER_STEP, Math.round(ticks / PATTERN_TICKS_PER_STEP) * PATTERN_TICKS_PER_STEP);
+  return Math.max(PATTERN_TICKS_PER_STEP, Math.round(ticks / PATTERN_TICKS_PER_STEP) * PATTERN_TICKS_PER_STEP);
 }

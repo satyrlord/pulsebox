@@ -23,6 +23,12 @@ export function WorkspaceBar(props: WorkspaceBarProps) {
   const redo = useAppStore((state) => state.redo);
   const saveProject = useAppStore((state) => state.saveProject);
 
+  // A polite live region announces save completion and failure. The button
+  // label changes are silent unless the button already has focus. The text is
+  // derived so it stays in sync with the store without extra state.
+  const saveAnnouncement =
+    saveStatus === "saved" ? "Saved." : saveStatus === "error" ? "Save failed." : "";
+
   return (
     <footer className={styles.workspaceBar} data-component="workspace-bar">
       <button
@@ -42,13 +48,22 @@ export function WorkspaceBar(props: WorkspaceBarProps) {
           />
         </svg>
         {editorExpanded ? "Collapse editor" : "Expand editor"}
+        <span className={styles.keyHint} aria-hidden="true">
+          Ctrl+Alt+E
+        </span>
       </button>
       <span className={styles.barSpacer} />
       <button type="button" disabled={!canUndo} title="Undo. Ctrl+Z." onClick={undo}>
         Undo
+        <span className={styles.keyHint} aria-hidden="true">
+          Ctrl+Z
+        </span>
       </button>
       <button type="button" disabled={!canRedo} title="Redo. Ctrl+Y." onClick={redo}>
         Redo
+        <span className={styles.keyHint} aria-hidden="true">
+          Ctrl+Y
+        </span>
       </button>
       <button
         type="button"
@@ -59,8 +74,15 @@ export function WorkspaceBar(props: WorkspaceBarProps) {
           void saveProject();
         }}
       >
+        <span className={styles.saveLamp} data-lamp={saveStatus} aria-hidden="true" />
         {SAVE_LABELS[saveStatus]}
+        <span className={styles.keyHint} aria-hidden="true">
+          Ctrl+S
+        </span>
       </button>
+      <span className={styles.visuallyHidden} role="status">
+        {saveAnnouncement}
+      </span>
     </footer>
   );
 }

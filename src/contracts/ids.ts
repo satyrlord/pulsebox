@@ -14,6 +14,7 @@ export type SendBusId = Brand<string, "SendBusId">;
 export type ModuleInstanceId = Brand<string, "ModuleInstanceId">;
 export type VoiceId = Brand<string, "VoiceId">;
 export type PatternId = Brand<string, "PatternId">;
+export type SongPlacementId = Brand<string, "SongPlacementId">;
 export type NoteEventId = Brand<string, "NoteEventId">;
 export type EffectInstanceId = Brand<string, "EffectInstanceId">;
 export type AutomationLaneId = Brand<string, "AutomationLaneId">;
@@ -44,6 +45,7 @@ type GeneratedUuidId =
   | ModuleInstanceId
   | VoiceId
   | PatternId
+  | SongPlacementId
   | NoteEventId
   | EffectInstanceId
   | AutomationLaneId
@@ -126,12 +128,20 @@ export function createPatternId(factory: IdFactory): PatternId {
   return createGeneratedUuidId(factory) as string as PatternId;
 }
 
+export function createSongPlacementId(factory: IdFactory): SongPlacementId {
+  return createGeneratedUuidId(factory) as string as SongPlacementId;
+}
+
 export function createNoteEventId(factory: IdFactory): NoteEventId {
   return createGeneratedUuidId(factory) as string as NoteEventId;
 }
 
 export function createEffectInstanceId(factory: IdFactory): EffectInstanceId {
   return createGeneratedUuidId(factory) as string as EffectInstanceId;
+}
+
+export function createAutomationLaneId(factory: IdFactory): AutomationLaneId {
+  return createGeneratedUuidId(factory) as string as AutomationLaneId;
 }
 
 export function createCommandId(factory: IdFactory): CommandId {

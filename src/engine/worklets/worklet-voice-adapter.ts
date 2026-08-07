@@ -14,7 +14,12 @@ import {
   type ScheduledEventPayload,
 } from "../../contracts/worklet-protocol";
 import { isPlainRecord } from "../../contracts/validation";
-import type { ScheduledVoiceEvent } from "../transport/scheduled-event";
+import {
+  SCHEDULED_EVENT_QUEUE_CAPACITY,
+  SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+  type ScheduledParameterChange,
+  type ScheduledVoiceEvent,
+} from "../transport/scheduled-event";
 import type {
   VoiceAdapterOptions,
   VoiceAdapterPort,
@@ -188,6 +193,43 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#schedulePreviewFlush();
   };
 
+  readonly scheduleParameters = (changes: readonly ScheduledParameterChange[]): void => {
+    if (!this.#canSendMusicalControl() || changes.length === 0) return;
+    if (changes.length > SCHEDULED_PARAMETER_QUEUE_CAPACITY) {
+      this.#fail(
+        "parameter-batch-overflow",
+        `The ${this.#descriptor.displayName} parameter horizon exceeded its queue capacity.`,
+        "Pulsebox will silence and replace this processor from its latest state.",
+        true,
+      );
+      return;
+    }
+    const mapped = changes.map((change) => {
+      const parameters = this.#descriptor.mapParameters({ [change.parameterId]: change.value });
+      const entry = Object.entries(parameters)[0];
+      if (entry === undefined) return undefined;
+      return {
+        parameterId: entry[0],
+        value: entry[1],
+        audioFrame: change.atFrame,
+      };
+    }).filter((change): change is { parameterId: string; value: ParameterValue; audioFrame: number } =>
+      change !== undefined && Number.isSafeInteger(change.audioFrame) && change.audioFrame >= 0,
+    );
+    for (
+      let offset = 0;
+      offset < mapped.length;
+      offset += ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch
+    ) {
+      this.#postControl("parameter-batch", {
+        changes: mapped.slice(
+          offset,
+          offset + ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch,
+        ),
+      });
+    }
+  };
+
   readonly replaceState = (
     parameters: Readonly<Record<string, ParameterValue>>,
     projectRevision: StateRevision,
@@ -210,12 +252,10 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
 
   readonly schedule = (events: readonly ScheduledVoiceEvent[]): void => {
     if (!this.#canSendMusicalControl() || events.length === 0) return;
-    // An oversized batch is a scheduler bug. Discarding it silently would drop
-    // a whole window of notes, so it is reported through the fault path.
-    if (events.length > ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch) {
+    if (events.length > SCHEDULED_EVENT_QUEUE_CAPACITY) {
       this.#fail(
         "event-batch-overflow",
-        `The ${this.#descriptor.displayName} event batch exceeded the protocol limit.`,
+        `The ${this.#descriptor.displayName} event horizon exceeded its queue capacity.`,
         "Pulsebox will silence and replace this processor from its latest state.",
         true,
       );
@@ -243,7 +283,15 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
       this.#eventId += 1;
     }
     scheduled.sort(compareScheduledEvents);
-    this.#postControl("event-batch", { events: scheduled });
+    for (
+      let offset = 0;
+      offset < scheduled.length;
+      offset += ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch
+    ) {
+      this.#postControl("event-batch", {
+        events: scheduled.slice(offset, offset + ENGINE_PROTOCOL_LIMITS.maximumEventsPerBatch),
+      });
+    }
   };
 
   /**
