@@ -13,18 +13,28 @@ import type {
 import {
   createCommandId,
   createEffectInstanceId,
+  createNoteEventId,
   createStateRevisionEpoch,
+  isCanonicalUuid,
   type EffectInstanceId,
   type GestureId,
   type IdFactory,
   type ModuleInstanceId,
+  type NoteEventId,
   type StateRevision,
   type VoiceId,
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
-import type { PulseCommand } from "./commands";
+import type { PatternEventEdit, PulseCommand } from "./commands";
 import { createModule, MAXIMUM_PATTERN_SEED, type ModuleSeed } from "./default-state";
-import type { PatternStep, ProjectState, PulseState, RackModuleState } from "./model";
+import {
+  PATTERN_TICKS_PER_STEP,
+  type PatternEvent,
+  type PatternPartState,
+  type ProjectState,
+  type PulseState,
+  type RackModuleState,
+} from "./model";
 
 const MAX_SONG_ENTRIES = 128;
 const MAX_SONG_REPEATS = 64;
@@ -43,6 +53,19 @@ interface HistoryPlan {
   readonly undo: readonly HistoryEntry[];
 }
 
+interface PatternEditIssue {
+  readonly field: string;
+  readonly message: string;
+  readonly recoveryAction: string;
+}
+
+type PatternEditResult =
+  | {
+      readonly events: readonly PatternEvent[];
+      readonly selectedEventIds: readonly NoteEventId[];
+    }
+  | { readonly issue: PatternEditIssue };
+
 interface Subscription<Selected = unknown> {
   readonly selector: Selector<PulseState, Selected>;
   readonly listener: Listener<Selected>;
@@ -57,7 +80,7 @@ export type PulseEngineDelta = EngineDelta<
   | "module-swap"
   | "parameter-set"
   | "module-effects-set"
-  | "step-set"
+  | "pattern-events-set"
   | "transport"
   | "pattern-select"
   | "pattern-rename"
@@ -368,7 +391,12 @@ export class PulseStore {
         return {
           state: {
             ...this.#state,
-            ui: { ...this.#state.ui, selectedModuleId: command.payload.moduleId },
+            ui: {
+              ...this.#state.ui,
+              selectedModuleId: command.payload.moduleId,
+              pianoRollSelection: undefined,
+              pianoRollParameter: "velocity",
+            },
           },
           projectChanged: false,
         };
@@ -395,8 +423,20 @@ export class PulseStore {
           command.payload.voiceId,
           command.payload.effectPluginId,
         );
-      case "pattern-step-toggle":
-        return this.#toggleStep(command.payload.moduleId, command.payload.step);
+      case "pattern-events-edit":
+        return this.#editPatternEvents(
+          command.payload.moduleId,
+          command.payload.patternIndex,
+          command.payload.edit,
+        );
+      case "piano-roll-selection-set":
+        return this.#setPianoRollSelection(
+          command.payload.moduleId,
+          command.payload.patternIndex,
+          command.payload.eventIds,
+        );
+      case "piano-roll-parameter-set":
+        return this.#setPianoRollParameter(command.payload.parameter);
       case "transport-swing-set":
         return this.#setSwing(command.payload.swing);
       case "pattern-humanize-set":
@@ -529,6 +569,7 @@ export class PulseStore {
       "pattern-select",
       [],
       { patternIndex },
+      { pianoRollSelection: undefined },
     );
   }
 
@@ -558,12 +599,12 @@ export class PulseStore {
     );
   }
 
-  #mapParts(patternIndex: number, next: (steps: readonly PatternStep[]) => readonly PatternStep[]) {
+  #mapParts(patternIndex: number, next: (part: PatternPartState) => PatternPartState) {
     const modules: Record<string, RackModuleState> = {};
     for (const [id, module] of Object.entries(this.#state.project.modules)) {
       modules[id] = {
         ...module,
-        parts: module.parts.map((steps, index) => (index === patternIndex ? next(steps) : steps)),
+        parts: module.parts.map((part, index) => (index === patternIndex ? next(part) : part)),
       };
     }
     return modules;
@@ -572,12 +613,10 @@ export class PulseStore {
   #clearPattern(patternIndex: number) {
     const error = this.#requirePatternIndex("payload.patternIndex", patternIndex);
     if (error !== undefined) return { error };
-    const modules = this.#mapParts(patternIndex, (steps) =>
-      steps.map((step) => ({ ...step, active: false })),
-    );
+    const modules = this.#mapParts(patternIndex, (part) => ({ ...part, events: [] }));
     return this.#projectTransition({ ...this.#state.project, modules }, "project-replace", [], {
       patternIndex,
-    });
+    }, { pianoRollSelection: undefined });
   }
 
   #copyPattern(fromPatternIndex: number, toPatternIndex: number) {
@@ -595,15 +634,27 @@ export class PulseStore {
           ? module
           : {
               ...module,
-              parts: module.parts.map((steps, index) =>
-                index === toPatternIndex ? source.map((step) => ({ ...step })) : steps,
+              parts: module.parts.map((part, index) =>
+                index === toPatternIndex
+                  ? {
+                      length: source.length,
+                      events: source.events.map((event) => ({
+                        ...event,
+                        id: createNoteEventId(this.#idFactory),
+                        data: { ...event.data },
+                      })),
+                    }
+                  : part,
               ),
             };
     }
-    return this.#projectTransition({ ...this.#state.project, modules }, "project-replace", [], {
-      fromPatternIndex,
-      toPatternIndex,
-    });
+    return this.#projectTransition(
+      { ...this.#state.project, modules },
+      "project-replace",
+      [],
+      { fromPatternIndex, toPatternIndex },
+      { pianoRollSelection: undefined },
+    );
   }
 
   #setSong(song: PulseState["project"]["song"]) {
@@ -864,6 +915,10 @@ export class PulseStore {
           this.#state.ui.selectedModuleId === moduleId
             ? undefined
             : this.#state.ui.selectedModuleId,
+        pianoRollSelection:
+          this.#state.ui.pianoRollSelection?.moduleId === moduleId
+            ? undefined
+            : this.#state.ui.pianoRollSelection,
       },
     );
   }
@@ -1084,41 +1139,143 @@ export class PulseStore {
     };
   }
 
-  #toggleStep(moduleId: ModuleInstanceId, step: number) {
+  #setPianoRollSelection(
+    moduleId: ModuleInstanceId,
+    patternIndex: number,
+    eventIds: readonly NoteEventId[],
+  ) {
     const module = this.#state.project.modules[moduleId];
     if (module === undefined)
       return {
         error: rejected("payload.moduleId", "Module does not exist.", "Edit a loaded module."),
       };
-    const patternIndex = this.#state.project.activePatternIndex;
-    const current = module.parts[patternIndex];
-    if (current === undefined)
+    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
+    if (indexError !== undefined) return { error: indexError };
+    const part = module.parts[patternIndex];
+    if (part === undefined)
       return {
         error: rejected("payload.moduleId", "Pattern does not exist.", "Select a Pattern first."),
       };
-    if (!Number.isInteger(step) || step < 0 || step >= current.length)
+    const selection = selectEvents(part, eventIds, "payload.eventIds");
+    if ("issue" in selection) {
       return {
         error: rejected(
-          "payload.step",
-          "Step is outside the pattern.",
-          "Choose a visible pattern step.",
+          selection.issue.field,
+          selection.issue.message,
+          selection.issue.recoveryAction,
         ),
       };
-    const steps = current.map((value, index) =>
-      index === step ? { ...value, active: !value.active } : value,
-    );
+    }
+    const nextSelection =
+      selection.events.length === 0
+        ? undefined
+        : { moduleId, patternIndex, eventIds: selection.events.map((event) => event.id) };
+    if (sameStructuredValue(this.#state.ui.pianoRollSelection, nextSelection)) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    return {
+      state: {
+        ...this.#state,
+        ui: { ...this.#state.ui, pianoRollSelection: nextSelection },
+      },
+      projectChanged: false as const,
+    };
+  }
+
+  #setPianoRollParameter(parameter: string) {
+    const normalized = parameter.trim();
+    if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(normalized) || normalized.length > 64) {
+      return {
+        error: rejected(
+          "payload.parameter",
+          "The Piano Roll parameter ID is invalid.",
+          "Choose a parameter from the selected module.",
+        ),
+      };
+    }
+    if (normalized === this.#state.ui.pianoRollParameter) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    return {
+      state: {
+        ...this.#state,
+        ui: { ...this.#state.ui, pianoRollParameter: normalized },
+      },
+      projectChanged: false as const,
+    };
+  }
+
+  #editPatternEvents(
+    moduleId: ModuleInstanceId,
+    patternIndex: number,
+    edit: PatternEventEdit,
+  ) {
+    const module = this.#state.project.modules[moduleId];
+    if (module === undefined)
+      return {
+        error: rejected("payload.moduleId", "Module does not exist.", "Edit a loaded module."),
+      };
+    const indexError = this.#requirePatternIndex("payload.patternIndex", patternIndex);
+    if (indexError !== undefined) return { error: indexError };
+    const current = module.parts[patternIndex];
+    if (current === undefined)
+      return {
+        error: rejected("payload.patternIndex", "Pattern part does not exist.", "Select a Pattern first."),
+      };
+    if (edit.type === "create") {
+      const moduleSeed = this.#moduleSeedFor(module.pluginId);
+      const moduleEventType =
+        moduleSeed === undefined
+          ? module.parts.find((part) => part.events.length > 0)?.events[0]?.type
+          : moduleSeed.voiceIds === undefined || moduleSeed.voiceIds.length === 0
+            ? "note"
+            : "trigger";
+      if (moduleEventType !== undefined && edit.event.type !== moduleEventType) {
+        return {
+          error: rejected(
+            "payload.edit.event.type",
+            "The event type does not match this module.",
+            "Create an event supported by the selected module.",
+          ),
+        };
+      }
+    }
+    const result = applyPatternEventEdit(current, edit, this.#idFactory);
+    if ("issue" in result) {
+      return {
+        error: rejected(result.issue.field, result.issue.message, result.issue.recoveryAction),
+      };
+    }
+    if (sameStructuredValue(result.events, current.events)) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    const nextPart: PatternPartState = { ...current, events: result.events };
+    const selectedEventIds =
+      edit.type === "delete" &&
+      this.#state.ui.pianoRollSelection?.moduleId === moduleId &&
+      this.#state.ui.pianoRollSelection.patternIndex === patternIndex
+        ? this.#state.ui.pianoRollSelection.eventIds.filter(
+            (eventId) => !edit.eventIds.includes(eventId),
+          )
+        : result.selectedEventIds;
     const nextModule: RackModuleState = {
       ...module,
-      parts: module.parts.map((value, index) => (index === patternIndex ? steps : value)),
+      parts: module.parts.map((part, index) => (index === patternIndex ? nextPart : part)),
     };
     return this.#projectTransition(
       {
         ...this.#state.project,
         modules: { ...this.#state.project.modules, [moduleId]: nextModule },
       },
-      "step-set",
+      "pattern-events-set",
       [moduleId],
-      { moduleId, patternIndex, step, active: steps[step]?.active ?? false },
+      { moduleId, patternIndex },
+      {
+        pianoRollSelection:
+          selectedEventIds.length === 0
+            ? undefined
+            : { moduleId, patternIndex, eventIds: selectedEventIds },
+      },
     );
   }
 
@@ -1220,6 +1377,313 @@ export class PulseStore {
   }
 }
 
+function patternEditIssue(field: string, message: string, recoveryAction: string): PatternEditResult {
+  return { issue: { field, message, recoveryAction } };
+}
+
+function selectEvents(
+  part: PatternPartState,
+  eventIds: readonly NoteEventId[],
+  field: string,
+): { readonly events: readonly PatternEvent[] } | { readonly issue: PatternEditIssue } {
+  if (!Array.isArray(eventIds)) {
+    return {
+      issue: {
+        field,
+        message: "The event selection is not a list.",
+        recoveryAction: "Select events from the current Pattern part.",
+      },
+    };
+  }
+  const selectedIds = eventIds.filter(
+    (eventId: unknown): eventId is NoteEventId => isCanonicalUuid(eventId),
+  );
+  if (selectedIds.length !== eventIds.length || new Set(selectedIds).size !== selectedIds.length) {
+    return {
+      issue: {
+        field,
+        message: "The event selection contains an invalid or duplicate ID.",
+        recoveryAction: "Select each current event once.",
+      },
+    };
+  }
+  const byId = new Map<NoteEventId, PatternEvent>(
+    part.events.map((event): readonly [NoteEventId, PatternEvent] => [event.id, event]),
+  );
+  const events: PatternEvent[] = [];
+  for (const eventId of selectedIds) {
+    const event = byId.get(eventId);
+    if (event === undefined) {
+      return {
+        issue: {
+          field,
+          message: "The event selection contains an event that does not exist.",
+          recoveryAction: "Select events from the current Pattern part.",
+        },
+      };
+    }
+    events.push(event);
+  }
+  return { events };
+}
+
+function requireEditedEvents(
+  part: PatternPartState,
+  eventIds: readonly NoteEventId[],
+  field: string,
+): { readonly events: readonly PatternEvent[] } | { readonly issue: PatternEditIssue } {
+  if (eventIds.length === 0) {
+    return {
+      issue: {
+        field,
+        message: "The edit needs at least one event.",
+        recoveryAction: "Select one or more events.",
+      },
+    };
+  }
+  return selectEvents(part, eventIds, field);
+}
+
+function applyPatternEventEdit(
+  part: PatternPartState,
+  edit: PatternEventEdit,
+  idFactory: IdFactory,
+): PatternEditResult {
+  let events: readonly PatternEvent[];
+  let selectedEventIds: readonly NoteEventId[];
+
+  switch (edit.type) {
+    case "create": {
+      const event: PatternEvent = {
+        ...edit.event,
+        id: createNoteEventId(idFactory),
+        data: { ...edit.event.data },
+      };
+      events = [...part.events, event];
+      selectedEventIds = [event.id];
+      break;
+    }
+    case "delete": {
+      const selected = requireEditedEvents(part, edit.eventIds, "payload.edit.eventIds");
+      if ("issue" in selected) return { issue: selected.issue };
+      const deleted = new Set(edit.eventIds);
+      events = part.events.filter((event) => !deleted.has(event.id));
+      selectedEventIds = [];
+      break;
+    }
+    case "move": {
+      const selected = requireEditedEvents(part, edit.eventIds, "payload.edit.eventIds");
+      if ("issue" in selected) return { issue: selected.issue };
+      if (
+        !Number.isSafeInteger(edit.deltaTicks) ||
+        edit.deltaTicks % PATTERN_TICKS_PER_STEP !== 0 ||
+        !Number.isSafeInteger(edit.deltaNote)
+      ) {
+        return patternEditIssue(
+          "payload.edit",
+          "The move offset is outside the Piano Roll grid.",
+          "Move events by whole 1/16 steps and semitones.",
+        );
+      }
+      const moved = new Set(edit.eventIds);
+      events = part.events.map((event) =>
+        moved.has(event.id)
+          ? {
+              ...event,
+              positionTicks: event.positionTicks + edit.deltaTicks,
+              data: { ...event.data, note: event.data.note + edit.deltaNote },
+            }
+          : event,
+      );
+      selectedEventIds = edit.eventIds;
+      break;
+    }
+    case "resize": {
+      const selected = requireEditedEvents(part, [edit.eventId], "payload.edit.eventId");
+      if ("issue" in selected) return { issue: selected.issue };
+      const event = selected.events[0];
+      if (event?.type !== "note") {
+        return patternEditIssue(
+          "payload.edit.eventId",
+          "A trigger does not have a duration edge.",
+          "Resize a pitched note.",
+        );
+      }
+      events = part.events.map((candidate) =>
+        candidate.id === edit.eventId
+          ? {
+              ...event,
+              positionTicks: edit.positionTicks ?? event.positionTicks,
+              durationTicks: edit.durationTicks,
+            }
+          : candidate,
+      );
+      selectedEventIds = [edit.eventId];
+      break;
+    }
+    case "duplicate": {
+      const selected = requireEditedEvents(part, edit.eventIds, "payload.edit.eventIds");
+      if ("issue" in selected) return { issue: selected.issue };
+      const copies = selected.events.map((event) => ({
+        ...event,
+        id: createNoteEventId(idFactory),
+        positionTicks: event.positionTicks + PATTERN_TICKS_PER_STEP,
+        data: { ...event.data },
+      }));
+      events = [...part.events, ...copies];
+      selectedEventIds = copies.map((event) => event.id);
+      break;
+    }
+    case "velocity": {
+      const selected = requireEditedEvents(part, edit.eventIds, "payload.edit.eventIds");
+      if ("issue" in selected) return { issue: selected.issue };
+      if (!Number.isFinite(edit.velocity) || edit.velocity < 0 || edit.velocity > 1) {
+        return patternEditIssue(
+          "payload.edit.velocity",
+          "Velocity must be between 0 and 1.",
+          "Choose a valid velocity.",
+        );
+      }
+      const changed = new Set(edit.eventIds);
+      events = part.events.map((event) =>
+        changed.has(event.id)
+          ? { ...event, data: { ...event.data, velocity: edit.velocity } }
+          : event,
+      );
+      selectedEventIds = edit.eventIds;
+      break;
+    }
+  }
+
+  const issue = validatePatternEvents(part.length, events);
+  if (issue !== undefined) return { issue };
+  return { events: sortPatternEvents(events), selectedEventIds };
+}
+
+function validatePatternEvents(
+  partLength: number,
+  events: readonly PatternEvent[],
+): PatternEditIssue | undefined {
+  if (!Number.isSafeInteger(partLength) || partLength < 1 || partLength > 64) {
+    return {
+      field: "payload.patternIndex",
+      message: "The Pattern part length is outside 1 through 64 steps.",
+      recoveryAction: "Use a valid Pattern part.",
+    };
+  }
+  const endTicks = partLength * PATTERN_TICKS_PER_STEP;
+  const ids = new Set<string>();
+  let eventType: PatternEvent["type"] | undefined;
+  for (const event of events) {
+    if (ids.has(event.id)) {
+      return {
+        field: "payload.edit",
+        message: "The edit creates a duplicate event ID.",
+        recoveryAction: "Retry the edit with unique events.",
+      };
+    }
+    ids.add(event.id);
+    if (eventType !== undefined && event.type !== eventType) {
+      return {
+        field: "payload.edit",
+        message: "A Pattern part cannot mix notes and triggers.",
+        recoveryAction: "Create events supported by the selected module.",
+      };
+    }
+    eventType = event.type;
+    if (
+      !Number.isSafeInteger(event.positionTicks) ||
+      event.positionTicks < 0 ||
+      event.positionTicks >= endTicks ||
+      event.positionTicks % PATTERN_TICKS_PER_STEP !== 0
+    ) {
+      return {
+        field: "payload.edit",
+        message: "An event position is outside the Pattern or the 1/16 grid.",
+        recoveryAction: "Place the event on a valid grid step.",
+      };
+    }
+    if (
+      !Number.isInteger(event.data.note) ||
+      event.data.note < 0 ||
+      event.data.note > 127 ||
+      !Number.isFinite(event.data.velocity) ||
+      event.data.velocity < 0 ||
+      event.data.velocity > 1 ||
+      typeof event.data.accent !== "boolean" ||
+      typeof event.data.slide !== "boolean"
+    ) {
+      return {
+        field: "payload.edit",
+        message: "An event property is outside its supported range.",
+        recoveryAction: "Use a valid note, velocity, accent, and slide value.",
+      };
+    }
+    if (event.type === "note") {
+      if (
+        !Number.isSafeInteger(event.durationTicks) ||
+        event.durationTicks <= 0 ||
+        event.durationTicks % PATTERN_TICKS_PER_STEP !== 0 ||
+        event.positionTicks + event.durationTicks > endTicks
+      ) {
+        return {
+          field: "payload.edit",
+          message: "A note duration is outside the Pattern or the 1/16 grid.",
+          recoveryAction: "Resize the note within the Pattern.",
+        };
+      }
+    } else if (Object.prototype.hasOwnProperty.call(event, "durationTicks")) {
+      return {
+        field: "payload.edit",
+        message: "A trigger cannot have a duration.",
+        recoveryAction: "Create a fixed one-cell trigger.",
+      };
+    }
+  }
+
+  const sorted = sortPatternEvents(events);
+  if (eventType === "note") {
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1];
+      const current = sorted[index];
+      if (
+        previous !== undefined &&
+        current !== undefined &&
+        previous.positionTicks + (previous.durationTicks ?? 0) > current.positionTicks
+      ) {
+        return {
+          field: "payload.edit",
+          message: "Monophonic notes cannot overlap.",
+          recoveryAction: "Move or resize the notes so that they do not overlap.",
+        };
+      }
+    }
+  } else if (eventType === "trigger") {
+    const occupied = new Set<string>();
+    for (const event of sorted) {
+      const key = `${String(event.positionTicks)}:${String(event.data.note)}`;
+      if (occupied.has(key)) {
+        return {
+          field: "payload.edit",
+          message: "A drum voice already has a trigger at this step.",
+          recoveryAction: "Use another voice or step.",
+        };
+      }
+      occupied.add(key);
+    }
+  }
+  return undefined;
+}
+
+function sortPatternEvents(events: readonly PatternEvent[]): readonly PatternEvent[] {
+  return [...events].sort(
+    (left, right) =>
+      left.positionTicks - right.positionTicks ||
+      left.data.note - right.data.note ||
+      left.id.localeCompare(right.id),
+  );
+}
+
 function incrementRevision(revision: StateRevision, idFactory: IdFactory): StateRevision {
   if (revision.counter === Number.MAX_SAFE_INTEGER) {
     return { epoch: createStateRevisionEpoch(idFactory), counter: 0 };
@@ -1245,7 +1709,16 @@ function reconcileUiReferences(project: ProjectState, ui: PulseState["ui"]): Pul
     ui.selectedModuleId !== undefined && project.modules[ui.selectedModuleId] !== undefined
       ? ui.selectedModuleId
       : undefined;
-  return { ...ui, selectedModuleId };
+  const selection = ui.pianoRollSelection;
+  const selectedPart =
+    selection === undefined ? undefined : project.modules[selection.moduleId]?.parts[selection.patternIndex];
+  const selectedIds = new Set(selectedPart?.events.map((event) => event.id));
+  const eventIds = selection?.eventIds.filter((eventId) => selectedIds.has(eventId)) ?? [];
+  const pianoRollSelection =
+    selection !== undefined && selectedModuleId === selection.moduleId && eventIds.length > 0
+      ? { ...selection, eventIds }
+      : undefined;
+  return { ...ui, selectedModuleId, pianoRollSelection };
 }
 
 function sameProjectContent(left: ProjectState, right: ProjectState): boolean {

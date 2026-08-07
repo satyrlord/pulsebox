@@ -16,12 +16,11 @@ import { PulseStore, type PulseEngineDelta } from "../../../src/state/pulse-stor
 const seed = {
   pluginId: "bass-mono" as PluginId,
   parameters: { cutoff: 720 },
-  steps: Array.from({ length: 16 }, (_, index) => ({
-    active: index % 2 === 0,
-    note: 36,
-    velocity: 0.8,
-    accent: index % 4 === 0,
-    slide: false,
+  events: Array.from({ length: 8 }, (_, index) => ({
+    type: "note" as const,
+    positionTicks: index * 2 * 240,
+    durationTicks: 240,
+    data: { note: 36, velocity: 0.8, accent: index % 2 === 0, slide: false },
   })),
 };
 

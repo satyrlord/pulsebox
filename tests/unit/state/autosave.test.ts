@@ -17,13 +17,7 @@ import {
 const SEED: ModuleSeed = {
   pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, resonance: 0.38, waveform: "saw" },
-  steps: Array.from({ length: 16 }, () => ({
-    active: false,
-    note: 36,
-    velocity: 0.8,
-    accent: false,
-    slide: false,
-  })),
+  events: [],
 };
 
 const PROJECT_REVISION = {

@@ -159,7 +159,9 @@ conformance below its documented 1280 × 720 editing boundary.
 The specification owns the approved shortcuts. The current shell implements
 Space for play or pause and Escape for Stop. It also implements platform-standard
 undo, redo, and Save shortcuts. Ctrl+Alt+E collapses or expands the lower editor.
-The shortcut reference will expand when later editors add commands.
+The Piano Roll supports Delete and Backspace for selected events. Arrow keys move
+the selection. Shift plus Left or Right resizes a selected note. Control or
+Command plus A selects all events. Control or Command plus D duplicates them.
 
 ## Known limitations
 
@@ -167,8 +169,10 @@ The shortcut reference will expand when later editors add commands.
   editing belong to later roadmap phases. The drum-voice Distortion engine and
   state foundation is present.
 - The Pattern bank holds five named Patterns and selects Verse by default. The
-  lower editor shows the selected module events with Swing and Humanize
-  controls. Complete note, trigger, and automation editing remain planned.
+  lower editor creates, selects, moves, resizes, duplicates, and deletes notes.
+  It also paints fixed drum triggers and edits event velocity. Swing and
+  Humanize controls remain in the shared header. Automation editing remains
+  planned.
 - Record arms and disarms only. Live recording and its count-in settings belong
   to the specification 006 phase.
 - The mixer covers level, pan, mute, solo, and master level. Send buttons open

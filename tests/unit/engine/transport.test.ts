@@ -3,24 +3,92 @@ import { describe, expect, it } from "vitest";
 import {
   chainedStepResolver,
   loopingStepResolver,
+  pendingReleaseEvent,
   schedulePatternWindow,
 } from "../../../src/engine/transport/pattern-scheduler";
+import { BassMonoDsp } from "../../../src/engine/modules/bass-mono/dsp-core";
 import type {
-  PatternStepView,
+  PatternEventView,
+  PatternPartView,
   ScheduledVoiceEvent,
 } from "../../../src/engine/transport/scheduled-event";
 import { TransportClock } from "../../../src/engine/transport/transport-clock";
 
-function step(overrides: Partial<PatternStepView> = {}): PatternStepView {
-  return { active: true, note: 36, velocity: 0.8, accent: false, slide: false, ...overrides };
+function event(
+  step: number,
+  overrides: Partial<PatternEventView["data"]> = {},
+  eventOverrides: Partial<PatternEventView> = {},
+): PatternEventView {
+  return {
+    id: `event-${step}-${eventOverrides.type ?? "note"}`,
+    type: "note",
+    positionTicks: step * 240,
+    durationTicks: 240,
+    data: { note: 36, velocity: 0.8, accent: false, slide: false, ...overrides },
+    ...eventOverrides,
+  };
 }
 
-function pattern(length: number, overrides: Partial<PatternStepView> = {}): PatternStepView[] {
-  return Array.from({ length }, () => step(overrides));
+function pattern(
+  length: number,
+  overrides: Partial<PatternEventView["data"]> = {},
+): PatternPartView {
+  return { length, events: Array.from({ length }, (_, step) => event(step, overrides)) };
+}
+
+function trigger(step: number, id: string, note: number): PatternEventView {
+  return {
+    id,
+    type: "trigger",
+    positionTicks: step * 240,
+    data: { note, velocity: 0.8, accent: false, slide: false },
+  };
 }
 
 function noteOnFrames(events: readonly ScheduledVoiceEvent[]): number[] {
   return events.filter((event) => event.type === "note-on").map((event) => event.atFrame);
+}
+
+function renderBassEvents(
+  events: readonly ScheduledVoiceEvent[],
+  frameCount: number,
+  glide: number,
+): Float32Array {
+  const dsp = new BassMonoDsp(48_000);
+  dsp.setParameters(
+    {
+      cutoff: 12_000,
+      resonance: 0,
+      envelopeAmount: 0,
+      decay: 2,
+      accentAmount: 0,
+      waveform: "square",
+      glide,
+      volume: 0.8,
+    },
+    "immediate",
+  );
+  const output = new Float32Array(frameCount);
+  let cursor = 0;
+  for (const scheduled of events) {
+    if (scheduled.atFrame > frameCount) break;
+    dsp.process(output, undefined, cursor, scheduled.atFrame);
+    cursor = scheduled.atFrame;
+    if (scheduled.type === "note-on") {
+      dsp.noteOn(
+        scheduled.note ?? 0,
+        scheduled.velocity ?? 1,
+        scheduled.accent,
+        scheduled.slide,
+      );
+    } else if (scheduled.type === "note-off") {
+      dsp.noteOff();
+    } else {
+      dsp.reset();
+    }
+  }
+  dsp.process(output, undefined, cursor, frameCount);
+  return output;
 }
 
 describe("TransportClock", () => {
@@ -118,9 +186,13 @@ describe("schedulePatternWindow", () => {
     expect(noteOnFrames(events)).toEqual([0, 100, 200, 300]);
   });
 
-  it("emits a note-off only for steps that do not slide", () => {
+  it("keeps the gate open into an adjacent Slide and releases the slid note", () => {
+    const resolveStep = loopingStepResolver({
+      length: 4,
+      events: [event(0), event(1, { note: 43, slide: true }, { durationTicks: 480 })],
+    });
     const events = schedulePatternWindow({
-      resolveStep: loopingStepResolver([step(), step({ slide: true })]),
+      resolveStep,
       stepFrames: 100,
       swing: 0,
       patternStartFrame: 0,
@@ -128,15 +200,91 @@ describe("schedulePatternWindow", () => {
       windowEndFrame: 200,
     });
 
-    expect(events.filter((event) => event.type === "note-on")).toHaveLength(2);
-    expect(events.filter((event) => event.type === "note-off")).toHaveLength(1);
+    expect(events).toEqual([
+      expect.objectContaining({ atFrame: 0, type: "note-on", note: 36, slide: false }),
+      expect.objectContaining({ atFrame: 100, type: "note-on", note: 43, slide: true }),
+      expect.objectContaining({ atFrame: 300, type: "note-off", note: 43 }),
+    ]);
+    expect(
+      pendingReleaseEvent(
+        { resolveStep, stepFrames: 100, swing: 0, patternStartFrame: 0 },
+        50,
+      ),
+    ).toBeUndefined();
+    expect(
+      pendingReleaseEvent(
+        { resolveStep, stepFrames: 100, swing: 0, patternStartFrame: 0 },
+        150,
+      ),
+    ).toEqual({ atFrame: 300, type: "note-off", note: 43 });
+  });
+
+  it("feeds an adjacent Slide to bass DSP as a frequency ramp", () => {
+    const events = schedulePatternWindow({
+      resolveStep: loopingStepResolver({
+        length: 16,
+        events: [event(0, { note: 36 }), event(1, { note: 72, slide: true })],
+      }),
+      stepFrames: 4_800,
+      swing: 0,
+      patternStartFrame: 0,
+      windowStartFrame: 0,
+      windowEndFrame: 9_600,
+    });
+    const slid = renderBassEvents(events, 8_400, 1);
+    const snapped = renderBassEvents(events, 8_400, 0);
+    const difference = slid
+      .subarray(4_800)
+      .reduce((maximum, sample, index) =>
+        Math.max(maximum, Math.abs(sample - (snapped[index + 4_800] ?? 0))), 0);
+
+    expect(difference).toBeGreaterThan(0.01);
+    expect(events.some((item) => item.type === "note-off" && item.atFrame < 4_800)).toBe(
+      false,
+    );
+  });
+
+  it("releases before a Slide that starts after a gap", () => {
+    const events = schedulePatternWindow({
+      resolveStep: loopingStepResolver({
+        length: 4,
+        events: [event(0), event(2, { note: 43, slide: true })],
+      }),
+      stepFrames: 100,
+      swing: 0,
+      patternStartFrame: 0,
+      windowStartFrame: 0,
+      windowEndFrame: 300,
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({ atFrame: 0, type: "note-on", note: 36 }),
+      expect.objectContaining({ atFrame: 100, type: "note-off", note: 36 }),
+      expect.objectContaining({ atFrame: 200, type: "note-on", note: 43, slide: true }),
+      expect.objectContaining({ atFrame: 300, type: "note-off", note: 43 }),
+    ]);
+  });
+
+  it("retains the stored release for a held note during a bounded rebuild", () => {
+    const resolveStep = loopingStepResolver({
+      length: 16,
+      events: [event(0, {}, { durationTicks: 960 })],
+    });
+
+    expect(
+      pendingReleaseEvent(
+        { resolveStep, stepFrames: 100, swing: 0, patternStartFrame: 0 },
+        150,
+      ),
+    ).toEqual({ atFrame: 400, type: "note-off", note: 36 });
   });
 
   it("carries accent, slide, note, and velocity through to the event", () => {
     const events = schedulePatternWindow({
-      resolveStep: loopingStepResolver([
-        step({ note: 43, velocity: 0.9, accent: true, slide: true }),
-      ]),
+      resolveStep: loopingStepResolver({
+        length: 2,
+        events: [event(0, { note: 43, velocity: 0.9, accent: true, slide: true })],
+      }),
       stepFrames: 100,
       swing: 0,
       patternStartFrame: 0,
@@ -151,6 +299,29 @@ describe("schedulePatternWindow", () => {
       accent: true,
       slide: true,
     });
+  });
+
+  it("emits all simultaneous drum triggers at one stored position", () => {
+    const events = schedulePatternWindow({
+      resolveStep: loopingStepResolver({
+        length: 16,
+        events: [
+          trigger(0, "kick", 36),
+          trigger(0, "hat", 42),
+        ],
+      }),
+      stepFrames: 100,
+      swing: 0,
+      patternStartFrame: 0,
+      windowStartFrame: 0,
+      windowEndFrame: 100,
+    });
+
+    expect(events.filter((item) => item.type === "note-on")).toEqual([
+      expect.objectContaining({ atFrame: 0, note: 36 }),
+      expect.objectContaining({ atFrame: 0, note: 42 }),
+    ]);
+    expect(events.filter((item) => item.type === "note-off")).toHaveLength(2);
   });
 
   it("delays only offbeat steps when swing is applied", () => {
@@ -192,25 +363,27 @@ describe("schedulePatternWindow", () => {
 
   it("plays a chain of patterns in order and then repeats it", () => {
     const resolveStep = chainedStepResolver([
-      { steps: [step({ note: 1 }), step({ note: 2 })], patternIndex: 0 },
-      { steps: [step({ note: 3 })], patternIndex: 1 },
+      { part: { length: 2, events: [event(0, { note: 1 }), event(1, { note: 2 })] }, patternIndex: 0 },
+      { part: { length: 1, events: [event(0, { note: 3 })] }, patternIndex: 1 },
     ]);
 
-    expect([0, 1, 2, 3, 4, 5].map((index) => resolveStep(index)?.step.note)).toEqual([
-      1, 2, 3, 1, 2, 3,
-    ]);
+    expect(
+      [0, 1, 2, 3, 4, 5].map((index) => resolveStep(index)?.events[0]?.data.note),
+    ).toEqual([1, 2, 3, 1, 2, 3]);
     expect([0, 1, 2].map((index) => resolveStep(index)?.patternIndex)).toEqual([0, 0, 1]);
   });
 
   it("treats an empty pattern and an empty chain as silence", () => {
-    expect(loopingStepResolver([])(0)).toBeUndefined();
+    expect(loopingStepResolver({ length: 0, events: [] })(0)).toBeUndefined();
     expect(chainedStepResolver([])(0)).toBeUndefined();
-    expect(chainedStepResolver([{ steps: [], patternIndex: 0 }])(0)).toBeUndefined();
+    expect(
+      chainedStepResolver([{ part: { length: 0, events: [] }, patternIndex: 0 }])(0),
+    ).toBeUndefined();
   });
 
-  it("skips inactive steps without shifting the grid", () => {
+  it("keeps sparse events on their stored grid positions", () => {
     const events = schedulePatternWindow({
-      resolveStep: loopingStepResolver([step(), step({ active: false }), step()]),
+      resolveStep: loopingStepResolver({ length: 3, events: [event(0), event(2)] }),
       stepFrames: 100,
       swing: 0,
       patternStartFrame: 0,

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import type {
-  PatternStepView,
+  PatternPartView,
   ScheduledVoiceEvent,
 } from "../../../src/engine/transport/scheduled-event";
 import {
@@ -18,15 +18,20 @@ const REVISION = { epoch: TEST_UUID, counter: 0 } as StateRevision;
 const MODULE = "10000000-0000-4000-8000-000000000001" as ModuleInstanceId;
 const DEFAULT_MIX = { level: 0.8, pan: 0, muted: false, solo: false } as const;
 
-/** A part whose only active step is index 0, carrying a distinguishing note. */
-function marker(note: number): PatternStepView[] {
-  return Array.from({ length: 16 }, (_, index) => ({
-    active: index === 0,
-    note,
-    velocity: 0.8,
-    accent: false,
-    slide: false,
-  }));
+/** A part whose only event is at step 0, carrying a distinguishing note. */
+function marker(note: number): PatternPartView {
+  return {
+    length: 16,
+    events: [
+      {
+        id: `marker-${note}`,
+        type: "note",
+        positionTicks: 0,
+        durationTicks: 240,
+        data: { note, velocity: 0.8, accent: false, slide: false },
+      },
+    ],
+  };
 }
 
 function recordingAdapter() {
@@ -69,7 +74,7 @@ function stubContext() {
   };
 }
 
-function moduleWith(parts: readonly PatternStepView[][]): TransportModule {
+function moduleWith(parts: readonly PatternPartView[]): TransportModule {
   return {
     id: MODULE,
     pluginId: BASS_MONO_MANIFEST.pluginId,

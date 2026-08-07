@@ -81,13 +81,19 @@ export function parameterValues(
  */
 export const UNMAPPABLE_TEST_NOTE = 72;
 
-export const TEST_STEPS = Array.from({ length: 16 }, (_, index) => ({
-  active: index % 4 === 0,
-  note: index === 8 ? UNMAPPABLE_TEST_NOTE : 36,
-  velocity: 0.8,
-  accent: index === 0,
-  slide: index === 5,
-}));
+export const TEST_EVENTS = Array.from({ length: 16 }, (_, index) => index)
+  .filter((index) => index % 4 === 0)
+  .map((index) => ({
+    type: "note" as const,
+    positionTicks: index * 240,
+    durationTicks: 240,
+    data: {
+      note: index === 8 ? UNMAPPABLE_TEST_NOTE : 36,
+      velocity: 0.8,
+      accent: index === 0,
+      slide: false,
+    },
+  }));
 
 export function createHarness(
   options: { readonly extraModules?: readonly HarnessModule[] } = {},
@@ -96,12 +102,16 @@ export function createHarness(
   const seed: ModuleSeed = {
     pluginId: BASS_MONO_MANIFEST.pluginId,
     parameters: parameterValues(BASS_MONO_DEFAULT_PARAMETERS),
-    steps: TEST_STEPS,
+    events: TEST_EVENTS,
   };
   const drumSeed: ModuleSeed = {
     pluginId: DRUMLINE_SIX_MANIFEST.pluginId,
     parameters: parameterValues(DRUMLINE_SIX_DEFAULT_PARAMETERS),
-    steps: TEST_STEPS,
+    events: TEST_EVENTS.map((event) => ({
+      type: "trigger" as const,
+      positionTicks: event.positionTicks,
+      data: event.data,
+    })),
     voiceIds: DRUMLINE_SIX_MANIFEST.voices.map((voice) => voice.id as VoiceId),
   };
   const seeds = new Map<PluginId, ModuleSeed>([

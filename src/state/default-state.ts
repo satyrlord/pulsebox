@@ -1,6 +1,7 @@
 import {
   RACK_SLOT_IDS,
   createModuleInstanceId,
+  createNoteEventId,
   createPatternId,
   createProjectId,
   createProjectLineageId,
@@ -11,12 +12,21 @@ import {
 } from "../contracts/ids";
 import type { EffectsState } from "../contracts/effects";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
-import type { PatternStep, PulseState, RackModuleState } from "./model";
+import type {
+  PatternEvent,
+  PatternPartState,
+  PulseState,
+  RackModuleState,
+} from "./model";
+
+export type PatternEventSeed<Event extends PatternEvent = PatternEvent> = Event extends PatternEvent
+  ? Omit<Event, "id">
+  : never;
 
 export interface ModuleSeed {
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
-  readonly steps: readonly PatternStep[];
+  readonly events: readonly PatternEventSeed[];
   /** Drum voices that own durable insert slots. Pitched modules omit this. */
   readonly voiceIds?: readonly VoiceId[];
 }
@@ -52,12 +62,8 @@ const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as co
  */
 export const DEFAULT_PROJECT_NAME = "Neon Basement";
 
-export function createSilentSteps(length = PATTERN_STEP_COUNT): readonly PatternStep[] {
-  return Object.freeze(
-    Array.from({ length }, () =>
-      Object.freeze({ active: false, note: 36, velocity: 0.7, accent: false, slide: false }),
-    ),
-  );
+export function createEmptyPatternPart(length = PATTERN_STEP_COUNT): PatternPartState {
+  return Object.freeze({ length, events: Object.freeze([]) });
 }
 
 /**
@@ -129,6 +135,8 @@ export function createDefaultState(
     }),
     ui: Object.freeze({
       selectedModuleId: modules[0]?.id,
+      pianoRollSelection: undefined,
+      pianoRollParameter: "velocity",
     }),
     history: Object.freeze({ canUndo: false, canRedo: false }),
   });
@@ -156,8 +164,23 @@ function isSeedList(seed: ModuleSeed | readonly ModuleSeed[]): seed is readonly 
   return Array.isArray(seed);
 }
 
-function freezeSteps(steps: readonly PatternStep[]): readonly PatternStep[] {
-  return Object.freeze(steps.map((step) => Object.freeze({ ...step })));
+function freezeEvent(event: PatternEvent): PatternEvent {
+  return Object.freeze({ ...event, data: Object.freeze({ ...event.data }) });
+}
+
+function materializeEvent(idFactory: IdFactory, event: PatternEventSeed): PatternEvent {
+  return freezeEvent({ ...event, id: createNoteEventId(idFactory) });
+}
+
+function clonePart(idFactory: IdFactory, part: PatternPartState): PatternPartState {
+  return Object.freeze({
+    length: part.length,
+    events: Object.freeze(
+      part.events.map((event) =>
+        freezeEvent({ ...event, id: createNoteEventId(idFactory), data: { ...event.data } }),
+      ),
+    ),
+  });
 }
 
 export function createModule(
@@ -167,16 +190,22 @@ export function createModule(
 ): RackModuleState {
   // A duplicated module carries its whole Pattern bank. A fresh module seeds
   // the default Verse and leaves the other Patterns silent.
-  const parts: readonly (readonly PatternStep[])[] =
-    source?.parts ??
-    Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) =>
-      index === 1 ? seed.steps : createSilentSteps(),
-    );
+  const parts: readonly PatternPartState[] =
+    source === undefined
+      ? Array.from({ length: PATTERN_SLOT_COUNT }, (_, index) =>
+          index === 1
+            ? Object.freeze({
+                length: PATTERN_STEP_COUNT,
+                events: Object.freeze(seed.events.map((event) => materializeEvent(idFactory, event))),
+              })
+            : createEmptyPatternPart(),
+        )
+      : source.parts.map((part) => clonePart(idFactory, part));
   return Object.freeze({
     id: createModuleInstanceId(idFactory),
     pluginId: source?.pluginId ?? seed.pluginId,
     parameters: Object.freeze({ ...(source?.parameters ?? seed.parameters) }),
-    parts: Object.freeze(parts.map(freezeSteps)),
+    parts: Object.freeze(parts),
     muted: source?.muted ?? false,
     solo: source?.solo ?? false,
     level: source?.level ?? DEFAULT_MODULE_LEVEL,

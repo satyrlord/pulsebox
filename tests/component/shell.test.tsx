@@ -22,19 +22,29 @@ import {
   firstModuleId,
   parameterValues,
   renderWithHarness,
-  TEST_STEPS,
+  TEST_EVENTS,
   UNMAPPABLE_TEST_NOTE,
 } from "./helpers";
 
 /**
- * Puts one undoable edit on the history stack. Step editing belongs to the
- * Piano Roll, which is not built yet, so this dispatches the command directly
- * rather than pretending a rack surface can reach it.
+ * Puts one undoable event edit on the history stack.
  */
 function makeHistory(harness: ReturnType<typeof createHarness>, step: number): void {
   const domain = harness.domain;
   domain.dispatch(
-    domain.createCommand("pattern-step-toggle", { moduleId: firstModuleId(harness), step }),
+    domain.createCommand("pattern-events-edit", {
+      moduleId: firstModuleId(harness),
+      patternIndex: 1,
+      edit: {
+        type: "create",
+        event: {
+          type: "note",
+          positionTicks: step * 240,
+          durationTicks: 240,
+          data: { note: 36, velocity: 0.7, accent: false, slide: false },
+        },
+      },
+    }),
   );
 }
 
@@ -400,7 +410,7 @@ describe("Rack", () => {
     const module = harness.domain.getState().project.modules[moduleId];
     expect(module?.pluginId).toBe("drum-analog-small");
     // The module keeps its identity and Pattern parts across the swap.
-    expect(module?.parts[1]?.some((step) => step.active)).toBe(true);
+    expect(module?.parts[1]?.events.length).toBeGreaterThan(0);
     expect(harness.domain.getState().history.canUndo).toBe(true);
   });
 
@@ -482,7 +492,11 @@ describe("Rack", () => {
           seed: {
             pluginId: DIGIT_FIVE_MANIFEST.pluginId,
             parameters: parameterValues(DIGIT_FIVE_DEFAULT_PARAMETERS),
-            steps: TEST_STEPS,
+            events: TEST_EVENTS.map((event) => ({
+              type: "trigger" as const,
+              positionTicks: event.positionTicks,
+              data: event.data,
+            })),
           },
           manifest: DIGIT_FIVE_MANIFEST,
         },
@@ -699,7 +713,7 @@ describe("PulseApp under StrictMode", () => {
 
     const moduleId = firstModuleId(harness);
     const parts = harness.domain.getState().project.modules[moduleId]?.parts;
-    expect(parts?.[1]?.[8]?.note).toBe(UNMAPPABLE_TEST_NOTE);
+    expect(parts?.[1]?.events.some((event) => event.data.note === UNMAPPABLE_TEST_NOTE)).toBe(true);
   });
 
   it("clears the swap result panel on its timer and on undo", () => {

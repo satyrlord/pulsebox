@@ -9,12 +9,11 @@ import { PulseStore } from "../../../src/state/pulse-store";
 const SEED = {
   pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, waveform: "saw", volume: 0.62 },
-  steps: Array.from({ length: 16 }, (_, index) => ({
-    active: index % 4 === 0,
-    note: 36,
-    velocity: 0.8,
-    accent: false,
-    slide: false,
+  events: Array.from({ length: 4 }, (_, index) => ({
+    type: "note" as const,
+    positionTicks: index * 4 * 240,
+    durationTicks: 240,
+    data: { note: 36, velocity: 0.8, accent: false, slide: false },
   })),
 };
 
@@ -48,18 +47,32 @@ describe("pattern bank", () => {
 
     expect(store.getState().project.patterns).toHaveLength(PATTERN_SLOT_COUNT);
     expect(module?.parts).toHaveLength(PATTERN_SLOT_COUNT);
-    expect(module?.parts[0]?.every((step) => !step.active)).toBe(true);
-    expect(module?.parts[1]?.some((step) => step.active)).toBe(true);
+    expect(module?.parts[0]?.events).toEqual([]);
+    expect(module?.parts[1]?.events).toHaveLength(4);
   });
 
   it("edits only the selected Pattern", () => {
     const { store, moduleId } = harness();
     store.dispatch(store.createCommand("pattern-select", { patternIndex: 1 }));
-    store.dispatch(store.createCommand("pattern-step-toggle", { moduleId, step: 3 }));
+    store.dispatch(
+      store.createCommand("pattern-events-edit", {
+        moduleId,
+        patternIndex: 1,
+        edit: {
+          type: "create",
+          event: {
+            type: "note",
+            positionTicks: 3 * 240,
+            durationTicks: 240,
+            data: { note: 38, velocity: 0.8, accent: false, slide: false },
+          },
+        },
+      }),
+    );
 
     const module = store.getState().project.modules[moduleId];
-    expect(module?.parts[1]?.[3]?.active).toBe(true);
-    expect(module?.parts[0]?.[3]?.active).toBe(false);
+    expect(module?.parts[1]?.events.some((event) => event.positionTicks === 3 * 240)).toBe(true);
+    expect(module?.parts[0]?.events).toEqual([]);
   });
 
   it("rejects a Pattern index outside the bank", () => {
@@ -72,10 +85,21 @@ describe("pattern bank", () => {
 
   it("copies one Pattern over another across every module", () => {
     const { store, moduleId } = harness();
-    store.dispatch(store.createCommand("pattern-copy", { fromPatternIndex: 0, toPatternIndex: 2 }));
+    store.dispatch(store.createCommand("pattern-copy", { fromPatternIndex: 1, toPatternIndex: 2 }));
 
     const module = store.getState().project.modules[moduleId];
-    expect(module?.parts[2]).toEqual(module?.parts[0]);
+    const source = module?.parts[1]?.events ?? [];
+    const copy = module?.parts[2]?.events ?? [];
+    const content = (event: (typeof source)[number]) => ({
+      type: event.type,
+      positionTicks: event.positionTicks,
+      durationTicks: event.durationTicks,
+      data: event.data,
+    });
+    expect(copy.map(content)).toEqual(
+      source.map(content),
+    );
+    expect(copy.map((event) => event.id)).not.toEqual(source.map((event) => event.id));
   });
 
   it("clears a Pattern without touching the others", () => {
@@ -84,8 +108,8 @@ describe("pattern bank", () => {
     store.dispatch(store.createCommand("pattern-clear", { patternIndex: 0 }));
 
     const module = store.getState().project.modules[moduleId];
-    expect(module?.parts[0]?.every((step) => !step.active)).toBe(true);
-    expect(module?.parts[1]?.some((step) => step.active)).toBe(true);
+    expect(module?.parts[0]?.events).toEqual([]);
+    expect(module?.parts[1]?.events).toHaveLength(4);
   });
 
   it("renames a Pattern and rejects an empty name", () => {

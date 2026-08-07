@@ -13,7 +13,7 @@ import {
 } from "./pattern-scheduler";
 import {
   compareScheduledVoiceEvents,
-  type PatternStepView,
+  type PatternPartView,
   type ScheduledVoiceEvent,
 } from "./scheduled-event";
 import { TransportClock } from "./transport-clock";
@@ -38,8 +38,8 @@ export interface TransportModule {
   readonly parameters: Readonly<Record<string, ParameterValue>>;
   /** Saved per-drum-voice insert instances resolved for the audio thread. */
   readonly voiceInserts?: Readonly<Record<string, VoiceInsertRuntime | null>>;
-  /** One step list per project Pattern slot. */
-  readonly parts: readonly (readonly PatternStepView[])[];
+  /** One event part per project Pattern slot. */
+  readonly parts: readonly PatternPartView[];
   readonly mix: TransportModuleMix;
 }
 
@@ -57,7 +57,7 @@ export type TransportEngineDelta = EngineDelta<
   | "module-swap"
   | "module-effects-set"
   | "parameter-set"
-  | "step-set"
+  | "pattern-events-set"
   | "transport"
   | "pattern-select"
   | "pattern-rename"
@@ -274,15 +274,19 @@ export class TransportRuntime {
     const { activePatternIndex, songEnabled, songEntries } = arrangement;
     let resolve: StepResolver;
     if (!songEnabled || songEntries.length === 0) {
-      resolve = loopingStepResolver(module.parts[activePatternIndex] ?? [], activePatternIndex);
+      const part = module.parts[activePatternIndex];
+      resolve =
+        part === undefined
+          ? () => undefined
+          : loopingStepResolver(part, activePatternIndex);
     } else {
-      const chain: { readonly steps: readonly PatternStepView[]; readonly patternIndex: number }[] =
+      const chain: { readonly part: PatternPartView; readonly patternIndex: number }[] =
         [];
       for (const entry of songEntries) {
         const part = module.parts[entry.patternIndex];
         if (part === undefined) continue;
         for (let repeat = 0; repeat < entry.repeats; repeat += 1) {
-          chain.push({ steps: part, patternIndex: entry.patternIndex });
+          chain.push({ part, patternIndex: entry.patternIndex });
         }
       }
       resolve = chainedStepResolver(chain);
@@ -650,22 +654,14 @@ export class TransportRuntime {
         this.#adapters.get(moduleId)?.setParameters({ [parameter]: value }, delta.projectRevision);
         return;
       }
-      case "step-set": {
-        const { moduleId, patternIndex, step, active } = readStepDelta(delta.payload);
-        this.#setRevision(delta.projectRevision);
-        const module = this.#modules.get(moduleId);
-        const part = module?.parts[patternIndex];
-        if (module !== undefined && part?.[step] !== undefined) {
-          this.#modules.set(moduleId, {
-            ...module,
-            parts: module.parts.map((steps, index) =>
-              index === patternIndex
-                ? steps.map((value, at) => (at === step ? { ...value, active } : value))
-                : steps,
-            ),
-          });
-          this.#rescheduleModule(moduleId);
+      case "pattern-events-set": {
+        if (moduleProjection === undefined) {
+          throw new Error("Pattern event update requires its bounded module projection.");
         }
+        this.#setRevision(delta.projectRevision);
+        this.#modules.set(moduleProjection.id, moduleProjection);
+        this.#resolvers.delete(moduleProjection.id);
+        this.#rescheduleModule(moduleProjection.id);
         return;
       }
       case "module-move":
@@ -1693,28 +1689,6 @@ function readParameterDelta(payload: Readonly<Record<string, unknown>>): {
     throw new TypeError("Engine parameter delta is malformed.");
   }
   return { moduleId, parameter: payload.parameter, value: payload.value };
-}
-
-function readStepDelta(payload: Readonly<Record<string, unknown>>): {
-  readonly moduleId: ModuleInstanceId;
-  readonly patternIndex: number;
-  readonly step: number;
-  readonly active: boolean;
-} {
-  const moduleId = readModuleId(payload);
-  if (
-    !Number.isSafeInteger(payload.step) ||
-    typeof payload.step !== "number" ||
-    payload.step < 0 ||
-    typeof payload.active !== "boolean"
-  ) {
-    throw new TypeError("Engine step delta is malformed.");
-  }
-  const patternIndex =
-    typeof payload.patternIndex === "number" && Number.isSafeInteger(payload.patternIndex)
-      ? payload.patternIndex
-      : 0;
-  return { moduleId, patternIndex, step: payload.step, active: payload.active };
 }
 
 interface MixerChannel {

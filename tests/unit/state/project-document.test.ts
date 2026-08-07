@@ -39,12 +39,11 @@ import {
 const SEED: ModuleSeed = {
   pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, resonance: 0.38, waveform: "saw" },
-  steps: Array.from({ length: 16 }, (_, index) => ({
-    active: index % 4 === 0,
-    note: 36,
-    velocity: 0.8,
-    accent: index === 0,
-    slide: false,
+  events: Array.from({ length: 4 }, (_, index) => ({
+    type: "note" as const,
+    positionTicks: index * 4 * 240,
+    durationTicks: 240,
+    data: { note: 36, velocity: 0.8, accent: index === 0, slide: false },
   })),
 };
 
@@ -58,13 +57,21 @@ const STATEFUL_EFFECT_PLUGIN_ID = "stateful-drive" as PluginId;
 const DRUM_SEED: ModuleSeed = {
   pluginId: "drum-analog-small" as PluginId,
   parameters: {},
-  steps: SEED.steps,
+  events: SEED.events.map((event) => ({
+    type: "trigger" as const,
+    positionTicks: event.positionTicks,
+    data: { ...event.data, slide: false },
+  })),
   voiceIds: DRUM_VOICE_IDS,
 };
 const SINGLE_DRUM_SEED: ModuleSeed = {
   pluginId: "drum-one-voice" as PluginId,
   parameters: {},
-  steps: SEED.steps,
+  events: SEED.events.map((event) => ({
+    type: "trigger" as const,
+    positionTicks: event.positionTicks,
+    data: { ...event.data, slide: false },
+  })),
   voiceIds: [SINGLE_DRUM_VOICE_ID],
 };
 
@@ -135,8 +142,8 @@ const STATEFUL_VOICE_INSERT_PARSE = {
   },
 };
 
-function document(): ProjectDocument {
-  return serializeProject(createDefaultState(browserIdFactory, SEED), OPTIONS);
+function document(seed: ModuleSeed = SEED): ProjectDocument {
+  return serializeProject(createDefaultState(browserIdFactory, seed), OPTIONS);
 }
 
 describe("project document", () => {
@@ -482,11 +489,127 @@ describe("project document", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("rejects a malformed step record", () => {
+  it("rejects a malformed event envelope", () => {
     const written = document();
-    const patterns = [{ ...written.patterns[0], steps: [{ active: "yes", note: 36 }] }];
+    const patterns = [{ ...written.patterns[0], events: [{ type: "note", positionTicks: -1 }] }];
     const result = parseProjectDocument({ ...written, patterns }, PARSE);
     expect(result.ok).toBe(false);
+  });
+
+  it("accepts simultaneous trigger voices and rejects duplicate voice triggers", () => {
+    const written = document(DRUM_SEED);
+    const first = written.patterns[0];
+    if (first === undefined) throw new Error("Test fixture has no Pattern part.");
+    const triggers = [
+      {
+        id: "00000000-0000-4000-8000-000000000901" as never,
+        type: "trigger" as const,
+        positionTicks: 0,
+        data: { note: 36, velocity: 0.8, accent: false, slide: false },
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000902" as never,
+        type: "trigger" as const,
+        positionTicks: 0,
+        data: { note: 38, velocity: 0.7, accent: false, slide: false },
+      },
+    ];
+    const patterns = written.patterns.map((pattern, index) =>
+      index === 0 ? { ...pattern, events: triggers } : pattern,
+    );
+    expect(parseProjectDocument({ ...written, patterns }, VOICE_INSERT_PARSE).ok).toBe(true);
+
+    const secondTrigger = triggers[1];
+    if (secondTrigger === undefined) throw new Error("Test fixture has no second trigger.");
+    const duplicateVoice = [
+      triggers[0],
+      { ...secondTrigger, data: { ...secondTrigger.data, note: 36 } },
+    ];
+    const invalidPatterns = written.patterns.map((pattern, index) =>
+      index === 0 ? { ...pattern, events: duplicateVoice } : pattern,
+    );
+    expect(parseProjectDocument({ ...written, patterns: invalidPatterns }, VOICE_INSERT_PARSE).ok).toBe(
+      false,
+    );
+  });
+
+  it("rejects an event type that the module does not support", () => {
+    const bass = document();
+    const bassPart = bass.patterns.find((pattern) => pattern.events.length > 0);
+    const bassEvent = bassPart?.events[0];
+    if (bassPart === undefined || bassEvent === undefined) {
+      throw new Error("Test fixture has no bass event.");
+    }
+    const bassPatterns = bass.patterns.map((pattern) =>
+      pattern.id === bassPart.id
+        ? {
+            ...pattern,
+            events: [
+              {
+                id: bassEvent.id,
+                type: "trigger" as const,
+                positionTicks: bassEvent.positionTicks,
+                data: bassEvent.data,
+              },
+            ],
+          }
+        : pattern,
+    );
+    expect(parseProjectDocument({ ...bass, patterns: bassPatterns }, PARSE).ok).toBe(false);
+
+    const drum = document(DRUM_SEED);
+    const drumPart = drum.patterns.find((pattern) => pattern.events.length > 0);
+    const drumEvent = drumPart?.events[0];
+    if (drumPart === undefined || drumEvent === undefined) {
+      throw new Error("Test fixture has no drum event.");
+    }
+    const drumPatterns = drum.patterns.map((pattern) =>
+      pattern.id === drumPart.id
+        ? {
+            ...pattern,
+            events: [
+              {
+                id: drumEvent.id,
+                type: "note" as const,
+                positionTicks: drumEvent.positionTicks,
+                durationTicks: 240,
+                data: drumEvent.data,
+              },
+            ],
+          }
+        : pattern,
+    );
+    expect(parseProjectDocument({ ...drum, patterns: drumPatterns }, VOICE_INSERT_PARSE).ok).toBe(
+      false,
+    );
+  });
+
+  it("rejects overlapping note envelopes and a duration on a trigger", () => {
+    const written = document();
+    const first = written.patterns.find((pattern) => pattern.events.length > 0);
+    const source = first?.events[0];
+    if (first === undefined || source === undefined) {
+      throw new Error("Test fixture has no Pattern event.");
+    }
+    const overlap = {
+      ...source,
+      id: "00000000-0000-4000-8000-000000000903" as never,
+      positionTicks: source.positionTicks,
+    };
+    const overlapPatterns = written.patterns.map((pattern) =>
+      pattern.id === first.id ? { ...pattern, events: [...pattern.events, overlap] } : pattern,
+    );
+    expect(parseProjectDocument({ ...written, patterns: overlapPatterns }, PARSE).ok).toBe(false);
+
+    const triggerWithDuration = {
+      ...source,
+      type: "trigger" as const,
+      durationTicks: 240,
+    };
+    const durationPatterns = written.patterns.map((pattern) =>
+      pattern.id === first.id ? { ...pattern, events: [triggerWithDuration] } : pattern,
+    );
+    expect(parseProjectDocument({ ...written, patterns: durationPatterns }, PARSE).ok).toBe(false);
   });
 
   it("rejects malformed rack records and accumulates bounded semantic errors", () => {

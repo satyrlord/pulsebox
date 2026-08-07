@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { clampUnitInterval, countUnmappedEvents } from "../../../src/state/edit-policy";
 
-function step(active: boolean, note: number) {
-  return { active, note, velocity: 0.8, accent: false, slide: false };
+function event(id: string, note: number) {
+  return {
+    id: id as never,
+    type: "trigger" as const,
+    positionTicks: 0,
+    data: { note, velocity: 0.8, accent: false, slide: false },
+  };
 }
 
 describe("clampUnitInterval", () => {
@@ -18,11 +23,11 @@ describe("clampUnitInterval", () => {
 
 describe("countUnmappedEvents", () => {
   const parts = [
-    [step(true, 36), step(true, 72), step(false, 72)],
-    [step(true, 40), step(true, 72)],
+    { length: 16, events: [event("a", 36), event("b", 72)] },
+    { length: 16, events: [event("c", 40), event("d", 72)] },
   ];
 
-  it("counts only active events the target cannot map", () => {
+  it("counts events the target cannot map", () => {
     expect(countUnmappedEvents(parts, new Set([36, 40]))).toBe(2);
   });
 

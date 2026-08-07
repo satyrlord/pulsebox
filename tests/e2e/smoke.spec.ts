@@ -95,16 +95,8 @@ test("duplicates a Tin Soldier module without changing its plugin type", async (
   await expect(page.locator(`${RACK_MODULE}[data-label='Silver Serpent']`)).toHaveCount(1);
 });
 
-test("play activates the AudioWorklet path and Stop is idempotent", async ({ page }) => {
+test("Stop is idempotent after Play", async ({ page }) => {
   await startPlayback(page);
-
-  const workletActive = await page.evaluate(() => {
-    const context = new AudioContext();
-    const state = context.state;
-    void context.close();
-    return state;
-  });
-  expect(workletActive).toBeDefined();
 
   await page.getByRole("button", { name: "Stop" }).click();
   await page.getByRole("button", { name: "Stop" }).click();

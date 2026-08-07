@@ -4,6 +4,7 @@ import type {
   GestureId,
   IdFactory,
   ModuleInstanceId,
+  NoteEventId,
   ParameterValue,
   PluginId,
   PluginManifest,
@@ -12,6 +13,7 @@ import type {
 import {
   clampUnitInterval,
   countUnmappedEvents,
+  type PatternEventEdit,
   type ProjectSaveResult,
   type PulseState,
   type PulseStore,
@@ -298,6 +300,18 @@ export interface AppState {
   readonly renamePattern: (patternIndex: number, name: string) => void;
   readonly clearPattern: (patternIndex: number) => void;
   readonly copyPattern: (fromPatternIndex: number, toPatternIndex: number) => void;
+  readonly selectPianoRollEvents: (
+    moduleId: ModuleInstanceId,
+    patternIndex: number,
+    eventIds: readonly NoteEventId[],
+  ) => void;
+  readonly setPianoRollParameter: (parameter: string) => void;
+  readonly editPatternEvents: (
+    moduleId: ModuleInstanceId,
+    patternIndex: number,
+    edit: PatternEventEdit,
+    gestureId?: GestureId,
+  ) => void;
   readonly toggleSongMode: () => void;
   readonly addSongEntry: (patternIndex: number) => void;
   readonly removeSongEntry: (entryIndex: number) => void;
@@ -727,6 +741,40 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     copyPattern: (fromPatternIndex, toPatternIndex) => {
       store.dispatch(store.createCommand("pattern-copy", { fromPatternIndex, toPatternIndex }));
+    },
+
+    selectPianoRollEvents: (moduleId, patternIndex, eventIds) => {
+      store.dispatch(
+        store.createCommand("piano-roll-selection-set", {
+          moduleId,
+          patternIndex,
+          eventIds,
+        }),
+      );
+    },
+
+    setPianoRollParameter: (parameter) => {
+      store.dispatch(store.createCommand("piano-roll-parameter-set", { parameter }));
+    },
+
+    editPatternEvents: (moduleId, patternIndex, edit, gestureId) => {
+      const result = store.dispatch(
+        store.createCommand(
+          "pattern-events-edit",
+          { moduleId, patternIndex, edit },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+      if (result.status !== "accepted") return;
+      const message =
+        edit.type === "create"
+          ? "Created an event. Undo is available."
+          : edit.type === "delete"
+            ? "Deleted the selected events. Undo is available."
+            : edit.type === "duplicate"
+              ? "Duplicated the selected events. Undo is available."
+              : "Changed the selected events. Undo is available.";
+      set({ undoNotice: notice(message) });
     },
 
     toggleSongMode: () => {

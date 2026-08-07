@@ -85,11 +85,11 @@ describe("default project", () => {
       .filter((module) => module !== undefined)
       .map((module) => module.parts[1]);
     for (const part of verseParts) {
-      expect(part?.some((step) => step.active)).toBe(true);
+      expect(part?.events.length).toBeGreaterThan(0);
     }
     // Every machine plays its own pattern, not a restated copy.
     const signatures = verseParts.map((part) =>
-      JSON.stringify(part?.map((step) => [step.active, step.note])),
+      JSON.stringify(part?.events.map((event) => [event.positionTicks, event.data.note])),
     );
     expect(new Set(signatures).size).toBe(signatures.length);
   });
@@ -129,7 +129,19 @@ describe("starter template", () => {
   it("repeats the same note data on every call", () => {
     const notes = (project: typeof first) =>
       project.rackSlots.map((slot) =>
-        slot.moduleId === undefined ? undefined : project.modules[slot.moduleId]?.parts,
+        slot.moduleId === undefined
+          ? undefined
+          : project.modules[slot.moduleId]?.parts.map((part) => ({
+              length: part.length,
+              events: part.events.map((event) => ({
+                type: event.type,
+                positionTicks: event.positionTicks,
+                ...(event.durationTicks === undefined
+                  ? {}
+                  : { durationTicks: event.durationTicks }),
+                data: event.data,
+              })),
+            })),
       );
     expect(JSON.stringify(notes(second))).toBe(JSON.stringify(notes(first)));
   });

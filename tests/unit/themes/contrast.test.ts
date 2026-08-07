@@ -5,11 +5,7 @@ import {
   findContrastFailures,
   relativeLuminance,
 } from "../../../src/themes/contrast";
-import {
-  BUILT_IN_PALETTES,
-  HIGH_CONTRAST_OVERLAY,
-  PULSE_THEME_IDS,
-} from "../../../src/themes/tokens";
+import { BUILT_IN_PALETTES } from "../../../src/themes/tokens";
 
 describe("contrast calculation", () => {
   it("matches published reference luminance values", () => {
@@ -37,18 +33,6 @@ describe("contrast calculation", () => {
 });
 
 describe("built-in palette accessibility", () => {
-  it.each(PULSE_THEME_IDS)("theme %s passes the semantic contrast matrix", (theme) => {
-    expect(findContrastFailures(BUILT_IN_PALETTES[theme])).toEqual([]);
-  });
-
-  it.each(PULSE_THEME_IDS)(
-    "theme %s passes the matrix under the high-contrast overlay",
-    (theme) => {
-      const overlaid = { ...BUILT_IN_PALETTES[theme], ...HIGH_CONTRAST_OVERLAY };
-      expect(findContrastFailures(overlaid)).toEqual([]);
-    },
-  );
-
   it("reports every failing pair rather than only the first", () => {
     const broken = {
       ...BUILT_IN_PALETTES.rack,

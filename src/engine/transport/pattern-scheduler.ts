@@ -1,31 +1,22 @@
 import {
   compareScheduledVoiceEvents,
-  type PatternStepView,
+  type PatternEventView,
+  type PatternPartView,
   type ScheduledVoiceEvent,
 } from "./scheduled-event";
 
-/**
- * One resolved step plus the bank index of the Pattern it came from. The bank
- * index selects the Pattern-owned timing (Humanize amount and seed), so a Song
- * chain plays each Pattern with that Pattern's own feel.
- */
+/** One fixed Piano Roll grid step at 960 ticks per quarter note. */
+const PATTERN_STEP_TICKS = 240;
+
+/** All events that begin at one resolved Pattern step. */
 export interface ResolvedStep {
-  readonly step: PatternStepView;
+  readonly events: readonly PatternEventView[];
   readonly patternIndex: number;
-  /**
-   * Position of this step inside its own Pattern. Humanize keys on this rather
-   * than on the absolute step, so a loop replays the same feel every pass
-   * instead of drifting into a new variation on every repeat.
-   */
+  /** Position inside the source Pattern, used for deterministic Humanize. */
   readonly stepInPattern: number;
 }
 
-/**
- * Resolves an absolute step index to the step that should sound there, or
- * `undefined` for silence. A single looping pattern, a chained pattern list, and
- * a song arrangement are all just different resolvers, so the scheduler itself
- * never learns about chaining or song mode.
- */
+/** Resolves an absolute transport step to all events at that Pattern position. */
 export type StepResolver = (absoluteStep: number) => ResolvedStep | undefined;
 
 /** Pattern-owned deterministic timing, mirrored from the state layer. */
@@ -38,88 +29,78 @@ export interface PatternTiming {
 
 export interface PatternWindowRequest {
   readonly resolveStep: StepResolver;
-  /**
-   * Frames per sixteenth at the current tempo. It may be fractional: each
-   * onset rounds the whole product once, so the grid cannot drift by an
-   * accumulated per-step rounding error.
-   */
+  /** Exact frames per fixed sixteenth. */
   readonly stepFrames: number;
   /** 0 is straight; 1 delays every odd step to a 2:1 triplet feel. */
   readonly swing: number;
-  /** Pattern-owned timing by bank index. A missing entry plays mechanically. */
   readonly patternTiming?: readonly PatternTiming[];
-  /**
-   * Per-module salt so each voice drifts independently. Without it every module
-   * would shift together and Humanize would just move the whole grid.
-   */
+  /** Stable per-module salt for independent Humanize. */
   readonly voiceSalt?: number;
   readonly windowStartFrame: number;
   readonly windowEndFrame: number;
   readonly patternStartFrame: number;
-  /** Fraction of a step a non-slid note holds before releasing. */
+  /** Fraction of one step used for a trigger release. */
   readonly gateRatio?: number;
   readonly maximumEvents?: number;
-  /**
-   * Exclusive lower bound on the absolute step index. Steps at or below it emit
-   * nothing. A timing-change rebuild uses it so a step already preserved at its
-   * old onset cannot fire again at its shifted new onset.
-   */
   readonly minimumStepExclusive?: number;
 }
 
 const DEFAULT_GATE_RATIO = 0.82;
 const DEFAULT_MAXIMUM_EVENTS = 256;
-
-/**
- * Full swing delays the offbeat to two thirds of the pair, which is the 2:1
- * triplet feel. That is one third of a step.
- */
 const MAXIMUM_SWING_FRACTION = 1 / 3;
-
-/**
- * Full Humanize moves an onset at most a quarter step either way. Together with
- * the swing maximum of one third this keeps onsets in absolute-step order, so a
- * note-off clamp can always find the next onset ahead of the current one.
- */
 const MAXIMUM_HUMANIZE_FRACTION = 0.25;
-
-/** Full Humanize scales a velocity by at most this fraction either way. */
 const MAXIMUM_VELOCITY_FRACTION = 0.25;
+const MAXIMUM_PATTERN_STEPS = 64;
+
+function eventBuckets(part: PatternPartView): ReadonlyMap<number, readonly PatternEventView[]> {
+  const mutable = new Map<number, PatternEventView[]>();
+  for (const event of part.events) {
+    const bucket = mutable.get(event.positionTicks);
+    if (bucket === undefined) mutable.set(event.positionTicks, [event]);
+    else bucket.push(event);
+  }
+  return mutable;
+}
 
 export function loopingStepResolver(
-  steps: readonly PatternStepView[],
+  part: PatternPartView,
   patternIndex = 0,
 ): StepResolver {
-  if (steps.length === 0) return () => undefined;
+  if (!Number.isSafeInteger(part.length) || part.length <= 0) return () => undefined;
+  const eventsByPosition = eventBuckets(part);
   return (absoluteStep) => {
-    if (!Number.isFinite(absoluteStep) || absoluteStep < 0) return undefined;
-    const stepInPattern = absoluteStep % steps.length;
-    const step = steps[stepInPattern];
-    return step === undefined ? undefined : { step, patternIndex, stepInPattern };
+    if (!Number.isSafeInteger(absoluteStep) || absoluteStep < 0) return undefined;
+    const stepInPattern = absoluteStep % part.length;
+    return {
+      events: eventsByPosition.get(stepInPattern * PATTERN_STEP_TICKS) ?? [],
+      patternIndex,
+      stepInPattern,
+    };
   };
 }
 
-/**
- * Builds a resolver that plays each pattern in order for its own length, then
- * repeats the whole chain. An empty chain is silence.
- */
+/** Plays each part in order, then repeats the whole chain. */
 export function chainedStepResolver(
-  patterns: readonly { readonly steps: readonly PatternStepView[]; readonly patternIndex: number }[],
+  patterns: readonly { readonly part: PatternPartView; readonly patternIndex: number }[],
 ): StepResolver {
-  const playable = patterns.filter((pattern) => pattern.steps.length > 0);
-  const total = playable.reduce((sum, pattern) => sum + pattern.steps.length, 0);
+  const playable = patterns.filter((pattern) => pattern.part.length > 0);
+  const total = playable.reduce((sum, pattern) => sum + pattern.part.length, 0);
   if (total === 0) return () => undefined;
+  const buckets = playable.map((pattern) => eventBuckets(pattern.part));
   return (absoluteStep) => {
-    if (!Number.isFinite(absoluteStep) || absoluteStep < 0) return undefined;
+    if (!Number.isSafeInteger(absoluteStep) || absoluteStep < 0) return undefined;
     let offset = absoluteStep % total;
-    for (const pattern of playable) {
-      if (offset < pattern.steps.length) {
-        const step = pattern.steps[offset];
-        return step === undefined
-          ? undefined
-          : { step, patternIndex: pattern.patternIndex, stepInPattern: offset };
+    for (let index = 0; index < playable.length; index += 1) {
+      const pattern = playable[index];
+      if (pattern === undefined) continue;
+      if (offset < pattern.part.length) {
+        return {
+          events: buckets[index]?.get(offset * PATTERN_STEP_TICKS) ?? [],
+          patternIndex: pattern.patternIndex,
+          stepInPattern: offset,
+        };
       }
-      offset -= pattern.steps.length;
+      offset -= pattern.part.length;
     }
     return undefined;
   };
@@ -130,15 +111,6 @@ function swingFramesFor(stepFrames: number, swing: number): number {
   return Math.round(Math.min(1, swing) * stepFrames * MAXIMUM_SWING_FRACTION);
 }
 
-/**
- * Deterministic hash of (seed, step in pattern, salt) into [-1, 1). Pure 32-bit
- * integer math, so the same stored seed replays the same variation on every
- * platform and in every render.
- *
- * The step index is the position inside the Pattern, never the absolute step.
- * Keying on the absolute step would give the same beat a new offset on every
- * repeat, so the loop would never play the same way twice.
- */
 function humanizeUnit(seed: number, stepInPattern: number, salt: number): number {
   let hash =
     ((seed | 0) ^ Math.imul(stepInPattern + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b)) | 0;
@@ -162,16 +134,12 @@ interface OnsetContext {
   readonly voiceSalt: number;
 }
 
-/** Timing-offset salt and velocity salt keep the two variations independent. */
 const TIMING_SALT = 0;
 const VELOCITY_SALT = 1;
 
 function onsetFrame(context: OnsetContext, absoluteStep: number): number {
   const swung = absoluteStep % 2 === 1 ? context.swingFrames : 0;
-  // One rounding of the whole product per onset. Rounding the step size first
-  // would multiply that error by the step index and drift the audible grid.
-  const base =
-    context.patternStartFrame + Math.round(absoluteStep * context.stepFrames) + swung;
+  const base = context.patternStartFrame + Math.round(absoluteStep * context.stepFrames) + swung;
   const resolved = context.resolveStep(absoluteStep);
   if (resolved === undefined) return base;
   const timing = context.patternTiming?.[resolved.patternIndex];
@@ -185,24 +153,93 @@ function onsetFrame(context: OnsetContext, absoluteStep: number): number {
   return base + Math.round(unit * humanize * MAXIMUM_HUMANIZE_FRACTION * context.stepFrames);
 }
 
-function humanizedVelocity(context: OnsetContext, resolved: ResolvedStep): number {
+function humanizedVelocity(
+  context: OnsetContext,
+  resolved: ResolvedStep,
+  event: PatternEventView,
+): number {
   const timing = context.patternTiming?.[resolved.patternIndex];
   const humanize = clampHumanize(timing?.humanize);
-  if (humanize === 0 || timing === undefined) return resolved.step.velocity;
+  if (humanize === 0 || timing === undefined) return event.data.velocity;
   const unit = humanizeUnit(
     timing.seed,
     resolved.stepInPattern,
     context.voiceSalt * 2 + VELOCITY_SALT,
   );
-  const scaled = resolved.step.velocity * (1 + unit * humanize * MAXIMUM_VELOCITY_FRACTION);
+  const scaled = event.data.velocity * (1 + unit * humanize * MAXIMUM_VELOCITY_FRACTION);
   return Math.min(1, Math.max(0, scaled));
 }
 
-/**
- * Emits every event whose onset lands in `[windowStartFrame, windowEndFrame)`.
- * A note-off may be stamped past the window end; it travels with its note-on so
- * the pair is never split across two scheduling passes.
- */
+function durationStepsFor(event: PatternEventView): number {
+  if (event.type !== "note") return 1;
+  const duration = event.durationTicks ?? PATTERN_STEP_TICKS;
+  return Math.max(1, Math.round(duration / PATTERN_STEP_TICKS));
+}
+
+function adjacentSlidNote(
+  context: OnsetContext,
+  event: PatternEventView,
+  absoluteStep: number,
+): { readonly event: PatternEventView; readonly absoluteStep: number } | undefined {
+  if (event.type !== "note" || event.durationTicks === undefined) return undefined;
+  const durationSteps = event.durationTicks / PATTERN_STEP_TICKS;
+  if (!Number.isSafeInteger(durationSteps) || durationSteps <= 0) return undefined;
+  const nextAbsoluteStep = absoluteStep + durationSteps;
+  const next = context.resolveStep(nextAbsoluteStep)?.events.find(
+    (candidate) => candidate.type === "note" && candidate.data.slide,
+  );
+  return next === undefined ? undefined : { event: next, absoluteStep: nextAbsoluteStep };
+}
+
+function releaseFrameFor(
+  context: OnsetContext,
+  event: PatternEventView,
+  absoluteStep: number,
+  onset: number,
+  triggerGateFrames: number,
+): number | undefined {
+  if (event.type === "trigger") return onset + triggerGateFrames;
+  if (adjacentSlidNote(context, event, absoluteStep) !== undefined) return undefined;
+  const durationSteps = durationStepsFor(event);
+  const nominalRelease = onset + Math.max(1, Math.round(durationSteps * context.stepFrames));
+  const endStep = absoluteStep + durationSteps;
+  const end = context.resolveStep(endStep);
+  if (end === undefined || end.events.length === 0) return nominalRelease;
+  return Math.max(onset + 1, Math.min(nominalRelease, onsetFrame(context, endStep) - 1));
+}
+
+function terminalReleaseFor(
+  context: OnsetContext,
+  event: PatternEventView,
+  absoluteStep: number,
+  onset: number,
+  triggerGateFrames: number,
+  latestStartedFrame: number,
+): { readonly frame: number; readonly note: number } | undefined {
+  let currentEvent = event;
+  let currentStep = absoluteStep;
+  let currentOnset = onset;
+  for (let traversed = 0; traversed < DEFAULT_MAXIMUM_EVENTS; traversed += 1) {
+    const release = releaseFrameFor(
+      context,
+      currentEvent,
+      currentStep,
+      currentOnset,
+      triggerGateFrames,
+    );
+    if (release !== undefined) return { frame: release, note: currentEvent.data.note };
+    const next = adjacentSlidNote(context, currentEvent, currentStep);
+    if (next === undefined) return undefined;
+    const nextOnset = onsetFrame(context, next.absoluteStep);
+    if (nextOnset > latestStartedFrame) return undefined;
+    currentEvent = next.event;
+    currentStep = next.absoluteStep;
+    currentOnset = nextOnset;
+  }
+  return undefined;
+}
+
+/** Emits each persisted event whose onset lands in the requested frame window. */
 export function schedulePatternWindow(
   request: PatternWindowRequest,
 ): readonly ScheduledVoiceEvent[] {
@@ -223,20 +260,15 @@ export function schedulePatternWindow(
   if (!Number.isFinite(stepFrames) || stepFrames <= 0) return [];
   if (windowStartFrame >= windowEndFrame) return [];
 
-  const swingFrames = swingFramesFor(stepFrames, swing);
-  const gateFrames = Math.max(1, Math.floor(stepFrames * gateRatio));
+  const triggerGateFrames = Math.max(1, Math.floor(stepFrames * gateRatio));
   const context: OnsetContext = {
     resolveStep,
     stepFrames,
-    swingFrames,
+    swingFrames: swingFramesFor(stepFrames, swing),
     patternStartFrame,
     patternTiming,
     voiceSalt: voiceSalt | 0,
   };
-
-  // Swing only delays, but Humanize can also advance an onset, so the scanned
-  // index range widens by two on each side to cover every shifted onset that can
-  // enter the window.
   const firstIndex = Math.max(
     0,
     Math.floor((windowStartFrame - patternStartFrame) / stepFrames) - 2,
@@ -249,58 +281,46 @@ export function schedulePatternWindow(
     const frame = onsetFrame(context, absoluteStep);
     if (frame < windowStartFrame || frame >= windowEndFrame) continue;
     const resolved = resolveStep(absoluteStep);
-    if (resolved?.step.active !== true) continue;
-    const step = resolved.step;
-    // A note-off travels with its note-on, so the whole pair must fit under
-    // the cap. Emitting the onset alone would strand a note with no release.
-    if (events.length + (step.slide ? 1 : 2) > maximumEvents) break;
+    if (resolved === undefined || resolved.events.length === 0) continue;
+    const releases = resolved.events.map((event) =>
+      releaseFrameFor(context, event, absoluteStep, frame, triggerGateFrames),
+    );
+    const requiredEvents = releases.reduce<number>(
+      (count, release) => count + 1 + (release === undefined ? 0 : 1),
+      0,
+    );
+    // Keep all simultaneous triggers together. A note that leads into a Slide
+    // has no release in this group because its adjacent note keeps the gate open.
+    if (events.length + requiredEvents > maximumEvents) break;
 
-    events.push({
-      atFrame: frame,
-      type: "note-on",
-      sourceStep: absoluteStep,
-      note: step.note,
-      velocity: humanizedVelocity(context, resolved),
-      accent: step.accent,
-      slide: step.slide,
-    });
-
-    if (step.slide) continue;
-    // A held note must never ring past the next trigger. Swing and Humanize move
-    // the next onset, so the release is clamped rather than fixed at the gate
-    // ratio.
-    const nextOnset = onsetFrame(context, absoluteStep + 1);
-    events.push({
-      atFrame: Math.max(frame + 1, Math.min(frame + gateFrames, nextOnset - 1)),
-      type: "note-off",
-    });
+    for (let index = 0; index < resolved.events.length; index += 1) {
+      const event = resolved.events[index];
+      if (event === undefined) continue;
+      events.push({
+        atFrame: frame,
+        type: "note-on",
+        sourceStep: absoluteStep,
+        note: event.data.note,
+        velocity: humanizedVelocity(context, resolved, event),
+        accent: event.data.accent,
+        slide: event.data.slide,
+      });
+      const release = releases[index];
+      if (release !== undefined) {
+        events.push({ atFrame: release, type: "note-off", note: event.data.note });
+      }
+    }
   }
 
   return events.sort(compareScheduledVoiceEvents);
 }
 
-/**
- * The highest absolute step whose onset lies before `boundaryFrame`, or -1 when
- * no onset does. Onsets stay in absolute-step order, so the first hit while
- * scanning down from just past the boundary is the highest.
- *
- * A timing change captures the lead window at its old onsets and uses this
- * value as the exclusive step filter for the rebuild: every step at or below it
- * either already sounded or travels in the preserved batch, so the rebuild must
- * not emit it again.
- */
 export function highestStepBefore(
   request: Omit<PatternWindowRequest, "windowStartFrame" | "windowEndFrame">,
   boundaryFrame: number,
 ): number {
-  const {
-    resolveStep,
-    stepFrames,
-    swing,
-    patternTiming,
-    voiceSalt = 0,
-    patternStartFrame,
-  } = request;
+  const { resolveStep, stepFrames, swing, patternTiming, voiceSalt = 0, patternStartFrame } =
+    request;
   if (!Number.isFinite(stepFrames) || stepFrames <= 0) return -1;
   const context: OnsetContext = {
     resolveStep,
@@ -317,14 +337,7 @@ export function highestStepBefore(
   return -1;
 }
 
-/**
- * The clamped gate release still owed for the newest onset at or before
- * `playheadFrame`, or `undefined` when that note already released or slides.
- *
- * A bounded reschedule clears the queued horizon, and that queue held this
- * note-off. Re-emitting it keeps the sounding voice on its natural release
- * instead of a blanket cut at the reschedule point.
- */
+/** Returns the duration-based release that a bounded queue rebuild must retain. */
 export function pendingReleaseEvent(
   request: Omit<PatternWindowRequest, "windowStartFrame" | "windowEndFrame">,
   playheadFrame: number,
@@ -339,34 +352,34 @@ export function pendingReleaseEvent(
     gateRatio = DEFAULT_GATE_RATIO,
   } = request;
   if (!Number.isFinite(stepFrames) || stepFrames <= 0) return undefined;
-  const swingFrames = swingFramesFor(stepFrames, swing);
-  const gateFrames = Math.max(1, Math.floor(stepFrames * gateRatio));
   const context: OnsetContext = {
     resolveStep,
     stepFrames,
-    swingFrames,
+    swingFrames: swingFramesFor(stepFrames, swing),
     patternStartFrame,
     patternTiming,
     voiceSalt: voiceSalt | 0,
   };
-
-  // Onsets stay in absolute-step order, so scan back from just past the
-  // playhead. Once even an unclamped gate has expired, every older onset
-  // released long ago.
+  const triggerGateFrames = Math.max(1, Math.floor(stepFrames * gateRatio));
   const nearest = Math.floor((playheadFrame - patternStartFrame) / stepFrames) + 3;
-  for (let absoluteStep = nearest; absoluteStep >= 0; absoluteStep -= 1) {
+  const oldest = Math.max(0, nearest - MAXIMUM_PATTERN_STEPS - 3);
+  for (let absoluteStep = nearest; absoluteStep >= oldest; absoluteStep -= 1) {
     const frame = onsetFrame(context, absoluteStep);
     if (frame > playheadFrame) continue;
-    if (frame + gateFrames <= playheadFrame) return undefined;
     const resolved = resolveStep(absoluteStep);
-    if (resolved?.step.active !== true) continue;
-    if (resolved.step.slide) return undefined;
-    const releaseFrame = Math.max(
-      frame + 1,
-      Math.min(frame + gateFrames, onsetFrame(context, absoluteStep + 1) - 1),
+    if (resolved === undefined) continue;
+    const note = resolved.events.find((event) => event.type === "note");
+    if (note === undefined) continue;
+    const release = terminalReleaseFor(
+      context,
+      note,
+      absoluteStep,
+      frame,
+      triggerGateFrames,
+      playheadFrame,
     );
-    return releaseFrame > playheadFrame
-      ? { atFrame: releaseFrame, type: "note-off" }
+    return release !== undefined && release.frame > playheadFrame
+      ? { atFrame: release.frame, type: "note-off", note: release.note }
       : undefined;
   }
   return undefined;

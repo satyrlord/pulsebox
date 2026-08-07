@@ -1,6 +1,39 @@
 import type { CommandEnvelope } from "../contracts/commands";
-import type { ModuleInstanceId, RackSlotId, VoiceId } from "../contracts/ids";
+import type { ModuleInstanceId, NoteEventId, RackSlotId, VoiceId } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
+import type { PatternEventData } from "./model";
+
+export type NewPatternEvent =
+  | {
+      readonly type: "note";
+      readonly positionTicks: number;
+      readonly durationTicks: number;
+      readonly data: PatternEventData;
+    }
+  | {
+      readonly type: "trigger";
+      readonly positionTicks: number;
+      readonly durationTicks?: never;
+      readonly data: PatternEventData;
+    };
+
+export type PatternEventEdit =
+  | { readonly type: "create"; readonly event: NewPatternEvent }
+  | { readonly type: "delete"; readonly eventIds: readonly NoteEventId[] }
+  | {
+      readonly type: "move";
+      readonly eventIds: readonly NoteEventId[];
+      readonly deltaTicks: number;
+      readonly deltaNote: number;
+    }
+  | {
+      readonly type: "resize";
+      readonly eventId: NoteEventId;
+      readonly durationTicks: number;
+      readonly positionTicks?: number;
+    }
+  | { readonly type: "duplicate"; readonly eventIds: readonly NoteEventId[] }
+  | { readonly type: "velocity"; readonly eventIds: readonly NoteEventId[]; readonly velocity: number };
 
 export type PulseCommand =
   | CommandEnvelope<"transport-play", Record<string, never>>
@@ -40,9 +73,22 @@ export type PulseCommand =
       }
     >
   | CommandEnvelope<
-      "pattern-step-toggle",
-      { readonly moduleId: ModuleInstanceId; readonly step: number }
+      "pattern-events-edit",
+      {
+        readonly moduleId: ModuleInstanceId;
+        readonly patternIndex: number;
+        readonly edit: PatternEventEdit;
+      }
     >
+  | CommandEnvelope<
+      "piano-roll-selection-set",
+      {
+        readonly moduleId: ModuleInstanceId;
+        readonly patternIndex: number;
+        readonly eventIds: readonly NoteEventId[];
+      }
+    >
+  | CommandEnvelope<"piano-roll-parameter-set", { readonly parameter: string }>
   | CommandEnvelope<"transport-swing-set", { readonly swing: number }>
   | CommandEnvelope<"transport-seek", { readonly positionTicks: number }>
   | CommandEnvelope<

@@ -1,4 +1,5 @@
 import type { ParameterValue, PluginId } from "../../contracts/parameters";
+import { isPlainRecord } from "../../contracts/validation";
 import {
   createVoiceInsertProcessor,
   type VoiceInsertConfiguration,
@@ -144,10 +145,6 @@ function isParameterValue(value: unknown): value is ParameterValue {
     typeof value === "boolean" ||
     (typeof value === "number" && Number.isFinite(value))
   );
-}
-
-function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

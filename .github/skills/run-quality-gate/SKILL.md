@@ -34,15 +34,15 @@ Read [REFERENCE.md](REFERENCE.md) for applicability and stop conditions.
 
 If the repository defines each check, use this order:
 
-1. Markdown and documentation links.
-2. Naming, originality, and prohibited-technology checks.
-3. Dependency and dead-code checks.
-4. Lint.
-5. Typecheck.
-6. Unit and component tests.
-7. Production build.
-8. Playwright in Chrome.
-9. Configured coverage, visual, export, or audio checks.
+1. Run the Markdown and documentation-link checks.
+2. Run the naming, originality, and prohibited-technology checks.
+3. Run the dependency and dead-code checks.
+4. Run lint.
+5. Run typecheck.
+6. Run the unit and component tests.
+7. Run the production build.
+8. Run Playwright in Chrome.
+9. Run the configured coverage, visual, export, or audio checks.
 
 In verify mode, after a failure, run independent safe checks.
 

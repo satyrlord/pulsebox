@@ -245,9 +245,9 @@ generated with a cryptographically strong browser source. Tests shall inject a
 deterministic ID factory. Identity across stored heads is project ID, lineage
 ID, and typed entity ID. An entity ID shall never be reused for a different
 entity within one lineage. This rule also applies after Undo removes an entity
-and a later command creates another entity. Whole-project Replace and Undo replace start new
-lineages and use complete state and engine replacement, as defined in
-`PROJECT-FORMAT.md`.
+and a later command creates another entity. The explicit Replace existing and
+Undo replace actions start new lineages and require complete state and engine
+replacement, as defined in `PROJECT-FORMAT.md`.
 
 The eight MVP rack positions shall use the fixed `RackSlotId` values `slot-01`
 through `slot-08`. The four sends shall use `send-a` through `send-d`. Module
@@ -1209,9 +1209,6 @@ This document is complete as a contract when:
    requirement.
 6. Documentation distinguishes implemented Phase 1 work from planned later
    phases and cites current checks for implementation claims.
-
-Phase 0 was the document gate. Its acceptance-blocking conflicts were resolved
-before the Phase 1 product source tree was created.
 
 ## 18. Primary technical references
 

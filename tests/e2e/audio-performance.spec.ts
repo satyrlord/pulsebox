@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { arch, platform, release } from "node:os";
+import type { NoteEventId } from "../../src/contracts";
 import {
   serializePortableProject,
   type ProjectDocument,
@@ -18,6 +19,11 @@ const STEPS_PER_BEAT = 4;
 const DISTORTION_PLUGIN_ID = "distortion";
 const DRUMLINE_PLUGIN_ID = "drum-analog-small";
 const EFFECT_INSTANCE_ID = "00000000-0000-4000-8000-000000000991";
+
+function fixtureEventId(patternIndex: number, step: number): NoteEventId {
+  const suffix = (patternIndex * 16 + step + 1).toString(16).padStart(12, "0");
+  return `00000000-0000-4000-8000-${suffix}` as NoteEventId;
+}
 const SOURCE_REVISION = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const WORKTREE_SOURCE_HASH = (() => {
   const paths = execFileSync(
@@ -137,13 +143,16 @@ function distortionFixture(document: ProjectDocument): {
         ...slot,
         ...(slot.moduleId === undefined ? {} : { muted: !targetModules.has(slot.moduleId) }),
       })),
-      patterns: document.patterns.map((pattern) => ({
+      patterns: document.patterns.map((pattern, patternIndex) => ({
         ...pattern,
-        steps: pattern.steps.map((step) =>
-          targetModules.has(pattern.moduleId)
-            ? { ...step, active: true, note: 36, velocity: 0.8, accent: false, slide: false }
-            : { ...step, active: false },
-        ),
+        events: targetModules.has(pattern.moduleId)
+          ? Array.from({ length: pattern.length }, (_, step) => ({
+              id: fixtureEventId(patternIndex, step),
+              type: "trigger" as const,
+              positionTicks: step * 240,
+              data: { note: 36, velocity: 0.8, accent: false, slide: false },
+            }))
+          : [],
       })),
       effects: {
         instances: [

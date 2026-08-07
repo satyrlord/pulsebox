@@ -5,7 +5,7 @@
  * restating the numbers.
  */
 
-import type { PatternStep } from "./model";
+import type { PatternPartState } from "./model";
 
 /** Swing and Pattern Humanize live on the closed unit interval. */
 export function clampUnitInterval(value: number): number {
@@ -18,13 +18,13 @@ export function clampUnitInterval(value: number): number {
  * on a pitched instrument.
  */
 export function countUnmappedEvents(
-  parts: readonly (readonly PatternStep[])[],
+  parts: readonly PatternPartState[],
   playableNotes: ReadonlySet<number> | undefined,
 ): number {
   if (playableNotes === undefined) return 0;
   return parts.reduce(
-    (total, steps) =>
-      total + steps.filter((step) => step.active && !playableNotes.has(step.note)).length,
+    (total, part) =>
+      total + part.events.filter((event) => !playableNotes.has(event.data.note)).length,
     0,
   );
 }

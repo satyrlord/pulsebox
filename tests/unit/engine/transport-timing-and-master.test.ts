@@ -9,7 +9,7 @@ import {
   type PatternWindowRequest,
 } from "../../../src/engine/transport/pattern-scheduler";
 import type {
-  PatternStepView,
+  PatternPartView,
   ScheduledVoiceEvent,
 } from "../../../src/engine/transport/scheduled-event";
 import {
@@ -23,14 +23,17 @@ const REVISION = { epoch: TEST_UUID, counter: 0 } as StateRevision;
 const DEFAULT_MIX = { level: 0.8, pan: 0, muted: false, solo: false } as const;
 const MODULE_ID = "10000000-0000-4000-8000-000000000001" as ModuleInstanceId;
 
-function steps(note: number): PatternStepView[] {
-  return Array.from({ length: 16 }, () => ({
-    active: true,
-    note,
-    velocity: 0.8,
-    accent: false,
-    slide: false,
-  }));
+function steps(note: number): PatternPartView {
+  return {
+    length: 16,
+    events: Array.from({ length: 16 }, (_, step) => ({
+      id: `event-${step}`,
+      type: "note" as const,
+      positionTicks: step * 240,
+      durationTicks: 240,
+      data: { note, velocity: 0.8, accent: false, slide: false },
+    })),
+  };
 }
 
 function noteOns(events: readonly ScheduledVoiceEvent[]): readonly ScheduledVoiceEvent[] {
@@ -263,7 +266,7 @@ function stubContext() {
   return { context, analysers, oscillators };
 }
 
-function bassModule(parts: readonly (readonly PatternStepView[])[]): TransportModule {
+function bassModule(parts: readonly PatternPartView[]): TransportModule {
   return {
     id: MODULE_ID,
     pluginId: BASS_MONO_MANIFEST.pluginId,

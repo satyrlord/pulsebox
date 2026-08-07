@@ -126,6 +126,10 @@ export function createPatternId(factory: IdFactory): PatternId {
   return createGeneratedUuidId(factory) as string as PatternId;
 }
 
+export function createNoteEventId(factory: IdFactory): NoteEventId {
+  return createGeneratedUuidId(factory) as string as NoteEventId;
+}
+
 export function createEffectInstanceId(factory: IdFactory): EffectInstanceId {
   return createGeneratedUuidId(factory) as string as EffectInstanceId;
 }

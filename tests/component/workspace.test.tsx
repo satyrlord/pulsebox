@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { DRUMLINE_SIX_MANIFEST } from "../../src/engine/public";
 import { DEFAULT_MASTER_LEVEL } from "../../src/state/public";
 import { EditorWorkspace } from "../../src/ui/react/shell/EditorWorkspace";
 import { EffectsBank } from "../../src/ui/react/shell/EffectsBank";
@@ -33,9 +34,7 @@ describe("EditorWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear the Pattern" }));
 
     expect(harness.domain.getState().project.activePatternIndex).toBe(0);
-    expect(
-      harness.domain.getState().project.modules[moduleId]?.parts[0]?.every((step) => !step.active),
-    ).toBe(true);
+    expect(harness.domain.getState().project.modules[moduleId]?.parts[0]?.events).toHaveLength(0);
     expect(harness.store.getState().undoNotice?.message).toContain("Undo is available");
   });
 
@@ -48,9 +47,13 @@ describe("EditorWorkspace", () => {
     expect(
       within(roll as HTMLElement).getByRole("combobox", { name: "Piano Roll module" }),
     ).toHaveValue(firstModuleId(harness));
-    expect(within(roll as HTMLElement).getByRole("img")).toHaveAccessibleName(
-      "Active steps: 1, 5, 9, 13.",
-    );
+    const eventGroup = within(roll as HTMLElement).getByRole("group", {
+      name: /events in Verse/,
+    });
+    expect(within(eventGroup).getAllByRole("button")).toHaveLength(3);
+    expect(
+      within(eventGroup).getByRole("button", { name: /^C2 note, step 1,/ }),
+    ).toBeVisible();
   });
 
   it("renders a chromatic keybed that auditions the exact held pitch", async () => {
@@ -61,12 +64,115 @@ describe("EditorWorkspace", () => {
     const keys = within(keybed).getAllByRole("button");
     const c4 = within(keybed).getByRole("button", { name: "C4 piano key audition" });
 
-    expect(keys).toHaveLength(13);
+    expect(keys).toHaveLength(25);
     fireEvent.pointerDown(c4, { button: 0, pointerId: 9 });
     await waitFor(() => expect(harness.audio.startAudition).toHaveBeenCalledWith(moduleId, 60));
     fireEvent.pointerUp(c4, { button: 0, pointerId: 9 });
     expect(harness.audio.stopAudition).toHaveBeenCalledWith(moduleId);
     expect(harness.domain.getState().history.canUndo).toBe(false);
+  });
+
+  it("moves a selected note by one step with the keyboard", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const moduleId = firstModuleId(harness);
+    const eventButton = screen.getByRole("button", { name: /^C2 note, step 1,/ });
+    const eventId = harness.domain.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id;
+
+    expect(eventId).toBeDefined();
+    fireEvent.keyDown(eventButton, { key: "ArrowRight" });
+
+    expect(
+      harness.domain.getState().project.modules[moduleId]?.parts[1]?.events.find(
+        (event) => event.id === eventId,
+      )?.positionTicks,
+    ).toBe(240);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+  });
+
+  it("shows Velocity as the only available Piano Roll parameter", () => {
+    renderWithHarness(<EditorWorkspace />);
+    const selector = screen.getByRole("combobox", { name: "Piano Roll parameter" });
+
+    expect(within(selector).getAllByRole("option")).toHaveLength(1);
+    expect(
+      within(selector).getByRole<HTMLOptionElement>("option", { name: "Velocity" }).selected,
+    ).toBe(true);
+    expect(screen.getByRole("group", { name: "Velocity lane" })).toBeVisible();
+  });
+
+  it("coalesces one drum paint drag into one Undo entry", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const emptySlot = harness.domain.getState().project.rackSlots.find(
+      (slot) => slot.moduleId === undefined,
+    );
+    if (emptySlot === undefined) throw new Error("The test project has no empty rack slot.");
+    act(() => {
+      harness.store.getState().addModule(emptySlot.id, DRUMLINE_SIX_MANIFEST.pluginId);
+    });
+    const drumModuleId = harness.domain.getState().project.rackSlots.find(
+      (slot) => slot.id === emptySlot.id,
+    )?.moduleId;
+    if (drumModuleId === undefined) throw new Error("The drum module was not added.");
+    act(() => harness.store.getState().selectModule(drumModuleId));
+    const part = harness.domain.getState().project.modules[drumModuleId]?.parts[1];
+    const baseline = part?.events.length ?? 0;
+    const grid = screen.getByRole("group", { name: /Tin Soldier events in Verse/ });
+    Object.assign(grid, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    });
+    vi.spyOn(grid, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 1600,
+      bottom: 144,
+      width: 1600,
+      height: 144,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(grid, { button: 0, pointerId: 37, clientX: 150, clientY: 84 });
+    fireEvent.pointerMove(grid, { pointerId: 37, clientX: 250, clientY: 84 });
+    fireEvent.pointerMove(grid, { pointerId: 37, clientX: 350, clientY: 84 });
+    fireEvent.pointerUp(grid, { pointerId: 37, clientX: 350, clientY: 84 });
+
+    expect(harness.domain.getState().project.modules[drumModuleId]?.parts[1]?.events).toHaveLength(
+      baseline + 3,
+    );
+    act(() => harness.store.getState().undo());
+    expect(harness.domain.getState().project.modules[drumModuleId]?.parts[1]?.events).toHaveLength(
+      baseline,
+    );
+  });
+
+  it("keeps same-step velocity controls separate and keyboard reachable", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const moduleId = firstModuleId(harness);
+
+    act(() => {
+      harness.store.getState().editPatternEvents(moduleId, 1, {
+        type: "create",
+        event: {
+          type: "note",
+          positionTicks: 0,
+          durationTicks: 240,
+          data: { note: 38, velocity: 0.65, accent: false, slide: false },
+        },
+      });
+    });
+
+    const lane = screen.getByRole("group", { name: "Velocity lane" });
+    const firstStepControls = within(lane)
+      .getAllByRole("slider")
+      .filter((control) => control.getAttribute("aria-label")?.includes("step 1"));
+    expect(firstStepControls).toHaveLength(2);
+    expect(firstStepControls.every((control) => control.tabIndex >= 0)).toBe(true);
   });
 
   it("adds the selected Pattern to the compact Playlist", () => {

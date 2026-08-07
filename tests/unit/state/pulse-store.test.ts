@@ -21,12 +21,11 @@ import { PulseStore } from "../../../src/state/pulse-store";
 const seed = {
   pluginId: "bass-mono" as PluginId,
   parameters: { cutoff: 720, waveform: "saw", volume: 0.62 },
-  steps: Array.from({ length: 16 }, (_, index) => ({
-    active: index % 2 === 0,
-    note: 36,
-    velocity: 0.8,
-    accent: index % 4 === 0,
-    slide: false,
+  events: Array.from({ length: 8 }, (_, index) => ({
+    type: "note" as const,
+    positionTicks: index * 2 * 240,
+    durationTicks: 240,
+    data: { note: 36, velocity: 0.8, accent: index % 2 === 0, slide: false },
   })),
 };
 
@@ -83,12 +82,207 @@ function createDistortionVoiceInsert(
 }
 
 describe("PulseStore", () => {
+  it("edits note duration and velocity through one undoable event command", () => {
+    const ids = deterministicIds();
+    const deltas = vi.fn();
+    const store = createStore(ids, deltas);
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const eventId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
+
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: { type: "resize", eventId, durationTicks: 480 },
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.durationTicks).toBe(480);
+    expect(deltas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: "pattern-events-set",
+        targetIds: [moduleId],
+        payload: { moduleId, patternIndex: 1 },
+      }),
+    );
+
+    store.undo();
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.durationTicks).toBe(240);
+    store.redo();
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.durationTicks).toBe(480);
+
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: { type: "resize", eventId, positionTicks: 240, durationTicks: 240 },
+        }),
+      ),
+    ).toMatchObject({ status: "accepted", changed: true });
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]).toMatchObject({
+      positionTicks: 240,
+      durationTicks: 240,
+    });
+
+    store.undo();
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]).toMatchObject({
+      positionTicks: 0,
+      durationTicks: 480,
+    });
+    store.redo();
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]).toMatchObject({
+      positionTicks: 240,
+      durationTicks: 240,
+    });
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: { type: "resize", eventId, positionTicks: 240, durationTicks: 480 },
+        }),
+      ),
+    ).toMatchObject({
+      status: "rejected",
+      error: { message: "Monophonic notes cannot overlap." },
+    });
+
+    store.dispatch(
+      store.createCommand("pattern-events-edit", {
+        moduleId,
+        patternIndex: 1,
+        edit: { type: "velocity", eventIds: [eventId], velocity: 0.35 },
+      }),
+    );
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.data.velocity).toBe(0.35);
+  });
+
+  it("rejects overlapping monophonic notes", () => {
+    const ids = deterministicIds();
+    const store = createStore(ids);
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const eventId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
+
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: { type: "move", eventIds: [eventId], deltaTicks: 480, deltaNote: 0 },
+        }),
+      ),
+    ).toMatchObject({ status: "rejected", error: { message: "Monophonic notes cannot overlap." } });
+  });
+
+  it("allows simultaneous drum voices and rejects a duplicate voice trigger", () => {
+    const ids = deterministicIds();
+    const triggerSeed = {
+      pluginId: "drum-analog-small" as PluginId,
+      parameters: { tone: 0.45, drive: 0.2 },
+      events: [],
+      voiceIds: DRUM_VOICE_IDS,
+    };
+    const store = new PulseStore(
+      createDefaultState(ids, triggerSeed),
+      ids,
+      triggerSeed,
+      () => undefined,
+      validateParameter,
+    );
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const create = (note: number) =>
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: {
+            type: "create",
+            event: {
+              type: "trigger",
+              positionTicks: 0,
+              data: { note, velocity: 0.8, accent: false, slide: false },
+            },
+          },
+        }),
+      );
+
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: {
+            type: "create",
+            event: {
+              type: "note",
+              positionTicks: 0,
+              durationTicks: 240,
+              data: { note: 36, velocity: 0.8, accent: false, slide: false },
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: "rejected",
+      error: { message: "The event type does not match this module." },
+    });
+    expect(create(36)).toMatchObject({ status: "accepted", changed: true });
+    expect(create(38)).toMatchObject({ status: "accepted", changed: true });
+    expect(create(36)).toMatchObject({
+      status: "rejected",
+      error: { message: "A drum voice already has a trigger at this step." },
+    });
+    expect(store.getState().project.modules[moduleId]?.parts[1]?.events).toHaveLength(2);
+  });
+
+  it("duplicates on the next grid step and filters deleted event selections", () => {
+    const ids = deterministicIds();
+    const store = createStore(ids);
+    const moduleId = required(store.getState().ui.selectedModuleId);
+    const firstId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
+    const secondId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[1]?.id);
+
+    store.dispatch(
+      store.createCommand("pattern-events-edit", {
+        moduleId,
+        patternIndex: 1,
+        edit: { type: "duplicate", eventIds: [firstId] },
+      }),
+    );
+    const duplicate = store.getState().project.modules[moduleId]?.parts[1]?.events.find(
+      (event) => event.positionTicks === 240,
+    );
+    expect(duplicate?.id).not.toBe(firstId);
+
+    store.dispatch(
+      store.createCommand("piano-roll-selection-set", {
+        moduleId,
+        patternIndex: 1,
+        eventIds: [firstId, secondId],
+      }),
+    );
+    store.dispatch(
+      store.createCommand("pattern-events-edit", {
+        moduleId,
+        patternIndex: 1,
+        edit: { type: "delete", eventIds: [firstId] },
+      }),
+    );
+    expect(store.getState().ui.pianoRollSelection?.eventIds).toEqual([secondId]);
+  });
+
   it("adds the selected registered plugin and duplicates its complete state", () => {
     const ids = deterministicIds();
     const drumSeed = {
       pluginId: "drum-analog-small" as PluginId,
       parameters: { tone: 0.45, drive: 0.2 },
-      steps: seed.steps.map((step, index) => ({ ...step, note: 36 + (index % 6) })),
+      events: seed.events.map((event, index) => ({
+        type: "trigger" as const,
+        positionTicks: event.positionTicks,
+        data: { ...event.data, note: 36 + (index % 6), slide: false },
+      })),
       voiceIds: DRUM_VOICE_IDS,
     };
     const seeds = new Map<PluginId, typeof seed | typeof drumSeed>([
@@ -125,7 +319,12 @@ describe("PulseStore", () => {
     expect(duplicateId).not.toBe(drumId);
     expect(duplicate.pluginId).toBe(drumSeed.pluginId);
     expect(duplicate.parameters).toEqual(drum.parameters);
-    expect(duplicate.parts).toEqual(drum.parts);
+    expect(duplicate.parts.map((part) => part.events.length)).toEqual(
+      drum.parts.map((part) => part.events.length),
+    );
+    expect(duplicate.parts.flatMap((part) => part.events).map((event) => event.id)).not.toEqual(
+      drum.parts.flatMap((part) => part.events).map((event) => event.id),
+    );
   });
 
   it("exchanges validated in-memory projects and owns no serialization entry point", () => {
@@ -154,7 +353,11 @@ describe("PulseStore", () => {
     const drumSeed = {
       pluginId: "drum-analog-small" as PluginId,
       parameters: { tone: 0.45, drive: 0.2 },
-      steps: seed.steps,
+      events: seed.events.map((event) => ({
+        type: "trigger" as const,
+        positionTicks: event.positionTicks,
+        data: { ...event.data, slide: false },
+      })),
       voiceIds: DRUM_VOICE_IDS,
     };
     const deltas = vi.fn();
@@ -249,7 +452,11 @@ describe("PulseStore", () => {
     const oneVoiceDrumSeed = {
       pluginId: "drum-one-voice" as PluginId,
       parameters: {},
-      steps: seed.steps,
+      events: seed.events.map((event) => ({
+        type: "trigger" as const,
+        positionTicks: event.positionTicks,
+        data: { ...event.data, slide: false },
+      })),
       voiceIds: [CLAP],
     };
     const store = new PulseStore(
@@ -434,10 +641,17 @@ describe("PulseStore", () => {
       validateParameter,
     );
     const moduleId = required(store.getState().ui.selectedModuleId);
+    const eventId = required(store.getState().project.modules[moduleId]?.parts[1]?.events[0]?.id);
     const snapshot = store.getState();
 
     expect(
-      store.dispatch(store.createCommand("pattern-step-toggle", { moduleId, step: 0 })),
+      store.dispatch(
+        store.createCommand("pattern-events-edit", {
+          moduleId,
+          patternIndex: 1,
+          edit: { type: "velocity", eventIds: [eventId], velocity: 0.9 },
+        }),
+      ),
     ).toMatchObject({
       status: "rejected",
       error: { field: "history" },
@@ -529,7 +743,11 @@ describe("PulseStore", () => {
     const drumSeed = {
       pluginId: "drum-analog-small" as PluginId,
       parameters: { tone: 0.45, drive: 0.2 },
-      steps: seed.steps,
+      events: seed.events.map((event) => ({
+        type: "trigger" as const,
+        positionTicks: event.positionTicks,
+        data: { ...event.data, slide: false },
+      })),
       voiceIds: DRUM_VOICE_IDS,
     };
     const seeds = new Map<PluginId, typeof seed | typeof drumSeed>([

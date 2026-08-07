@@ -7,7 +7,6 @@ import {
   commitPortableProjectImport,
   createDefaultState,
   createMemoryProjectRepository,
-  createSilentSteps,
   serializePortableProject,
   serializeProject,
   type ModuleSeed,
@@ -18,7 +17,7 @@ import {
 const SEED: ModuleSeed = {
   pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: BASS_MONO_DEFAULT_PARAMETERS,
-  steps: createSilentSteps(),
+  events: [],
 };
 
 const PARSE_OPTIONS = {

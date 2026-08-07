@@ -460,13 +460,16 @@ describe("Silver Serpent plugin", () => {
           pluginId: BASS_MONO_MANIFEST.pluginId,
           parameters: BASS_MONO_DEFAULT_PARAMETERS,
           parts: [
-            Array.from({ length: 16 }, () => ({
-              active: true,
-              note: 36,
-              velocity: 0.8,
-              accent: false,
-              slide: false,
-            })),
+            {
+              length: 16,
+              events: Array.from({ length: 16 }, (_, step) => ({
+                id: `event-${step}`,
+                type: "note" as const,
+                positionTicks: step * 240,
+                durationTicks: 240,
+                data: { note: 36, velocity: 0.8, accent: false, slide: false },
+              })),
+            },
           ],
           mix: { level: 0.8, pan: 0, muted: false, solo: false },
         },

@@ -557,7 +557,7 @@
 
 .inspectorActions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
 }
 
@@ -578,7 +578,7 @@
   min-block-size: 38px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding-inline: 8px;
   border-block-end: 1px solid var(--edge-hairline);
   box-shadow: 0 1px 0 var(--edge-highlight);
@@ -628,13 +628,8 @@
   box-shadow: var(--sink-1);
 }
 
-.variationButton {
-  flex: none;
-  min-block-size: 26px;
-  padding-inline: 8px;
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.parameterSelector select {
+  min-inline-size: 88px;
 }
 
 .moduleSelector {
@@ -642,7 +637,9 @@
 }
 
 .rollContext {
-  max-inline-size: 24ch;
+  flex: 0 1 13ch;
+  min-inline-size: 5ch;
+  max-inline-size: 13ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -663,14 +660,34 @@
   min-block-size: 0;
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-rows: 24px auto;
   align-items: start;
   overflow-y: auto;
   background: var(--surface-well);
 }
 
+.timelineLabel {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  min-block-size: 24px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: var(--surface-raised);
+  border-block-end: 1px solid var(--edge-hairline);
+  border-inline-end: 1px solid var(--edge-hairline);
+}
+
 /* The keybed and grid use the same 24px chromatic rows. This makes each key a
    valid target and keeps its sounding pitch aligned with the note row. */
 .pianoKeybed {
+  grid-column: 1;
+  grid-row: 2;
   block-size: var(--editor-content-height);
   display: grid;
   grid-template-rows: repeat(var(--editor-row-count), 24px);
@@ -764,24 +781,24 @@
 
 /* The grid is black glass behind the plate, so the notes read as lit. */
 .noteGrid {
+  grid-column: 2;
+  grid-row: 2;
   position: relative;
   block-size: var(--editor-content-height);
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--editor-row-count), 24px);
   overflow: hidden;
   background: var(--surface-well);
   box-shadow: var(--sink-2);
 }
 
-.noteLayers {
-  position: absolute;
-  inset: 0;
-}
-
-.pitchRows,
-.stepNotes {
+.pitchRows {
   position: absolute;
   inset: 0;
   display: grid;
   grid-template-rows: repeat(var(--editor-row-count), 24px);
+  pointer-events: none;
 }
 
 .pitchRows > span {
@@ -792,26 +809,20 @@
   background: #0000002e;
 }
 
-.stepNotes {
-  inset-inline: 2px;
-  grid-template-columns: repeat(16, minmax(0, 1fr));
-  grid-template-rows: none;
-  gap: 1px;
-  pointer-events: none;
-}
-
-.stepNotes > i {
-  display: none;
-  block-size: 16px;
-  margin-block-start: 4px;
-  border: 1px solid #ffffff0f;
-  border-radius: 3px;
-}
-
-.stepNotes > i[data-active="true"] {
+.pianoRollEvent {
   --k: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
 
-  display: block;
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  min-inline-size: 0;
+  inline-size: calc(100% - 4px + var(--event-resize-x, 0px));
+  min-block-size: 24px;
+  block-size: 24px;
+  margin-inline: 2px;
+  padding: 0 5px;
+  overflow: hidden;
+  color: var(--pulse-color-on-accent, #07110b);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--k) 75%, #ffffff) 0%,
@@ -823,6 +834,65 @@
     inset 0 1px 0 #ffffff52,
     0 0 4px color-mix(in srgb, var(--k) 34%, transparent),
     0 1px 2px var(--edge-shadow);
+  transform: translate(var(--event-drag-x, 0), var(--event-drag-y, 0));
+  cursor: grab;
+  touch-action: none;
+}
+
+.pianoRollEvent[data-event-type="trigger"] {
+  min-inline-size: 24px;
+  padding-inline: 3px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 700;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pianoRollEvent[data-selected="true"] {
+  z-index: 3;
+  outline: 2px solid var(--pulse-color-text-primary, #f3f5f6);
+  outline-offset: 1px;
+}
+
+.pianoRollEvent:active {
+  cursor: grabbing;
+}
+
+.pianoRollEvent:focus-visible {
+  z-index: 5;
+}
+
+.pianoRollEvent > i[data-edge] {
+  position: absolute;
+  inset-block: 0;
+  inline-size: 10px;
+  background: color-mix(in srgb, var(--k) 16%, transparent);
+  cursor: ew-resize;
+}
+
+.pianoRollEvent > i[data-edge="start"] {
+  inset-inline-start: 0;
+  border-inline-end: 2px solid color-mix(in srgb, var(--k) 55%, #000000);
+}
+
+.pianoRollEvent > i[data-edge="end"] {
+  inset-inline-end: 0;
+  border-inline-start: 2px solid color-mix(in srgb, var(--k) 55%, #000000);
+}
+
+.pianoRollEvent:focus-visible > i[data-edge] {
+  background: color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 28%, transparent);
+}
+
+.gridCursor {
+  z-index: 1;
+  margin: 1px;
+  border: 1px dashed var(--pulse-color-text-secondary, #bac2c8);
+  border-radius: var(--pulse-radius-control);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* The playhead element spans the grid, so a percentage translateX moves the
@@ -850,22 +920,33 @@
 /* Transparent seek targets, one per step. Keyboard and pointer both position
    the playhead through the same buttons. */
 .seekSteps {
-  position: absolute;
-  inset: 0;
-  inset-inline: 2px;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 4;
+  grid-column: 2;
+  grid-row: 1;
+  min-block-size: 24px;
   display: grid;
   grid-template-columns: repeat(16, minmax(0, 1fr));
-  gap: 1px;
+  background: var(--surface-raised);
+  border-block-end: 1px solid var(--edge-hairline);
 }
 
 .seekSteps > button {
   min-inline-size: 0;
+  min-block-size: 24px;
   padding: 0;
   background: none;
-  border: none;
+  border: 0;
+  border-inline-end: 1px solid var(--edge-hairline);
   box-shadow: none;
   border-radius: 3px;
   cursor: pointer;
+}
+
+.seekSteps > button span {
+  font: var(--pulse-type-10, 10px) / 1 var(--pulse-font-mono, ui-monospace), monospace;
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
 .seekSteps > button:disabled {
@@ -910,19 +991,36 @@
   box-shadow: var(--sink-1);
 }
 
-/* Slim stems show one value per step instead of a filled region. */
-.velocityLane i {
-  --k: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+.velocityControl {
+  align-self: stretch;
+  min-inline-size: 24px;
+  min-block-size: 40px;
+  inline-size: 24px;
+  block-size: 40px;
+  margin: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  accent-color: var(--module-accent, var(--pulse-color-accent, #7ed9a3));
+}
 
-  inline-size: 4px;
-  min-block-size: 2px;
-  border-radius: 1px 1px 0 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--k) 70%, #ffffff),
-    color-mix(in srgb, var(--k) 88%, #000000)
-  );
-  box-shadow: 0 0 2px color-mix(in srgb, var(--k) 32%, transparent);
+.velocityControl[data-selected="true"] {
+  outline: 2px solid var(--pulse-color-text-primary, #f3f5f6);
+  outline-offset: 1px;
+}
+
+.velocityStep {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.velocityStep > .velocityControl {
+  flex: 0 0 24px;
 }
 
 .playlist ol {
@@ -1089,6 +1187,7 @@
   }
 
   .rollContext {
-    display: none;
+    flex-basis: 9ch;
+    max-inline-size: 9ch;
   }
 }

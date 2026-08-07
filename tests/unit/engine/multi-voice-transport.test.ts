@@ -4,12 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import { DRUMLINE_SIX_MANIFEST } from "../../../src/engine/modules/drumline-six/manifest";
-import type { ScheduledVoiceEvent } from "../../../src/engine/transport/scheduled-event";
+import type {
+  PatternPartView,
+  ScheduledVoiceEvent,
+} from "../../../src/engine/transport/scheduled-event";
 import {
   TransportRuntime,
   type TransportModule,
 } from "../../../src/engine/transport/transport-runtime";
-import type { PatternStepView } from "../../../src/engine/transport/scheduled-event";
 import type { VoiceAdapterPort } from "../../../src/engine/transport/voice-adapter";
 import { TEST_UUID } from "../contracts/fixtures";
 
@@ -20,14 +22,19 @@ function moduleId(suffix: number): ModuleInstanceId {
   return `10000000-0000-4000-8000-00000000000${suffix.toString()}` as ModuleInstanceId;
 }
 
-function steps(note: number, active: (index: number) => boolean): PatternStepView[] {
-  return Array.from({ length: 16 }, (_, index) => ({
-    active: active(index),
-    note,
-    velocity: 0.8,
-    accent: false,
-    slide: false,
-  }));
+function steps(note: number, active: (index: number) => boolean): PatternPartView {
+  return {
+    length: 16,
+    events: Array.from({ length: 16 }, (_, index) => index)
+      .filter(active)
+      .map((index) => ({
+        id: `event-${note}-${index}`,
+        type: "note" as const,
+        positionTicks: index * 240,
+        durationTicks: 240,
+        data: { note, velocity: 0.8, accent: false, slide: false },
+      })),
+  };
 }
 
 interface RecordingAdapter extends VoiceAdapterPort {
@@ -191,7 +198,7 @@ describe("transport with several voices", () => {
     runtime.dispose();
   });
 
-  it("replaces one module's queued horizon after a live step edit", async () => {
+  it("replaces one module's queued horizon after a live event edit", async () => {
     const context = stubContext();
     const adapter = recordingAdapter();
     const clearScheduledEvents = vi.spyOn(adapter, "clearScheduledEvents");
@@ -199,25 +206,24 @@ describe("transport with several voices", () => {
       createContext: () => context as unknown as AudioContext,
       adapterFactoryFor: () => () => adapter,
     });
-    await runtime.replaceFromCurrentState(
-      [
-        {
-          id: moduleId(1),
-          pluginId: BASS_MONO_MANIFEST.pluginId,
-          parameters: {},
-          parts: [steps(36, () => false)],
-          mix: DEFAULT_MIX,
-        },
-      ],
-      REVISION,
-    );
+    const silentModule: TransportModule = {
+      id: moduleId(1),
+      pluginId: BASS_MONO_MANIFEST.pluginId,
+      parameters: {},
+      parts: [steps(36, () => false)],
+      mix: DEFAULT_MIX,
+    };
+    await runtime.replaceFromCurrentState([silentModule], REVISION);
     await runtime.play(120);
-    await runtime.project({
-      kind: "step-set",
-      projectRevision: { epoch: TEST_UUID, counter: 1 } as StateRevision,
-      targetIds: [moduleId(1)],
-      payload: { moduleId: moduleId(1), patternIndex: 0, step: 1, active: true },
-    });
+    await runtime.project(
+      {
+        kind: "pattern-events-set",
+        projectRevision: { epoch: TEST_UUID, counter: 1 } as StateRevision,
+        targetIds: [moduleId(1)],
+        payload: { moduleId: moduleId(1), patternIndex: 0 },
+      },
+      { ...silentModule, parts: [steps(36, (index) => index === 1)] },
+    );
 
     expect(clearScheduledEvents).toHaveBeenCalledOnce();
     expect(

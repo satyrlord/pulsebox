@@ -27,7 +27,7 @@ in the implementation or repair branch, do not stop.
 2. Read the owning specification and each listed dependency in full.
    Completion criterion: You know every applicable requirement and acceptance criterion.
 3. If the current implementation and tests exist, inspect them.
-   Completion criterion: You know the present behavior and test seams.
+   Completion criterion: You know the current behavior and test seams.
 4. Verify unstable browser or Web Audio facts with current primary sources.
    Completion criterion: Each material API claim has current evidence.
 

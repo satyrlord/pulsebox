@@ -22,7 +22,6 @@ import {
   commitPortableProjectImport,
   createProjectFromTemplate,
   createParameterValidator,
-  createSilentSteps,
   DEFAULT_PROJECT_NAME,
   documentToState,
   nextProjectRevision,
@@ -74,7 +73,7 @@ const registry = createPluginRegistry<RuntimePlugin>([
         moduleSeed: {
           pluginId: manifest.pluginId,
           parameters: toParameterValues(defaultParameters),
-          steps: createSilentSteps(),
+          events: [],
           ...(voiceIds.length > 0 ? { voiceIds } : {}),
         },
         auditionNoteForVoice: (voiceId: string | undefined) => auditionNoteFor(manifest, voiceId),

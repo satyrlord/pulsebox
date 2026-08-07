@@ -17,13 +17,19 @@ import {
 } from "../../contracts/parameters";
 import { isPlainRecord, type ValidationIssue } from "../../contracts/validation";
 import {
-  createSilentSteps,
+  createEmptyPatternPart,
   DEFAULT_MASTER_LEVEL,
   DEFAULT_MODULE_LEVEL,
   PATTERN_SLOT_COUNT,
   PATTERN_STEP_COUNT,
 } from "../default-state";
-import type { PatternStep, PulseState, RackModuleState } from "../model";
+import {
+  PATTERN_TICKS_PER_STEP,
+  type PatternEvent,
+  type PatternPartState,
+  type PulseState,
+  type RackModuleState,
+} from "../model";
 
 /**
  * The on-disk project document, per `docs/PROJECT-FORMAT.md` section 5.
@@ -40,7 +46,7 @@ export const DOCUMENT_LIMITS = {
   /** PROJECT-FORMAT.md section 4.3: the project manifest is at most 8 MiB. */
   maximumBytes: 8 * 1024 * 1024,
   maximumRackSlots: RACK_SLOT_IDS.length,
-  maximumPatternSteps: 512,
+  maximumPatternSteps: 64,
   maximumEventRecords: 1_000_000,
   /** Mirrors the editor's own song ceiling, so import cannot exceed it. */
   maximumSongEntries: 128,
@@ -88,7 +94,7 @@ export interface PatternDocument {
   readonly humanize?: number;
   /** Stored Pattern seed, an unsigned 32-bit integer. Absent in old documents. */
   readonly seed?: number;
-  readonly steps: readonly PatternStep[];
+  readonly events: readonly PatternEvent[];
 }
 
 export interface RackSlotDocument {
@@ -237,19 +243,19 @@ export function serializeProject(
     // One record per module per Pattern slot. The bank's name and length live on
     // the project, so every record for an index repeats them.
     patterns: modules.flatMap((module) =>
-      module.parts.map((steps, patternIndex) => {
+      module.parts.map((part, patternIndex) => {
         const slot = project.patterns[patternIndex];
         return {
           id: `${slot?.id ?? String(patternIndex)}:${module.id}`,
           moduleId: module.id,
           patternIndex,
           name: slot?.name ?? `Pattern ${String(patternIndex + 1)}`,
-          length: slot?.length ?? steps.length,
+          length: part.length,
           // State keeps Humanize as a 0-to-1 ratio; the format stores percent,
           // the unit the specification and the interface both speak in.
           humanize: Math.round((slot?.humanize ?? 0) * 100),
           seed: slot?.seed ?? 0,
-          steps: steps.map((step) => ({ ...step })),
+          events: part.events.map((event) => ({ ...event, data: { ...event.data } })),
         };
       }),
     ),
@@ -292,10 +298,9 @@ export function serializeProjectToJson(
   return JSON.stringify(serializeProject(state, options));
 }
 
-function isStep(value: unknown): value is PatternStep {
+function isPatternEventData(value: unknown): value is PatternEvent["data"] {
   if (!isPlainRecord(value)) return false;
   return (
-    typeof value.active === "boolean" &&
     typeof value.note === "number" &&
     Number.isFinite(value.note) &&
     typeof value.velocity === "number" &&
@@ -303,6 +308,21 @@ function isStep(value: unknown): value is PatternStep {
     typeof value.accent === "boolean" &&
     typeof value.slide === "boolean"
   );
+}
+
+function isPatternEvent(value: unknown): value is PatternEvent {
+  if (!isPlainRecord(value) || !isPatternEventData(value.data)) return false;
+  if (!(
+    isCanonicalUuid(value.id) &&
+    (value.type === "note" || value.type === "trigger") &&
+    typeof value.positionTicks === "number" &&
+    Number.isSafeInteger(value.positionTicks)
+  )) {
+    return false;
+  }
+  return value.type === "note"
+    ? typeof value.durationTicks === "number" && Number.isSafeInteger(value.durationTicks)
+    : value.durationTicks === undefined;
 }
 
 export interface ParseOptions {
@@ -371,9 +391,10 @@ const PATTERN_KEYS = new Set([
   "patternIndex",
   "humanize",
   "seed",
-  "steps",
+  "events",
 ]);
-const STEP_KEYS = new Set(["active", "note", "velocity", "accent", "slide"]);
+const EVENT_KEYS = new Set(["id", "type", "positionTicks", "durationTicks", "data"]);
+const EVENT_DATA_KEYS = new Set(["note", "velocity", "accent", "slide"]);
 const SONG_KEYS = new Set(["patternIndex", "repeats"]);
 const EFFECTS_KEYS = new Set(["instances", "voiceInserts"]);
 const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state"]);
@@ -419,6 +440,51 @@ function finiteNumber(value: unknown, minimum: number, maximum: number): value i
     value >= minimum &&
     value <= maximum
   );
+}
+
+function validatePatternEventConflicts(
+  events: readonly PatternEvent[],
+  patternPath: string,
+  collector: IssueCollector,
+): void {
+  const types = new Set(events.map((event) => event.type));
+  if (types.size > 1) {
+    collector.add(`${patternPath}.events`, "A Pattern part cannot mix notes and triggers.");
+    return;
+  }
+  const sorted = [...events].sort(
+    (left, right) =>
+      left.positionTicks - right.positionTicks ||
+      left.data.note - right.data.note ||
+      left.id.localeCompare(right.id),
+  );
+  if (sorted[0]?.type === "note") {
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1];
+      const current = sorted[index];
+      if (
+        previous !== undefined &&
+        current !== undefined &&
+        previous.positionTicks + (previous.durationTicks ?? 0) > current.positionTicks
+      ) {
+        collector.add(`${patternPath}.events`, "Monophonic notes cannot overlap.");
+        return;
+      }
+    }
+    return;
+  }
+  const occupied = new Set<string>();
+  for (const event of sorted) {
+    const key = `${String(event.positionTicks)}:${String(event.data.note)}`;
+    if (occupied.has(key)) {
+      collector.add(
+        `${patternPath}.events`,
+        "A drum voice cannot have two triggers at the same step.",
+      );
+      return;
+    }
+    occupied.add(key);
+  }
 }
 
 function hasForbiddenStringCodePoint(value: string): boolean {
@@ -942,7 +1008,8 @@ export function parseProjectDocument(
   }
 
   const patternKeys = new Set<string>();
-  let stepRecords = 0;
+  const eventIds = new Set<string>();
+  let eventRecords = 0;
   if (!Array.isArray(value.patterns)) {
     collector.add("patterns", "Patterns must be an array.");
   } else {
@@ -989,34 +1056,65 @@ export function parseProjectDocument(
           Number(pattern.seed) > 0xffff_ffff)
       )
         collector.add(`${path}.seed`, "A Pattern seed must be an unsigned 32-bit integer.");
-      if (!Array.isArray(pattern.steps)) {
-        collector.add(`${path}.steps`, "A pattern needs a step list.");
+      if (!Array.isArray(pattern.events)) {
+        collector.add(`${path}.events`, "A Pattern part needs an event list.");
         continue;
       }
-      if (pattern.steps.length < 1 || pattern.steps.length > DOCUMENT_LIMITS.maximumPatternSteps)
-        collector.add(`${path}.steps`, "Pattern exceeds its step limit.");
-      stepRecords += pattern.steps.length;
-      for (const [stepIndex, step] of pattern.steps.entries()) {
-        if (stepIndex >= DOCUMENT_LIMITS.maximumPatternSteps) break;
-        const stepPath = `${path}.steps[${String(stepIndex)}]`;
-        if (!isPlainRecord(step)) {
-          collector.add(stepPath, "A step record is malformed.");
+      eventRecords += pattern.events.length;
+      const validEvents: PatternEvent[] = [];
+      for (const [eventIndex, event] of pattern.events.entries()) {
+        if (eventRecords > DOCUMENT_LIMITS.maximumEventRecords && eventIndex >= 100) break;
+        const eventPath = `${path}.events[${String(eventIndex)}]`;
+        if (!isPlainRecord(event)) {
+          collector.add(eventPath, "An event record is malformed.");
           continue;
         }
-        collector.exactKeys(step, STEP_KEYS, stepPath);
+        collector.exactKeys(event, EVENT_KEYS, eventPath);
+        if (isPlainRecord(event.data)) {
+          collector.exactKeys(event.data, EVENT_DATA_KEYS, `${eventPath}.data`);
+        }
         if (
-          !isStep(step) ||
-          !Number.isInteger(step.note) ||
-          step.note < 0 ||
-          step.note > 127 ||
-          step.velocity < 0 ||
-          step.velocity > 1
-        )
-          collector.add(stepPath, "A step record is malformed or outside its range.");
+          !isPatternEvent(event) ||
+          !Number.isInteger(event.data.note) ||
+          event.data.note < 0 ||
+          event.data.note > 127 ||
+          event.data.velocity < 0 ||
+          event.data.velocity > 1 ||
+          event.positionTicks < 0 ||
+          event.positionTicks % PATTERN_TICKS_PER_STEP !== 0 ||
+          event.positionTicks >= Number(pattern.length) * PATTERN_TICKS_PER_STEP ||
+          (event.type === "note" &&
+            (event.durationTicks <= 0 ||
+              event.durationTicks % PATTERN_TICKS_PER_STEP !== 0 ||
+              event.positionTicks + event.durationTicks >
+                Number(pattern.length) * PATTERN_TICKS_PER_STEP))
+        ) {
+          collector.add(eventPath, "An event record is malformed or outside its range.");
+          continue;
+        }
+        if (eventIds.has(event.id)) {
+          collector.add(`${eventPath}.id`, "Event IDs must be unique in the project.");
+          continue;
+        }
+        eventIds.add(event.id);
+        validEvents.push(event);
       }
+      const pluginId =
+        typeof pattern.moduleId === "string" ? occupiedModules.get(pattern.moduleId) : undefined;
+      if (pluginId !== undefined) {
+        const expectedType =
+          (options.voiceIdsByPluginId?.[pluginId]?.length ?? 0) > 0 ? "trigger" : "note";
+        if (validEvents.some((event) => event.type !== expectedType)) {
+          collector.add(
+            `${path}.events`,
+            `The module accepts ${expectedType} events, not the stored event type.`,
+          );
+        }
+      }
+      validatePatternEventConflicts(validEvents, path, collector);
     }
   }
-  if (stepRecords > DOCUMENT_LIMITS.maximumEventRecords)
+  if (eventRecords > DOCUMENT_LIMITS.maximumEventRecords)
     collector.add("patterns", "The document exceeds its total event-record limit.");
   const effects = parseEffects(value.effects, collector, occupiedModules, requirements, options);
   const referencedPlugins = new Set([...occupiedModules.values(), ...effects.referencedPluginIds]);
@@ -1275,14 +1373,21 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
 
   // A record without `patternIndex` comes from a format-1 document, where each
   // module had exactly one pattern. Those land in slot 0 and the rest go silent.
-  const partsByModule = new Map<string, (readonly PatternStep[])[]>();
+  const partsByModule = new Map<string, PatternPartState[]>();
   for (const record of document.patterns) {
     const index = record.patternIndex ?? 0;
     if (!Number.isInteger(index) || index < 0 || index >= slotCount) continue;
     const parts =
       partsByModule.get(record.moduleId) ??
-      Array.from<readonly PatternStep[]>({ length: slotCount });
-    parts[index] = Object.freeze(record.steps.map((step) => Object.freeze({ ...step })));
+      Array.from<PatternPartState>({ length: slotCount });
+    parts[index] = Object.freeze({
+      length: record.length,
+      events: Object.freeze(
+        record.events.map((event) =>
+          Object.freeze({ ...event, data: Object.freeze({ ...event.data }) }),
+        ),
+      ),
+    });
     partsByModule.set(record.moduleId, parts);
   }
 
@@ -1295,7 +1400,7 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
       pluginId: slot.pluginId,
       parameters: Object.freeze({ ...slot.parameters }),
       parts: Object.freeze(
-        Array.from({ length: slotCount }, (_, index) => stored[index] ?? createSilentSteps()),
+        Array.from({ length: slotCount }, (_, index) => stored[index] ?? createEmptyPatternPart()),
       ),
       muted: slot.muted ?? false,
       solo: slot.solo ?? false,

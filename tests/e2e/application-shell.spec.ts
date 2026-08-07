@@ -258,7 +258,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     expect(separated(roll, playlist)).toBe(true);
 
     const keybed = page.getByRole("group", { name: "Piano keyboard" });
-    await expect(keybed.getByRole("button")).toHaveCount(13);
+    await expect(keybed.getByRole("button")).toHaveCount(25);
     const naturalKey = keybed.getByRole("button", { name: "C4 piano key audition" });
     const sharpKey = keybed.getByRole("button", { name: "A#3 piano key audition" });
     const naturalBox = await box(naturalKey);
@@ -483,6 +483,95 @@ test("holds and releases a Piano Roll pitch key with pointer and keyboard input"
   const drumVoices = page.getByRole("group", { name: "Drum voices" });
   await expect(drumVoices.getByRole("button")).toHaveCount(6);
   await expect(drumVoices.getByRole("button", { name: "Kick voice audition" })).toBeVisible();
+});
+
+test("edits Piano Roll notes with real pointer and keyboard gestures", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const scroll = page.locator('[data-component="piano-roll-scroll"]');
+  await scroll.evaluate((element) => {
+    element.scrollTop = 12 * 24;
+  });
+
+  const grid = page.locator('[data-component="piano-roll-grid"]');
+  const c3Key = page.getByRole("button", { name: "C3 piano key audition" });
+  const gridBounds = await box(grid);
+  const keyBounds = await box(c3Key);
+  const stepWidth = gridBounds.width / 16;
+  await page.mouse.click(
+    gridBounds.x + stepWidth * 3.5,
+    keyBounds.y + keyBounds.height / 2,
+  );
+
+  let created = page.getByRole("button", { name: /C3 note, step 4,/u });
+  await expect(created).toBeVisible();
+  const velocity = page.getByRole("slider", { name: /C3 note, step 4,.*velocity$/u });
+  await velocity.fill("60");
+  await velocity.blur();
+  created = page.getByRole("button", { name: /C3 note, step 4, 60 percent velocity/u });
+  await expect(created).toBeVisible();
+  await created.press("Delete");
+  await expect(created).toHaveCount(0);
+
+  const moving = page.getByRole("button", { name: /G2 note, step 3,/u });
+  const movingBounds = await box(moving);
+  await page.mouse.move(movingBounds.x + movingBounds.width / 2, movingBounds.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(
+    movingBounds.x + movingBounds.width / 2 + stepWidth,
+    movingBounds.y + 12,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  const moved = page.getByRole("button", { name: /G2 note, step 4,/u });
+  await expect(moved).toBeVisible();
+
+  const blocking = page.getByRole("button", { name: /C2 note, step 5,/u });
+  await blocking.press("Delete");
+  const movedBounds = await box(moved);
+  await page.mouse.move(movedBounds.x + movedBounds.width - 3, movedBounds.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(movedBounds.x + movedBounds.width - 3 + stepWidth, movedBounds.y + 12, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  const resized = page.getByRole("button", { name: /G2 note, step 4,.*2 step duration/u });
+  await expect(resized).toBeVisible();
+
+  const resizedBounds = await box(resized);
+  await page.mouse.move(resizedBounds.x + 3, resizedBounds.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(resizedBounds.x + 3 - stepWidth, resizedBounds.y + 12, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: /G2 note, step 3,.*3 step duration/u })).toBeVisible();
+});
+
+test("paints drum triggers with one pointer gesture and one Undo entry", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  await page.getByRole("combobox", { name: "Piano Roll module" }).selectOption({
+    label: "Tin Soldier",
+  });
+
+  const grid = page.locator('[data-component="piano-roll-grid"]');
+  const clap = page.getByRole("button", { name: "Clap voice audition" });
+  const eventButtons = grid.locator('[data-component="piano-roll-event"]');
+  const baseline = await eventButtons.count();
+  const gridBounds = await box(grid);
+  const clapBounds = await box(clap);
+  const stepWidth = gridBounds.width / 16;
+
+  await page.mouse.move(gridBounds.x + stepWidth * 1.5, clapBounds.y + clapBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(gridBounds.x + stepWidth * 3.5, clapBounds.y + clapBounds.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+
+  await expect(eventButtons).toHaveCount(baseline + 3);
+  await page.locator('[data-component="workspace-bar"]').getByRole("button", { name: "Undo" }).click();
+  await expect(eventButtons).toHaveCount(baseline);
+  await expect(
+    page.locator('[data-component="workspace-bar"]').getByRole("button", { name: "Undo" }),
+  ).toBeDisabled();
 });
 
 test("changes transport scope without stopping and toggles meter analysis without changing audio", async ({

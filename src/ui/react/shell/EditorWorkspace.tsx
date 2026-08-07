@@ -1,6 +1,11 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { type GestureId, type ModuleInstanceId } from "../../../contracts";
+import { type GestureId, type ModuleInstanceId, type NoteEventId } from "../../../contracts";
+import {
+  PATTERN_TICKS_PER_STEP,
+  type PatternEvent,
+  type PatternPartState,
+} from "../../../state/public";
 import { AuditionButton } from "../controls/AuditionButton";
 import { useContinuousGesture } from "../controls/use-gesture-id";
 import { WHEEL_IDLE_MILLISECONDS } from "../controls/use-range-gesture";
@@ -50,6 +55,7 @@ function PatternInspector() {
   const clearPattern = useAppStore((state) => state.clearPattern);
   const copyPattern = useAppStore((state) => state.copyPattern);
   const renamePattern = useAppStore((state) => state.renamePattern);
+  const newPatternVariation = useAppStore((state) => state.newPatternVariation);
   const pattern = patterns[activePatternIndex];
 
   return (
@@ -136,26 +142,36 @@ function PatternInspector() {
             />
           </svg>
         </button>
+        <button
+          type="button"
+          aria-label="New variation"
+          title="Store a new seed. The same seed always replays the same variation."
+          onClick={() => {
+            newPatternVariation(activePatternIndex);
+          }}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path
+              d="M2 4h2.2c2.8 0 3.6 8 6.5 8H14m-2-2 2 2-2 2M2 12h2.2c1.2 0 2-1.5 2.8-3.2M10 4h4m-2-2 2 2-2 2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </aside>
   );
 }
 
-const PIANO_PITCHES = [
-  { label: "C4", note: 60 },
-  { label: "B3", note: 59 },
-  { label: "A#3", note: 58 },
-  { label: "A3", note: 57 },
-  { label: "G#3", note: 56 },
-  { label: "G3", note: 55 },
-  { label: "F#3", note: 54 },
-  { label: "F3", note: 53 },
-  { label: "E3", note: 52 },
-  { label: "D#3", note: 51 },
-  { label: "D3", note: 50 },
-  { label: "C#3", note: 49 },
-  { label: "C3", note: 48 },
-] as const;
+const PITCH_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const PIANO_PITCHES = Array.from({ length: 25 }, (_, index) => {
+  const note = 60 - index;
+  const name = PITCH_NAMES[note % 12] ?? "C";
+  return { label: `${name}${String(Math.floor(note / 12) - 1)}`, note };
+});
 
 interface EditorRow {
   readonly label: string;
@@ -476,9 +492,79 @@ function SeekSteps() {
           onClick={() => {
             seek(index * 240);
           }}
-        />
+        >
+          <span aria-hidden="true">{index % 4 === 0 ? index + 1 : ""}</span>
+        </button>
       ))}
     </div>
+  );
+}
+
+const STEP_TICKS = PATTERN_TICKS_PER_STEP;
+const VISIBLE_STEPS = 16;
+
+interface EventDrag {
+  readonly eventId: NoteEventId;
+  readonly pointerId: number;
+  readonly originX: number;
+  readonly originY: number;
+  readonly originRow: number;
+  readonly originStep: number;
+  readonly durationSteps: number;
+  readonly mode: "move" | "resize-start" | "resize-end";
+  readonly eventIds: readonly NoteEventId[];
+  deltaSteps: number;
+  deltaRows: number;
+  clientDeltaX: number;
+  clientDeltaY: number;
+}
+
+function eventStep(event: PatternEvent): number {
+  return Math.floor(event.positionTicks / STEP_TICKS);
+}
+
+function eventDurationSteps(event: PatternEvent): number {
+  return Math.max(1, Math.round((event.durationTicks ?? STEP_TICKS) / STEP_TICKS));
+}
+
+function VelocityControl(props: {
+  readonly event: PatternEvent;
+  readonly label: string;
+  readonly selected: boolean;
+  readonly onSelect: () => void;
+  readonly onCommit: (velocity: number) => void;
+}) {
+  const committed = Math.round(props.event.data.velocity * 100);
+  const [draft, setDraft] = useState(committed);
+  const [tracked, setTracked] = useState(committed);
+
+  if (tracked !== committed) {
+    setTracked(committed);
+    setDraft(committed);
+  }
+
+  const commit = () => {
+    if (draft !== committed) props.onCommit(draft / 100);
+  };
+
+  return (
+    <input
+      className={styles.velocityControl}
+      type="range"
+      min={1}
+      max={100}
+      step={1}
+      value={draft}
+      aria-label={`${props.label} velocity`}
+      aria-valuetext={`${String(draft)} percent`}
+      data-selected={props.selected}
+      onFocus={props.onSelect}
+      onPointerDown={props.onSelect}
+      onChange={(event) => setDraft(event.currentTarget.valueAsNumber)}
+      onPointerUp={commit}
+      onKeyUp={commit}
+      onBlur={commit}
+    />
   );
 }
 
@@ -494,9 +580,12 @@ function PianoRoll() {
   const previewSwing = useAppStore((state) => state.previewSwing);
   const setHumanize = useAppStore((state) => state.setHumanize);
   const previewHumanize = useAppStore((state) => state.previewHumanize);
-  const newPatternVariation = useAppStore((state) => state.newPatternVariation);
   const startAudition = useAppStore((state) => state.startAudition);
   const stopAudition = useAppStore((state) => state.stopAudition);
+  const pianoRollSelection = useAppStore((state) => state.project.ui.pianoRollSelection);
+  const selectPianoRollEvents = useAppStore((state) => state.selectPianoRollEvents);
+  const setPianoRollParameter = useAppStore((state) => state.setPianoRollParameter);
+  const editPatternEvents = useAppStore((state) => state.editPatternEvents);
   const humanize = patterns[activePatternIndex]?.humanize ?? 0;
   const module = selectedModuleId === undefined ? undefined : modules[selectedModuleId];
   const manifest = module === undefined ? undefined : manifestFor(module.pluginId);
@@ -513,13 +602,304 @@ function PianoRoll() {
           ...pitch,
           tone: pitch.label.includes("#") ? ("sharp" as const) : ("natural" as const),
         }));
-  const steps = module?.parts[activePatternIndex] ?? [];
-  const activeSteps = steps.flatMap((step, index) => (step.active ? [index + 1] : []));
+  const part: PatternPartState | undefined = module?.parts[activePatternIndex];
+  const events = part?.events ?? [];
+  const patternName = patterns[activePatternIndex]?.name ?? "Pattern";
+  const moduleName = manifest?.productName ?? "No module";
+  const [keyboardCell, setKeyboardCell] = useState({ step: 0, row: 0 });
+  const [dragPreview, setDragPreview] = useState<EventDrag | undefined>(undefined);
+  const drag = useRef<EventDrag | undefined>(undefined);
+  const painting = useRef<
+    {
+      readonly pointerId: number;
+      readonly visited: Set<string>;
+      readonly gestureId: GestureId;
+    } | undefined
+  >(undefined);
+  const paintGesture = useContinuousGesture();
+
+  const selectedEventIds =
+    pianoRollSelection !== undefined &&
+    pianoRollSelection.moduleId === selectedModuleId &&
+    pianoRollSelection.patternIndex === activePatternIndex
+      ? pianoRollSelection.eventIds
+      : [];
+
+  const visibleEvents = events.filter((event) => {
+    const step = eventStep(event);
+    return step >= 0 && step < VISIBLE_STEPS && editorRows.some((row) => row.note === event.data.note);
+  });
+
+  const labelFor = (event: PatternEvent) => {
+    const row = editorRows.find((one) => one.note === event.data.note);
+    const kind = event.type === "note" ? "note" : "trigger";
+    const duration = eventDurationSteps(event);
+    const durationText = event.type === "note" ? `, ${String(duration)} step duration` : "";
+    const selectedText = selectedEventIds.includes(event.id) ? ", selected" : "";
+    return `${row?.label ?? `Note ${String(event.data.note)}`} ${kind}, step ${String(eventStep(event) + 1)}, ${String(Math.round(event.data.velocity * 100))} percent velocity${durationText}${selectedText}`;
+  };
+
+  const selectEvents = (eventIds: readonly NoteEventId[]) => {
+    if (selectedModuleId !== undefined) {
+      selectPianoRollEvents(selectedModuleId, activePatternIndex, eventIds);
+    }
+  };
+
+  const edit = (change: Parameters<typeof editPatternEvents>[2], gestureId?: GestureId) => {
+    if (selectedModuleId === undefined) return;
+    editPatternEvents(selectedModuleId, activePatternIndex, change, gestureId);
+  };
+
+  const selectOne = (eventId: NoteEventId, additive: boolean) => {
+    if (!additive) {
+      selectEvents([eventId]);
+      return;
+    }
+    selectEvents(
+      selectedEventIds.includes(eventId)
+        ? selectedEventIds.filter((one) => one !== eventId)
+        : [...selectedEventIds, eventId],
+    );
+  };
+
+  const createAt = (step: number, rowIndex: number, gestureId?: GestureId) => {
+    const row = editorRows[rowIndex];
+    if (row === undefined || selectedModuleId === undefined) return;
+    const data = { note: row.note, velocity: 0.8, accent: false, slide: false };
+    if (pitched) {
+      edit(
+        {
+          type: "create",
+          event: {
+            type: "note",
+            positionTicks: step * STEP_TICKS,
+            durationTicks: STEP_TICKS,
+            data,
+          },
+        },
+        gestureId,
+      );
+      return;
+    }
+    edit(
+      {
+        type: "create",
+        event: { type: "trigger", positionTicks: step * STEP_TICKS, data },
+      },
+      gestureId,
+    );
+  };
+
+  const cellFromPointer = (element: HTMLElement, clientX: number, clientY: number) => {
+    const bounds = element.getBoundingClientRect();
+    const step = Math.min(
+      VISIBLE_STEPS - 1,
+      Math.max(0, Math.floor(((clientX - bounds.left) / bounds.width) * VISIBLE_STEPS)),
+    );
+    const row = Math.min(
+      editorRows.length - 1,
+      Math.max(0, Math.floor((clientY - bounds.top) / 24)),
+    );
+    return { step, row };
+  };
+
+  const deleteSelection = (fallbackId?: NoteEventId) => {
+    const eventIds =
+      fallbackId !== undefined && !selectedEventIds.includes(fallbackId)
+        ? [fallbackId]
+        : selectedEventIds;
+    if (eventIds.length === 0) return;
+    selectEvents([]);
+    edit({ type: "delete", eventIds });
+  };
+
+  const moveSelection = (event: PatternEvent, deltaSteps: number, deltaRows: number) => {
+    const rowIndex = editorRows.findIndex((row) => row.note === event.data.note);
+    const nextRow = editorRows[rowIndex + deltaRows];
+    if (nextRow === undefined) return;
+    const currentStep = eventStep(event);
+    const duration = eventDurationSteps(event);
+    if (currentStep + deltaSteps < 0 || currentStep + deltaSteps + duration > VISIBLE_STEPS) return;
+    const eventIds = selectedEventIds.includes(event.id) ? selectedEventIds : [event.id];
+    edit({
+      type: "move",
+      eventIds,
+      deltaTicks: deltaSteps * STEP_TICKS,
+      deltaNote: nextRow.note - event.data.note,
+    });
+  };
+
+  const onEventKeyDown = (event: React.KeyboardEvent, item: PatternEvent) => {
+    const selected = selectedEventIds.includes(item.id) ? selectedEventIds : [item.id];
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      event.stopPropagation();
+      selectEvents(visibleEvents.map((one) => one.id));
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+      event.preventDefault();
+      event.stopPropagation();
+      edit({ type: "duplicate", eventIds: selected });
+      return;
+    }
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      event.stopPropagation();
+      deleteSelection(item.id);
+      return;
+    }
+    const arrows = ["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"];
+    if (!arrows.includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.shiftKey && item.type === "note" && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      if (event.altKey) {
+        const positionStep = eventStep(item) + direction;
+        const durationSteps = eventDurationSteps(item) - direction;
+        if (positionStep >= 0 && durationSteps >= 1) {
+          edit({
+            type: "resize",
+            eventId: item.id,
+            positionTicks: positionStep * STEP_TICKS,
+            durationTicks: durationSteps * STEP_TICKS,
+          });
+        }
+        return;
+      }
+      const durationSteps = eventDurationSteps(item) + direction;
+      if (durationSteps >= 1 && eventStep(item) + durationSteps <= VISIBLE_STEPS) {
+        edit({ type: "resize", eventId: item.id, durationTicks: durationSteps * STEP_TICKS });
+      }
+      return;
+    }
+    moveSelection(
+      item,
+      event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0,
+      event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0,
+    );
+  };
+
+  const startEventDrag = (event: React.PointerEvent<HTMLButtonElement>, item: PatternEvent) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.target as HTMLElement;
+    const edge = target.closest<HTMLElement>("[data-edge]")?.dataset.edge;
+    const mode = edge === "start" ? "resize-start" : edge === "end" ? "resize-end" : "move";
+    const originRow = editorRows.findIndex((row) => row.note === item.data.note);
+    const eventIds = selectedEventIds.includes(item.id) ? selectedEventIds : [item.id];
+    if (!selectedEventIds.includes(item.id)) selectEvents(eventIds);
+    const state: EventDrag = {
+      eventId: item.id,
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      originRow,
+      originStep: eventStep(item),
+      durationSteps: eventDurationSteps(item),
+      mode,
+      eventIds,
+      deltaSteps: 0,
+      deltaRows: 0,
+      clientDeltaX: 0,
+      clientDeltaY: 0,
+    };
+    drag.current = state;
+    setDragPreview({ ...state });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const updateEventDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const state = drag.current;
+    if (state?.pointerId !== event.pointerId) return;
+    const grid = event.currentTarget.closest('[data-component="piano-roll-grid"]');
+    if (!(grid instanceof HTMLElement)) return;
+    const width = grid.getBoundingClientRect().width / VISIBLE_STEPS;
+    state.clientDeltaX = event.clientX - state.originX;
+    state.clientDeltaY = event.clientY - state.originY;
+    state.deltaSteps = Math.round(state.clientDeltaX / width);
+    state.deltaRows = state.mode === "move" ? Math.round(state.clientDeltaY / 24) : 0;
+    if (state.mode === "move") {
+      state.deltaSteps = Math.min(
+        VISIBLE_STEPS - state.originStep - state.durationSteps,
+        Math.max(-state.originStep, state.deltaSteps),
+      );
+      state.deltaRows = Math.min(
+        editorRows.length - state.originRow - 1,
+        Math.max(-state.originRow, state.deltaRows),
+      );
+    } else if (state.mode === "resize-end") {
+      state.deltaSteps = Math.min(
+        VISIBLE_STEPS - state.originStep - state.durationSteps,
+        Math.max(1 - state.durationSteps, state.deltaSteps),
+      );
+    } else {
+      state.deltaSteps = Math.min(
+        state.durationSteps - 1,
+        Math.max(-state.originStep, state.deltaSteps),
+      );
+    }
+    state.clientDeltaX = state.deltaSteps * width;
+    state.clientDeltaY = state.deltaRows * 24;
+    setDragPreview({ ...state });
+  };
+
+  const finishEventDrag = (event: React.PointerEvent<HTMLButtonElement>, cancel: boolean) => {
+    const state = drag.current;
+    if (state?.pointerId !== event.pointerId) return;
+    drag.current = undefined;
+    setDragPreview(undefined);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (cancel || (state.deltaSteps === 0 && state.deltaRows === 0)) return;
+    const item = events.find((one) => one.id === state.eventId);
+    if (item === undefined) return;
+    if (state.mode === "resize-end") {
+      edit({
+        type: "resize",
+        eventId: state.eventId,
+        durationTicks: (state.durationSteps + state.deltaSteps) * STEP_TICKS,
+      });
+      return;
+    }
+    if (state.mode === "resize-start") {
+      edit({
+        type: "resize",
+        eventId: state.eventId,
+        positionTicks: (state.originStep + state.deltaSteps) * STEP_TICKS,
+        durationTicks: (state.durationSteps - state.deltaSteps) * STEP_TICKS,
+      });
+      return;
+    }
+    const nextRow = editorRows[state.originRow + state.deltaRows];
+    if (nextRow === undefined) return;
+    edit({
+      type: "move",
+      eventIds: state.eventIds,
+      deltaTicks: state.deltaSteps * STEP_TICKS,
+      deltaNote: nextRow.note - item.data.note,
+    });
+  };
 
   return (
     <section className={styles.pianoRoll} data-component="piano-roll" aria-label="Piano Roll">
       <header className={styles.rollTools}>
         <span className={styles.gridReadout}>1/16</span>
+        <label className={styles.parameterSelector}>
+          <span>Parameter</span>
+          <select
+            aria-label="Piano Roll parameter"
+            value="velocity"
+            onChange={() => setPianoRollParameter("velocity")}
+          >
+            <optgroup label="Note properties">
+              <option value="velocity">Velocity</option>
+            </optgroup>
+          </select>
+        </label>
         <TimingSlider
           label="Swing"
           ariaLabel="Project Swing"
@@ -538,16 +918,6 @@ function PianoRoll() {
             setHumanize(activePatternIndex, value, gestureId);
           }}
         />
-        <button
-          type="button"
-          className={styles.variationButton}
-          title="Store a new seed. The same seed always replays the same variation."
-          onClick={() => {
-            newPatternVariation(activePatternIndex);
-          }}
-        >
-          New variation
-        </button>
         <label className={styles.moduleSelector}>
           <span>Module</span>
           <select
@@ -566,8 +936,12 @@ function PianoRoll() {
             ))}
           </select>
         </label>
-        <span className={styles.rollContext}>
-          {`${manifest?.productName ?? "No module"} — ${patterns[activePatternIndex]?.name ?? "Pattern"}`}
+        <span
+          className={styles.rollContext}
+          aria-label={`Editing ${moduleName}, Pattern ${patternName}`}
+          title={`${moduleName} — ${patternName}`}
+        >
+          {patternName}
         </span>
       </header>
       <div
@@ -580,6 +954,10 @@ function PianoRoll() {
           } as CSSProperties
         }
       >
+        <span className={styles.timelineLabel} aria-hidden="true">
+          Step
+        </span>
+        <SeekSteps />
         <AuditionKeys
           label={pitched || manifest === undefined ? "Piano keyboard" : "Drum voices"}
           moduleId={module?.id}
@@ -587,36 +965,175 @@ function PianoRoll() {
           onStart={startAudition}
           onStop={stopAudition}
         />
-        <div className={styles.noteGrid}>
-          <div
-            className={styles.noteLayers}
-            role="img"
-            aria-label={
-              activeSteps.length === 0
-                ? "The selected Pattern has no active steps."
-                : `Active steps: ${activeSteps.join(", ")}.`
+        <div
+          className={styles.noteGrid}
+          data-component="piano-roll-grid"
+          role="group"
+          aria-label={`${moduleName} events in ${patternName}. ${String(visibleEvents.length)} events.`}
+          tabIndex={0}
+          onPointerDown={(event) => {
+            if (event.button !== 0 || event.target !== event.currentTarget) return;
+            const cell = cellFromPointer(event.currentTarget, event.clientX, event.clientY);
+            setKeyboardCell(cell);
+            if (!pitched) {
+              const gestureId = paintGesture.current();
+              createAt(cell.step, cell.row, gestureId);
+              painting.current = {
+                pointerId: event.pointerId,
+                visited: new Set([`${cell.step}:${cell.row}`]),
+                gestureId,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              return;
             }
-          >
-            <div className={styles.pitchRows} aria-hidden="true">
-              {editorRows.map((row) => (
-                <span key={`${row.label}-${String(row.note)}`} data-sharp={row.tone === "sharp"} />
-              ))}
-            </div>
-            <div className={styles.stepNotes} aria-hidden="true">
-              {Array.from({ length: 16 }, (_, index) => (
-                <i key={index} data-active={steps[index]?.active === true} />
-              ))}
-            </div>
+            createAt(cell.step, cell.row);
+          }}
+          onPointerMove={(event) => {
+            const active = painting.current;
+            if (active?.pointerId !== event.pointerId) return;
+            const cell = cellFromPointer(event.currentTarget, event.clientX, event.clientY);
+            const key = `${cell.step}:${cell.row}`;
+            if (active.visited.has(key)) return;
+            active.visited.add(key);
+            createAt(cell.step, cell.row, active.gestureId);
+          }}
+          onPointerUp={(event) => {
+            if (painting.current?.pointerId !== event.pointerId) return;
+            painting.current = undefined;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            paintGesture.end();
+          }}
+          onPointerCancel={() => {
+            painting.current = undefined;
+            paintGesture.end();
+          }}
+          onLostPointerCapture={() => {
+            painting.current = undefined;
+            paintGesture.end();
+          }}
+          onContextMenu={(event) => event.preventDefault()}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+              event.preventDefault();
+              selectEvents(visibleEvents.map((one) => one.id));
+              return;
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+              if (selectedEventIds.length === 0) return;
+              event.preventDefault();
+              edit({ type: "duplicate", eventIds: selectedEventIds });
+              return;
+            }
+            if (event.key === "Delete" || event.key === "Backspace") {
+              event.preventDefault();
+              deleteSelection();
+              return;
+            }
+            if (event.key === "Enter") {
+              event.preventDefault();
+              createAt(keyboardCell.step, keyboardCell.row);
+              return;
+            }
+            if (!["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(event.key)) return;
+            event.preventDefault();
+            setKeyboardCell((current) => ({
+              step: Math.min(
+                VISIBLE_STEPS - 1,
+                Math.max(0, current.step + (event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0)),
+              ),
+              row: Math.min(
+                editorRows.length - 1,
+                Math.max(0, current.row + (event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0)),
+              ),
+            }));
+          }}
+        >
+          <div className={styles.pitchRows} aria-hidden="true">
+            {editorRows.map((row) => (
+              <span key={`${row.label}-${String(row.note)}`} data-sharp={row.tone === "sharp"} />
+            ))}
           </div>
-          <SeekSteps />
+          <span
+            className={styles.gridCursor}
+            aria-hidden="true"
+            style={{ gridColumn: keyboardCell.step + 1, gridRow: keyboardCell.row + 1 }}
+          />
+          {visibleEvents.map((item) => {
+            const row = editorRows.findIndex((one) => one.note === item.data.note);
+            const preview = dragPreview?.eventIds.includes(item.id) === true ? dragPreview : undefined;
+            const selected = selectedEventIds.includes(item.id);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={styles.pianoRollEvent}
+                data-component="piano-roll-event"
+                data-event-type={item.type}
+                data-selected={selected}
+                aria-label={labelFor(item)}
+                aria-pressed={selected}
+                style={
+                  {
+                    gridColumn: `${String(eventStep(item) + 1)} / span ${String(eventDurationSteps(item))}`,
+                    gridRow: row + 1,
+                    "--event-drag-x": `${String(
+                      preview?.mode === "move" || preview?.mode === "resize-start"
+                        ? preview.clientDeltaX
+                        : 0,
+                    )}px`,
+                    "--event-drag-y": `${String(preview?.mode === "move" ? preview.clientDeltaY : 0)}px`,
+                    "--event-resize-x": `${String(
+                      preview?.mode === "resize-end"
+                        ? preview.clientDeltaX
+                        : preview?.mode === "resize-start"
+                          ? -preview.clientDeltaX
+                          : 0,
+                    )}px`,
+                  } as CSSProperties
+                }
+                onClick={(event) => selectOne(item.id, event.ctrlKey || event.metaKey)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  deleteSelection(item.id);
+                }}
+                onKeyDown={(event) => onEventKeyDown(event, item)}
+                onPointerDown={(event) => startEventDrag(event, item)}
+                onPointerMove={updateEventDrag}
+                onPointerUp={(event) => finishEventDrag(event, false)}
+                onPointerCancel={(event) => finishEventDrag(event, true)}
+              >
+                {item.type === "note" ? <i data-edge="start" aria-hidden="true" /> : null}
+                <span aria-hidden="true">{item.type === "note" ? "" : editorRows[row]?.label}</span>
+                {item.type === "note" ? <i data-edge="end" aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
           <Playhead />
         </div>
       </div>
       <footer className={styles.velocityLane}>
         <span>Velocity</span>
-        <div aria-hidden="true">
-          {steps.map((step, index) => (
-            <i key={index} style={{ blockSize: `${String(Math.round(step.velocity * 100))}%` }} />
+        <div role="group" aria-label="Velocity lane">
+          {Array.from({ length: VISIBLE_STEPS }, (_, step) => (
+            <div className={styles.velocityStep} key={step}>
+              {visibleEvents
+                .filter((item) => eventStep(item) === step)
+                .map((item) => (
+                  <VelocityControl
+                    key={item.id}
+                    event={item}
+                    label={labelFor(item)}
+                    selected={selectedEventIds.includes(item.id)}
+                    onSelect={() => selectEvents([item.id])}
+                    onCommit={(velocity) => {
+                      edit({ type: "velocity", eventIds: [item.id], velocity });
+                    }}
+                  />
+                ))}
+            </div>
           ))}
         </div>
       </footer>

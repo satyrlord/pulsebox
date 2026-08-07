@@ -69,4 +69,4 @@ output, vendored code, lockfiles, or binary assets without an explicit request.
 
 The pass is complete after you account for every scoped file. Every edit must
 have a repository or sibling justification. All affected checks must pass, or
-you must report a pre-existing blocker.
+you report a pre-existing blocker.

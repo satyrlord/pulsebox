@@ -19,12 +19,11 @@ import { TEST_UUID } from "../contracts/fixtures";
 const seed = {
   pluginId: BASS_MONO_MANIFEST.pluginId,
   parameters: { cutoff: 720, waveform: "saw", volume: 0.62 },
-  steps: Array.from({ length: 16 }, () => ({
-    active: true,
-    note: 36,
-    velocity: 0.8,
-    accent: false,
-    slide: false,
+  events: Array.from({ length: 16 }, (_, step) => ({
+    type: "note" as const,
+    positionTicks: step * 240,
+    durationTicks: 240,
+    data: { note: 36, velocity: 0.8, accent: false, slide: false },
   })),
 };
 

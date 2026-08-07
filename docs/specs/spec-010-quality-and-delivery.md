@@ -325,12 +325,7 @@ link, naming, and contract-consistency checks. It does not require a runnable
 product application or product tests.
 
 Phase 1: Application shell, controls, state foundation, AudioWorklet foundation,
-transport, Silver Serpent, three-slot functional rack. During Phase 1, the product
-exposes the first three slots of the durable eight-slot model. The development
-seed
-loads Silver Serpent in slot 01 and leaves slots 02 and 03 available for Add or
-Duplicate. This seed is not the final default project or the section 9.2
-starter template.
+transport, Silver Serpent, three-slot functional rack.
 
 Phase 2: Remaining instruments, sample layers, eight-slot rack, overview,
 internal voice mixers.

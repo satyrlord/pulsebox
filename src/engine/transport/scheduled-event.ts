@@ -19,13 +19,27 @@ export interface ScheduledVoiceEvent {
   readonly slide?: boolean;
 }
 
-/** One step as the scheduler reads it. Mirrors the state layer's `PatternStep`. */
-export interface PatternStepView {
-  readonly active: boolean;
+export interface PatternEventDataView {
   readonly note: number;
   readonly velocity: number;
   readonly accent: boolean;
   readonly slide: boolean;
+}
+
+/** One persisted Piano Roll event as the scheduler reads it. */
+export interface PatternEventView {
+  readonly id: string;
+  readonly type: "note" | "trigger";
+  readonly positionTicks: number;
+  readonly durationTicks?: number;
+  readonly data: PatternEventDataView;
+}
+
+/** One module part for a project Pattern slot. */
+export interface PatternPartView {
+  /** Nominal length in fixed sixteenth-note steps. */
+  readonly length: number;
+  readonly events: readonly PatternEventView[];
 }
 
 /**
