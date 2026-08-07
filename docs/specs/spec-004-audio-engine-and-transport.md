@@ -195,6 +195,17 @@ or a processor recovery.
 A live step edit replaces the affected module's queued horizon. A quantized
 Pattern launch replaces queued events that cross its selected boundary.
 
+A timing rebuild preserves expanded onsets by their actual frame and stable
+occurrence identity. It does not use only the source step. Thus, Micro-timing,
+Flam, and Roll events cannot be lost or repeated at the rebuild boundary.
+
+The engine sends large horizons as bounded worklet batches. It schedules every
+complete source step that fits the declared processor queue. It does not move
+the horizon past a source step that it did not schedule.
+
+Pattern automation uses absolute audio frames. The processor applies a step
+before a note-on at the same frame and holds the value until the next step.
+
 ### 21.3 Worklet and graph messaging
 
 - UI sends commands to the state and engine controller.

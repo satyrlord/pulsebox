@@ -119,8 +119,8 @@ Component tests:
 - Numeric entry.
 - Fader keyboard behavior.
 - Toggle ARIA.
-- Step painting.
-- Drum-trigger painting and pitched-note move and resize.
+- Marquee selection.
+- Drum-trigger double-click creation and pitched-note move and resize.
 - Module add and remove.
 - Module reorder.
 - Playlist reorder.
@@ -142,7 +142,7 @@ Playwright:
 - Pattern and Song mode.
 - Add, reorder, swap, and remove module.
 - Undo removal.
-- Toggle and paint steps.
+- Double-click to create and marquee-select events.
 - Record computer-keyboard input.
 - Generate a pattern.
 - Edit a note.

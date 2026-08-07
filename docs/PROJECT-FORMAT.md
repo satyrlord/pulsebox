@@ -377,7 +377,8 @@ An `AutomationLane` contains:
 - scope, target instance ID, and stable parameter ID.
 - `pattern` context and its owning Pattern ID.
 - a fixed grid size of 240 ticks, equal to 1/16 at 960 ticks per quarter note.
-- ordered steps containing a non-negative tick and one JSON scalar value.
+- steps in strictly increasing tick order. Each step contains a non-negative
+  tick and one JSON scalar value.
 
 Two steps in one lane may not occupy the same tick. Automation contains only
 discrete held steps. Lines, curves, and dense freehand points are invalid. Known

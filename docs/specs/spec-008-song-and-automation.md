@@ -44,6 +44,10 @@ Interactions:
 The user edits Pattern names on the shared Pattern record. Playlist rows do not
 copy Pattern names.
 
+On compact layouts, Playlist action buttons use original inline SVG icons. Each
+icon-only button has a full accessible name and a tooltip. The mode and Add
+controls also use icons. Pattern names and repeat counts remain visible.
+
 In Pattern mode, the transport loops the selected named Pattern. In Song mode,
 it plays Playlist rows in order, honoring each row's repeat count. Switching
 modes does not stop playback. Playlist edits are project-owned and undoable.
@@ -90,6 +94,9 @@ Whenever the user arms transport Record, each deliberate parameter movement
 records automatically into the active Pattern's target lane. This rule applies
 in both Pattern and Song transport modes. The resulting take is one undoable
 command.
+
+If the Pattern has no part for that loaded module, its first automation step
+creates an empty 16-step part for the module.
 
 Within one 1/16 cell, the last recorded value wins. The engine holds it until
 the next automation step. One gesture or recording pass creates one undo entry.

@@ -123,7 +123,7 @@ must be newly created for Pulsebox.
 
 ## 3. Product principles
 
-1. **Editing includes more than step toggles.** Every sequencer lets you paint,
+1. **Editing includes more than step toggles.** Every sequencer lets you place,
    directly manipulate, perform with the computer keyboard, generate, and
    transform events.
 2. **The system is modular.** Instruments and effects use plugin contracts. Rack

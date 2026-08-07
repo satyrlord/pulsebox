@@ -513,7 +513,10 @@ need separate evidence.
   with one another by at least 3:1.
 - Pointer targets contain a 24 by 24 CSS pixel square. If visible control art is
   smaller, a pseudo-element or wrapper expands the hit area without changing
-  layout. Do not use the spacing exception as the normal control design.
+  layout. Do not use the spacing exception as the normal control design. The
+  Piano Roll is the one exception (decision `D98`): its keybed keys and event
+  targets are at least 24 by 16 CSS pixels. Its grid rows are 16 CSS pixels
+  tall, so more note rows stay visible.
 - Focus is never fully obscured by sticky bars, menus, overlays, or internal
   scrolling. Scrolling a focused item brings the complete indicator into view.
 - Status, meter, selection, module identity, and disabled state have a non-color
@@ -577,6 +580,8 @@ For each built-in theme, a valid user theme, and each with high contrast on:
 - assert text, non-text, focus, accent-content, and meter contrast pairs.
 - keyboard through every shared control and assert visible, unobscured focus.
 - measure every operational pointer target as at least 24 by 24 CSS pixels.
+  The Piano Roll keybed keys and event targets measure at least 24 by 16 CSS
+  pixels, per decision `D98`.
 - switch appearance during active playback and assert transport continuity, the
   same audio graph identity, the same focused element, and no project or
   undo-state change.

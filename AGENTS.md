@@ -70,7 +70,8 @@ AudioWorklet. No server product component, no MIDI.
   conflict and obtain a product decision when the current repository cannot
   resolve it.
 - Files under docs/design/ are prototypes and visual evidence. They are not
-  normative unless the specification or user explicitly makes them so.
+  normative unless the specification or user explicitly makes them so. The
+  root DESIGN.md is an owning contract, not a prototype.
 
 Owning contract documents:
 
@@ -84,15 +85,18 @@ Owning contract documents:
   storage, migrations, import validation, and portable `.pulsebox` archives.
 - [THEMING.md](docs/THEMING.md) owns the theme token vocabulary and the user-theme
   import contract.
+- [PRODUCT.md](PRODUCT.md) owns the product purpose, positioning, brand
+  personality, and design principles.
+- [DESIGN.md](DESIGN.md) owns the design system and the visual language.
 
 ## Current repository state
 
 - Phase 0 contracts and the Phase 1 foundation are complete. Narrow foundation
   slices from later phases are runnable without marking those phases complete.
 - Claim checks only when their current scripts have been run successfully.
-- Later MVP phases remain governed by the indexed specification set under
-  `docs/specs/`. Claim only the narrow later-phase slices listed in README.md.
-  Do not describe their incomplete parent phases as implemented.
+- The indexed specification set under `docs/specs/` governs later MVP phases.
+  Claim only the narrow later-phase slices listed in README.md. Do not describe
+  their incomplete parent phases as implemented.
 
 ## Roles and workflow
 
@@ -107,7 +111,7 @@ Owning contract documents:
   design-pulsebox-ui, run-quality-gate, full-code-review, verify, refactor,
   dead-code-audit, and handoff. If the correct workflow is unclear, read
   `.github/skills/SKILLS.md`.
-- Use higher reasoning for architecture, audio, persistence, security,
+- Use a higher reasoning level for architecture, audio, persistence, security,
   concurrency, and ambiguous product contracts.
 - Before material work, inspect all applicable current documentation and code.
 - Verify unstable browser and Web Audio behavior with current primary sources.
@@ -235,8 +239,8 @@ The stable `pluginId` lives in the manifest and can differ from the folder
 name:
 
 - `manifest.ts` declares the base manifest, parameter descriptors, meters,
-  defaults, voice notes, the audition note, and the UI manifest including its
-  `moduleAccent` tokens and original `icon` path.
+  defaults, voice notes, the audition note, and the UI manifest. The UI
+  manifest includes its `moduleAccent` tokens and original `icon` path.
 - `voices.ts` holds the declarative voice data for an instrument with voices:
   voice IDs, names, and note mapping. A pitched instrument has no `voices.ts`.
 - `dsp-core.ts` holds pure, testable DSP.
@@ -308,8 +312,9 @@ limited to 100 entries and 64 MiB in total. One entry is limited to 17 MiB.
 - Do not add glassmorphism, floating translucent cards, excessive glow, generic
   dashboard styling, mobile-style pills, or decorative fake controls.
 - This bans fake controls and the listed idioms. It does not ban visual richness.
-  Keep raised caps, recessed bays, inset readouts, edges, and pointer response:
-  detail that shows affordance, structure, identity, or feedback is doing work.
+  Keep raised caps, recessed bays, inset readouts, edges, and pointer response.
+  This detail shows affordance, structure, identity, or feedback. It does real
+  work.
 - Every visible operational control must change state, sound, navigation, or a
   documented preference.
 - An empty rack slot or channel may show the loaded silhouette with the real
@@ -364,6 +369,8 @@ limited to 100 entries and 64 MiB in total. One entry is limited to 17 MiB.
   docs/THEMING.md, and docs/PROJECT-FORMAT.md current.
 - Also keep README.md and domain documentation current. Do not claim that a
   planned implementation exists.
+- Keep AGENTS.md, CLAUDE.md, and .github/copilot-instructions.md consistent.
+  They describe the same rules for the different agent tools.
 
 ## Close-out
 

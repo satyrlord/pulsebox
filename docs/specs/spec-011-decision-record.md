@@ -175,7 +175,8 @@ contains the normative requirements. This table is the traceability record.
   context menu rather than a persistent minus button. The piano-roll header has
   no local Play, pen, or erase buttons. Pattern mode uses global Play. A
   left-click creates, a right-click deletes, and a drag moves or resizes pitched
-  notes. A named, project-wide Pattern is also the Playlist building block.
+  notes. `D97` supersedes the left-click-create pointer description in this
+  decision. A named, project-wide Pattern is also the Playlist building block.
 
   Separate Section and Scene entities do not exist.
 - **D64.** The approved compact header has no theme selector. Themes live in
@@ -189,7 +190,8 @@ contains the normative requirements. This table is the traceability record.
   full Song timeline, Feel module, or Straight selector.
 
   It also has no local Play, pen, or erase tools. Monophonic pitched notes move,
-  resize, and support slides. Drum triggers paint as fixed one-cell events. The
+  resize, and support slides. Drum triggers paint as fixed one-cell events.
+  `D97` supersedes the drum-trigger paint behavior in this decision. The
   master-effects
   bypass leaves master gain and the protected limiter active.
 - **D65.** The Piano Roll is the only Pattern editing surface. Rack faceplates
@@ -243,7 +245,7 @@ contains the normative requirements. This table is the traceability record.
 - **D67.** `D82` supersedes the faceplate identity part of this decision. `D83`
   supersedes the browser type-text part. A rack faceplate shows only its short
   label. The module browser retains the full name. The bottom workspace bar is
-  approximately 50 to 52 pixels high. Empty mixer strips show their two-digit
+  approximately 26 pixels high. Empty mixer strips show their two-digit
   slot numbers. The product specifications own responsive and accessible
   behavior. Design artifacts do not own that behavior.
 
@@ -597,3 +599,18 @@ contains the normative requirements. This table is the traceability record.
   Chrome support. The acceptance evidence in
   [ARCHITECTURE.md](../ARCHITECTURE.md) records Chrome results. Section 24.6 of
   [quality and delivery](spec-010-quality-and-delivery.md) owns this behavior.
+- **D97.** The Piano Roll uses one shared pointer model for pitched notes and
+  drum triggers. A single click on an empty cell does nothing. Drag on an
+  empty cell draws a marquee selection box. Drag on an event body moves the
+  event and replaces any event at the destination. Double-click on an empty
+  cell creates one one-cell event and replaces any event at that step column
+  or exact cell. The replacement and the move or creation form one Undo entry.
+- **D98.** The Piano Roll keeps a fixed timeline above its scrolling note grid.
+  Notes always paint below that timeline. Numeric note-property lanes use
+  point-and-stem controls with native range semantics. Binary note-property
+  lanes use a compact toggle row. The pitched keybed uses full-width natural
+  keys, shorter sharp keys, and pitch labels on all natural keys.
+  Grid rows are 16 CSS pixels tall. Keybed keys and event targets are at least
+  24 by 16 CSS pixels. Follow and page lock are icon toggle buttons with
+  explanatory tooltips. Section 16.3 of
+  [pattern editing](spec-006-pattern-editing.md) owns this behavior.

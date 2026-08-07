@@ -362,10 +362,17 @@ Primary marks the recent peak.
 ### Piano keybed
 
 The pitched Piano Roll has a functional side-view keybed. Natural keys use an
-ivory face that reaches the grid edge. Sharp keys use a shorter black face.
-Each 24px row aligns with one chromatic grid row and auditions its exact pitch
-while held. A dark 15px name strip labels natural keys without reducing their
-target size. High contrast keeps the same natural and sharp geometry.
+ivory face across the full keybed width. Sharp keys use a shorter black face.
+Each 16px row aligns with one chromatic grid row and auditions its exact pitch
+while held. Each natural key carries its pitch and octave at the grid edge.
+High contrast keeps the same natural and sharp geometry.
+
+### Piano Roll point controls
+
+Numeric note-property lanes use compact vertical point-and-stem controls. A
+small round point shows the value. A two-pixel stem connects the point to the
+lane floor. The control keeps a 24px operable width and native range semantics.
+Binary note-property lanes collapse to one compact row of raised toggles.
 
 ### LEDs
 

@@ -30,7 +30,7 @@ manage their own overflow.
    keyboard until the rack row reaches its 350-pixel minimum. A double-click on
    the handle restores the default height. The chosen height is session UI
    state, not project data.
-4. Bottom workspace bar: approximately 50 to 52 pixels.
+4. Bottom workspace bar: approximately 26 pixels.
 
 At 1280 × 720, the complete row stack, inter-region gaps, and borders must fit
 without page-level scrolling or overlap. The rack and editor manage their own

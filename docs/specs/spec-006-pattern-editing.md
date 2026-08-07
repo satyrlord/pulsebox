@@ -56,6 +56,13 @@ a visible page indicator. Enable playback follow by default. It advances the
 displayed page with the playhead. The user may lock the viewed page while
 playback continues.
 
+Follow and page lock are icon toggle buttons in the Piano Roll header. Each
+button has an explanatory tooltip and reports its pressed state to assistive
+technology. Follow uses a playhead-on-track icon. Its tooltip reads "Follow the
+playhead. The page advances during playback." Page lock uses a padlock icon.
+Its tooltip reads "Lock the viewed page during playback." when unlocked and
+"Unlock the viewed page during playback." when locked.
+
 ### 16.2 Named project Patterns
 
 A project owns between 1 and 32 named Patterns. A Pattern is a complete
@@ -151,6 +158,25 @@ Shared interactions:
 - Prevent invalid pitch or time.
 - Undo and redo for every committed edit.
 
+Shared pointer model:
+
+- A single click on an empty cell does nothing.
+- Drag on an empty cell draws a selection box. Release selects the events
+  whose start cell the box covers. Shift adds the covered events to the
+  current selection. A click without a drag changes no selection.
+- Drag on an event body moves the event anywhere on the grid, vertically and
+  horizontally. The move stays inside the Pattern cycle.
+- A move replaces an event at the destination. For a pitched note, it replaces
+  every note that overlaps the destination time range. For a drum trigger, it
+  replaces the trigger in the exact destination cell. The replacement and the
+  move form one Undo entry.
+- A double-click on an empty cell creates one one-cell event in that exact
+  cell. The creation replaces any note in the destination step column, or any
+  trigger in the exact destination cell. The replacement and the creation form
+  one Undo entry.
+- Right-click deletes an event with Undo available.
+- Each grid row is 16 CSS pixels tall.
+
 The Piano Roll header has no local Play button and no persistent pen or erase
 tools. Pattern playback uses Pattern mode and the global transport Play control.
 Direct pointer gestures create, delete, move, and resize events.
@@ -161,15 +187,16 @@ Monophonic pitched mode:
 
 - Shows a vertically scrollable ivory-and-black piano keybed. Each chromatic key
   aligns with one pitch row in the grid.
+- Natural keys use the full keybed width. Sharp keys use a shorter dark face.
+  Each natural key shows its pitch and octave at the grid edge. The shapes stay
+  distinct in high contrast.
 - Each key is a momentary pitch audition control. Pointer or Space and Enter
   hold the exact pitch. Release, lost capture, or lost focus stops it.
 - Key audition changes no Pattern data, project state, transport position, or
   Undo history. It uses the selected module's current sound and routing.
 - Natural and sharp keys use geometry and labels as well as color. Each visible
-  key target is at least 24 by 24 CSS pixels.
+  key target is at least 24 by 16 CSS pixels.
 - Prevents overlapping sounding notes in the module part.
-- Left-click creates a note.
-- Right-click deletes a note with Undo available.
 - Drag the note body to move it. Drag either edge to resize it.
 - Slide is an explicit note property. The UI shows it with a non-color cue.
 - Scale, key, scale lock, snap-to-scale, and out-of-scale shading apply only in
@@ -179,9 +206,6 @@ Drum trigger mode:
 
 - Shows one named voice row per drum voice.
 - Allows simultaneous triggers on different rows.
-- Left-click adds one fixed one-cell trigger.
-- Left-drag paints fixed one-cell triggers.
-- Right-click deletes a trigger with Undo available.
 - Triggers have no duration edge. Do not resize them.
 - Voice cycle lengths may differ and wrap independently.
 - Advanced trigger properties remain keyboard-accessible and do not depend on
@@ -195,6 +219,12 @@ Per-note or trigger properties where supported by the selected module:
 - Probability.
 - Micro-timing.
 - Duration.
+
+Probability stores a value from 0 through 100 percent. New events use 100
+percent. Micro-timing stores a whole-tick offset from -60 through 60 ticks.
+One sixteenth step is 240 ticks. New events use 0 ticks. Flam stores 0 through
+3 extra attacks. Roll stores 0 through 7 extra attacks. New events use 0 for
+both values.
 
 Canvas may render the static grid and playhead. Interactive notes must expose
 meaningful accessibility information.
@@ -240,6 +270,12 @@ separate automation record.
 
 Therefore, a note property has no lane record. When the user erases its lane
 content, the property resets to its default. The notes remain.
+
+Numeric note-property lanes use point-and-stem controls. The point shows the
+exact value. The stem connects it to the lane floor. Each point supports
+pointer drag and native range-key input, and each gesture creates one Undo
+entry. Binary note-property lanes use a compact toggle row and do not reserve
+the numeric lane height.
 
 The selector is keyboard reachable, announces the active parameter and its
 group, and reports when a listed parameter has existing data.
@@ -294,6 +330,10 @@ Keyboard behavior:
 
 Musical input uses physical `KeyboardEvent.code` positions. Text fields use
 normal typed characters. Show the musical map. Let the user remap it.
+
+The key map, input quantize mode, count-in, metronome setting, and ghost
+display are local UI preferences. They are not project data and do not create
+Undo entries. A recorded take writes only its resulting Pattern events.
 
 ### 16.5 Generators and transforms
 

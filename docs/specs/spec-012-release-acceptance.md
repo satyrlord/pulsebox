@@ -44,9 +44,10 @@ The merged MVP is complete only when:
     audition control sounds the module while held by pointer or keyboard. It
     stops on release or after lost focus or capture. It respects mute, solo, and
     routing. It writes no Pattern event, project state, or Undo entry.
-12. **AC-012.** Piano-roll note creation, movement, resizing, deletion, velocity, selection,
-    and quantization work.
-13. **AC-013.** Drum-grid painting, velocity, probability, micro-timing, flam, roll, voice
+12. **AC-012.** Piano-roll note creation, movement, resizing, deletion,
+    selection, and quantization work. Numeric note properties use operable
+    point-and-stem controls with pointer and keyboard input.
+13. **AC-013.** Drum-trigger creation, velocity, probability, micro-timing, flam, roll, voice
     length, and resolution work.
 14. **AC-014.** Computer-keyboard live input and recording work through physical key
     positions.
@@ -179,12 +180,14 @@ The merged MVP is complete only when:
     A–D send or return grid.
 69. **AC-069.** One module-aware Piano Roll switches between monophonic pitched
     rows and named drum-voice rows. Pitched mode has a vertically scrollable
-    ivory-and-black chromatic keybed. Each 24-pixel-high key aligns with its grid
-    row and auditions that exact pitch while held. Release, lost capture, or
+    ivory-and-black chromatic keybed. Each 16-pixel-high key aligns with its grid
+    row. Natural keys span the keybed width. Sharp keys are shorter and do not
+    hide adjacent natural-key labels. Each natural key shows its pitch
+    and octave. Each key auditions its exact pitch while held. Release, lost capture, or
     lost focus stops audition without project data, transport, or Undo changes.
     Its header has no local Play, pen, or erase buttons. Monophonic notes create,
     delete, move, resize, and slide without overlapping sounding notes. Drum
-    triggers add or paint as fixed one-cell events, delete by right-click or
+    triggers add as fixed one-cell events, delete by right-click or
     keyboard, allow simultaneous voices, and do not resize. Pattern playback
     uses global Play.
 70. **AC-070.** Step automation contains no line or curve segments.

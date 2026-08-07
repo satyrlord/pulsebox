@@ -701,9 +701,11 @@ Scheduled event batches shall carry absolute audio-frame targets. Events in one
 batch shall be sorted by frame, then by a deterministic event priority, then by
 stable event ID. `all-notes-off`, `transport stop`, disposal, and graph-safety
 messages shall never be dropped or reordered behind later musical events.
-Each Pattern note-on shall also carry its absolute Pattern-step identity. Audio
-processors can ignore this identity, but browser evidence uses it to detect a
-missing or duplicate interior onset across timing rebuilds.
+Each expanded Pattern onset and its release shall carry one stable occurrence
+identity. Each automation step shall also carry one stable occurrence identity.
+The identity includes its absolute Pattern position. Audio processors can ignore
+these identities, but browser evidence uses them to detect missing or duplicate
+occurrences across timing rebuilds.
 
 The controller shall keep a 500-millisecond event horizon at each active
 processor. A 25-millisecond interval maintains this horizon. A late pass shall
@@ -723,7 +725,9 @@ the queued events at or past that frame. Events before the bound stay queued
 and keep playing exactly as sent. A rebuild that keeps the imminent lead window
 shall use a bounded clear and shall re-send the one release the bound drops, so
 the kept note ends on its natural gate. A timing change that does not change
-the tempo shall not move the pattern grid anchor.
+the tempo shall not move the pattern grid anchor. A rebuild shall compare the
+actual frames and occurrence identities. It shall not classify a micro-timed,
+Flam, or Roll occurrence only by its source step.
 
 An acknowledgment shall identify the highest contiguous applied sequence and
 complete state revision token. That token is the receiver's own current
@@ -751,6 +755,9 @@ Every queue and payload shall have a declared bound.
 - A `parameter-batch` shall contain at most 128 changes.
 - An `event-batch` shall contain at most 256 events and shall not schedule
   beyond the 500-millisecond lookahead horizon.
+- One processor shall retain at most 2,048 scheduled musical endpoints. The
+  controller shall split one horizon into event batches without dropping a
+  complete source step.
 - Meter publication shall be at most 30 frames per second per visible meter
   group. Only the newest unsent meter frame is retained.
 - Status messages shall be edge-triggered. Identical repeated status shall
@@ -782,6 +789,10 @@ parse project JSON, or access persistence during `process()`. Meter publication
 is the one bounded exception: a processor may allocate one small meter envelope
 per published frame, at most 30 per second, because `postMessage` cannot send a
 frame without it.
+
+The controller shall schedule Pattern automation as absolute-frame parameter
+changes. The processor shall hold each value until the next step for that
+parameter. A parameter change at the same frame as a note-on shall apply first.
 
 The processor shall use a non-serializing validation path for normal controller
 messages. Full diagnostic validation stays on the controller thread.
