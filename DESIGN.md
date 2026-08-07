@@ -365,7 +365,8 @@ The pitched Piano Roll has a functional side-view keybed. Natural keys use an
 ivory face across the full keybed width. Sharp keys use a shorter black face.
 Each 16px row aligns with one chromatic grid row and auditions its exact pitch
 while held. Each natural key carries its pitch and octave at the grid edge.
-High contrast keeps the same natural and sharp geometry.
+High contrast keeps the same natural and sharp geometry. Disabled audition
+keeps the ivory and black faces visible.
 
 ### Piano Roll point controls
 

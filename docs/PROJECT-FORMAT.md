@@ -176,7 +176,7 @@ compressed bytes is invalid. The importer enforces declared limits before
 inflation and actual limits while streaming inflation. Crossing a limit stops
 that import immediately.
 
-## 5. Project manifest version 1
+## 5. Project manifest version 2
 
 ### 5.1 Root record
 
@@ -185,7 +185,7 @@ absent. Unknown root keys are invalid.
 
 ```text
 format              "pulsebox-project"
-formatVersion       1
+formatVersion       2
 project             ProjectMetadata
 plugins             PluginRequirement[]
 rack                RackSlot[8]
@@ -273,13 +273,13 @@ canonical JSON. Known plugin state is validated against that plugin's registered
 schema, including parameter IDs, types, ranges, references, and allowed keys.
 Instrument and effect parameters use the same registered descriptor checks.
 
-Every instrument and effect instance is required in format 1. The manifest has
+Every instrument and effect instance is required in format 2. The manifest has
 no optional-plugin mode. Missing, unknown, or incompatible referenced plugins
 reject the project in full.
 
 ### 5.4 Required MVP plugin registry
 
-Format 1 assigns API version 1, plugin version `1.0.0`, and state version 1 to
+Format 2 assigns API version 1, plugin version `1.0.0`, and state version 1 to
 the following built-in instrument IDs:
 
 - `bass-mono`
@@ -318,7 +318,7 @@ record with:
 - a reference to its module effect chain.
 
 The eight-slot array is an MVP file-format limit. Slot-count-agnostic code may
-support later migrations, but a format-1 importer rejects a ninth slot and
+support later migrations, but a format-2 importer rejects a ninth slot and
 reports every over-cap slot before applying any state.
 
 The root `patterns` array contains 1 through 32 project-wide `Pattern` records.
@@ -368,7 +368,7 @@ Playlist order is array order, not identity. Every reference must resolve to a
 Pattern in the same project. At least one placement is required. Pattern names
 and duration are read from the referenced Pattern and are not duplicated in the
 placement. There are no Section, Scene, lane, arrangement-clip, tempo-event,
-time-signature-event, or Song-automation records in format version 1. Musical
+time-signature-event, or Song-automation records in format version 2. Musical
 structure is fixed at 4/4 for the MVP.
 
 An `AutomationLane` contains:
@@ -670,8 +670,20 @@ Project and plugin migrations are pure, deterministic data transforms. They:
 - produce a complete repair and migration report.
 
 Format 1 has no predecessor. Unversioned JSON is invalid. A reader rejects a
-project `formatVersion` newer than it supports. Before format 2 ships, its full
-project migration and rollback fixtures must ship with the reader.
+project `formatVersion` newer than it supports.
+
+The format-2 reader migrates the released format-1 project shape before current
+schema validation. It groups flat module Pattern records by their saved Pattern
+index. It preserves each valid Pattern UUID prefix. It derives missing Pattern
+and Playlist placement UUIDs from saved project data with a deterministic
+function. It also supplies the neutral defaults for Pattern event properties,
+Pattern color, duration, scale, voice cycles, and automation references. The
+reader creates a neutral Pattern when a format-1 empty rack retained no Pattern
+records. It creates one placement when the saved Song is empty. The
+reader validates the full format-2 result before it opens, imports, or restores
+the project. It appends the `project-format-1-to-2-pattern-bank` migration
+record. The same fixture must pass direct import, stored-project open, and
+autosave recovery tests.
 
 ## 9. Import validation and atomicity
 

@@ -130,7 +130,8 @@ resource bounds, and archive safety rules.
 - Tell the user which data recovery restored. Use a non-blocking panel and ARIA
   live announcement.
 - Keep a bounded recovery history.
-- Schema migrations exist before version 2 is needed.
+- The format-1 to format-2 project migration runs before current-schema
+  validation. Import, stored-project open, and autosave recovery use it.
 
 After the first explicit Save or sample-pack installation gesture, request
 persistent origin storage once. Show whether the browser granted the request.

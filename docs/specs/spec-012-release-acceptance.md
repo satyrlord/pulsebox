@@ -182,7 +182,8 @@ The merged MVP is complete only when:
     rows and named drum-voice rows. Pitched mode has a vertically scrollable
     ivory-and-black chromatic keybed. Each 16-pixel-high key aligns with its grid
     row. Natural keys span the keybed width. Sharp keys are shorter and do not
-    hide adjacent natural-key labels. Each natural key shows its pitch
+    hide adjacent natural-key labels. Disabled audition keeps the ivory and
+    black key faces. Each natural key shows its pitch
     and octave. Each key auditions its exact pitch while held. Release, lost capture, or
     lost focus stops audition without project data, transport, or Undo changes.
     Its header has no local Play, pen, or erase buttons. Monophonic notes create,

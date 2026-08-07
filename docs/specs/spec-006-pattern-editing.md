@@ -189,7 +189,8 @@ Monophonic pitched mode:
   aligns with one pitch row in the grid.
 - Natural keys use the full keybed width. Sharp keys use a shorter dark face.
   Each natural key shows its pitch and octave at the grid edge. The shapes stay
-  distinct in high contrast.
+  distinct in high contrast. An unavailable keybed keeps these faces while its
+  audition controls stay disabled.
 - Each key is a momentary pitch audition control. Pointer or Space and Enter
   hold the exact pitch. Release, lost capture, or lost focus stops it.
 - Key audition changes no Pattern data, project state, transport position, or

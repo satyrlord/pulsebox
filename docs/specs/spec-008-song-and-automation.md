@@ -50,7 +50,9 @@ controls also use icons. Pattern names and repeat counts remain visible.
 
 In Pattern mode, the transport loops the selected named Pattern. In Song mode,
 it plays Playlist rows in order, honoring each row's repeat count. Switching
-modes does not stop playback. Playlist edits are project-owned and undoable.
+modes does not stop playback. A repeated placement keeps each independent drum
+voice cycle in phase until that placement ends. A new placement starts a new
+phase. Playlist edits are project-owned and undoable.
 
 Live Pattern launch, lane-based timeline editing, clip-level transforms, loop
 markers, Song automation, tempo automation, and time-signature timelines are

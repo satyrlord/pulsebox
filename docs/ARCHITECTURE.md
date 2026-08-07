@@ -513,7 +513,7 @@ transition is accepted.
 The MVP musical structure is fixed at 4/4 and its Pattern grid is fixed at 1/16.
 Playlist placement, reorder, repeat-count, duplicate, and delete operations are
 undoable structural commands. There are no time-signature events, Song
-automation lanes, or arrangement-timeline commands in format version 1.
+automation lanes, or arrangement-timeline commands in format version 2.
 
 ### 7.2 Engine projection
 
@@ -593,7 +593,8 @@ Rules:
 - Escape shall cancel and restore the captured before-state.
 - Pointer cancellation, component disconnection, or window blur shall commit the
   last valid value when it differs. This prevents an audible edit from escaping
-  history.
+  history. Timing controls are the exception. They restore the prior timing
+  value and create no Undo entry, as specified in specification 004.
 - Pointer gestures end at pointer release or cancellation.
 - Keyboard-repeat gestures end at key release or focus loss.
 - A wheel burst coalesces by target parameter and ends after 250 milliseconds
@@ -728,6 +729,17 @@ the kept note ends on its natural gate. A timing change that does not change
 the tempo shall not move the pattern grid anchor. A rebuild shall compare the
 actual frames and occurrence identities. It shall not classify a micro-timed,
 Flam, or Roll occurrence only by its source step.
+If rebuild work makes a pulled replacement onset expire, the controller shall
+retain its cleared old-timing occurrence when that occurrence is still future.
+The same rule applies to a pulled automation step.
+The controller shall keep a bounded ledger of the events and parameter changes
+sent to each processor. Each scheduler pass shall remove consumed ledger items.
+The future ledger shall not exceed the matching processor queue capacity. Each
+clear shall apply the same bound to this ledger. A rebuild shall derive kept
+and fallback occurrences from this ledger.
+A Swing or Humanize rebuild shall retain at least 100 milliseconds of old
+timing inside the 500-millisecond processor horizon. A Tempo rebuild shall use
+the scheduler lead and apply the new tempo grid without that added delay.
 
 An acknowledgment shall identify the highest contiguous applied sequence and
 complete state revision token. That token is the receiver's own current

@@ -198,6 +198,16 @@ Pattern launch replaces queued events that cross its selected boundary.
 A timing rebuild preserves expanded onsets by their actual frame and stable
 occurrence identity. It does not use only the source step. Thus, Micro-timing,
 Flam, and Roll events cannot be lost or repeated at the rebuild boundary.
+If controller work makes a pulled replacement onset expire, the engine keeps
+the cleared old-timing occurrence when its frame is still in the future.
+The engine applies the same rule to a pulled automation step.
+The controller tracks the bounded queue sent to each processor. Timing rebuilds
+derive kept and fallback occurrences from this queue record. Each scheduler
+pass removes consumed records. Future records cannot exceed the matching
+processor queue capacity.
+A Swing or Humanize rebuild retains at least 100 milliseconds of old timing
+inside the 500-millisecond processor horizon. A Tempo rebuild uses the normal
+scheduler lead and applies the new tempo grid without that added delay.
 
 The engine sends large horizons as bounded worklet batches. It schedules every
 complete source step that fits the declared processor queue. It does not move
