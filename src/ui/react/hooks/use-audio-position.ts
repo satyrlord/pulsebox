@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { masterMeterFrameFor } from "../store/app-store";
+import { masterMeterFrameFor, SILENT_MASTER_METER } from "../store/app-store";
 import { useAppContext, useDependencies } from "../store/app-store-context";
 
 /** Master analysis publishes at most this often, matching the meter protocol. */
@@ -28,7 +28,8 @@ export function useAudioPosition(): void {
       // nothing to produce, and the store drops an unchanged frame anyway.
       const now = performance.now();
       const analyzing =
-        state.audioRuntimeState === "active" && state.project.transport.status === "playing";
+        state.audioRuntimeState === "active" &&
+        state.project.transport.status === "playing";
       if (!analyzing || now - lastMeterAt >= METER_INTERVAL_MILLISECONDS) {
         if (analyzing) lastMeterAt = now;
         state.setMasterMeterFrame(
@@ -38,6 +39,24 @@ export function useAudioPosition(): void {
             audio.getMasterMeter,
           ),
         );
+        if (state.studioView === "master") {
+          state.setMasterChainMeterFrames(
+            masterMeterFrameFor(
+              state.audioRuntimeState,
+              state.project.transport.status,
+              audio.getMasterChainMeter === undefined
+                ? undefined
+                : () => audio.getMasterChainMeter?.("pre") ?? SILENT_MASTER_METER,
+            ),
+            masterMeterFrameFor(
+              state.audioRuntimeState,
+              state.project.transport.status,
+              audio.getMasterChainMeter === undefined
+                ? undefined
+                : () => audio.getMasterChainMeter?.("post") ?? SILENT_MASTER_METER,
+            ),
+          );
+        }
       }
       frame = requestAnimationFrame(tick);
     };

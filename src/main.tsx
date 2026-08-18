@@ -4,6 +4,7 @@ import {
   type ModuleInstanceId,
   type PluginId,
   type ProjectRevision,
+  type SendBusId,
 } from "./contracts";
 import { browserIdFactory } from "./composition/browser-id-factory";
 import { toTransportDelta } from "./composition/audio-delta-projection";
@@ -14,7 +15,11 @@ import {
   auditionNoteFor,
   playableNotesFor,
   createPluginRegistry,
+  createEffectWorkletPort,
+  type RoutingEffectInstance,
   type TransportModule,
+  type TransportRoutingProjection,
+  type TransportExternalAutomationProjection,
   type VoiceAdapterFactory,
 } from "./engine/public";
 import {
@@ -33,6 +38,7 @@ import {
   serializeProject,
   serializePortableProject,
   type ModuleSeed,
+  type ChainEffectPlacement,
   type PulseEngineDelta,
   type PulseState,
   type RackModuleState,
@@ -54,6 +60,7 @@ interface RuntimePlugin {
   readonly voiceAdapterFactory?: VoiceAdapterFactory;
   readonly moduleSeed?: ModuleSeed;
   readonly auditionNoteForVoice?: (voiceId: string | undefined) => number;
+  readonly effectProcessorFactoryKey?: string;
 }
 
 const appReference: { current: PulseboxAppHandle | undefined } = { current: undefined };
@@ -81,7 +88,10 @@ const registry = createPluginRegistry<RuntimePlugin>([
       },
     };
   }),
-  ...BUILT_IN_EFFECTS.map(({ manifest }) => ({ manifest, factory: {} })),
+  ...BUILT_IN_EFFECTS.map(({ manifest, processorFactoryKey }) => ({
+    manifest,
+    factory: { effectProcessorFactoryKey: processorFactoryKey },
+  })),
 ]);
 // One transport owns the clock, the lookahead loop, and every voice. Registering
 // an instrument means adding a registry entry, not touching the transport.
@@ -89,6 +99,26 @@ let audio: TransportRuntime;
 function createAudioRuntime(): TransportRuntime {
   const runtime = new TransportRuntime({
     adapterFactoryFor: (pluginId) => registry.get(pluginId)?.factory.voiceAdapterFactory,
+    effectChainNodeFactory: async (context, effect) => {
+      const registration = registry.get(effect.pluginId);
+      if (
+        registration?.factory.effectProcessorFactoryKey === undefined ||
+        registration.factory.effectProcessorFactoryKey !== registration.manifest.processorFactoryKey
+      ) {
+        throw new Error(`The effect registry cannot activate ${effect.pluginId}.`);
+      }
+      return createEffectWorkletPort(context, {
+        pluginId: effect.pluginId,
+        state: effect.state,
+        onStatus: (status) => {
+          if (runtime !== audio) return;
+          appReference.current?.reportAudioStatus(
+            status.state === "degraded" ? "recovering" : status.state,
+            status.state === "recovered" ? undefined : `${status.message} ${status.recoveryAction}`,
+          );
+        },
+      });
+    },
     onStatus: (status) => {
       if (runtime !== audio) return;
       appReference.current?.reportAudioStatus(
@@ -123,7 +153,7 @@ function queueFullAudioProjection(): void {
 }
 
 const store = new PulseStore(
-  createDefaultProjectState(browserIdFactory),
+  createDefaultProjectState(browserIdFactory, createEffectInstance),
   browserIdFactory,
   (pluginId) => registry.get(pluginId)?.factory.moduleSeed,
   (delta) => queueAudioDelta(delta),
@@ -132,7 +162,11 @@ const store = new PulseStore(
   createParameterValidator(
     (pluginId) => registry.get(pluginId as PluginId)?.manifest.parameters,
   ),
-  createVoiceInsertEffect,
+  undefined,
+  createParameterValidator(
+    (pluginId) => registry.get(pluginId as PluginId)?.manifest.parameters,
+  ),
+  createEffectInstance,
 );
 
 const host = document.querySelector<HTMLElement>("#app");
@@ -146,32 +180,35 @@ const registryEntries = registry.entries();
 const instrumentRegistryEntries = registryEntries.filter(
   ([, entry]) => entry.manifest.kind === "instrument",
 );
-const voiceInsertEffectEntries = registryEntries.flatMap(([pluginId, entry]) => {
-  if (entry.manifest.kind !== "effect" || !entry.manifest.placements.includes("voice-insert")) {
-    return [];
-  }
-  return [[pluginId, entry.manifest] as const];
-});
-const voiceInsertEffectPluginIds = voiceInsertEffectEntries.map(([pluginId]) => pluginId);
-const voiceInsertEffectsByPluginId = Object.fromEntries(
-  voiceInsertEffectEntries.map(([pluginId, manifest]) => [
-    pluginId,
-    {
-      stateSchemaVersion: manifest.stateSchemaVersion,
-      parameters: manifest.parameters,
-    },
-  ]),
+const effectDescriptorsByPluginId = Object.fromEntries(
+  registryEntries.flatMap(([pluginId, entry]) =>
+    entry.manifest.kind === "effect"
+      ? [[pluginId, {
+          stateSchemaVersion: entry.manifest.stateSchemaVersion,
+          parameters: entry.manifest.parameters,
+          placements: entry.manifest.placements,
+        }]]
+      : [],
+  ),
+);
+const pluginMetadataByPluginId = Object.fromEntries(
+  registryEntries.map(([pluginId, entry]) => [pluginId, {
+    kind: entry.manifest.kind,
+    pluginVersion: entry.manifest.pluginVersion,
+    apiVersion: entry.manifest.apiVersion,
+    stateSchemaVersion: entry.manifest.stateSchemaVersion,
+  }]),
 );
 const parseOptions = {
   knownPluginIds: instrumentRegistryEntries.map(([pluginId]) => pluginId as string),
   parameterDescriptorsByPluginId: Object.fromEntries(
     instrumentRegistryEntries.map(([pluginId, entry]) => [pluginId, entry.manifest.parameters]),
   ),
-  knownVoiceInsertEffectPluginIds: voiceInsertEffectPluginIds.map((pluginId) => pluginId as string),
   stateSchemaVersionByPluginId: Object.fromEntries(
     registryEntries.map(([pluginId, entry]) => [pluginId, entry.manifest.stateSchemaVersion]),
   ),
-  voiceInsertEffectsByPluginId,
+  effectDescriptorsByPluginId,
+  pluginMetadataByPluginId,
   voiceIdsByPluginId: Object.fromEntries(
     registryEntries.flatMap(([pluginId, entry]) => {
       if (entry.manifest.kind !== "instrument") return [];
@@ -206,6 +243,7 @@ const projectsService = {
           modifiedAt: now,
           projectRevision: committedMetadata.revision,
           manifestVersionFor,
+          pluginMetadataByPluginId,
         }),
       },
       browserIdFactory,
@@ -249,6 +287,7 @@ const projectsService = {
         modifiedAt: committedMetadata.modifiedAt,
         projectRevision: committedMetadata.revision,
         manifestVersionFor,
+        pluginMetadataByPluginId,
       }),
     ),
   importPortable: async (bytes: Uint8Array) => {
@@ -275,6 +314,7 @@ const app = mountPulseboxApp({
   addablePluginIds: registryEntries
     .filter(([, entry]) => entry.manifest.kind === "instrument")
     .map(([pluginId]) => pluginId),
+  addableEffectPluginIds: BUILT_IN_EFFECTS.map(({ manifest }) => manifest.pluginId),
   auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) =>
     requireInstrumentRuntime(pluginId).auditionNoteForVoice(voiceId),
   playableNotesFor: (pluginId: PluginId) => {
@@ -316,6 +356,18 @@ const app = mountPulseboxApp({
     previewChannelMix: (moduleId, field, value) => {
       audio.previewChannelMix(moduleId, field, value);
     },
+    previewChannelSendAmount: (moduleId, sendBusId, amount) => {
+      audio.previewChannelSendAmount(moduleId, sendBusId, amount);
+    },
+    previewSendReturnLevel: (sendBusId, returnLevel) => {
+      audio.previewSendReturnLevel(sendBusId, returnLevel);
+    },
+    previewEffectWetDry: (effectInstanceId, wetDry) => {
+      audio.previewEffectWetDry(effectInstanceId, wetDry);
+    },
+    previewEffectParameter: (effectInstanceId, parameterId, value) => {
+      audio.previewEffectParameter(effectInstanceId, parameterId, value);
+    },
     previewMasterLevel: (level) => {
       audio.previewMasterLevel(level);
     },
@@ -328,6 +380,10 @@ const app = mountPulseboxApp({
       audio.setSwing(swing);
     },
     getMasterMeter: () => audio.getMasterMeter(),
+    getMasterChainMeter: (position) => audio.getMasterChainMeter(position),
+    getEffectMeter: (effectInstanceId, meterId) =>
+      audio.getEffectMeter(effectInstanceId, meterId),
+    resetMasterPeak: () => audio.resetMasterPeak(),
     setMetronomeEnabled: (enabled) => {
       audio.setMetronomeEnabled(enabled);
     },
@@ -356,7 +412,7 @@ const app = mountPulseboxApp({
           storageAvailable: repositorySelection.durable,
           save: projectsService.save,
           currentRevision: () => store.getState().project.revision,
-          createFresh: () => createDefaultProjectState(browserIdFactory),
+          createFresh: () => createDefaultProjectState(browserIdFactory, createEffectInstance),
           activateFresh: (next) => {
             if (!activateTemplateProject(store, next, () => audio.stop())) return false;
             const now = new Date().toISOString();
@@ -383,6 +439,7 @@ const autosave = createAutosave({
   createdAt: () => committedMetadata.createdAt,
   projectRevision: () => committedMetadata.revision,
   manifestVersionFor,
+  pluginMetadataByPluginId,
   onError: (error) => {
     app.reportProjectNotice("Autosave failed. This browser may be blocking storage.");
     console.error("Pulsebox could not write the autosave snapshot.", error);
@@ -467,6 +524,8 @@ function queueAudioDelta(delta: PulseEngineDelta): void {
     module === undefined ? undefined : toAudioModule(acceptedState, module);
   const fullProjection =
     transportDelta.kind === "project-replace" ? toAudioModules(acceptedState) : undefined;
+  const fullRouting =
+    transportDelta.kind === "project-replace" ? toAudioRouting(acceptedState) : undefined;
 
   audioProjectionQueue = audioProjectionQueue
     .then(async () => {
@@ -477,6 +536,14 @@ function queueAudioDelta(delta: PulseEngineDelta): void {
         audio.setPatternTiming(toPatternTiming(acceptedState));
         audio.setSwing(acceptedState.project.swing);
         audio.setMasterLevel(acceptedState.project.masterLevel);
+        if (fullRouting !== undefined) audio.setRoutingProjection(fullRouting);
+      }
+      if (
+        transportDelta.kind === "pattern-events-set" ||
+        transportDelta.kind === "module-effects-set" ||
+        transportDelta.kind === "mixer-set"
+      ) {
+        audio.setRoutingProjection(toAudioRouting(acceptedState));
       }
       await audio.project(transportDelta, moduleProjection, fullProjection);
     })
@@ -493,6 +560,7 @@ async function prepareImportedProject(
     candidateAudio.setPatternTiming(toPatternTiming(candidate));
     candidateAudio.setSwing(candidate.project.swing);
     candidateAudio.setMasterLevel(candidate.project.masterLevel);
+    candidateAudio.setRoutingProjection(toAudioRouting(candidate));
     await candidateAudio.replaceFromCurrentState(
       toAudioModules(candidate),
       candidate.project.revision,
@@ -534,6 +602,7 @@ async function replaceAudioProjection(state: Readonly<PulseState>): Promise<void
     audio.setPatternTiming(toPatternTiming(state));
     audio.setSwing(state.project.swing);
     audio.setMasterLevel(state.project.masterLevel);
+    audio.setRoutingProjection(toAudioRouting(state));
     await audio.replaceFromCurrentState(toAudioModules(state), state.project.revision);
   } catch {
     app.markAudioUnavailable();
@@ -579,27 +648,11 @@ function patternIndexFor(state: Readonly<PulseState>, patternId: string): number
 }
 
 function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): TransportModule {
-  const slots = state.project.effects.voiceInserts[module.id];
-  const voiceInserts =
-    slots === undefined
-      ? undefined
-      : Object.fromEntries(
-          Object.entries(slots).map(([voiceId, effectInstanceId]) => {
-            const effect =
-              effectInstanceId === null
-                ? undefined
-                : state.project.effects.instances[effectInstanceId];
-            return [
-              voiceId,
-              effect === undefined ? null : { pluginId: effect.pluginId, state: effect.state },
-            ];
-          }),
-        );
   return {
     id: module.id,
     pluginId: module.pluginId,
     parameters: module.parameters,
-    ...(voiceInserts === undefined ? {} : { voiceInserts }),
+    effects: resolveEffectChain(state, state.project.effects.moduleChains[module.id] ?? []),
     parts: state.project.patterns.map((pattern) => {
       const part = pattern.parts[module.id];
       return part === undefined
@@ -630,8 +683,90 @@ function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): Tr
       pan: module.pan,
       muted: module.muted,
       solo: module.solo,
+      sends: Object.entries(module.sends).map(([busId, send]) => ({
+        busId: busId as SendBusId,
+        amount: send.amount,
+        mode: send.mode === "pre-fader" ? "pre" : "post",
+      })),
     },
   };
+}
+
+function toAudioRouting(state: Readonly<PulseState>): TransportRoutingProjection {
+  const sendChains = Object.entries(state.project.effects.sendChains).map(([busId, chain]) => ({
+    busId: busId as SendBusId,
+    returnLevel: chain.returnLevel,
+    effects: resolveEffectChain(state, chain.slots),
+    effectsBypassed: chain.bypassed,
+  }));
+  const masterEffects = resolveEffectChain(state, state.project.effects.masterChain);
+  const limiter = masterEffects.at(-1);
+  return {
+    sends: sendChains,
+    master: {
+      level: state.project.masterLevel,
+      effects: limiter === undefined ? [] : masterEffects.slice(0, -1),
+      effectsBypassed: state.project.effects.masterEffectsBypassed,
+      limiterBypassed: limiter?.bypassed ?? false,
+      ...(limiter === undefined
+        ? {}
+        : {
+            limiterState: limiter.state,
+            limiterEffectId: limiter.id,
+            limiterWetDry: limiter.wetDry,
+            limiterWetDryLaw: limiter.wetDryLaw,
+          }),
+    },
+    automation: toAudioExternalAutomation(state),
+  };
+}
+
+function toAudioExternalAutomation(
+  state: Readonly<PulseState>,
+): TransportExternalAutomationProjection {
+  const targets: Record<string, TransportExternalAutomationProjection["targets"][string]> = {};
+  const parts = state.project.patterns.map((pattern) => {
+    const automationSteps = pattern.automationLaneIds.flatMap((laneId) => {
+      const lane = state.project.automationLanes[laneId];
+      if (lane === undefined || lane.scope === "module") return [];
+      targets[lane.id] = {
+        scope: lane.scope,
+        targetId: lane.targetId,
+        parameterId: lane.parameterId,
+      };
+      return lane.steps.map((step) => ({
+        parameterId: lane.id,
+        positionTicks: step.tick,
+        value: step.value,
+      }));
+    });
+    return {
+      length: 16,
+      durationSteps: pattern.durationBars * 16,
+      events: [],
+      automationSteps: automationSteps.sort(
+        (left, right) =>
+          left.positionTicks - right.positionTicks ||
+          left.parameterId.localeCompare(right.parameterId),
+      ),
+    };
+  });
+  return { parts, targets };
+}
+
+function resolveEffectChain(
+  state: Readonly<PulseState>,
+  slots: readonly (EffectInstanceId | null)[],
+): readonly RoutingEffectInstance[] {
+  return slots.flatMap((effectId) => {
+    if (effectId === null) return [];
+    const effect = state.project.effects.instances[effectId];
+    if (effect === undefined) return [];
+    const manifest = registry.get(effect.pluginId)?.manifest;
+    return manifest?.kind === "effect"
+      ? [{ ...effect, wetDryLaw: manifest.wetDryLaw }]
+      : [];
+  });
 }
 
 /** The state contract lets a drum part use its stable voice ID. The scheduler
@@ -667,14 +802,15 @@ function requireInstrumentRuntime(pluginId: PluginId): Required<RuntimePlugin> {
   return runtime as Required<RuntimePlugin>;
 }
 
-function createVoiceInsertEffect(
+function createEffectInstance(
   id: EffectInstanceId,
   pluginId: PluginId,
+  placement?: ChainEffectPlacement,
 ): EffectInstanceState | undefined {
   const entry = registry.get(pluginId);
   if (
     entry?.manifest.kind !== "effect" ||
-    !entry.manifest.placements.includes("voice-insert")
+    (placement !== undefined && !entry.manifest.placements.includes(placement))
   ) {
     return undefined;
   }
@@ -683,6 +819,8 @@ function createVoiceInsertEffect(
     pluginId,
     stateVersion: entry.manifest.stateSchemaVersion,
     state: Object.freeze(effectStateDefaultsFor(entry.manifest.defaultState)),
+    bypassed: false,
+    wetDry: 1,
   });
 }
 
@@ -691,7 +829,7 @@ function effectStateDefaultsFor(
 ): Readonly<Record<string, number | boolean | string>> {
   const state = toParameterValues(defaultState);
   if (Object.keys(state).length !== Object.keys(defaultState).length) {
-    throw new Error("Voice insert state must contain only finite scalar values.");
+    throw new Error("Effect state must contain only finite scalar values.");
   }
   return state;
 }

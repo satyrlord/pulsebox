@@ -36,13 +36,13 @@ contains the normative requirements. This table is the traceability record.
 - **D08.** Deep effect editors use the established 760 × 680 playback-safe modal
   overlay.
 - **D09.** Compact faceplates expose the established fast controls. Deeper
-  synthesis, sample, voice, insert, and routing controls live in the expanded
+  synthesis, sample, voice, pedalboard, and routing controls live in the expanded
   editor. Faceplates carry no step grid and no per-step editing, as recorded in
   `D65`.
 - **D10.** Browser projects use JSON manifests plus asset records. Portable
   export is one `.pulsebox` package.
 - **D11.** Support current stable Chrome.
-- **D12.** Rack stems are post-module-insert and post-fader. Send returns are
+- **D12.** Rack stems are post-module-pedalboard and post-fader. Send returns are
   separate. Export also includes the master mix.
 - **D13.** The MVP has no voice-level send controls. Sends exist only on the
   parent module channel.
@@ -55,7 +55,8 @@ contains the normative requirements. This table is the traceability record.
   declaration-injecting values.
 - **D17.** Musical input uses physical key positions through
   `KeyboardEvent.code`. The user can remap it.
-- **D18.** MVP output routing is main plus four send buses.
+- **D18.** MVP output routing is one fixed main path plus four A–D send buses.
+  Fixed subgroups and an arbitrary routing graph are outside the MVP.
 - **D19.** Automation is step-based only.
 - **D20.** Import safely repairs ranges and missing optional fields, rejects
   structural failures and any unknown or incompatible referenced plugin, and
@@ -71,8 +72,8 @@ contains the normative requirements. This table is the traceability record.
 - **D25.** Ordinary Save preserves each asset's current embedded or
   recognized-pack-reference policy silently. Portable Export asks whether
   eligible pack references remain references or whether Export embeds them.
-- **D26.** Mixer strips have a fixed structure with swappable processing modules
-  and insert chains.
+- **D26.** Mixer strips have a fixed structure without a processing expansion.
+  The instrument rack owns each module pedalboard.
 - **D27.** The three-second first-sound metric starts at the first valid
   audio-unlock gesture that requests an audible result. It uses the five-run
   warm-cache procedure in section 21.8.
@@ -109,10 +110,8 @@ contains the normative requirements. This table is the traceability record.
   installed IndexedDB packs. SHA-256 content ID identifies each pack. The
   install, integrity, missing-pack, and removal rules are in
   `PROJECT-FORMAT.md`. Portable export embeds loose imports.
-- **D42.** Monitor is exclusive physical-output PFL for one post-insert,
-  pre-fader channel. The engine keeps rendering the master program while Monitor
-  is active. It does not send that program to the physical output. Thus, it
-  never doubles the selected channel.
+- **D42.** The mixer has no single-channel audition path or channel expansion
+  surface. The instrument rack is the only pedalboard entry point.
 - **D43.** One header Pattern/Song toggle selects transport scope. One
   module-aware Piano Roll edits the selected Pattern, the Playlist orders
   Patterns into a Song, and the bottom bar only collapses or expands the editor.
@@ -131,9 +130,8 @@ contains the normative requirements. This table is the traceability record.
 - **D49.** Channel mute silences main and sends. Global solo passes only soloed
   channels and their sends. Shared returns contain only surviving soloed
   sources.
-- **D50.** Header L/R and M/S are transient meter-analysis modes and never alter
-  audio or export. Mono remains a separate transient monitor-only fold-down in
-  the Master studio view and does not affect WAV or stem export.
+- **D50.** Header L/R and M/S are transient meter-analysis modes. They never
+  alter audio or export. The Master studio has no fold-down output control.
 - **D51.** Development and built-app launch use `http://127.0.0.1:4173` with
   strict-port behavior. The static-file launcher exposes no product API.
 - **D52.** WAV, AIFF, and FLAC import uses bundled deterministic decoders behind
@@ -614,3 +612,8 @@ contains the normative requirements. This table is the traceability record.
   24 by 16 CSS pixels. Follow and page lock are icon toggle buttons with
   explanatory tooltips. Section 16.3 of
   [pattern editing](spec-006-pattern-editing.md) owns this behavior.
+- **D99.** Each Playlist row uses one drag handle for movement. The handle
+  supports pointer drag and Arrow Up and Arrow Down. The row menu contains
+  Duplicate and Delete, which removes the repeated move, duplicate, and delete
+  caps from every row. Section 18.1 of
+  [song and automation](spec-008-song-and-automation.md) owns this behavior.

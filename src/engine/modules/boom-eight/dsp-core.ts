@@ -14,6 +14,7 @@
  */
 
 import {
+  applyVoiceDistortion,
   clamp,
   DeterministicNoise,
   EqualPowerPan,
@@ -27,7 +28,6 @@ import {
   StateVariableFilter,
   VoiceMixGates,
 } from "../../dsp/primitives";
-import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { BOOM_VOICE_IDS, type BoomVoiceId } from "./voices";
 
 export interface BoomVoiceParameters {
@@ -37,6 +37,7 @@ export interface BoomVoiceParameters {
   readonly punch: number;
   readonly decay: number;
   readonly level: number;
+  readonly distortion: number;
   /** -1 hard left to 1 hard right. */
   readonly pan: number;
   /** A muted voice keeps rendering but contributes silence to the mix. */
@@ -86,6 +87,7 @@ const DEFAULT_BOOM_VOICE_PARAMETERS: Readonly<Record<BoomVoiceId, BoomVoiceParam
           punch: VOICE_CHARACTER[id].punch,
           decay: VOICE_CHARACTER[id].decay,
           level: id === "sub-kick" ? 0.7 : 0.8,
+          distortion: 0,
           // Toms and rim spread across the field; the low end stays centred so
           // the kick pair keeps its weight in mono.
           pan: id === "low-tom" ? -0.3 : id === "high-tom" ? 0.3 : id === "rim" ? 0.24 : 0,
@@ -128,6 +130,8 @@ class BoomVoice {
    * change on a ringing voice glides instead of stepping in one sample.
    */
   readonly #level: ParameterGlide;
+  /** The Distortion descriptor declares the same 8 ms linear glide. */
+  readonly #distortion: ParameterGlide;
   /** Linear choke over the declared release, never a hard cut. */
   readonly #chokeStep: number;
   #parameters: BoomVoiceParameters;
@@ -146,6 +150,7 @@ class BoomVoice {
     this.#parameters = parameters;
     this.#noise = new DeterministicNoise(this.#character.seed);
     this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
+    this.#distortion = new ParameterGlide(clamp(parameters.distortion, 0, 1), sampleRate);
     this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
@@ -155,7 +160,10 @@ class BoomVoice {
 
   setParameters(parameters: BoomVoiceParameters, mode: BoomParameterUpdateMode = "smooth"): void {
     this.#parameters = parameters;
-    if (mode === "immediate") this.#level.set(clamp(parameters.level, 0, 1));
+    if (mode === "immediate") {
+      this.#level.set(clamp(parameters.level, 0, 1));
+      this.#distortion.set(clamp(parameters.distortion, 0, 1));
+    }
   }
 
   trigger(velocity: number, accent: boolean): void {
@@ -163,7 +171,10 @@ class BoomVoice {
     this.#noiseFilter.reset();
     // A hit that starts from silence takes the committed level directly; the
     // glide exists to protect a ringing tail, not to lag a fresh attack.
-    if (!this.#active) this.#level.set(clamp(this.#parameters.level, 0, 1));
+    if (!this.#active) {
+      this.#level.set(clamp(this.#parameters.level, 0, 1));
+      this.#distortion.set(clamp(this.#parameters.distortion, 0, 1));
+    }
     this.#phase = 0;
     this.#elapsed = 0;
     this.#velocity = clamp(velocity, 0, 1);
@@ -209,9 +220,13 @@ class BoomVoice {
     return sample * this.#amplitude * gain;
   }
 
-  /** The outer machine applies this after the per-voice insert. */
+  /** The outer machine applies this after the per-voice distortion. */
   advanceLevel(): number {
     return this.#level.advance(clamp(this.#parameters.level, 0, 1));
+  }
+
+  advanceDistortion(): number {
+    return this.#distortion.advance(clamp(this.#parameters.distortion, 0, 1));
   }
 
   #renderVoice(frequency: number, punch: number, decaySeconds: number): number {
@@ -318,7 +333,6 @@ export class BoomEightDsp {
   readonly #tone: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<BoomVoiceId, EqualPowerPan>>;
-  readonly #voiceInserts: Readonly<Record<BoomVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly BoomVoice[];
   #parameters: BoomEightParameters = DEFAULT_BOOM_PARAMETERS;
@@ -338,9 +352,6 @@ export class BoomEightDsp {
         new EqualPowerPan(DEFAULT_BOOM_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<BoomVoiceId, EqualPowerPan>;
-    this.#voiceInserts = Object.fromEntries(
-      BOOM_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
-    ) as Record<BoomVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       BOOM_VOICE_IDS.map((id) => [
         id,
@@ -382,17 +393,6 @@ export class BoomEightDsp {
 
   getParameterSnapshot(): BoomEightParameters {
     return this.#parameters;
-  }
-
-  setVoiceInserts(
-    configurations: Readonly<Partial<Record<BoomVoiceId, VoiceInsertConfiguration | null>>>,
-  ): boolean {
-    let accepted = true;
-    for (const voiceId of BOOM_VOICE_IDS) {
-      const host = this.#voiceInserts[voiceId];
-      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.active === true) && accepted;
-    }
-    return accepted;
   }
 
   trigger(voiceId: BoomVoiceId, velocity = 1, accent = false): void {
@@ -459,7 +459,7 @@ export class BoomEightDsp {
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
         const source = voice.render();
-        const sample = this.#voiceInserts[voice.id].process(source) * voice.advanceLevel();
+        const sample = applyVoiceDistortion(source, voice.advanceDistortion()) * voice.advanceLevel();
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

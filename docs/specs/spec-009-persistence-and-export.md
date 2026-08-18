@@ -206,7 +206,7 @@ over-cap slot. Import applies no partial project state.
 - No playback dropout.
 - No server.
 
-Stem export produces one post-module-insert, post-fader stem per occupied rack
+Stem export produces one post-module-pedalboard, post-fader stem per occupied rack
 slot, one separate stem for each of the four send returns, and one master mix.
 Rack stems do not duplicate shared send returns. Rack and send-return stems are
 rendered before the master chain. Only the master mix includes master-chain

@@ -2,6 +2,13 @@ import { createHash } from "node:crypto";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+interface MeterModeProbe {
+  analysers: number;
+  contexts: number;
+  workletNodes: number;
+  contextState: AudioContextState | undefined;
+}
+
 const SUPPORTED_VIEWPORTS = [
   { width: 1536, height: 1024 },
   { width: 1440, height: 900 },
@@ -807,46 +814,103 @@ test("replaces a note at the move destination in one Undo entry", async ({ page 
 test("changes transport scope without stopping and toggles meter analysis without changing audio", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    const state = window as unknown as { __meterModeProbe: MeterModeProbe };
+    state.__meterModeProbe = { analysers: 0, contexts: 0, workletNodes: 0, contextState: undefined };
+
+    const NativeAudioContext = window.AudioContext;
+    class ProbedAudioContext extends NativeAudioContext {
+      constructor(options: AudioContextOptions = {}) {
+        super(options);
+        state.__meterModeProbe.contexts += 1;
+        state.__meterModeProbe.contextState = this.state;
+      }
+
+      override createAnalyser(): AnalyserNode {
+        state.__meterModeProbe.analysers += 1;
+        return super.createAnalyser();
+      }
+    }
+    Object.defineProperty(window, "AudioContext", {
+      configurable: true,
+      value: ProbedAudioContext,
+    });
+
+    const NativeAudioWorkletNode = window.AudioWorkletNode;
+    Object.defineProperty(window, "AudioWorkletNode", {
+      configurable: true,
+      value: new Proxy(NativeAudioWorkletNode, {
+        construct(target, argumentsList: ConstructorParameters<typeof AudioWorkletNode>) {
+          state.__meterModeProbe.workletNodes += 1;
+          return Reflect.construct(target, argumentsList);
+        },
+      }),
+    });
+  });
+  await page.reload();
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.locator(".audio-status")).toHaveText("Audio active");
+  await expect.poll(async () => page.evaluate(() => {
+    const probe = (window as unknown as { __meterModeProbe: { analysers: number } }).__meterModeProbe;
+    return probe.analysers;
+  })).toBeGreaterThanOrEqual(2);
   await page.getByRole("button", { name: "Pattern playback mode" }).click();
   await expect(page.getByRole("button", { name: "Song playback mode" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
 
+  const playlist = page.locator('[data-component="playlist-summary"]');
+  await expect(playlist.locator('[data-component="playlist-playback-marker"]')).toHaveCount(1);
+  await expect(playlist.getByText("Playing", { exact: true })).toBeVisible();
+
+  const before = await page.evaluate(() => {
+    const probe = (window as unknown as { __meterModeProbe: MeterModeProbe }).__meterModeProbe;
+    return { ...probe };
+  });
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  const redo = page.getByRole("button", { name: "Redo", exact: true });
+  const historyBefore = { undoDisabled: await undo.isDisabled(), redoDisabled: await redo.isDisabled() };
   const meterMode = page.getByRole("button", { name: "Master meter mode: left and right" });
   await meterMode.click();
   await expect(page.getByRole("button", { name: "Master meter mode: mid and side" })).toHaveText(
     "M/S",
   );
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect.poll(async () => page.evaluate(() => {
+    const probe = (window as unknown as { __meterModeProbe: MeterModeProbe }).__meterModeProbe;
+    return { ...probe };
+  })).toEqual(before);
+  expect(await undo.isDisabled()).toBe(historyBefore.undoDisabled);
+  expect(await redo.isDisabled()).toBe(historyBefore.redoDisabled);
 });
 
-test("uses icon-only Playlist actions at the compact supported width", async ({ page }) => {
+test("keeps the complete Playlist row contract at the compact supported width", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   const playlist = page.locator('[data-component="playlist-summary"]');
   const mode = playlist.getByRole("button", { name: "Pattern playback mode" });
   await expect(mode.locator("svg")).toBeVisible();
   await expect(mode).toHaveAttribute("title", /switch to Song/u);
 
-  for (const name of [
-    "Move Playlist row 2 earlier",
-    "Move Playlist row 1 later",
-    "Duplicate Playlist row 1",
-    "Remove Playlist row 1",
-  ] as const) {
-    const action = playlist.getByRole("button", { name });
-    await expect(action.locator("svg")).toBeVisible();
-    await expect(action).toHaveText("");
-    await expect(action).toHaveAttribute("title", /Playlist row/u);
-    const target = await box(action);
-    expect(target.width).toBeGreaterThanOrEqual(24);
-    expect(target.height).toBeGreaterThanOrEqual(24);
-  }
+  const handle = playlist.getByRole("button", { name: "Reorder Playlist row 1" });
+  await expect(handle.locator("svg")).toBeVisible();
+  await expect(handle).toHaveAttribute("title", /Arrow Up and Arrow Down/u);
+  const handleTarget = await box(handle);
+  expect(handleTarget.width).toBeGreaterThanOrEqual(24);
+  expect(handleTarget.height).toBeGreaterThanOrEqual(24);
+  await expect(playlist.getByRole("combobox", { name: "Playlist row 1 Pattern" })).toBeVisible();
+  await expect(playlist.getByText(/bar/u).first()).toBeVisible();
 
-  const add = playlist.getByRole("button", { name: "Add selected Pattern" });
+  const menu = playlist.getByRole("button", { name: "Playlist row 1 menu" });
+  await expect(menu.locator("svg")).toBeVisible();
+  await menu.click();
+  await expect(page.getByRole("menu", { name: "Playlist row 1 menu" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Move /u })).toHaveCount(0);
+
+  const add = playlist.getByRole("button", { name: "Add Verse at the end as Playlist row 6" });
   await expect(add.locator("svg")).toBeVisible();
-  await expect(add).toHaveText("");
-  await expect(add).toHaveAttribute("title", "Add the selected Pattern to the Playlist.");
+  await expect(add).toHaveText("Add at end. Row 6.Verse");
+  await expect(add).toHaveAttribute("title", "Add Verse at the end as Playlist row 6.");
   expect(await playlist.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
@@ -857,7 +921,7 @@ test("collapses and restores the lower editor with its focus and scroll context"
   const beforeHeight = (await box(rack)).height;
   const patternName = page.getByRole("textbox", { name: "Pattern name" });
 
-  const addPattern = page.getByRole("button", { name: "Add selected Pattern" });
+  const addPattern = page.getByRole("button", { name: /Add .* at the end as Playlist row \d+/u });
   for (let index = 0; index < 12; index += 1) await addPattern.click();
   await patternName.focus();
   const playlist = page.locator('[data-component="playlist-summary"] ol');

@@ -1,21 +1,27 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
+  type EffectInstanceId,
   type GestureId,
   type ModuleInstanceId,
   type NoteEventId,
   type ParameterDescriptor,
+  type ParameterId,
   type ParameterValue,
   type PatternId,
+  type SendBusId,
+  type SongPlacementId,
 } from "../../../contracts";
 import {
   PATTERN_SCALES,
+  PATTERN_TICKS_PER_BAR,
   PATTERN_TICKS_PER_STEP,
   type PatternEvent,
   type PatternPartState,
   type PatternScale,
 } from "../../../state/public";
 import { AuditionButton } from "../controls/AuditionButton";
+import { PopupMenu, type PopupMenuItem } from "../controls/PopupMenu";
 import { useContinuousGesture } from "../controls/use-gesture-id";
 import { WHEEL_IDLE_MILLISECONDS } from "../controls/use-range-gesture";
 import { useAppStore, useDependencies } from "../store/app-store-context";
@@ -871,6 +877,42 @@ function notePropertyUpdate(
   }
 }
 
+interface ExternalAutomationView {
+  readonly descriptor: ParameterDescriptor;
+  readonly ownerLabel: string;
+  readonly currentValue: ParameterValue;
+}
+
+function externalDescriptor(
+  id: string,
+  name: string,
+  defaultValue: ParameterValue,
+  options: {
+    readonly valueType?: "float" | "boolean";
+    readonly minimum?: number;
+    readonly maximum?: number;
+    readonly step?: number;
+    readonly unit?: "none" | "percent";
+  } = {},
+): ParameterDescriptor {
+  return {
+    id: id as ParameterId,
+    name,
+    valueType: options.valueType ?? "float",
+    ...(options.minimum === undefined ? {} : { minimum: options.minimum }),
+    ...(options.maximum === undefined ? {} : { maximum: options.maximum }),
+    ...(options.step === undefined ? {} : { step: options.step }),
+    defaultValue,
+    unit: options.unit ?? "none",
+    displayPrecision: options.step !== undefined && options.step < 0.1 ? 2 : 0,
+    resetValue: defaultValue,
+    smoothing: { curve: "linear", durationMilliseconds: 10 },
+    workletRate: "message",
+    automation: "step",
+    modulation: "none",
+  };
+}
+
 function PianoRoll() {
   const { auditionNoteFor, manifestFor } = useDependencies();
   const modules = useAppStore((state) => state.project.project.modules);
@@ -891,7 +933,15 @@ function PianoRoll() {
   const setPianoRollParameter = useAppStore((state) => state.setPianoRollParameter);
   const editPatternEvents = useAppStore((state) => state.editPatternEvents);
   const automationLanes = useAppStore((state) => state.project.project.automationLanes);
+  const effects = useAppStore((state) => state.project.project.effects);
+  const masterLevel = useAppStore((state) => state.project.project.masterLevel);
+  const externalAutomationTarget = useAppStore(
+    (state) => state.project.ui.pianoRollAutomationTarget,
+  );
   const setAutomationLaneSteps = useAppStore((state) => state.setAutomationLaneSteps);
+  const setExternalAutomationLaneSteps = useAppStore(
+    (state) => state.setExternalAutomationLaneSteps,
+  );
   const pattern = patterns.find((candidate) => candidate.id === activePatternId);
   const humanize = pattern?.humanize ?? 0;
   const module = selectedModuleId === undefined ? undefined : modules[selectedModuleId];
@@ -914,7 +964,12 @@ function PianoRoll() {
   const events = part?.events ?? [];
   const patternName = pattern?.name ?? "Pattern";
   const moduleName = manifest?.productName ?? "No module";
-  const cycleSteps = Math.max(1, part?.length ?? VISIBLE_STEPS);
+  const cycleSteps = Math.max(
+    1,
+    externalAutomationTarget === undefined
+      ? (part?.length ?? VISIBLE_STEPS)
+      : (pattern?.durationBars ?? 1) * 16,
+  );
   const pageCount = Math.max(1, Math.ceil(cycleSteps / VISIBLE_STEPS));
   const [pageIndexState, setPageIndex] = useState(0);
   const [followPages, setFollowPages] = useState(true);
@@ -933,6 +988,161 @@ function PianoRoll() {
     ? ["velocity", "accent", "slide", "probability", "microTimingTicks", "flam", "roll"]
     : ["velocity", "accent", "probability", "microTimingTicks", "flam", "roll"];
   const automatableParameters = manifest?.parameters.filter((parameter) => parameter.automation === "step") ?? [];
+  const externalAutomation: ExternalAutomationView | undefined = (() => {
+    const target = externalAutomationTarget;
+    if (target === undefined) return undefined;
+    if (target.scope === "mixer") {
+      const targetModule = modules[target.targetId as ModuleInstanceId];
+      if (targetModule === undefined) return undefined;
+      const ownerLabel = `${manifestFor(targetModule.pluginId)?.productName ?? "Module"} mixer`;
+      if (target.parameterId === "level") {
+        return {
+          descriptor: externalDescriptor("level", "Level", 0.8, {
+            minimum: 0,
+            maximum: 1,
+            step: 0.01,
+            unit: "percent",
+          }),
+          ownerLabel,
+          currentValue: targetModule.level,
+        };
+      }
+      if (target.parameterId === "pan") {
+        return {
+          descriptor: externalDescriptor("pan", "Pan", 0, {
+            minimum: -1,
+            maximum: 1,
+            step: 0.01,
+          }),
+          ownerLabel,
+          currentValue: targetModule.pan,
+        };
+      }
+      if (target.parameterId === "muted" || target.parameterId === "solo") {
+        return {
+          descriptor: externalDescriptor(
+            target.parameterId,
+            target.parameterId === "muted" ? "Mute" : "Solo",
+            false,
+            { valueType: "boolean" },
+          ),
+          ownerLabel,
+          currentValue: target.parameterId === "muted" ? targetModule.muted : targetModule.solo,
+        };
+      }
+      return undefined;
+    }
+    if (target.scope === "send") {
+      const targetModule = modules[target.targetId as ModuleInstanceId];
+      const match = /^send-([abcd])-(amount|mode)$/.exec(target.parameterId);
+      if (targetModule === undefined || match?.[1] === undefined) return undefined;
+      const sendBusId = `send-${match[1]}` as SendBusId;
+      const send = targetModule.sends[sendBusId];
+      if (send === undefined) return undefined;
+      if (match[2] === "mode") {
+        return {
+          descriptor: {
+            ...externalDescriptor(target.parameterId, "Tap mode", "post-fader"),
+            valueType: "enum",
+            enumValues: ["post-fader", "pre-fader"],
+          },
+          ownerLabel: `${manifestFor(targetModule.pluginId)?.productName ?? "Module"} send ${match[1].toUpperCase()}`,
+          currentValue: send.mode,
+        };
+      }
+      return {
+        descriptor: externalDescriptor(target.parameterId, "Amount", 0, {
+          minimum: 0,
+          maximum: 1,
+          step: 0.01,
+          unit: "percent",
+        }),
+        ownerLabel: `${manifestFor(targetModule.pluginId)?.productName ?? "Module"} send ${match[1].toUpperCase()}`,
+        currentValue: send.amount,
+      };
+    }
+    if (target.scope === "send-return") {
+      const sendBusId = target.targetId as SendBusId;
+      const send = effects.sendChains[sendBusId];
+      if (send === undefined) return undefined;
+      if (target.parameterId === "chain-bypassed") {
+        return {
+          descriptor: externalDescriptor("chain-bypassed", "Chain bypass", false, {
+            valueType: "boolean",
+          }),
+          ownerLabel: `Send ${sendBusId.at(-1)?.toUpperCase() ?? ""}`,
+          currentValue: send.bypassed,
+        };
+      }
+      if (target.parameterId !== "return-level") return undefined;
+      return {
+        descriptor: externalDescriptor("return-level", "Return Mix", 1, {
+          minimum: 0,
+          maximum: 1,
+          step: 0.01,
+          unit: "percent",
+        }),
+        ownerLabel: `Send ${sendBusId.at(-1)?.toUpperCase() ?? ""}`,
+        currentValue: send.returnLevel,
+      };
+    }
+    if (target.scope === "master") {
+      if (target.parameterId === "level") {
+        return {
+          descriptor: externalDescriptor("level", "Level", 0.8, {
+            minimum: 0,
+            maximum: 1,
+            step: 0.01,
+            unit: "percent",
+          }),
+          ownerLabel: "Master",
+          currentValue: masterLevel,
+        };
+      }
+      if (target.parameterId === "effects-bypassed") {
+        return {
+          descriptor: externalDescriptor("effects-bypassed", "Effects bypass", false, {
+            valueType: "boolean",
+          }),
+          ownerLabel: "Master",
+          currentValue: effects.masterEffectsBypassed,
+        };
+      }
+      return undefined;
+    }
+    const effect = effects.instances[target.targetId as EffectInstanceId];
+    if (effect === undefined) return undefined;
+    const effectManifest = manifestFor(effect.pluginId);
+    const ownerLabel = effectManifest?.productName ?? "Effect";
+    if (target.parameterId === "wet-dry") {
+      return {
+        descriptor: externalDescriptor("wet-dry", "Wet/dry", 1, {
+          minimum: 0,
+          maximum: 1,
+          step: 0.01,
+          unit: "percent",
+        }),
+        ownerLabel,
+        currentValue: effect.wetDry,
+      };
+    }
+    if (target.parameterId === "bypassed") {
+      return {
+        descriptor: externalDescriptor("bypassed", "Bypass", false, { valueType: "boolean" }),
+        ownerLabel,
+        currentValue: effect.bypassed,
+      };
+    }
+    const descriptor = effectManifest?.parameters.find(
+      (candidate) => candidate.id === target.parameterId && candidate.automation === "step",
+    );
+    if (descriptor === undefined) return undefined;
+    return {
+      descriptor,
+      ownerLabel,
+      currentValue: effect.state[descriptor.id] ?? descriptor.defaultValue,
+    };
+  })();
 
   const followedPageIndex = Math.floor(
     (((positionTicks % (cycleSteps * STEP_TICKS)) + cycleSteps * STEP_TICKS) %
@@ -955,7 +1165,8 @@ function PianoRoll() {
       : undefined;
   const parameterIsAvailable =
     noteProperties.includes(pianoRollParameter as NoteProperty) ||
-    automatableParameters.some((parameter) => parameter.id === pianoRollParameter);
+    automatableParameters.some((parameter) => parameter.id === pianoRollParameter) ||
+    externalAutomation?.descriptor.id === pianoRollParameter;
   const activePianoRollParameter = parameterIsAvailable ? pianoRollParameter : "velocity";
 
   const selectedEventIds =
@@ -991,22 +1202,26 @@ function PianoRoll() {
   const selectedNoteProperty = noteProperties.find(
     (property) => property === activePianoRollParameter,
   );
-  const selectedAutomationParameter = automatableParameters.find(
-    (parameter) => parameter.id === activePianoRollParameter,
-  );
+  const selectedAutomationParameter =
+    externalAutomation?.descriptor.id === activePianoRollParameter
+      ? externalAutomation.descriptor
+      : automatableParameters.find((parameter) => parameter.id === activePianoRollParameter);
   const automationLane =
-    selectedAutomationParameter === undefined || selectedModuleId === undefined || pattern === undefined
+    selectedAutomationParameter === undefined || pattern === undefined
       ? undefined
       : Object.values(automationLanes).find(
           (lane) =>
             lane.patternId === pattern.id &&
-            lane.targetId === selectedModuleId &&
+            lane.scope === (externalAutomationTarget?.scope ?? "module") &&
+            lane.targetId === (externalAutomationTarget?.targetId ?? selectedModuleId) &&
             lane.parameterId === selectedAutomationParameter.id,
         );
   const automationSteps = automationLane?.steps ?? [];
   const activeLaneLabel =
     selectedNoteProperty === undefined
-      ? selectedAutomationParameter?.name ?? "Velocity"
+      ? externalAutomation === undefined
+        ? selectedAutomationParameter?.name ?? "Velocity"
+        : `${externalAutomation.ownerLabel}: ${externalAutomation.descriptor.name}`
       : notePropertyLabel(selectedNoteProperty);
 
   const labelFor = (event: PatternEvent) => {
@@ -1029,14 +1244,21 @@ function PianoRoll() {
     editPatternEvents(selectedModuleId, activePatternId, change, gestureId);
   };
 
+  const commitAutomationSteps = (steps: readonly { readonly tick: number; readonly value: ParameterValue }[]) => {
+    if (selectedAutomationParameter === undefined || pattern === undefined) return;
+    if (externalAutomationTarget !== undefined) {
+      setExternalAutomationLaneSteps(externalAutomationTarget, pattern.id, steps);
+      return;
+    }
+    if (selectedModuleId === undefined) return;
+    setAutomationLaneSteps(selectedModuleId, pattern.id, selectedAutomationParameter.id, steps);
+  };
+
   const setAutomationStep = (step: number, value: ParameterValue | undefined) => {
-    if (selectedModuleId === undefined || selectedAutomationParameter === undefined || pattern === undefined) return;
+    if (selectedAutomationParameter === undefined || pattern === undefined) return;
     const tick = (pageStartStep + step) * STEP_TICKS;
     const withoutCurrent = automationSteps.filter((candidate) => candidate.tick !== tick);
-    setAutomationLaneSteps(
-      selectedModuleId,
-      pattern.id,
-      selectedAutomationParameter.id,
+    commitAutomationSteps(
       value === undefined ? withoutCurrent : [...withoutCurrent, { tick, value }],
     );
   };
@@ -1044,8 +1266,7 @@ function PianoRoll() {
   const moveSelectedAutomationStep = (deltaSteps: number) => {
     if (
       selectedAutomationParameter === undefined ||
-      activeSelectedAutomationTick === undefined ||
-      selectedModuleId === undefined
+      activeSelectedAutomationTick === undefined
     ) {
       return;
     }
@@ -1059,10 +1280,7 @@ function PianoRoll() {
     ) {
       return;
     }
-    setAutomationLaneSteps(
-      selectedModuleId,
-      activePatternId,
-      selectedAutomationParameter.id,
+    commitAutomationSteps(
       automationSteps.map((candidate) =>
         candidate.tick === activeSelectedAutomationTick ? { ...candidate, tick: targetTick } : candidate,
       ),
@@ -1073,8 +1291,7 @@ function PianoRoll() {
   const scaleSelectedAutomationStep = (amount: number) => {
     if (
       selectedAutomationParameter === undefined ||
-      activeSelectedAutomationTick === undefined ||
-      selectedModuleId === undefined
+      activeSelectedAutomationTick === undefined
     ) {
       return;
     }
@@ -1083,10 +1300,7 @@ function PianoRoll() {
     const minimum = selectedAutomationParameter.minimum ?? 0;
     const maximum = selectedAutomationParameter.maximum ?? 1;
     const value = Math.min(maximum, Math.max(minimum, source.value + amount));
-    setAutomationLaneSteps(
-      selectedModuleId,
-      activePatternId,
-      selectedAutomationParameter.id,
+    commitAutomationSteps(
       automationSteps.map((candidate) =>
         candidate.tick === activeSelectedAutomationTick ? { ...candidate, value } : candidate,
       ),
@@ -1603,6 +1817,13 @@ function PianoRoll() {
                 </option>
               ))}
             </optgroup>
+            {externalAutomation === undefined ? null : (
+              <optgroup label={externalAutomation.ownerLabel}>
+                <option value={externalAutomation.descriptor.id}>
+                  {externalAutomation.descriptor.name}
+                </option>
+              </optgroup>
+            )}
             {automatableParameters.length > 0 ? (
               <optgroup label="Automatable parameters">
                 {automatableParameters.map((parameter) => (
@@ -1966,6 +2187,7 @@ function PianoRoll() {
                     value={
                       automationSteps.find((candidate) => candidate.tick === (pageStartStep + step) * STEP_TICKS)
                         ?.value ??
+                      externalAutomation?.currentValue ??
                       module?.parameters[selectedAutomationParameter.id] ??
                       selectedAutomationParameter.defaultValue
                     }
@@ -2032,11 +2254,8 @@ function PianoRoll() {
               type="button"
               disabled={activeSelectedAutomationTick === undefined}
               onClick={() => {
-                if (activeSelectedAutomationTick === undefined || selectedModuleId === undefined) return;
-                setAutomationLaneSteps(
-                  selectedModuleId,
-                  activePatternId,
-                  selectedAutomationParameter.id,
+                if (activeSelectedAutomationTick === undefined) return;
+                commitAutomationSteps(
                   automationSteps.filter((candidate) => candidate.tick !== activeSelectedAutomationTick),
                 );
                 setSelectedAutomationTick(undefined);
@@ -2051,7 +2270,7 @@ function PianoRoll() {
   );
 }
 
-type PlaylistIconKind = "pattern" | "song" | "earlier" | "later" | "duplicate" | "remove" | "add";
+type PlaylistIconKind = "pattern" | "song" | "drag" | "menu" | "add";
 
 function PlaylistIcon(props: { readonly kind: PlaylistIconKind }) {
   if (props.kind === "pattern") {
@@ -2075,47 +2294,24 @@ function PlaylistIcon(props: { readonly kind: PlaylistIconKind }) {
       </svg>
     );
   }
-  if (props.kind === "earlier" || props.kind === "later") {
-    const path = props.kind === "earlier" ? "M8 12V4m-3 3 3-3 3 3" : "M8 4v8m-3-3 3 3 3-3";
+  if (props.kind === "drag") {
     return (
       <svg className={styles.playlistIcon} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <path
-          d={path}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <circle cx="5" cy="4" r="1" fill="currentColor" />
+        <circle cx="11" cy="4" r="1" fill="currentColor" />
+        <circle cx="5" cy="8" r="1" fill="currentColor" />
+        <circle cx="11" cy="8" r="1" fill="currentColor" />
+        <circle cx="5" cy="12" r="1" fill="currentColor" />
+        <circle cx="11" cy="12" r="1" fill="currentColor" />
       </svg>
     );
   }
-  if (props.kind === "duplicate") {
+  if (props.kind === "menu") {
     return (
       <svg className={styles.playlistIcon} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <rect x="5.5" y="2.5" width="7.5" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        <path
-          d="M10 5.5H3.8a1.3 1.3 0 0 0-1.3 1.3v5.4a1.3 1.3 0 0 0 1.3 1.3h5.4a1.3 1.3 0 0 0 1.3-1.3V6.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-  if (props.kind === "remove") {
-    return (
-      <svg className={styles.playlistIcon} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <path
-          d="M3.5 4.5h9m-6.5-2h5l.7 2H4.8zm.2 2v7.2c0 .4.3.8.8.8h4c.4 0 .8-.3.8-.8v-7.2m-3.5 2v4m2-4v4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <circle cx="3" cy="8" r="1.2" fill="currentColor" />
+        <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+        <circle cx="13" cy="8" r="1.2" fill="currentColor" />
       </svg>
     );
   }
@@ -2132,6 +2328,40 @@ function PlaylistIcon(props: { readonly kind: PlaylistIconKind }) {
   );
 }
 
+/**
+ * This leaf reads the transport clock itself. It keeps playback frames out of
+ * the structural Playlist render while the editor selection stays project data.
+ */
+function PlaylistPlaybackMarker(props: { readonly placementId: SongPlacementId }) {
+  const isCurrentPlacement = useAppStore((state) => {
+    const { patterns, song } = state.project.project;
+    if (!song.enabled || state.project.transport.status !== "playing") return false;
+
+    const patternById = new Map(patterns.map((pattern) => [pattern.id, pattern]));
+    const totalTicks = song.placements.reduce((total, placement) => {
+      const pattern = patternById.get(placement.patternId);
+      return total + (pattern?.durationBars ?? 0) * placement.repeatCount * PATTERN_TICKS_PER_BAR;
+    }, 0);
+    if (totalTicks <= 0) return false;
+
+    let remainingTicks = state.positionTicks % totalTicks;
+    for (const placement of song.placements) {
+      const pattern = patternById.get(placement.patternId);
+      const placementTicks =
+        (pattern?.durationBars ?? 0) * placement.repeatCount * PATTERN_TICKS_PER_BAR;
+      if (remainingTicks < placementTicks) return placement.id === props.placementId;
+      remainingTicks -= placementTicks;
+    }
+    return false;
+  });
+
+  return isCurrentPlacement ? (
+    <span className={styles.playlistPlaybackMarker} data-component="playlist-playback-marker">
+      Playing
+    </span>
+  ) : null;
+}
+
 function PlaylistSummary() {
   const patterns = useAppStore((state) => state.project.project.patterns);
   const song = useAppStore((state) => state.project.project.song);
@@ -2141,11 +2371,38 @@ function PlaylistSummary() {
   const addSongPlacement = useAppStore((state) => state.addSongPlacement);
   const removeSongPlacement = useAppStore((state) => state.removeSongPlacement);
   const setSongPlacementRepeats = useAppStore((state) => state.setSongPlacementRepeats);
+  const setSongPlacementPattern = useAppStore((state) => state.setSongPlacementPattern);
   const reorderSongPlacement = useAppStore((state) => state.reorderSongPlacement);
   const duplicateSongPlacement = useAppStore((state) => state.duplicateSongPlacement);
+  const [openMenu, setOpenMenu] = useState<
+    | { readonly placementId: SongPlacementId; readonly x: number; readonly y: number }
+    | undefined
+  >(undefined);
+  const menuTogglePress = useRef(false);
   const patternById = new Map(patterns.map((pattern) => [pattern.id, pattern]));
+  const activePattern = patternById.get(activePatternId);
+  const addedRowNumber = song.placements.length + 1;
+  const addPlacementLabel = `Add ${activePattern?.name ?? "selected Pattern"} at the end as Playlist row ${String(addedRowNumber)}`;
   const playbackMode = song.enabled ? "Song" : "Pattern";
   const nextPlaybackMode = song.enabled ? "Pattern" : "Song";
+
+  const menuItemsFor = (placementId: SongPlacementId): readonly PopupMenuItem[] => [
+    {
+      id: "duplicate",
+      label: "Duplicate",
+      onSelect: () => {
+        duplicateSongPlacement(placementId);
+      },
+    },
+    {
+      id: "remove",
+      label: "Delete",
+      danger: true,
+      onSelect: () => {
+        removeSongPlacement(placementId);
+      },
+    },
+  ];
 
   return (
     <aside className={styles.playlist} data-component="playlist-summary" aria-label="Playlist">
@@ -2166,91 +2423,152 @@ function PlaylistSummary() {
         {song.placements.length === 0 ? (
           <li className={styles.emptyPlaylist}>The Playlist is empty.</li>
         ) : (
-          song.placements.map((placement, index) => (
-            <li key={placement.id}>
-              <button
-                type="button"
-                aria-pressed={placement.patternId === activePatternId}
-                onClick={() => {
-                  selectPattern(placement.patternId);
+          song.placements.map((placement, index) => {
+            const pattern = patternById.get(placement.patternId);
+            const rowNumber = String(index + 1);
+            return (
+              <li
+                key={placement.id}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  const sourceId = event.dataTransfer.getData("text/pulsebox-playlist-placement");
+                  const sourceIndex = song.placements.findIndex((candidate) => candidate.id === sourceId);
+                  if (sourceIndex < 0 || sourceIndex === index) return;
+                  reorderSongPlacement(
+                    sourceId as SongPlacementId,
+                    sourceIndex < index ? placement.id : song.placements[index - 1]?.id,
+                  );
                 }}
               >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{patternById.get(placement.patternId)?.name ?? "Missing Pattern"}</strong>
-                <small>{`${String(placement.repeatCount)}×`}</small>
-              </button>
-              <label className={styles.playlistRepeats}>
-                <span>Repeats</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={999}
-                  step={1}
-                  aria-label={`Playlist row ${String(index + 1)} repeat count`}
-                  value={placement.repeatCount}
-                  onChange={(event) => {
-                    const repeatCount = event.currentTarget.valueAsNumber;
-                    if (Number.isSafeInteger(repeatCount)) {
-                      setSongPlacementRepeats(placement.id, repeatCount);
+                <button
+                  type="button"
+                  draggable
+                  aria-label={`Reorder Playlist row ${rowNumber}`}
+                  title={`Drag Playlist row ${rowNumber}, or use Arrow Up and Arrow Down to reorder it.`}
+                  className={styles.playlistDragHandle}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/pulsebox-playlist-placement", placement.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowUp" && index > 0) {
+                      event.preventDefault();
+                      reorderSongPlacement(placement.id, index > 1 ? song.placements[index - 2]?.id : undefined);
+                    }
+                    if (event.key === "ArrowDown" && index < song.placements.length - 1) {
+                      event.preventDefault();
+                      reorderSongPlacement(placement.id, song.placements[index + 1]?.id);
                     }
                   }}
-                />
-              </label>
-              <button
-                type="button"
-                aria-label={`Move Playlist row ${String(index + 1)} earlier`}
-                title={`Move Playlist row ${String(index + 1)} earlier.`}
-                className={styles.playlistAction}
-                disabled={index === 0}
-                onClick={() => reorderSongPlacement(placement.id, index > 1 ? song.placements[index - 2]?.id : undefined)}
-              >
-                <PlaylistIcon kind="earlier" />
-              </button>
-              <button
-                type="button"
-                aria-label={`Move Playlist row ${String(index + 1)} later`}
-                title={`Move Playlist row ${String(index + 1)} later.`}
-                className={styles.playlistAction}
-                disabled={index >= song.placements.length - 1}
-                onClick={() => reorderSongPlacement(placement.id, song.placements[index + 1]?.id)}
-              >
-                <PlaylistIcon kind="later" />
-              </button>
-              <button
-                type="button"
-                aria-label={`Duplicate Playlist row ${String(index + 1)}`}
-                title={`Duplicate Playlist row ${String(index + 1)}.`}
-                className={styles.playlistAction}
-                onClick={() => duplicateSongPlacement(placement.id)}
-              >
-                <PlaylistIcon kind="duplicate" />
-              </button>
-              <button
-                type="button"
-                aria-label={`Remove Playlist row ${String(index + 1)}`}
-                title={`Remove Playlist row ${String(index + 1)}.`}
-                className={styles.playlistAction}
-                onClick={() => {
-                  removeSongPlacement(placement.id);
-                }}
-              >
-                <PlaylistIcon kind="remove" />
-              </button>
-            </li>
-          ))
+                >
+                  <PlaylistIcon kind="drag" />
+                </button>
+                <button
+                  type="button"
+                  className={styles.playlistSelection}
+                  aria-pressed={placement.patternId === activePatternId}
+                  onClick={() => {
+                    selectPattern(placement.patternId);
+                  }}
+                >
+                  <span>{rowNumber.padStart(2, "0")}</span>
+                  <i
+                    className={styles.playlistPatternColor}
+                    style={{ backgroundColor: pattern?.color ?? "#E6A23C" }}
+                    aria-hidden="true"
+                  />
+                  <strong>{pattern?.name ?? "Missing Pattern"}</strong>
+                  <small>{`${String(pattern?.durationBars ?? 1)} bar${pattern?.durationBars === 1 ? "" : "s"}`}</small>
+                  <PlaylistPlaybackMarker placementId={placement.id} />
+                </button>
+                <label className={styles.playlistPatternPicker}>
+                  <span className={styles.visuallyHidden}>Pattern</span>
+                  <select
+                    aria-label={`Playlist row ${rowNumber} Pattern`}
+                    title={`Choose the Pattern for Playlist row ${rowNumber}.`}
+                    value={placement.patternId}
+                    onChange={(event) => {
+                      setSongPlacementPattern(placement.id, event.currentTarget.value as PatternId);
+                    }}
+                  >
+                    {patterns.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.playlistRepeats}>
+                  <span>Repeats</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    step={1}
+                    aria-label={`Playlist row ${rowNumber} repeat count`}
+                    value={placement.repeatCount}
+                    onChange={(event) => {
+                      const repeatCount = event.currentTarget.valueAsNumber;
+                      if (Number.isSafeInteger(repeatCount)) {
+                        setSongPlacementRepeats(placement.id, repeatCount);
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  aria-label={`Playlist row ${rowNumber} menu`}
+                  title={`Open secondary actions for Playlist row ${rowNumber}.`}
+                  className={styles.playlistAction}
+                  aria-haspopup="menu"
+                  aria-expanded={openMenu?.placementId === placement.id}
+                  onPointerDown={() => {
+                    menuTogglePress.current = openMenu?.placementId === placement.id;
+                  }}
+                  onClick={(event) => {
+                    if (menuTogglePress.current) {
+                      menuTogglePress.current = false;
+                      setOpenMenu(undefined);
+                      return;
+                    }
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setOpenMenu({ placementId: placement.id, x: rect.left, y: rect.bottom + 2 });
+                  }}
+                >
+                  <PlaylistIcon kind="menu" />
+                </button>
+              </li>
+            );
+          })
         )}
       </ol>
       <button
         type="button"
         className={styles.addPattern}
-        aria-label="Add selected Pattern"
-        title="Add the selected Pattern to the Playlist."
+        aria-label={addPlacementLabel}
+        title={`${addPlacementLabel}.`}
         onClick={() => {
           addSongPlacement(activePatternId);
         }}
       >
         <PlaylistIcon kind="add" />
+        <span className={styles.addPatternCopy}>
+          <span className={styles.addPatternTarget}>Add at end. Row {String(addedRowNumber)}.</span>
+          <span className={styles.addPatternName}>{activePattern?.name ?? "selected Pattern"}</span>
+        </span>
       </button>
+      {openMenu === undefined ? null : (
+        <PopupMenu
+          label={`Playlist row ${String(song.placements.findIndex((placement) => placement.id === openMenu.placementId) + 1)} menu`}
+          position={openMenu}
+          items={menuItemsFor(openMenu.placementId)}
+          onClose={() => {
+            setOpenMenu(undefined);
+          }}
+        />
+      )}
     </aside>
   );
 }

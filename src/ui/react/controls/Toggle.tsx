@@ -1,4 +1,5 @@
 import { cx } from "../class-names";
+import { automationShortcut } from "./automation-shortcut";
 import styles from "./Toggle.module.css";
 
 export interface ToggleProps {
@@ -9,6 +10,8 @@ export interface ToggleProps {
   readonly caption?: string;
   readonly tone?: "neutral" | "warn" | "accent";
   readonly disabled?: boolean;
+  /** Arms this control as the active Piano Roll lane. */
+  readonly onAutomate?: () => void;
 }
 
 /**
@@ -23,7 +26,9 @@ export function Toggle({
   caption,
   tone = "neutral",
   disabled = false,
+  onAutomate,
 }: ToggleProps) {
+  const automation = automationShortcut(onAutomate);
   return (
     <button
       type="button"
@@ -32,7 +37,10 @@ export function Toggle({
       aria-label={label}
       aria-pressed={pressed}
       disabled={disabled}
+      aria-keyshortcuts={automation.ariaKeyShortcuts}
       onClick={onToggle}
+      onKeyDown={automation.onKeyDown}
+      onContextMenu={onAutomate === undefined ? undefined : automation.onContextMenu}
     >
       <span aria-hidden="true">{caption ?? label}</span>
     </button>

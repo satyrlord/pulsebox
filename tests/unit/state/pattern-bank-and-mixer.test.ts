@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { IdFactory, ModuleInstanceId, PatternId, VoiceId } from "../../../src/contracts/ids";
+import {
+  SEND_BUS_IDS,
+  type EffectInstanceId,
+  type IdFactory,
+  type ModuleInstanceId,
+  type PatternId,
+  type ProjectRevision,
+  type VoiceId,
+} from "../../../src/contracts/ids";
 import type { PluginId } from "../../../src/contracts/parameters";
+import {
+  PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
+  type EffectInstanceState,
+} from "../../../src/contracts/effects";
 import { RACK_SLOT_IDS } from "../../../src/contracts/ids";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import {
@@ -9,8 +21,15 @@ import {
   DEFAULT_PATTERN_COUNT,
   type ModuleSeed,
 } from "../../../src/state/default-state";
-import { createParameterValidator } from "../../../src/state/persistence/project-document";
-import { PulseStore } from "../../../src/state/pulse-store";
+import {
+  createParameterValidator,
+  parseProjectDocument,
+  serializeProject,
+} from "../../../src/state/persistence/project-document";
+import {
+  PulseStore,
+  type ChainEffectPlacement,
+} from "../../../src/state/pulse-store";
 
 const TIMESTAMP = "2026-08-07T12:00:00.000Z";
 const SEED: ModuleSeed = {
@@ -54,15 +73,64 @@ function harness(seed: ModuleSeed = SEED, onDelta = () => undefined) {
     createParameterValidator((pluginId) =>
       pluginId === BASS_MONO_MANIFEST.pluginId ? BASS_MONO_MANIFEST.parameters : undefined,
     ),
-    undefined,
     () => TIMESTAMP,
   );
   const moduleId = required(store.getState().ui.selectedModuleId);
   return { store, moduleId };
 }
 
+function createCatalogEffect(
+  id: EffectInstanceId,
+  pluginId: PluginId,
+  placement?: ChainEffectPlacement,
+): EffectInstanceState | undefined {
+  if (pluginId === ("missing-effect" as PluginId)) return undefined;
+  const limitedPlacement = new Map<PluginId, ChainEffectPlacement>([
+    ["module-only" as PluginId, "module-pedalboard"],
+    ["send-only" as PluginId, "send-chain"],
+    ["master-only" as PluginId, "master-chain"],
+  ]).get(pluginId);
+  if (placement !== undefined && limitedPlacement !== undefined && placement !== limitedPlacement) {
+    return undefined;
+  }
+  return {
+    id,
+    pluginId,
+    stateVersion: 1,
+    state: { preset: pluginId },
+    bypassed: false,
+    wetDry: 1,
+  };
+}
+
+function effectHarness() {
+  const ids = deterministicIds();
+  const store = new PulseStore(
+    createDefaultState(ids, SEED, () => TIMESTAMP, createCatalogEffect),
+    ids,
+    SEED,
+    () => undefined,
+    createParameterValidator((pluginId) =>
+      pluginId === BASS_MONO_MANIFEST.pluginId ? BASS_MONO_MANIFEST.parameters : undefined,
+    ),
+    () => TIMESTAMP,
+    () => true,
+    createCatalogEffect,
+  );
+  return { store, moduleId: required(store.getState().ui.selectedModuleId) };
+}
+
 function required<Value>(value: Value | undefined): Value {
   if (value === undefined) throw new Error("Test fixture did not create the expected value.");
+  return value;
+}
+
+function requiredEffectId(
+  value: EffectInstanceId | null | undefined,
+): EffectInstanceId {
+  if (value === undefined || value === null) {
+    throw new Error("Test fixture did not create the expected effect.");
+  }
   return value;
 }
 
@@ -244,5 +312,384 @@ describe("mixer commands", () => {
     store.dispatch(store.createCommand("mixer-master-level-set", { level: 0.4 }));
     expect(store.undo().status).toBe("accepted");
     expect(store.getState().project.masterLevel).toBe(0.5);
+  });
+
+  it("stores all four send taps and restores a send edit through Undo", () => {
+    const { store, moduleId } = harness();
+    expect(
+      store.dispatch(
+        store.createCommand("mixer-send-amount-set", {
+          moduleId,
+          sendBusId: "send-a" as never,
+          amount: 0.65,
+        }),
+      ).status,
+    ).toBe("accepted");
+    expect(
+      store.dispatch(
+        store.createCommand("mixer-send-mode-set", {
+          moduleId,
+          sendBusId: "send-a" as never,
+          mode: "pre-fader",
+        }),
+      ).status,
+    ).toBe("accepted");
+    expect(store.getState().project.modules[moduleId]?.sends["send-a" as never]).toEqual({
+      amount: 0.65,
+      mode: "pre-fader",
+    });
+    store.undo();
+    expect(store.getState().project.modules[moduleId]?.sends["send-a" as never]).toEqual({
+      amount: 0.65,
+      mode: "post-fader",
+    });
+  });
+
+  it("removes module and chained-effect automation lanes with all Pattern references", () => {
+    const { store, moduleId } = effectHarness();
+    const verseId = patternId(store, "Verse");
+    expect(store.dispatch(store.createCommand("effects-chain-effect-add", {
+      chain: { scope: "module", targetId: moduleId },
+      effectPluginId: "module-effect" as PluginId,
+    })).status).toBe("accepted");
+    const effectId = requiredEffectId(
+      store.getState().project.effects.moduleChains[moduleId]?.find((id) => id !== null),
+    );
+    expect(store.dispatch(store.createCommand("automation-lane-steps-set", {
+      patternId: verseId,
+      scope: "mixer",
+      targetId: moduleId,
+      parameterId: "level",
+      steps: [{ tick: 0, value: 0.5 }],
+    })).status).toBe("accepted");
+    expect(store.dispatch(store.createCommand("automation-lane-steps-set", {
+      patternId: verseId,
+      scope: "effect",
+      targetId: effectId,
+      parameterId: "wet-dry",
+      steps: [{ tick: 0, value: 0.5 }],
+    })).status).toBe("accepted");
+
+    expect(store.dispatch(store.createCommand("rack-module-remove", { moduleId })).status).toBe("accepted");
+    expect(Object.values(store.getState().project.automationLanes)).toEqual([]);
+    for (const pattern of store.getState().project.patterns) {
+      expect(pattern.automationLaneIds).toEqual([]);
+      expect(Object.values(pattern.parts).flatMap((part) => part.automationLaneIds)).toEqual([]);
+    }
+
+    const document = serializeProject(store.getState(), {
+      createdAt: TIMESTAMP,
+      modifiedAt: TIMESTAMP,
+      projectRevision: {
+        epoch: "00000000-0000-4000-8000-000000000999",
+        counter: 0,
+      } as ProjectRevision,
+    });
+    expect(parseProjectDocument(document, {
+      knownPluginIds: [BASS_MONO_MANIFEST.pluginId],
+      parameterDescriptorsByPluginId: {
+        [BASS_MONO_MANIFEST.pluginId]: BASS_MONO_MANIFEST.parameters,
+      },
+    }).ok).toBe(true);
+  });
+
+  it("clears a deleted automation target after deletion, replacement, Undo, and Redo", () => {
+    const { store, moduleId } = effectHarness();
+    expect(store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "mixer", targetId: moduleId, parameterId: "level" },
+    })).status).toBe("accepted");
+    const replacement = createDefaultState(deterministicIds(), undefined, () => TIMESTAMP).project;
+    expect(store.loadProject(replacement).status).toBe("accepted");
+    expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+
+    const targetSlotId = required(store.getState().project.rackSlots[0]).id;
+    expect(store.dispatch(store.createCommand("rack-module-add", {
+      slotId: targetSlotId,
+      pluginId: BASS_MONO_MANIFEST.pluginId,
+    })).status).toBe("accepted");
+    const targetModuleId = required(store.getState().project.rackSlots[0]?.moduleId);
+    store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "mixer", targetId: targetModuleId, parameterId: "level" },
+    }));
+    store.dispatch(store.createCommand("rack-module-remove", { moduleId: targetModuleId }));
+    expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+    store.undo();
+    expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+    expect(store.dispatch(store.createCommand("effects-chain-effect-add", {
+      chain: { scope: "module", targetId: targetModuleId },
+      effectPluginId: "module-effect" as PluginId,
+    })).status).toBe("accepted");
+    const effectId = requiredEffectId(
+      store.getState().project.effects.moduleChains[targetModuleId]?.find((id) => id !== null),
+    );
+    store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "effect", targetId: effectId, parameterId: "wet-dry" },
+    }));
+    store.dispatch(store.createCommand("effects-chain-effect-remove", { effectInstanceId: effectId }));
+    expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+
+    store.undo();
+    expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+    store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "effect", targetId: effectId, parameterId: "wet-dry" },
+    }));
+    store.redo();
+    expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+  });
+
+  it("keeps default return chains, the protected limiter, and master bypass in project state", () => {
+    const { store } = harness();
+    const effects = store.getState().project.effects;
+    expect(effects.sendChains["send-a" as never]?.pinnedEffectId).not.toBeNull();
+    expect(effects.masterChain.filter((id) => id !== null)).toHaveLength(3);
+    const limiterId = effects.masterChain.at(-1);
+    expect(limiterId).not.toBeNull();
+    if (limiterId === null || limiterId === undefined) throw new Error("Expected the protected limiter.");
+    expect(effects.instances[limiterId]?.pluginId).toBe(PROTECTED_LIMITER_EFFECT_PLUGIN_ID);
+    expect(store.dispatch(store.createCommand("effects-master-bypass-toggle", {})).status).toBe("accepted");
+    expect(store.getState().project.effects.masterEffectsBypassed).toBe(true);
+    expect(store.undo().status).toBe("accepted");
+    expect(store.getState().project.effects.masterEffectsBypassed).toBe(false);
+  });
+
+  it("appends a send effect and reorders it by stable effect ID", () => {
+    const { store } = effectHarness();
+    const sendId = required(SEND_BUS_IDS[0]);
+    const initialId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots[0],
+    );
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-add", {
+          chain: { scope: "send", targetId: sendId },
+          effectPluginId: "chorus" as PluginId,
+        }),
+      ).status,
+    ).toBe("accepted");
+    const addedId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots.find(
+        (effectId) =>
+          effectId !== null &&
+          store.getState().project.effects.instances[effectId]?.pluginId === ("chorus" as PluginId),
+      ),
+    );
+    expect(store.getState().project.effects.sendChains[sendId]?.slots.slice(0, 2)).toEqual([
+      initialId,
+      addedId,
+    ]);
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-reorder", { effectInstanceId: addedId }),
+      ).status,
+    ).toBe("accepted");
+    expect(store.getState().project.effects.sendChains[sendId]?.slots[0]).toBe(addedId);
+  });
+
+  it("pins the first effect added after a send chain becomes empty", () => {
+    const { store } = effectHarness();
+    const sendId = required(SEND_BUS_IDS[0]);
+    const initialId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots[0],
+    );
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-remove", { effectInstanceId: initialId }),
+      ).status,
+    ).toBe("accepted");
+    expect(store.getState().project.effects.sendChains[sendId]?.pinnedEffectId).toBeNull();
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-add", {
+          chain: { scope: "send", targetId: sendId },
+          effectPluginId: "chorus" as PluginId,
+        }),
+      ).status,
+    ).toBe("accepted");
+    const addedId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots[0],
+    );
+    expect(store.getState().project.effects.sendChains[sendId]?.pinnedEffectId).toBe(addedId);
+  });
+
+  it("replaces one effect in place and restores its plugin and automation with one Undo", () => {
+    const { store } = effectHarness();
+    const sendId = required(SEND_BUS_IDS[0]);
+    store.dispatch(
+      store.createCommand("effects-chain-effect-add", {
+        chain: { scope: "send", targetId: sendId },
+        effectPluginId: "chorus" as PluginId,
+      }),
+    );
+    const effectId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots.find(
+        (candidate) =>
+          candidate !== null &&
+          store.getState().project.effects.instances[candidate]?.pluginId === ("chorus" as PluginId),
+      ),
+    );
+    store.dispatch(
+      store.createCommand("effects-send-focus-set", {
+        sendBusId: sendId,
+        effectInstanceId: effectId,
+      }),
+    );
+    const patternId = required(store.getState().project.patterns[1]).id;
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        patternId,
+        scope: "effect",
+        targetId: effectId,
+        parameterId: "rate",
+        steps: [{ tick: 0, value: 0.5 }],
+      }),
+    );
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        patternId,
+        scope: "effect",
+        targetId: effectId,
+        parameterId: "wet-dry",
+        steps: [{ tick: 0, value: 0.75 }],
+      }),
+    );
+    const parameterLaneId = required(
+      Object.values(store.getState().project.automationLanes).find(
+        (lane) => lane.targetId === effectId && lane.parameterId === "rate",
+      ),
+    ).id;
+    const genericLaneId = required(
+      Object.values(store.getState().project.automationLanes).find(
+        (lane) => lane.targetId === effectId && lane.parameterId === "wet-dry",
+      ),
+    ).id;
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-replace", {
+          effectInstanceId: effectId,
+          effectPluginId: "phaser" as PluginId,
+        }),
+      ).status,
+    ).toBe("accepted");
+    expect(store.getState().project.effects.instances[effectId]).toMatchObject({
+      id: effectId,
+      pluginId: "phaser",
+      state: { preset: "phaser" },
+    });
+    expect(store.getState().project.effects.sendChains[sendId]?.pinnedEffectId).toBe(effectId);
+    expect(store.getState().project.automationLanes[parameterLaneId]).toBeUndefined();
+    expect(store.getState().project.automationLanes[genericLaneId]).toBeDefined();
+
+    expect(store.undo().status).toBe("accepted");
+    expect(store.getState().project.effects.instances[effectId]?.pluginId).toBe("chorus");
+    expect(store.getState().project.automationLanes[parameterLaneId]).toBeDefined();
+    expect(store.getState().project.effects.sendChains[sendId]?.pinnedEffectId).toBe(effectId);
+  });
+
+  it("removes effect automation and restores the complete target through one Undo", () => {
+    const { store } = effectHarness();
+    const sendId = required(SEND_BUS_IDS[0]);
+    store.dispatch(
+      store.createCommand("effects-chain-effect-add", {
+        chain: { scope: "send", targetId: sendId },
+        effectPluginId: "chorus" as PluginId,
+      }),
+    );
+    const effectId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots.find(
+        (candidate) =>
+          candidate !== null &&
+          store.getState().project.effects.instances[candidate]?.pluginId === ("chorus" as PluginId),
+      ),
+    );
+    const patternId = required(store.getState().project.patterns[1]).id;
+    store.dispatch(
+      store.createCommand("automation-lane-steps-set", {
+        patternId,
+        scope: "effect",
+        targetId: effectId,
+        parameterId: "wet-dry",
+        steps: [{ tick: 0, value: 0.75 }],
+      }),
+    );
+    const laneId = required(
+      Object.values(store.getState().project.automationLanes).find(
+        (lane) => lane.targetId === effectId,
+      ),
+    ).id;
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-remove", { effectInstanceId: effectId }),
+      ).status,
+    ).toBe("accepted");
+    expect(store.getState().project.effects.instances[effectId]).toBeUndefined();
+    expect(store.getState().project.automationLanes[laneId]).toBeUndefined();
+    expect(
+      store.getState().project.patterns.find((pattern) => pattern.id === patternId)
+        ?.automationLaneIds,
+    ).not.toContain(laneId);
+
+    expect(store.undo().status).toBe("accepted");
+    expect(store.getState().project.effects.instances[effectId]?.pluginId).toBe("chorus");
+    expect(store.getState().project.automationLanes[laneId]).toBeDefined();
+    expect(
+      store.getState().project.patterns.find((pattern) => pattern.id === patternId)
+        ?.automationLaneIds,
+    ).toContain(laneId);
+  });
+
+  it("rejects effects that do not support the target chain placement", () => {
+    const { store, moduleId } = effectHarness();
+    const sendId = required(SEND_BUS_IDS[0]);
+    const attempts = [
+      store.createCommand("effects-chain-effect-add", {
+        chain: { scope: "module" as const, targetId: moduleId },
+        effectPluginId: "send-only" as PluginId,
+      }),
+      store.createCommand("effects-chain-effect-add", {
+        chain: { scope: "send" as const, targetId: sendId },
+        effectPluginId: "master-only" as PluginId,
+      }),
+      store.createCommand("effects-chain-effect-add", {
+        chain: { scope: "master" as const },
+        effectPluginId: "module-only" as PluginId,
+      }),
+    ];
+    for (const command of attempts) expect(store.dispatch(command).status).toBe("rejected");
+    const sendEffectId = requiredEffectId(
+      store.getState().project.effects.sendChains[sendId]?.slots[0],
+    );
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-replace", {
+          effectInstanceId: sendEffectId,
+          effectPluginId: "master-only" as PluginId,
+        }),
+      ).status,
+    ).toBe("rejected");
+  });
+
+  it("rejects replacement of the protected limiter", () => {
+    const { store } = effectHarness();
+    const limiterId = required(store.getState().project.effects.masterChain.at(-1));
+    expect(limiterId).not.toBeNull();
+    if (limiterId === null) throw new Error("Expected the protected limiter.");
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-replace", {
+          effectInstanceId: limiterId,
+          effectPluginId: "phaser" as PluginId,
+        }),
+      ).status,
+    ).toBe("rejected");
+    expect(store.getState().project.effects.instances[limiterId]?.pluginId).toBe(
+      PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
+    );
   });
 });

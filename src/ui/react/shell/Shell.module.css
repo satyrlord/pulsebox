@@ -98,6 +98,12 @@
     var(--pulse-color-scrollbar-track, #111519);
 }
 
+/* Keep offscreen Playlist rows inside their scroll port. Without paint
+   containment, the browser includes those rows in document scroll height. */
+.playlist ol {
+  contain: paint;
+}
+
 .moduleList {
   display: flex;
   flex-direction: column;
@@ -458,14 +464,23 @@
 
 .effectCard {
   grid-template-columns: 24px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
 }
 
 .effectCard[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--accent-lamp) 34%, var(--edge-hairline));
+  border-color: color-mix(in srgb, var(--send-accent, var(--accent-lamp)) 34%, var(--edge-hairline));
   box-shadow:
     var(--lift-1),
     inset 0 0 0 1px var(--accent-lamp);
+}
+
+.effectCard[data-active="true"] .sendBadge::after {
+  content: "";
+  inline-size: 4px;
+  block-size: 4px;
+  border-radius: 50%;
+  background: var(--send-accent, var(--accent-lamp));
+  box-shadow: 0 0 4px var(--send-accent, var(--accent-lamp));
 }
 
 .sendBadge {
@@ -478,13 +493,13 @@
   color: var(--accent-ink);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--accent-lamp) 88%, #ffffff) 0%,
+    color-mix(in srgb, var(--accent-lamp) 88%, var(--pulse-color-focus-inner, #ffffff)) 0%,
     var(--accent-lamp) 45%,
-    color-mix(in srgb, var(--accent-lamp) 96%, #000000) 100%
+    color-mix(in srgb, var(--accent-lamp) 96%, var(--pulse-color-focus-outer, #000000)) 100%
   );
   border-radius: var(--pulse-radius-control, 4px);
   box-shadow:
-    inset 0 1px 0 #ffffff4d,
+    inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 30%, transparent),
     0 0 7px color-mix(in srgb, var(--accent-lamp) 35%, transparent);
 }
 
@@ -497,6 +512,34 @@
   letter-spacing: 0.14em;
   color: var(--pulse-color-text-secondary, #bac2c8);
   text-shadow: 0 1px 0 var(--text-engraved-lo);
+}
+
+.effectSummary { min-inline-size: 0; display: grid; gap: 6px; }
+.effectHeading, .effectControls { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.effectHeading output { font-family: var(--pulse-font-mono, ui-monospace, monospace); font-size: var(--pulse-type-10, 10px); color: var(--pulse-color-text-muted, #919ba3); }
+.effectMacros { min-block-size: 30px; display: flex; align-items: start; gap: 4px; overflow: hidden; }
+.effectMacros :global([data-component="knob"]) { min-inline-size: 30px; gap: 0; }
+.effectMacros :global([data-component="knob"] [role="slider"]), .effectMacros :global([data-component="knob"] svg) { inline-size: 26px; block-size: 26px; }
+.effectMacros :global([data-component="knob"] > span) { max-inline-size: 30px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--pulse-type-10, 10px); }
+.compactSelect { min-inline-size: 42px; display: grid; gap: 1px; font-size: var(--pulse-type-10, 10px); text-align: center; }
+.compactSelect span { max-inline-size: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compactSelect select { inline-size: 42px; min-block-size: 26px; padding-inline: 1px; font-size: var(--pulse-type-10, 10px); }
+.emptyMacros { align-self: center; font-size: var(--pulse-type-10, 10px); color: var(--pulse-color-text-muted, #919ba3); }
+.effectControls { justify-content: start; }
+.effectControls :global([data-component="knob"]) { min-inline-size: 34px; gap: 0; }
+.effectControls :global([data-component="knob"] [role="slider"]), .effectControls :global([data-component="knob"] svg) { inline-size: 28px; block-size: 28px; }
+.effectControls :global([data-component="knob"] > span) { font-size: var(--pulse-type-10, 10px); }
+.effectControls button, .masterChainActions button { min-block-size: 24px; font-size: var(--pulse-type-10, 10px); }
+.masterChainActions { display: flex; flex-wrap: wrap; gap: 6px; }
+.masterOutputActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.masterChainMeters {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 8px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-muted, #919ba3);
 }
 
 .effectCard p,
@@ -1314,7 +1357,10 @@
 
 .playlist li:not(.emptyPlaylist) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto repeat(4, 24px);
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  grid-template-areas:
+    "drag identity menu"
+    "drag pattern repeats";
   gap: 3px;
 }
 
@@ -1328,11 +1374,27 @@
 }
 
 .playlistAction {
+  grid-area: menu;
   display: inline-grid;
   place-items: center;
   min-inline-size: 24px;
   min-block-size: 24px;
   padding: 2px;
+}
+
+.playlistDragHandle {
+  grid-area: drag;
+  display: inline-grid;
+  place-items: center;
+  align-self: stretch;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 2px;
+  cursor: grab;
+}
+
+.playlistDragHandle:active {
+  cursor: grabbing;
 }
 
 .playlistIcon {
@@ -1342,10 +1404,24 @@
 }
 
 .playlistRepeats {
+  grid-area: repeats;
   display: grid;
   gap: 1px;
   align-content: center;
   color: var(--pulse-color-text-muted, #919ba3);
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.playlistPatternPicker {
+  grid-area: pattern;
+  min-inline-size: 0;
+  align-self: end;
+}
+
+.playlistPatternPicker select {
+  inline-size: 100%;
+  min-block-size: 24px;
+  padding-inline: 4px;
   font-size: var(--pulse-type-10, 10px);
 }
 
@@ -1357,9 +1433,10 @@
 
 /* A playlist row is a raised plate. The engaged row lights its perimeter and
    its ink, so the state is not carried by color alone. */
-.playlist li > button:first-child {
+.playlistSelection {
+  grid-area: identity;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-columns: 17px 6px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   min-block-size: 35px;
@@ -1375,7 +1452,7 @@
     0 0 0 1px var(--edge-hairline);
 }
 
-.playlist li > button:first-child[aria-pressed="true"] {
+.playlistSelection[aria-pressed="true"] {
   color: color-mix(in srgb, var(--accent-lamp) 55%, var(--pulse-color-text-primary, #f3f5f6));
   background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
   box-shadow:
@@ -1384,11 +1461,31 @@
     0 0 9px var(--accent-dim);
 }
 
-.playlist li > button:first-child strong {
+.playlistSelection strong {
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The word makes the transport state clear even when selection appears on
+   more than one placement of the Pattern open in the editor. */
+.playlistPlaybackMarker {
+  padding: 1px 3px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--accent-lamp);
+  background: var(--surface-inset);
+}
+
+.playlistPatternColor {
+  inline-size: 6px;
+  block-size: 18px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #000000 30%, transparent);
 }
 
 .playlist small,
@@ -1401,7 +1498,11 @@
    than claims to be a switch. */
 .addPattern {
   display: grid;
-  place-items: center;
+  grid-template-columns: 19px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--pulse-space-2, 8px);
+  padding-inline: var(--pulse-space-2, 8px);
+  text-align: start;
   min-block-size: 46px;
   margin: 0 8px 8px;
   font-family: var(--type-display);
@@ -1415,8 +1516,26 @@
 }
 
 .addPattern .playlistIcon {
+  flex: none;
   inline-size: 19px;
   block-size: 19px;
+}
+
+.addPatternCopy {
+  display: grid;
+  gap: 1px;
+  min-inline-size: 0;
+}
+
+.addPatternTarget {
+  white-space: nowrap;
+}
+
+.addPatternName {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .addPattern:hover:not(:disabled) {

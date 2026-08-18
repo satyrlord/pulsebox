@@ -27,6 +27,7 @@ import {
 import {
   createDefaultState,
   PATTERN_TICKS_PER_STEP,
+  type DefaultEffectInstanceFactory,
   type ModuleSeed,
   type PatternEventSeed,
   type PulseState,
@@ -52,11 +53,6 @@ export function toParameterValues(
   );
 }
 
-/**
- * A drum module maps each declared drum voice to a saved voice insert slot.
- * Pitched instruments may also declare one playable voice, but their `note`
- * event keeps them outside this routing surface.
- */
 export function drumVoiceIdsFor(manifest: {
   readonly acceptedEvents: readonly { readonly id: string }[];
   readonly voices: readonly { readonly id: string | VoiceId }[];
@@ -194,6 +190,9 @@ const DEFAULT_RACK: readonly ModuleSeed[] = [
  * template as a fresh copy of this project, so the template calls this same
  * factory. Each call produces new project, lineage, and module IDs.
  */
-export function createDefaultProjectState(idFactory: IdFactory): PulseState {
-  return createDefaultState(idFactory, DEFAULT_RACK);
+export function createDefaultProjectState(
+  idFactory: IdFactory,
+  createEffectInstance?: DefaultEffectInstanceFactory,
+): PulseState {
+  return createDefaultState(idFactory, DEFAULT_RACK, undefined, createEffectInstance);
 }

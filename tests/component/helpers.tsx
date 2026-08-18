@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { vi, type Mock } from "vitest";
 
 import {
-  DISTORTION_EFFECT_PLUGIN_ID,
+  type EffectInstanceId,
   type ModuleInstanceId,
   type PluginId,
   type PluginManifest,
@@ -139,27 +139,56 @@ export function createHarness(
     previewSwing: vi.fn(),
     previewHumanize: vi.fn(),
     previewPatternPart: vi.fn(() => Promise.resolve()),
+    previewChannelMix: vi.fn(),
+    previewMasterLevel: vi.fn(),
+    previewChannelSendAmount: vi.fn(),
+    previewSendReturnLevel: vi.fn(),
+    previewEffectWetDry: vi.fn(),
+    previewEffectParameter: vi.fn(),
     startAudition: vi.fn(() => Promise.resolve()),
     stopAudition: vi.fn(),
     stop: vi.fn(),
     setSwing: vi.fn(),
     getMasterMeter: vi.fn(() => ({ left: 0, right: 0, mid: 0, side: 0, peak: false })),
+    getMasterChainMeter: vi.fn(() => ({ left: 0, right: 0, mid: 0, side: 0, peak: false })),
+    getEffectMeter: vi.fn(() => 0),
+    resetMasterPeak: vi.fn(),
     setMetronomeEnabled: vi.fn(),
     setPower: vi.fn(() => Promise.resolve()),
     setLaunchQuantization: vi.fn(),
   };
 
+  const createEffectInstance = (
+    id: EffectInstanceId,
+    pluginId: PluginId,
+    placement?: "module-pedalboard" | "send-chain" | "master-chain",
+  ) => {
+    const manifest = manifests.get(pluginId);
+    if (
+      manifest?.kind !== "effect" ||
+      (placement !== undefined && !manifest.placements.includes(placement))
+    ) {
+      return undefined;
+    }
+    return {
+      id,
+      pluginId,
+      stateVersion: manifest.stateSchemaVersion,
+      state: parameterValues(manifest.defaultState),
+      bypassed: false,
+      wetDry: 1,
+    };
+  };
   const domain = new PulseStore(
-    createDefaultState(browserIdFactory, seed),
+    createDefaultState(browserIdFactory, seed, undefined, createEffectInstance),
     browserIdFactory,
     (pluginId) => seeds.get(pluginId),
     () => undefined,
     // The production policy, built from the same manifests the harness serves.
     createParameterValidator((pluginId) => manifests.get(pluginId as PluginId)?.parameters),
-    (id, pluginId) =>
-      pluginId === DISTORTION_EFFECT_PLUGIN_ID
-        ? { id, pluginId, stateVersion: 1, state: {} }
-        : undefined,
+    undefined,
+    createParameterValidator((pluginId) => manifests.get(pluginId as PluginId)?.parameters),
+    createEffectInstance,
   );
 
   const projects = {
@@ -189,6 +218,7 @@ export function createHarness(
       DRUMLINE_SIX_MANIFEST.pluginId,
       ...extraModules.map((module) => module.manifest.pluginId),
     ],
+    addableEffectPluginIds: BUILT_IN_EFFECTS.map((effect) => effect.manifest.pluginId),
     auditionNoteFor: (pluginId, voiceId) => {
       const manifest = manifests.get(pluginId);
       return manifest?.kind === "instrument" ? noteForManifest(manifest, voiceId) : 36;

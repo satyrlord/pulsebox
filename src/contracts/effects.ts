@@ -1,28 +1,69 @@
-import type { EffectInstanceId, ModuleInstanceId, VoiceId } from "./ids";
+import { SEND_BUS_IDS, type EffectInstanceId, type ModuleInstanceId, type SendBusId } from "./ids";
 import type { ParameterValue, PluginId } from "./parameters";
 
-/** The first built-in effect that can occupy a drum voice insert slot. */
-export const DISTORTION_EFFECT_PLUGIN_ID = "distortion" as PluginId;
+const DISTORTION_EFFECT_PLUGIN_ID = "distortion" as PluginId;
 
 /**
- * A durable effect instance. The project owns the instance, while a voice
- * insert slot only stores a reference to it.
+ * A durable effect instance. The project owns the instance, while a chain slot
+ * only stores a reference to it.
  */
 export interface EffectInstanceState {
   readonly id: EffectInstanceId;
   readonly pluginId: PluginId;
   readonly stateVersion: number;
   readonly state: Readonly<Record<string, ParameterValue>>;
+  /** A bypass leaves the instance in its chain and keeps its automation target stable. */
+  readonly bypassed: boolean;
+  /** The effect-local wet and dry balance, from dry at 0 through wet at 1. */
+  readonly wetDry: number;
 }
 
-/** One insert slot exists for each supported drum voice. */
-export type VoiceInsertSlots = Readonly<Record<VoiceId, EffectInstanceId | null>>;
+/** A chain keeps its fixed slots so reordering never changes effect identity. */
+export type EffectChainSlots = readonly (EffectInstanceId | null)[];
+
+export interface SendEffectChainState {
+  readonly slots: EffectChainSlots;
+  /** Return level from silence through unity. This is not an effect wet/dry value. */
+  readonly returnLevel: number;
+  /** Bypasses every effect in this return chain without changing its instances. */
+  readonly bypassed: boolean;
+  /** The effect whose compact controls appear on the send card. */
+  readonly pinnedEffectId: EffectInstanceId | null;
+}
+
+export const MODULE_EFFECT_CHAIN_SLOT_COUNT = 8;
+export const SEND_EFFECT_CHAIN_SLOT_COUNT = 8;
+export const MASTER_EFFECT_CHAIN_SLOT_COUNT = 6;
+
+export const PROTECTED_LIMITER_EFFECT_PLUGIN_ID = "limiter" as PluginId;
+
+export const DEFAULT_SEND_EFFECT_PLUGIN_IDS: Readonly<Record<SendBusId, PluginId>> = Object.freeze(
+  Object.fromEntries(
+    SEND_BUS_IDS.map((id, index) => [
+      id,
+      (["delay", "reverb", "stereo-width", DISTORTION_EFFECT_PLUGIN_ID] as const)[index],
+    ]),
+  ) as Record<SendBusId, PluginId>,
+);
+
+export const DEFAULT_MASTER_EFFECT_PLUGIN_IDS = Object.freeze([
+  "compressor" as PluginId,
+  "parametric-eq" as PluginId,
+  PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
+] as const);
 
 /**
  * Effect instances and their routing references stay outside instrument
- * parameter maps. This keeps an insert independent from its parent module.
+ * parameter maps. This keeps a pedal independent from its parent module.
  */
 export interface EffectsState {
   readonly instances: Readonly<Record<EffectInstanceId, EffectInstanceState>>;
-  readonly voiceInserts: Readonly<Record<ModuleInstanceId, VoiceInsertSlots>>;
+  /** Eight fixed pedalboard slots exist for every loaded module. */
+  readonly moduleChains: Readonly<Record<ModuleInstanceId, EffectChainSlots>>;
+  /** The four fixed send paths each have an independently focused return chain. */
+  readonly sendChains: Readonly<Record<SendBusId, SendEffectChainState>>;
+  /** The final non-null slot is the protected limiter. */
+  readonly masterChain: EffectChainSlots;
+  /** Bypasses user master effects but never master gain or the final limiter. */
+  readonly masterEffectsBypassed: boolean;
 }

@@ -4,7 +4,6 @@ import {
   decodeVoiceParameterChanges,
   decodeVoiceParameterObject,
 } from "../../dsp/voice-parameter-routing";
-import { decodeVoiceInsertConfigurations } from "../../effects";
 import { WorkletVoiceProcessor } from "../../worklets/worklet-voice-processor";
 import { HybridNineDsp, type HybridNineParameters, type HybridVoiceParameters } from "./dsp-core";
 import { HYBRID_VOICE_IDS, hybridVoiceForNote, type HybridVoiceId } from "./voices";
@@ -20,7 +19,7 @@ function isHybridVoiceId(value: string): value is HybridVoiceId {
 
 const SHAPE = {
   moduleFields: new Set(["level", "filter"]),
-  voiceFields: new Set<string>(["tune", "decay", "blend", "start", "attack", "level", "pan"]),
+  voiceFields: new Set<string>(["tune", "decay", "blend", "start", "attack", "distortion", "level", "pan"]),
   booleanVoiceFields: new Set<string>(["mute", "solo"]),
   isVoiceId: isHybridVoiceId,
 } as const;
@@ -54,12 +53,6 @@ class HybridNineProcessor extends WorkletVoiceProcessor<PartialParameters> {
       // knob drag ramps, so the audible mix-bus controls cannot step or click.
       immediate ? "immediate" : "smooth",
     );
-  }
-
-  protected override applyVoiceInserts(value: unknown): boolean {
-    if (value === undefined) return this.#dsp.setVoiceInserts({});
-    const inserts = decodeVoiceInsertConfigurations(value, isHybridVoiceId);
-    return inserts !== undefined && this.#dsp.setVoiceInserts(inserts);
   }
 
   protected triggerNoteOn(note: number, velocity: number, accent: boolean): void {

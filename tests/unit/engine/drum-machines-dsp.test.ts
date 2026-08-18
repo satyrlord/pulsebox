@@ -73,12 +73,12 @@ it("drives the shared digital voice lifecycle through its concrete port", () => 
     "voice",
     SAMPLE_RATE,
     { baseFrequency: 180, decay: 0.2, seed: 7, body: "tonal", oneShotSeconds: 0.01 },
-    { tune: 0, decay: 0.2, level: 0.8, pan: 0 },
+    { tune: 0, decay: 0.2, level: 0.8, distortion: 0, pan: 0 },
     new Float32Array([1, 0.5, 0.25, 0]),
   );
 
   expect(voice.isActive()).toBe(false);
-  voice.setParameters({ tune: 0, decay: 0.2, level: 0.8, pan: -0.5 });
+  voice.setParameters({ tune: 0, decay: 0.2, level: 0.8, distortion: 0, pan: -0.5 });
   expect(voice.getPan()).toBe(-0.5);
   voice.trigger(0.75, true);
   expect(voice.isActive()).toBe(true);
@@ -97,7 +97,7 @@ it("fades a fresh shared digital one-shot but preserves an active voice restart"
     "voice",
     SAMPLE_RATE,
     { baseFrequency: 180, decay: 0.2, seed: 7, body: "tonal", oneShotSeconds: 0.1 },
-    { tune: 0, decay: 0.2, level: 1, pan: 0 },
+    { tune: 0, decay: 0.2, level: 1, distortion: 0, pan: 0 },
     table,
   );
 
@@ -112,7 +112,7 @@ it("fades a fresh shared digital one-shot but preserves an active voice restart"
   expect(Math.abs(voice.render(0, 0))).toBeGreaterThan(0.5);
 });
 
-it("sends digital voice velocity and accent gain into the voice insert", () => {
+it("applies digital voice velocity and accent gain", () => {
   const captureInput = (velocity: number, accent: boolean): number => {
     const table = new Float32Array(1_024);
     for (let index = 0; index < table.length; index += 1) {
@@ -122,18 +122,13 @@ it("sends digital voice velocity and accent gain into the voice insert", () => {
       "voice",
       SAMPLE_RATE,
       { baseFrequency: 180, decay: 0.2, seed: 7, body: "tonal", oneShotSeconds: 0.1 },
-      { tune: 0, decay: 0.2, level: 1, pan: 0 },
+      { tune: 0, decay: 0.2, level: 1, distortion: 0, pan: 0 },
       table,
     );
     let captured = 0;
     voice.trigger(velocity, accent);
     for (let frame = 0; frame < 128; frame += 1) {
-      voice.render(16, 1, {
-        process: (input) => {
-          captured = input;
-          return input;
-        },
-      });
+      captured = voice.render(16, 1);
     }
     return captured;
   };
@@ -186,8 +181,8 @@ const MACHINES: readonly MachineUnderTest[] = [
     voiceIds: BOOM_VOICE_IDS,
     // tone, compression, level
     moduleParameterCount: 3,
-    // tune, punch, decay, level, pan, plus mute and solo
-    voiceFieldCount: 7,
+    // tune, punch, decay, distortion, level, pan, plus mute and solo
+    voiceFieldCount: 8,
     create: (rate) => new BoomEightDsp(rate) as unknown as MachineDsp,
     chokePair: ["closed-hat", "open-hat"],
   },
@@ -197,8 +192,8 @@ const MACHINES: readonly MachineUnderTest[] = [
     voiceIds: HYBRID_VOICE_IDS,
     // filter, level
     moduleParameterCount: 2,
-    // tune, decay, blend, start, attack, level, pan, plus mute and solo
-    voiceFieldCount: 9,
+    // tune, decay, blend, start, attack, distortion, level, pan, plus mute and solo
+    voiceFieldCount: 10,
     create: (rate) => new HybridNineDsp(rate) as unknown as MachineDsp,
     chokePair: ["closed-hat", "open-hat"],
   },
@@ -208,8 +203,8 @@ const MACHINES: readonly MachineUnderTest[] = [
     voiceIds: DIGIT_SEVEN_VOICE_IDS,
     // compression, bits, rate, level, plus the lo-fi enable
     moduleParameterCount: 5,
-    // tune, decay, level, pan, plus mute and solo
-    voiceFieldCount: 6,
+    // tune, decay, distortion, level, pan, plus mute and solo
+    voiceFieldCount: 7,
     create: (rate) => new DigitSevenDsp(rate) as unknown as MachineDsp,
     chokePair: ["closed-hat", "open-hat"],
   },
@@ -219,8 +214,8 @@ const MACHINES: readonly MachineUnderTest[] = [
     voiceIds: DIGIT_FIVE_VOICE_IDS,
     // filter, bits, rate, level, plus the lo-fi enable
     moduleParameterCount: 5,
-    // tune, decay, noise, level, pan, plus mute and solo
-    voiceFieldCount: 7,
+    // tune, decay, noise, distortion, level, pan, plus mute and solo
+    voiceFieldCount: 8,
     create: (rate) => new DigitFiveDsp(rate) as unknown as MachineDsp,
     chokePair: ["conga", "bongo"],
   },
@@ -279,6 +274,16 @@ describe.each(MACHINES)("$name manifest", (machine) => {
     expect(machine.manifest.voices.map((voice) => voice.id)).toEqual([...machine.voiceIds]);
   });
 
+  it("declares a dry-by-default Distortion control for every voice", () => {
+    for (const voiceId of machine.voiceIds) {
+      const parameter = machine.manifest.parameters.find(
+        (candidate) => candidate.id === `${voiceId}-distortion`,
+      );
+      expect(parameter?.name.toLowerCase()).toContain("distortion");
+      expect(parameter?.defaultValue).toBe(0);
+    }
+  });
+
   it("defaults every declared parameter", () => {
     for (const parameter of machine.manifest.parameters) {
       expect(machine.manifest.defaultState[parameter.id]).toBe(parameter.defaultValue);
@@ -310,6 +315,30 @@ describe.each(MACHINES)("$name DSP", (machine) => {
       dsp.trigger(firstVoice, 1, false);
     });
     expect(peak(left)).toBeGreaterThan(0.01);
+  });
+
+  it.each([44_100, 48_000])("glides a full Distortion change at %i Hz", (sampleRate) => {
+    const renderChange = (mode: "dry" | "immediate" | "smooth"): Float32Array => {
+      const dsp = machine.create(sampleRate);
+      dsp.trigger(firstVoice, 1, false);
+      dsp.process(new Float32Array(128), new Float32Array(128));
+      if (mode !== "dry") {
+        dsp.setParameters({ voices: { [firstVoice]: { distortion: 1 } } }, mode);
+      }
+      const output = new Float32Array(32);
+      dsp.process(output, new Float32Array(32));
+      return output;
+    };
+    const dry = renderChange("dry");
+    const smooth = renderChange("smooth");
+    const immediate = renderChange("immediate");
+    const difference = (left: Float32Array, right: Float32Array): number =>
+      left.reduce((total, sample, index) => total + Math.abs(sample - (right[index] ?? 0)), 0);
+
+    const smoothDifference = difference(smooth, dry);
+    const immediateDifference = difference(immediate, dry);
+    expect(smoothDifference).toBeGreaterThan(0);
+    expect(smoothDifference).toBeLessThan(immediateDifference * 0.35);
   });
 
   it("keeps every sample finite and inside the output ceiling", () => {

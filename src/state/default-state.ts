@@ -1,5 +1,7 @@
 import {
   RACK_SLOT_IDS,
+  SEND_BUS_IDS,
+  createEffectInstanceId,
   createModuleInstanceId,
   createNoteEventId,
   createPatternId,
@@ -7,11 +9,20 @@ import {
   createProjectLineageId,
   createSongPlacementId,
   createStateRevisionEpoch,
+  type EffectInstanceId,
   type IdFactory,
   type ModuleInstanceId,
   type VoiceId,
 } from "../contracts/ids";
-import type { EffectsState } from "../contracts/effects";
+import {
+  DEFAULT_MASTER_EFFECT_PLUGIN_IDS,
+  DEFAULT_SEND_EFFECT_PLUGIN_IDS,
+  MASTER_EFFECT_CHAIN_SLOT_COUNT,
+  MODULE_EFFECT_CHAIN_SLOT_COUNT,
+  SEND_EFFECT_CHAIN_SLOT_COUNT,
+  type EffectInstanceState,
+  type EffectsState,
+} from "../contracts/effects";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 import type {
   PatternEvent,
@@ -40,9 +51,15 @@ export interface ModuleSeed {
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
   readonly events: readonly PatternEventSeed[];
-  /** Drum voices that own durable insert slots. Pitched modules omit this. */
+  /** Drum voice IDs let state validate trigger events without importing engine manifests. */
   readonly voiceIds?: readonly VoiceId[];
 }
+
+/** The composition boundary can provide manifest defaults without making state import engine code. */
+export type DefaultEffectInstanceFactory = (
+  id: EffectInstanceId,
+  pluginId: PluginId,
+) => EffectInstanceState | undefined;
 
 /** The supplied project contains five Patterns. Projects can hold 1 through 32. */
 export const DEFAULT_PATTERN_COUNT = 5;
@@ -102,13 +119,14 @@ export function createDefaultState(
   idFactory: IdFactory,
   seed?: ModuleSeed | readonly ModuleSeed[],
   now: () => string = () => new Date().toISOString(),
+  createEffectInstance?: DefaultEffectInstanceFactory,
 ): PulseState {
   const projectId = createProjectId(idFactory);
   const lineageId = createProjectLineageId(idFactory);
   const epoch = createStateRevisionEpoch(idFactory);
   const seeds: readonly ModuleSeed[] = seed === undefined ? [] : isSeedList(seed) ? seed : [seed];
   const modules = seeds.slice(0, RACK_SLOT_IDS.length).map((one) => createModule(idFactory, one));
-  const effects = createInitialEffectsState(modules, seeds);
+  const effects = createInitialEffectsState(idFactory, modules, createEffectInstance);
   const timestamp = now();
   const patterns = Array.from({ length: DEFAULT_PATTERN_COUNT }, (_, index) => {
     const id = createPatternId(idFactory);
@@ -197,27 +215,54 @@ export function createDefaultState(
       selectedModuleId: modules[0]?.id,
       pianoRollSelection: undefined,
       pianoRollParameter: "velocity",
+      pianoRollAutomationTarget: undefined,
     }),
     history: Object.freeze({ canUndo: false, canRedo: false }),
   });
 }
 
 function createInitialEffectsState(
+  idFactory: IdFactory,
   modules: readonly RackModuleState[],
-  seeds: readonly ModuleSeed[],
+  createEffectInstance: DefaultEffectInstanceFactory | undefined,
 ): EffectsState {
-  const voiceInserts: Record<ModuleInstanceId, Record<VoiceId, null>> = {};
-  for (const [index, module] of modules.entries()) {
-    const voiceIds = seeds[index]?.voiceIds;
-    if (voiceIds === undefined || voiceIds.length === 0) continue;
-    const slots: Record<VoiceId, null> = {};
-    for (const voiceId of voiceIds) slots[voiceId] = null;
-    voiceInserts[module.id] = Object.freeze(slots);
+  const moduleChains: Record<ModuleInstanceId, readonly null[]> = {};
+  for (const module of modules) {
+    moduleChains[module.id] = Object.freeze(Array.from({ length: MODULE_EFFECT_CHAIN_SLOT_COUNT }, () => null));
   }
-  return Object.freeze({
-    instances: Object.freeze({}),
-    voiceInserts: Object.freeze(voiceInserts),
+  const instances: Record<string, EffectInstanceState> = {};
+  const sendChains = Object.fromEntries(SEND_BUS_IDS.map((sendBusId) => {
+    const id = createEffectInstanceId(idFactory);
+    const pluginId = DEFAULT_SEND_EFFECT_PLUGIN_IDS[sendBusId];
+    if (pluginId === undefined) throw new Error("A default send effect is missing.");
+    instances[id] = createEffectInstance?.(id, pluginId) ?? createDefaultEffectInstance(id, pluginId);
+    return [sendBusId, Object.freeze({
+      slots: Object.freeze([id, ...Array.from({ length: SEND_EFFECT_CHAIN_SLOT_COUNT - 1 }, () => null)]),
+      returnLevel: 1,
+      bypassed: false,
+      pinnedEffectId: id,
+    })];
+  })) as EffectsState["sendChains"];
+  const masterIds = DEFAULT_MASTER_EFFECT_PLUGIN_IDS.map((pluginId) => {
+    const id = createEffectInstanceId(idFactory);
+    instances[id] = createEffectInstance?.(id, pluginId) ?? createDefaultEffectInstance(id, pluginId);
+    return id;
   });
+  return Object.freeze({
+    instances: Object.freeze(instances),
+    moduleChains: Object.freeze(moduleChains),
+    sendChains: Object.freeze(sendChains),
+    masterChain: Object.freeze([
+      ...masterIds.slice(0, -1),
+      ...Array.from({ length: MASTER_EFFECT_CHAIN_SLOT_COUNT - masterIds.length }, () => null),
+      masterIds.at(-1) ?? null,
+    ]),
+    masterEffectsBypassed: false,
+  });
+}
+
+function createDefaultEffectInstance(id: EffectInstanceId, pluginId: PluginId): EffectInstanceState {
+  return Object.freeze({ id, pluginId, stateVersion: 1, state: Object.freeze({}), bypassed: false, wetDry: 1 });
 }
 
 function isSeedList(seed: ModuleSeed | readonly ModuleSeed[]): seed is readonly ModuleSeed[] {
@@ -255,5 +300,9 @@ export function createModule(
     solo: source?.solo ?? false,
     level: source?.level ?? DEFAULT_MODULE_LEVEL,
     pan: source?.pan ?? 0,
+    sends: Object.freeze(Object.fromEntries(SEND_BUS_IDS.map((id) => {
+      const send = source?.sends[id];
+      return [id, Object.freeze({ amount: send?.amount ?? 0, mode: send?.mode ?? "post-fader" })];
+    }))),
   });
 }

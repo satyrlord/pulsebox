@@ -10,8 +10,9 @@ architecture details that implement that specification set.
 
 **Implementation state:** The Phase 1 contracts, layer guards, state spine,
 AudioWorklet spine, transport, bundled decoder adapter, and React UI foundation
-exist. Narrow later-phase foundations are listed in README.md. Their parent
-phases remain incomplete until their full owned scope and acceptance gates pass.
+exist. The specification 007 mixer and effects system also exists. Other narrow
+later-phase foundations are listed in README.md. Their parent phases remain
+incomplete until their full owned scope and acceptance gates pass.
 
 ## 1. Purpose and interpretation
 
@@ -411,7 +412,7 @@ prevent discontinuities.
 
 Formatting shall be a trusted UI function selected by `unit` and descriptor
 metadata. A project file shall not supply executable formatters. Structural
-operations, meter frames, monitor selection, audio power, hover, focus, and
+operations, meter frames, audio power, hover, focus, and
 global UI preferences shall not be parameters or automation targets.
 
 ### 6.4 Instrument specialization
@@ -446,8 +447,7 @@ suspend, render offline, reset, and dispose the instance. It shall not expose an
 
 An effect manifest shall add:
 
-- supported placement: voice insert, module pedalboard, send chain, or master
-  chain.
+- supported placement: module pedalboard, send chain, or master chain.
 - input and output channel configurations.
 - declared latency in frames for every sample rate.
 - finite tail policy and maximum tail duration, or an explicitly bounded
@@ -457,6 +457,11 @@ An effect manifest shall add:
 - the four or fewer compact controls and detailed editor sections.
 - a processor or native-adapter factory key.
 - live and offline-render capability declarations.
+
+The built-in effect registry includes the Limiter. Its manifest declares only
+`master-chain` placement. The final master slot is protected. Project validation
+and chain operations shall reject a missing, moved, or removed limiter. The user
+may bypass the limiter instance, but master-effects bypass shall leave it active.
 
 An effect shall preserve channel count unless its manifest declares an allowed
 conversion. Bypass and reorder shall use bounded click-safe transitions and
@@ -533,7 +538,7 @@ shall continue to play, and the transport shall remain able to start. Only a fai
 to create or resume the audio context shall make the runtime unavailable.
 
 Meter frames, meter-analysis mode, playheads, hover, focus, drag previews, audio
-power, monitor selection, and decoder progress are transient. They shall not enter project
+power and decoder progress are transient. They shall not enter project
 history or portable serialization.
 
 A processor shall report a final zero meter frame when it is suspended, stopped,
@@ -940,15 +945,17 @@ Decoded buffers are engine cache data. They shall not be serialized. Original
 asset bytes and their content IDs shall remain the persistence source so a cache
 can be rebuilt deterministically.
 
-## 11. Routing and Monitor audition
+## 11. Routing
 
 ### 11.1 Program routing
 
 The program path shall follow the routing in the
 [mixer and effects specification](specs/spec-007-mixer-and-effects.md). The path
-goes through voice processing, module sum, module inserts, channel processing,
-fader, sends, and send returns. It then goes through the master chain, selected
-monitor-only mono fold-down, and physical output.
+goes through voice processing, module sum, the module pedalboard, a fixed channel
+gate, fader, and pan. Each channel has fixed A–D send taps from the gate
+pre-fader or the pan post-fader. Each send return joins the main mix. The mixed
+signal then goes through the master chain, the meter-analysis branch, and the
+physical output.
 Offline rack and return stems shall branch at their specified pre-master points.
 Only the master export shall include the master chain.
 
@@ -956,7 +963,7 @@ Master-effects bypass shall switch around every user master effect as one
 click-safe graph operation, then pass through master gain and the protected
 limiter. It shall not change the limiter instance's detailed bypass state.
 
-The header meters shall observe the post-master, post-monitor-mode signal through
+The header meters shall observe the post-master signal through
 a non-audible analysis branch. L/R mode displays channel magnitudes. M/S mode
 derives `M = (L + R) / 2` and `S = (L - R) / 2` for analysis only. Switching
 meter mode shall not reconnect, sum, or otherwise alter the audible path.
@@ -964,71 +971,6 @@ meter mode shall not reconnect, sum, or otherwise alter the audible path.
 Mute and global solo shall gate both a channel's program path and its four sends
 as specified. Graph changes shall alter gains or bounded switches and shall not
 rebuild the whole mixer.
-
-### 11.2 Exclusive PFL Monitor mode
-
-Monitor shall be exclusive pre-fader listen for the physical live output. The
-selected tap shall be after the module insert chain and before the channel
-fader, channel pan, channel mute and solo gates, and send taps.
-
-When Monitor is inactive:
-
-```text
-program mix -> master chain -> live monitor mode -> physical output
-```
-
-When Monitor is active:
-
-```text
-selected post-insert/pre-fader tap
-  -> fixed -12 dB monitor safety gain
-  -> protected limiter safety processing
-  -> live monitor mode
-  -> physical output
-```
-
-The normal master program shall continue rendering internally while Monitor is
-active, but its output gain to the physical destination shall be zero. It shall
-not be summed with the selected tap. Only the selected channel shall reach the
-physical output. This prevents level doubling and makes single-channel audition
-literal.
-
-The protected limiter algorithm shall remain active on the Monitor path even
-when the project's master-limiter instance is bypassed. This temporary safety
-use shall not change the project bypass state. The Monitor path shall have a
-ceiling no higher than -1 dBFS and shall add no user-adjustable project
-parameter.
-
-Only one non-empty channel may be selected. Selecting another channel replaces
-the selection. A Monitor change shall use this 4-millisecond
-fade-through-silence sequence:
-
-1. Fade the old physical source to zero for 2 milliseconds.
-2. Switch the source at zero.
-3. Fade the new physical source up for 2 milliseconds.
-
-Program and PFL sources shall never overlap during the transition.
-
-Monitor selection shall ignore the selected channel's fader, channel pan, mute,
-global solo gate, and send levels. It shall preserve any pan already created
-inside the instrument or its inserts. Sends and the internally rendering program
-mix shall remain unchanged.
-
-Displayed master meters shall switch to the post-safety Monitor signal and shall
-show an explicit `Monitor` mode label. Hidden internal program metering may
-continue for engine diagnostics, but it shall not be presented as the audible
-master level.
-
-Monitor selection, transition state, safety gain, and monitor meters are
-transient session state. They shall not enter commands, undo history,
-automation, autosave, project files, recovery data, ordinary Save, portable
-export, master WAV export, or stem export. Closing or reloading the page shall
-clear Monitor.
-
-Routing tests shall prove zero program contribution while Monitor is active and
-zero PFL contribution while it is inactive. They shall also prove one selected
-source, fixed safety gain, limiter enforcement, and meter-source switching.
-The tests shall prove unchanged sends and export isolation.
 
 ## 12. Persistence boundary
 
@@ -1141,7 +1083,6 @@ The following gates shall apply:
 | Parameter smoothing          | Constant-input full-range sweep and worst-case discrete step fixtures        | Control trajectory error at or below `1e-6`; no output discontinuity above 0.02 full scale at an update boundary        |
 | Sample boundaries            | Start, stop, offset, choke, loop, and very-short-sample fixtures             | Specified 2 ms and 4 ms ramps within 1 frame; no boundary jump above 0.01 full scale                                    |
 | Export resampling            | Deterministic 48 kHz to 44.1 kHz impulse, sweep, and test-tone fixtures      | Passband error within 0.1 dB from 20 Hz through 20 kHz; aliased or imaged test-tone energy at or below -90 dBFS         |
-| Monitor exclusivity          | Orthogonal deterministic signals on program and selected PFL paths           | Rejected path below -120 dBFS; selected path matches fixed gain and limiter tolerances; no source overlap during switch |
 
 <!-- markdownlint-enable MD013 MD060 -->
 
@@ -1162,8 +1103,6 @@ Chrome shall also prove in the production build:
   are audibly and visibly coherent.
 - a compatible module or effect edit does not suspend the context or rebuild
   unrelated branches.
-- Monitor changes the actual destination source and meter source as section 11
-  requires.
 - saving, reloading, theme changes, and compatible graph edits do not stop
   transport.
 - a processor fault affects only its declared branch and produces the defined
@@ -1209,7 +1148,6 @@ action. No recovery path shall require a destructive confirmation dialog.
 | Worklet control     | Versioned, sequenced, acknowledged, bounded messages                        | Unversioned objects, unbounded posting, or direct UI ports                       | Protocol fuzzing, queue-limit, stale, duplicate, gap, and recovery tests are required |
 | Bulk audio transfer | Bounded transferable buffers prepared outside `process()`                   | PCM in JSON messages or allocation during real-time processing                   | Transfer ownership, in-flight limit, and allocation checks are required               |
 | Sample import       | Pulsebox-owned bundled WAV, AIFF, and FLAC decoders                         | Browser-format dependence through `decodeAudioData()` or a server decoder        | Chrome fixture hashes must match exactly                                              |
-| Monitor             | Exclusive post-insert, pre-fader PFL to the physical output                 | Additive PFL mixed with the program                                              | Destination null tests must prove no doubling or rejected-path leakage                |
 | Worklet transport   | `MessagePort` with explicit bounds                                          | `SharedArrayBuffer` as an MVP requirement                                        | No cross-origin-isolation dependency is allowed without a later contract change       |
 | DSP placement       | AudioWorklet for custom DSP and engine adapters for suitable native nodes   | Main-thread custom DSP or `ScriptProcessorNode`                                  | Dependency, source, and production-browser audits are required                        |
 | Persistence         | State-owned ports backed by browser storage                                 | Engine or UI access to storage, remote storage, or path-based durable references | Repository contract and canonical-origin integration tests are required               |

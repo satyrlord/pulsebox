@@ -110,7 +110,6 @@ Unit tests:
 - Plugin version and pack-reference validation.
 - Storage quota failure and atomic rollback.
 - Bundled WAV, AIFF, and FLAC decoder fixtures.
-- Monitor routing without program-path doubling.
 
 Component tests:
 
@@ -184,6 +183,17 @@ Visual regression:
 - High-contrast mode.
 - Deterministic meters and animation.
 
+#### 24.3.1 Mixer and effects verification matrix
+
+<!-- markdownlint-disable MD013 MD060 -->
+
+| Contract | Required evidence | Pass condition |
+| -------- | ----------------- | -------------- |
+| Direct per-voice Distortion | `tests/unit/engine/drumline-dsp.test.ts`, `tests/unit/engine/drum-machines-dsp.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/audio-performance.spec.ts` | Zero is dry. A non-zero value affects only the selected voice and changes safely while it sounds. |
+| Rack-only pedalboard access | `tests/component/mixer-effects.test.tsx` and `tests/e2e/spec-007-mixer-effects.spec.ts` | Rack Effects opens the module pedalboard. Mixer channels expose no module-chain editor. |
+
+<!-- markdownlint-enable MD013 MD060 -->
+
 ### 24.4 Objective evidence thresholds
 
 Use the deterministic fixtures and detailed procedures in `ARCHITECTURE.md`,
@@ -212,10 +222,17 @@ normative:
   every supported viewport, in the `rack` theme and high-contrast mode.
 - The first-sound procedure in section 21.8 passes all five runs in Chrome on
   the recorded release host.
-- Before final release, five people unfamiliar with Pulsebox attempt to start
-  the supplied loop from fresh browser storage using only visible product
-  guidance. At least four must produce audible playback within one minute
-  without assistance. Record anonymized elapsed times and failure points.
+- AC-077 uses one deterministic startup check run by the single owner. Start a fresh persistent
+  Chrome profile at `http://127.0.0.1:4173` and load the application. Verify each
+  condition below:
+  - The project selector reads `Current project: Neon Basement`.
+  - Six rack modules are loaded.
+  - The Play control is visible with title `Play. Space.`.
+  - The selected Pattern has a stable UUID.
+  - The `Silver Serpent events in Verse` group is visible.
+  - The stored-project list reads `No stored projects yet.`.
+  The check uses no user study or assistance. The procedure is in
+  `tests/e2e/first-sound-release.spec.ts`.
 
 ### 24.5 Suggested file structure
 
@@ -333,7 +350,7 @@ internal voice mixers.
 Phase 3: Named project Patterns, module-aware Piano Roll, live input, generators,
 transforms, bounded full Undo.
 
-Phase 4: Main mixer, voice inserts, module pedalboards, send chains, master
+Phase 4: Main mixer, per-voice Distortion, module pedalboards, send chains, master
 chain, complete effect catalog.
 
 Phase 5: Named-Pattern Playlist, Pattern automation, and Pattern/Song transport
@@ -354,11 +371,16 @@ User-facing status must name the exact implemented slice and its missing
 parent-phase scope.
 
 The current runnable foundation contains Phase 1 and narrow slices for Tin
-Soldier, named Pattern storage, basic channel mixing, and the drum-voice
-Distortion insert engine and state foundation. It also contains Playlist
-transport, appearance Settings, and browser project persistence. These slices
-verify shared contracts and integration points. They do not complete Phases 2
-through 7 or their acceptance criteria.
+Soldier, named Pattern storage, basic channel mixing, and the per-voice
+Distortion control. The runnable `spec-007` slice adds fixed mixer strips, A–D
+channel sends, module pedalboards, and four send chains. It also adds the master
+chain and the built-in effect catalog with its protected master-chain limiter.
+It contains Playlist transport, appearance Settings, and browser project
+persistence. These slices verify shared contracts and integration points. They
+do not complete the Phase 4 parent scope or Phases 5 through 7, or their
+acceptance criteria. Remaining gaps include the full Phase 4 acceptance set and
+the later Pattern/Song, persistence/export, accessibility, and release-evidence
+gates.
 
 ### 24.9 Close-out
 

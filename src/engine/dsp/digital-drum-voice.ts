@@ -19,6 +19,7 @@
 
 import {
   BitCrusher,
+  applyVoiceDistortion,
   clamp,
   DeterministicNoise,
   OnePoleHighpass,
@@ -45,15 +46,12 @@ export interface DigitalVoiceParameters {
   readonly tune: number;
   readonly decay: number;
   readonly level: number;
+  /** Per-voice saturation mix. Zero is dry. */
+  readonly distortion: number;
   /** -1 hard left to 1 hard right. */
   readonly pan: number;
   /** Extra noise blended into the voice. 0 leaves the table untouched. */
   readonly noise?: number;
-}
-
-/** A per-voice processor that runs before the voice output level. */
-export interface DigitalVoiceInsertProcessor {
-  process(input: number): number;
 }
 
 /**
@@ -129,6 +127,8 @@ export class DigitalDrumVoice {
    * change on a ringing voice glides instead of stepping in one sample.
    */
   readonly #level: ParameterGlide;
+  /** The Distortion descriptor declares the same 8 ms linear glide. */
+  readonly #distortion: ParameterGlide;
   /** Linear choke: spec-004 section 21.5 mandates a linear 4 ms fade-out. */
   readonly #chokeStep: number;
   #parameters: DigitalVoiceParameters;
@@ -151,6 +151,7 @@ export class DigitalDrumVoice {
     this.#sample = new SampleBoundaryPlayer([table], sampleRate);
     this.#noise = new DeterministicNoise(character.seed);
     this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
+    this.#distortion = new ParameterGlide(clamp(parameters.distortion, 0, 1), sampleRate);
     this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
@@ -163,7 +164,10 @@ export class DigitalDrumVoice {
     this.#parameters = parameters;
     // A snapshot is a state replacement, so the smoothed fields land without
     // a ramp. An incremental change glides from the render loop.
-    if (mode === "immediate") this.#level.set(clamp(parameters.level, 0, 1));
+    if (mode === "immediate") {
+      this.#level.set(clamp(parameters.level, 0, 1));
+      this.#distortion.set(clamp(parameters.distortion, 0, 1));
+    }
   };
 
   readonly trigger = (velocity: number, accent: boolean): void => {
@@ -173,7 +177,10 @@ export class DigitalDrumVoice {
     this.#highpass.reset();
     // A hit that starts from silence takes the committed level directly; the
     // glide exists to protect a ringing tail, not to lag a fresh attack.
-    if (!restarting) this.#level.set(clamp(this.#parameters.level, 0, 1));
+    if (!restarting) {
+      this.#level.set(clamp(this.#parameters.level, 0, 1));
+      this.#distortion.set(clamp(this.#parameters.distortion, 0, 1));
+    }
     // Same-voice restarts retain their exact attack frame. New voices use the
     // mandatory boundary fade before their stored table becomes audible.
     this.#sample.start({ fadeIn: !restarting });
@@ -204,7 +211,7 @@ export class DigitalDrumVoice {
    * machine crushes together rather than each carrying its own copy of the
    * control.
    */
-  render(bits: number, rate: number, insert?: DigitalVoiceInsertProcessor): number {
+  render(bits: number, rate: number): number {
     if (!this.#active) return 0;
 
     const decaySeconds = clamp(this.#parameters.decay, 0.01, 3);
@@ -232,7 +239,8 @@ export class DigitalDrumVoice {
 
     const gain = this.#velocity * (1 + this.#accent * 0.45);
     const voiceOutput = cleaned * this.#amplitude * gain;
-    const processed = insert?.process(voiceOutput) ?? voiceOutput;
+    const distortion = this.#distortion.advance(clamp(this.#parameters.distortion, 0, 1));
+    const processed = applyVoiceDistortion(voiceOutput, distortion);
     return processed * this.#level.advance(clamp(this.#parameters.level, 0, 1));
   }
 

@@ -91,6 +91,17 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].decay,
   },
   {
+    field: "distortion",
+    label: "Distortion",
+    minimum: 0,
+    maximum: 1,
+    step: 0.01,
+    unit: "percent",
+    precision: 2,
+    smoothing,
+    defaultFor: (voiceId) => DEFAULT_BOOM_PARAMETERS.voices[voiceId].distortion,
+  },
+  {
     field: "level",
     label: "Level",
     minimum: 0,
@@ -205,7 +216,7 @@ export const BOOM_EIGHT_MANIFEST = Object.freeze({
       position,
       parameterId: parameter.id,
     })),
-    voiceCompactControls: ["tune", "punch", "decay", "pan", "mute", "solo"].map(
+    voiceCompactControls: ["tune", "punch", "decay", "distortion", "pan", "mute", "solo"].map(
       (parameterSuffix, position) => ({ position, parameterSuffix }),
     ),
     detailedEditorSections: [

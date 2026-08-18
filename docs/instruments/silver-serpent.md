@@ -34,7 +34,7 @@ The full expanded editor remains governed by the
 [rack and instruments specification](../specs/spec-005-rack-and-instruments.md).
 Its second oscillator,
 sub oscillator, alternate filter model, detailed envelope, response curve, and
-voice monitor are later work. They must extend the plugin folder and manifest
+voice analysis display are later work. They must extend the plugin folder and manifest
 without adding shared-engine product branches.
 
 ## Stable parameters

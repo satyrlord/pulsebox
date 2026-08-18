@@ -40,16 +40,25 @@ function steps(note: number, active: (index: number) => boolean): PatternPartVie
 interface RecordingAdapter extends VoiceAdapterPort {
   readonly batches: (readonly ScheduledVoiceEvent[])[];
   readonly parameterWrites: Readonly<Record<string, unknown>>[];
+  readonly prepareCalls: ReturnType<typeof vi.fn>;
+  readonly activateCalls: ReturnType<typeof vi.fn>;
+  readonly disposeCalls: ReturnType<typeof vi.fn>;
 }
 
 function recordingAdapter(): RecordingAdapter {
   const batches: (readonly ScheduledVoiceEvent[])[] = [];
   const parameterWrites: Readonly<Record<string, unknown>>[] = [];
+  const prepareCalls = vi.fn();
+  const activateCalls = vi.fn();
+  const disposeCalls = vi.fn();
   return {
     batches,
     parameterWrites,
-    prepare: vi.fn().mockResolvedValue(undefined),
-    activate: vi.fn(),
+    prepareCalls,
+    activateCalls,
+    disposeCalls,
+    prepare: () => { prepareCalls(); return Promise.resolve(); },
+    activate: (destination) => { activateCalls(destination); },
     replaceState: vi.fn(),
     setProjectRevision: vi.fn(),
     setParameters: (parameters) => parameterWrites.push(parameters),
@@ -59,7 +68,7 @@ function recordingAdapter(): RecordingAdapter {
     clearScheduledEvents: vi.fn(),
     resume: vi.fn(),
     suspend: vi.fn(),
-    dispose: vi.fn(),
+    dispose: () => { disposeCalls(); },
   };
 }
 
@@ -311,11 +320,81 @@ describe("transport with several voices", () => {
     expect(replacementReplaceState).toHaveBeenCalledWith(
       { cutoff: 900 },
       expect.objectContaining({ counter: 1 }),
-      undefined,
     );
     // The unrelated drum voice keeps playing on its original adapter.
     expect(drumDispose).not.toHaveBeenCalled();
 
+    runtime.dispose();
+  });
+
+  it("recreates an adapter when full replacement changes the plugin for one ID", async () => {
+    const context = stubContext();
+    const initial = recordingAdapter();
+    const replacement = recordingAdapter();
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: (pluginId) => () =>
+        pluginId === BASS_MONO_MANIFEST.pluginId ? initial : replacement,
+    });
+    await runtime.replaceFromCurrentState([{
+      id: moduleId(1),
+      pluginId: BASS_MONO_MANIFEST.pluginId,
+      parameters: {},
+      parts: [steps(36, () => false)],
+      mix: DEFAULT_MIX,
+    }], REVISION);
+    await runtime.activate();
+
+    await runtime.replaceFromCurrentState([{
+      id: moduleId(1),
+      pluginId: DRUMLINE_SIX_MANIFEST.pluginId,
+      parameters: {},
+      parts: [steps(42, () => false)],
+      mix: DEFAULT_MIX,
+    }], { epoch: TEST_UUID, counter: 1 } as StateRevision);
+
+    expect(initial.disposeCalls.mock.calls).toHaveLength(1);
+    expect(replacement.prepareCalls.mock.calls).toHaveLength(1);
+    expect(replacement.activateCalls.mock.calls).toHaveLength(1);
+    runtime.dispose();
+  });
+
+  it("disposes a removed routing channel during full replacement", async () => {
+    const context = stubContext();
+    const initial = recordingAdapter();
+    const replacement = recordingAdapter();
+    const adapters = [initial, replacement];
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => () => {
+        const adapter = adapters.shift();
+        if (adapter === undefined) throw new Error("Missing adapter fixture.");
+        return adapter;
+      },
+    });
+    const module: TransportModule = {
+      id: moduleId(1),
+      pluginId: BASS_MONO_MANIFEST.pluginId,
+      parameters: {},
+      parts: [steps(36, () => false)],
+      mix: DEFAULT_MIX,
+    };
+    await runtime.replaceFromCurrentState([module], REVISION);
+    await runtime.activate();
+    const firstInput = initial.activateCalls.mock.calls[0]?.[0] as unknown;
+
+    await runtime.replaceFromCurrentState([], {
+      epoch: TEST_UUID,
+      counter: 1,
+    } as StateRevision);
+    await runtime.replaceFromCurrentState([module], {
+      epoch: TEST_UUID,
+      counter: 2,
+    } as StateRevision);
+    const secondInput = replacement.activateCalls.mock.calls[0]?.[0] as unknown;
+
+    expect(initial.disposeCalls.mock.calls).toHaveLength(1);
+    expect(secondInput).not.toBe(firstInput);
     runtime.dispose();
   });
 

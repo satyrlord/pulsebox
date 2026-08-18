@@ -1,5 +1,6 @@
 import type { EffectsState } from "../contracts/effects";
 import type {
+  EffectInstanceId,
   ModuleInstanceId,
   NoteEventId,
   AutomationLaneId,
@@ -7,6 +8,7 @@ import type {
   ProjectId,
   ProjectLineageId,
   RackSlotId,
+  SendBusId,
   SongPlacementId,
   StateRevision,
   VoiceId,
@@ -106,6 +108,13 @@ export interface RackModuleState {
   readonly level: number;
   /** Stereo position, -1 hard left to 1 hard right. */
   readonly pan: number;
+  /** Four fixed send taps. Amount zero makes a send inactive. */
+  readonly sends: Readonly<Record<SendBusId, MixerSendState>>;
+}
+
+export interface MixerSendState {
+  readonly amount: number;
+  readonly mode: "pre-fader" | "post-fader";
 }
 
 export interface SongPlacement {
@@ -129,10 +138,22 @@ export interface AutomationStepState {
  * The minimal Pattern automation record. Later scopes use this same state type
  * when their owner defines the target contract.
  */
+export type AutomationScope = "module" | "mixer" | "send" | "send-return" | "effect" | "master";
+
+/** The target ID stays stable when a pedal moves within a chain. */
+export type AutomationTargetId = ModuleInstanceId | SendBusId | EffectInstanceId | "master";
+
+/** A non-module lane that is armed from its owning mixer or effects control. */
+export interface ExternalAutomationTarget {
+  readonly scope: Exclude<AutomationScope, "module">;
+  readonly targetId: Exclude<AutomationTargetId, ModuleInstanceId> | ModuleInstanceId;
+  readonly parameterId: string;
+}
+
 export interface AutomationLaneState {
   readonly id: AutomationLaneId;
-  readonly scope: "module";
-  readonly targetId: ModuleInstanceId;
+  readonly scope: AutomationScope;
+  readonly targetId: AutomationTargetId;
   readonly parameterId: string;
   readonly patternId: PatternId;
   readonly stepTicks: typeof PATTERN_TICKS_PER_STEP;
@@ -185,6 +206,8 @@ export interface UiState {
       }
     | undefined;
   readonly pianoRollParameter: string;
+  /** An armed mixer, send, effect, or master lane. Arming does not edit the project. */
+  readonly pianoRollAutomationTarget: ExternalAutomationTarget | undefined;
 }
 
 export interface PulseState {

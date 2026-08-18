@@ -16,9 +16,7 @@ const LOADED_RACK_MODULE = `${RACK_MODULE}:not([data-label="Empty"])`;
 const DRUMLINE_PROCESSOR = "pulsebox-drumline-six";
 /** The fixed 1/16 Pattern grid puts four steps in one beat. */
 const STEPS_PER_BEAT = 4;
-const DISTORTION_PLUGIN_ID = "distortion";
 const DRUMLINE_PLUGIN_ID = "drum-analog-small";
-const EFFECT_INSTANCE_ID = "00000000-0000-4000-8000-000000000991";
 
 function fixtureEventId(patternIndex: number, partIndex: number, step: number): NoteEventId {
   const suffix = (patternIndex * 128 + partIndex * 16 + step + 1).toString(16).padStart(12, "0");
@@ -121,28 +119,36 @@ function documentFromPortableArchive(bytes: Uint8Array): ProjectDocument {
 function distortionFixture(document: ProjectDocument): {
   readonly document: ProjectDocument;
   readonly dryModuleId: string;
-  readonly insertedModuleId: string;
+  readonly distortedModuleId: string;
 } {
   const drumModules = document.rack.filter((slot) => slot.pluginId === DRUMLINE_PLUGIN_ID);
   const dryModuleId = drumModules[0]?.moduleId;
-  const insertedModuleId = drumModules[1]?.moduleId;
-  if (dryModuleId === undefined || insertedModuleId === undefined) {
+  const distortedModuleId = drumModules[1]?.moduleId;
+  if (dryModuleId === undefined || distortedModuleId === undefined) {
     throw new Error("The Distortion fixture requires two Tin Soldier modules.");
   }
-  const targetModules = new Set([dryModuleId, insertedModuleId]);
+  const targetModules = new Set([dryModuleId, distortedModuleId]);
   return {
     dryModuleId,
-    insertedModuleId,
+    distortedModuleId,
     document: {
       ...document,
-      plugins: [
-        ...document.plugins.filter((plugin) => plugin.pluginId !== DISTORTION_PLUGIN_ID),
-        { pluginId: DISTORTION_PLUGIN_ID, stateSchemaVersion: 1 },
-      ],
       rack: document.rack.map((slot) => ({
         ...slot,
         ...(slot.moduleId === undefined ? {} : { muted: !targetModules.has(slot.moduleId) }),
+        ...(slot.moduleId === dryModuleId
+          ? { parameters: { ...slot.parameters, "kick-distortion": 0 } }
+          : slot.moduleId === distortedModuleId
+            ? { parameters: { ...slot.parameters, "kick-distortion": 1 } }
+            : {}),
       })),
+      mixer: {
+        ...document.mixer,
+        channels: document.mixer.channels.map((channel) => ({
+          ...channel,
+          muted: channel.moduleId === null ? channel.muted : !targetModules.has(channel.moduleId),
+        })),
+      },
       patterns: document.patterns.map((pattern, patternIndex) => ({
         ...pattern,
         parts: pattern.parts.map((part, partIndex) =>
@@ -168,23 +174,6 @@ function distortionFixture(document: ProjectDocument): {
             : part,
         ),
       })),
-      effects: {
-        instances: [
-          {
-            id: EFFECT_INSTANCE_ID,
-            pluginId: DISTORTION_PLUGIN_ID,
-            stateVersion: 1,
-            state: {},
-          },
-        ],
-        voiceInserts: document.effects.voiceInserts.map((slot) => ({
-          ...slot,
-          effectInstanceId:
-            slot.moduleId === insertedModuleId && slot.voiceId === "kick"
-              ? EFFECT_INSTANCE_ID
-              : null,
-        })),
-      },
     },
   };
 }
@@ -628,7 +617,9 @@ for (const requestedSampleRate of [44_100, 48_000]) {
     const productionBuild = captureProductionBuildEvidence();
     const buildPaths = productionBuild.files.map((file) => file.path);
     expect(buildPaths).toContain("index.html");
-    expect(buildPaths.filter((path) => path.includes(".worklet-")).length).toBe(6);
+    const workletPaths = buildPaths.filter((path) => path.includes(".worklet-"));
+    expect(workletPaths).toHaveLength(7);
+    expect(workletPaths.some((path) => path.includes("effect.worklet-"))).toBe(true);
     expect(buildPaths.some((path) => path.includes("decoder-worker-"))).toBe(true);
     expect(buildPaths.some((path) => path.endsWith(".woff2"))).toBe(true);
     const report = JSON.stringify(
@@ -686,33 +677,31 @@ for (const requestedSampleRate of [44_100, 48_000]) {
   });
 }
 
-test("saved Distortion reaches the production worklet and transitions while sounding", async (
+test("saved Distortion reaches the production worklet and changes while sounding", async (
   { browser, page },
   testInfo,
 ) => {
   await page.addInitScript(() => {
-    interface EffectProbeRecord {
-      hasDistortion: boolean | undefined;
+    interface DistortionProbeRecord {
+      distortionChanges: number[];
+      distortionValue: number | undefined;
       lastMeterLevel: number;
       meterLevels: number[];
-      nextStateSnapshot: string | undefined;
-      nodeId: string | undefined;
       processorName: string;
-      transitionCount: number;
       transitionWasSounding: boolean;
     }
-    interface EffectProbe {
+    interface DistortionProbe {
       contexts: AudioContext[];
-      nodes: EffectProbeRecord[];
+      nodes: DistortionProbeRecord[];
     }
-    const state = window as unknown as { __effectProbe: EffectProbe };
-    state.__effectProbe = { contexts: [], nodes: [] };
+    const state = window as unknown as { __distortionProbe: DistortionProbe };
+    state.__distortionProbe = { contexts: [], nodes: [] };
 
     const NativeAudioContext = window.AudioContext;
     class ProbedAudioContext extends NativeAudioContext {
       constructor(options: AudioContextOptions = {}) {
         super(options);
-        state.__effectProbe.contexts.push(this);
+        state.__distortionProbe.contexts.push(this);
       }
     }
     Object.defineProperty(window, "AudioContext", {
@@ -724,22 +713,17 @@ test("saved Distortion reaches the production worklet and transitions while soun
     class ProbedAudioWorkletNode extends NativeAudioWorkletNode {
       constructor(context: BaseAudioContext, name: string, options?: AudioWorkletNodeOptions) {
         super(context, name, options);
-        const record: EffectProbeRecord = {
-          hasDistortion: undefined,
+        const record: DistortionProbeRecord = {
+          distortionChanges: [],
+          distortionValue: undefined,
           lastMeterLevel: 0,
           meterLevels: [],
-          nextStateSnapshot: undefined,
-          nodeId: undefined,
           processorName: name,
-          transitionCount: 0,
           transitionWasSounding: false,
         };
-        state.__effectProbe.nodes.push(record);
+        state.__distortionProbe.nodes.push(record);
         this.port.addEventListener("message", (event) => {
-          const message = event.data as {
-            kind?: string;
-            payload?: { level?: unknown };
-          };
+          const message = event.data as { kind?: string; payload?: { level?: unknown } };
           const level = message.payload?.level;
           if (message.kind !== "meter-frame" || typeof level !== "number") return;
           record.lastMeterLevel = level;
@@ -749,40 +733,28 @@ test("saved Distortion reaches the production worklet and transitions while soun
 
         const nativePost = this.port.postMessage.bind(this.port);
         this.port.postMessage = ((message: unknown, transfer?: Transferable[]) => {
-          if (typeof message !== "object" || message === null) {
-            nativePost(message, transfer ?? []);
-            return;
-          }
-          const envelope = message as {
-            kind?: string;
-            nodeId?: string;
-            payload?: { voiceInserts?: Record<string, unknown> };
-          };
-          record.nodeId = envelope.nodeId ?? record.nodeId;
-          if (envelope.kind === "state-snapshot") {
-            const kick = envelope.payload?.voiceInserts?.kick as
-              | { readonly pluginId?: unknown }
-              | null
-              | undefined;
-            record.hasDistortion = kick?.pluginId === "distortion";
-          }
-          if (envelope.kind === "parameter-batch" && record.nextStateSnapshot !== undefined) {
-            const payload = JSON.parse(record.nextStateSnapshot) as {
-              parameters: unknown;
-              voiceInserts: Record<string, unknown>;
+          if (typeof message === "object" && message !== null) {
+            const envelope = message as {
+              kind?: string;
+              payload?: {
+                changes?: { parameterId?: unknown; value?: unknown }[];
+                parameters?: Record<string, unknown>;
+              };
             };
-            record.transitionWasSounding = record.lastMeterLevel > 0;
-            record.nextStateSnapshot = undefined;
-            record.transitionCount += 1;
-            nativePost(
-              {
-                ...envelope,
-                kind: "state-snapshot",
-                payload,
-              },
-              transfer ?? [],
-            );
-            return;
+            if (envelope.kind === "state-snapshot") {
+              const value = envelope.payload?.parameters?.["kick-distortion"];
+              if (typeof value === "number") record.distortionValue = value;
+            }
+            if (envelope.kind === "parameter-batch") {
+              const change = envelope.payload?.changes?.find(
+                (candidate) => candidate.parameterId === "kick-distortion",
+              );
+              if (typeof change?.value === "number") {
+                record.distortionValue = change.value;
+                record.distortionChanges.push(change.value);
+                record.transitionWasSounding ||= record.lastMeterLevel > 0;
+              }
+            }
           }
           nativePost(message, transfer ?? []);
         }) as typeof this.port.postMessage;
@@ -806,29 +778,9 @@ test("saved Distortion reaches the production worklet and transitions while soun
     page.waitForEvent("download"),
     projectMenu.getByRole("button", { name: "Export" }).click(),
   ]);
-  const exportedPath = await download.path();
-  const exported = await readFile(exportedPath);
-  const fixture = distortionFixture(documentFromPortableArchive(exported));
-  const insertedParameters = fixture.document.rack.find(
-    (slot) => slot.moduleId === fixture.insertedModuleId,
-  )?.parameters;
-  if (insertedParameters === undefined) throw new Error("The inserted module parameters are missing.");
-  const emptyVoiceInserts = Object.fromEntries(
-    fixture.document.effects.voiceInserts
-      .filter((slot) => slot.moduleId === fixture.insertedModuleId)
-      .map((slot) => [slot.voiceId, null]),
+  const fixture = distortionFixture(
+    documentFromPortableArchive(await readFile(await download.path())),
   );
-  const bypassSnapshot = JSON.stringify({
-    parameters: insertedParameters,
-    voiceInserts: emptyVoiceInserts,
-  });
-  const insertSnapshot = JSON.stringify({
-    parameters: insertedParameters,
-    voiceInserts: {
-      ...emptyVoiceInserts,
-      kick: { pluginId: DISTORTION_PLUGIN_ID, state: {} },
-    },
-  });
   const archive = serializePortableProject(fixture.document);
   await page.getByLabel("Import project file").setInputFiles({
     name: "distortion-integration.pulsebox",
@@ -837,301 +789,144 @@ test("saved Distortion reaches the production worklet and transitions while soun
   });
   await expect(projectMenu.getByRole("status")).toContainText("Project imported");
 
+  const readProbe = () =>
+    page.evaluate((processorName) => {
+      const state = window as unknown as {
+        __distortionProbe: {
+          contexts: AudioContext[];
+          nodes: {
+            distortionChanges: number[];
+            distortionValue: number | undefined;
+            meterLevels: number[];
+            processorName: string;
+            transitionWasSounding: boolean;
+          }[];
+        };
+      };
+      const nodes = state.__distortionProbe.nodes.filter(
+        (node) => node.processorName === processorName,
+      );
+      const levels = (index: number) => [...(nodes[index]?.meterLevels ?? [])];
+      const peak = (index: number) => Math.max(0, ...levels(index));
+      return {
+        contextCount: state.__distortionProbe.contexts.length,
+        contextState: state.__distortionProbe.contexts[0]?.state,
+        contextTime: state.__distortionProbe.contexts[0]?.currentTime ?? 0,
+        distortionChanges: nodes.map((node) => [...node.distortionChanges]),
+        distortionValues: nodes.map((node) => node.distortionValue),
+        dryLevels: levels(0),
+        dryPeak: peak(0),
+        distortedLevels: levels(1),
+        distortedPeak: peak(1),
+        nodeCount: nodes.length,
+        transitionWasSounding: nodes[1]?.transitionWasSounding ?? false,
+      };
+    }, DRUMLINE_PROCESSOR);
+
   await expect
-    .poll(() =>
-      page.evaluate(
-        (processorName) => {
-          const state = window as unknown as {
-            __effectProbe: {
-              contexts: AudioContext[];
-              nodes: {
-                hasDistortion: boolean | undefined;
-                nodeId: string | undefined;
-                processorName: string;
-              }[];
-            };
-          };
-          const nodes = state.__effectProbe.nodes.filter(
-            (node) => node.processorName === processorName,
-          );
-          return {
-            contextCount: state.__effectProbe.contexts.length,
-            distortionStates: nodes.map((node) => node.hasDistortion),
-            nodeCount: nodes.length,
-          };
-        },
-        DRUMLINE_PROCESSOR,
-      ),
-    )
-    .toEqual({
-      contextCount: 1,
-      distortionStates: [false, true],
-      nodeCount: 2,
-    });
+    .poll(async () => {
+      const evidence = await readProbe();
+      return {
+        contextCount: evidence.contextCount,
+        distortionValues: evidence.distortionValues,
+        nodeCount: evidence.nodeCount,
+      };
+    })
+    .toEqual({ contextCount: 1, distortionValues: [0, 1], nodeCount: 2 });
 
   const renderStartedAt = Date.now();
   await page.getByRole("button", { name: /^play$/i }).click();
   await expect(page.locator(".audio-status")).toHaveText("Audio active");
   await expect
-    .poll(() =>
-      page.evaluate(
-        (processorName) => {
-          const state = window as unknown as {
-            __effectProbe: {
-              nodes: {
-                meterLevels: number[];
-                processorName: string;
-              }[];
-            };
-          };
-          const nodes = state.__effectProbe.nodes.filter(
-            (node) => node.processorName === processorName,
-          );
-          const peak = (index: number) => Math.max(0, ...(nodes[index]?.meterLevels ?? []));
-          return peak(0) > 0 && peak(1) > 0;
-        },
-        DRUMLINE_PROCESSOR,
-      ),
-    )
+    .poll(async () => {
+      const evidence = await readProbe();
+      return evidence.dryPeak > 0 && evidence.distortedPeak > 0;
+    })
     .toBe(true);
 
-  const initial = await page.evaluate(
-    (processorName) => {
-      const state = window as unknown as {
-        __effectProbe: {
-          contexts: AudioContext[];
-          nodes: {
-            meterLevels: number[];
-            processorName: string;
-          }[];
-        };
-      };
-      const nodes = state.__effectProbe.nodes.filter(
-        (node) => node.processorName === processorName,
-      );
-      const peak = (index: number) => Math.max(0, ...(nodes[index]?.meterLevels ?? []));
-      return {
-        contextTime: state.__effectProbe.contexts[0]?.currentTime ?? 0,
-        dryMeterLevels: [...(nodes[0]?.meterLevels ?? [])],
-        dryPeak: peak(0),
-        insertedMeterLevels: [...(nodes[1]?.meterLevels ?? [])],
-        insertedPeak: peak(1),
-        nodeCount: state.__effectProbe.nodes.length,
-      };
-    },
-    DRUMLINE_PROCESSOR,
+  const initial = await readProbe();
+  expect(Math.abs(initial.distortedPeak - initial.dryPeak)).toBeGreaterThan(
+    initial.dryPeak * 0.05,
   );
-  expect(initial.dryPeak).toBeGreaterThan(0);
-  expect(initial.insertedPeak).toBeGreaterThan(0);
-  expect(initial.insertedPeak).toBeLessThan(initial.dryPeak * 0.6);
 
-  await page.evaluate(({ processorName, snapshot }) => {
-    const state = window as unknown as {
-      __effectProbe: {
-        nodes: {
-          meterLevels: number[];
-          nextStateSnapshot: string | undefined;
-          processorName: string;
-        }[];
-      };
-    };
-    const node = state.__effectProbe.nodes.filter(
-      (candidate) => candidate.processorName === processorName,
-    )[1];
-    if (node === undefined) throw new Error("The inserted worklet probe is missing.");
-    node.meterLevels = [];
-    node.nextStateSnapshot = snapshot;
-  }, { processorName: DRUMLINE_PROCESSOR, snapshot: bypassSnapshot });
-  const insertedModule = page.locator(`${RACK_MODULE}[data-label='Tin Soldier']`).nth(1);
-  await insertedModule.getByRole("slider", { name: "Tone" }).press("ArrowUp");
-  await expect
-    .poll(() =>
-      page.evaluate((processorName) => {
-        const state = window as unknown as {
-          __effectProbe: {
-            nodes: {
-              meterLevels: number[];
-              processorName: string;
-              transitionCount: number;
-              transitionWasSounding: boolean;
-            }[];
-          };
-        };
-        const node = state.__effectProbe.nodes.filter(
-          (candidate) => candidate.processorName === processorName,
-        )[1];
-        return node?.transitionCount === 1 && node.transitionWasSounding;
-      }, DRUMLINE_PROCESSOR),
-    )
-    .toBe(true);
-  await page.evaluate((processorName) => {
-    const state = window as unknown as {
-      __effectProbe: {
-        nodes: { meterLevels: number[]; processorName: string }[];
-      };
-    };
-    for (const node of state.__effectProbe.nodes.filter(
-      (candidate) => candidate.processorName === processorName,
-    )) {
-      node.meterLevels = [];
-    }
-  }, DRUMLINE_PROCESSOR);
-  await expect
-    .poll(() =>
-      page.evaluate((processorName) => {
-        const state = window as unknown as {
-          __effectProbe: {
-            nodes: { meterLevels: number[]; processorName: string }[];
-          };
-        };
-        return state.__effectProbe.nodes
-          .filter((node) => node.processorName === processorName)
-          .every((node) => node.meterLevels.length >= 2);
-      }, DRUMLINE_PROCESSOR),
-    )
-    .toBe(true);
-
-  const bypassed = await page.evaluate(
-    (processorName) => {
+  const clearMeters = () =>
+    page.evaluate((processorName) => {
       const state = window as unknown as {
-        __effectProbe: {
-          contexts: AudioContext[];
-          nodes: {
-            meterLevels: number[];
-            processorName: string;
-          }[];
+        __distortionProbe: {
+          nodes: { meterLevels: number[]; processorName: string }[];
         };
       };
-      const nodes = state.__effectProbe.nodes.filter(
-        (node) => node.processorName === processorName,
-      );
-      const peak = (index: number) => Math.max(0, ...(nodes[index]?.meterLevels ?? []));
+      for (const node of state.__distortionProbe.nodes.filter(
+        (candidate) => candidate.processorName === processorName,
+      )) {
+        node.meterLevels = [];
+      }
+    }, DRUMLINE_PROCESSOR);
+  const waitForMeters = () =>
+    expect
+      .poll(async () => {
+        const evidence = await readProbe();
+        return evidence.dryLevels.length >= 2 && evidence.distortedLevels.length >= 2;
+      })
+      .toBe(true);
+
+  const distortedModule = page.locator(`${RACK_MODULE}[data-label='Tin Soldier']`).nth(1);
+  const distortionControl = distortedModule.getByRole("slider", { name: /Distortion/u }).first();
+  await expect(distortionControl).toHaveAttribute("aria-valuenow", "1");
+  await distortionControl.press("Home");
+  await expect(distortionControl).toHaveAttribute("aria-valuenow", "0");
+  await expect
+    .poll(async () => {
+      const evidence = await readProbe();
       return {
-        contextCount: state.__effectProbe.contexts.length,
-        contextState: state.__effectProbe.contexts[0]?.state,
-        contextTime: state.__effectProbe.contexts[0]?.currentTime ?? 0,
-        dryMeterLevels: [...(nodes[0]?.meterLevels ?? [])],
-        dryPeak: peak(0),
-        insertedMeterLevels: [...(nodes[1]?.meterLevels ?? [])],
-        insertedPeak: peak(1),
-        nodeCount: state.__effectProbe.nodes.length,
+        change: evidence.distortionChanges[1]?.at(-1),
+        sounding: evidence.transitionWasSounding,
       };
-    },
-    DRUMLINE_PROCESSOR,
+    })
+    .toEqual({ change: 0, sounding: true });
+
+  await clearMeters();
+  await waitForMeters();
+  const drySetting = await readProbe();
+  expect(Math.abs(drySetting.distortedPeak - drySetting.dryPeak)).toBeLessThan(
+    Math.max(drySetting.dryPeak, drySetting.distortedPeak) * 0.1,
   );
-  expect(bypassed.insertedPeak).toBeGreaterThan(initial.insertedPeak * 1.5);
-  expect(bypassed.dryPeak).toBeGreaterThan(0);
-  expect(bypassed.contextCount).toBe(1);
-  expect(bypassed.contextState).toBe("running");
-  expect(bypassed.contextTime).toBeGreaterThan(initial.contextTime);
-  expect(bypassed.nodeCount).toBe(initial.nodeCount);
+  expect(drySetting.contextCount).toBe(1);
+  expect(drySetting.contextState).toBe("running");
+  expect(drySetting.contextTime).toBeGreaterThan(initial.contextTime);
+  expect(drySetting.nodeCount).toBe(initial.nodeCount);
 
-  await page.evaluate(({ processorName, snapshot }) => {
-    const state = window as unknown as {
-      __effectProbe: {
-        nodes: {
-          meterLevels: number[];
-          nextStateSnapshot: string | undefined;
-          processorName: string;
-        }[];
-      };
-    };
-    const node = state.__effectProbe.nodes.filter(
-      (candidate) => candidate.processorName === processorName,
-    )[1];
-    if (node === undefined) throw new Error("The inserted worklet probe is missing.");
-    node.meterLevels = [];
-    node.nextStateSnapshot = snapshot;
-  }, { processorName: DRUMLINE_PROCESSOR, snapshot: insertSnapshot });
-  await insertedModule.getByRole("slider", { name: "Tone" }).press("ArrowDown");
-  await expect
-    .poll(() =>
-      page.evaluate((processorName) => {
-        const state = window as unknown as {
-          __effectProbe: {
-            nodes: {
-              meterLevels: number[];
-              processorName: string;
-              transitionCount: number;
-            }[];
-          };
-        };
-        const node = state.__effectProbe.nodes.filter(
-          (candidate) => candidate.processorName === processorName,
-        )[1];
-        return node?.transitionCount === 2;
-      }, DRUMLINE_PROCESSOR),
-    )
-    .toBe(true);
-  await page.evaluate((processorName) => {
-    const state = window as unknown as {
-      __effectProbe: {
-        nodes: { meterLevels: number[]; processorName: string }[];
-      };
-    };
-    const node = state.__effectProbe.nodes.filter(
-      (candidate) => candidate.processorName === processorName,
-    )[1];
-    if (node !== undefined) node.meterLevels = [];
-  }, DRUMLINE_PROCESSOR);
-  await expect
-    .poll(() =>
-      page.evaluate((processorName) => {
-        const state = window as unknown as {
-          __effectProbe: {
-            nodes: { meterLevels: number[]; processorName: string }[];
-          };
-        };
-        return (
-          state.__effectProbe.nodes.filter(
-            (candidate) => candidate.processorName === processorName,
-          )[1]?.meterLevels.length ?? 0
-        );
-      }, DRUMLINE_PROCESSOR),
-    )
-    .toBeGreaterThanOrEqual(2);
-  const restored = await page.evaluate((processorName) => {
-    const state = window as unknown as {
-      __effectProbe: {
-        nodes: { meterLevels: number[]; processorName: string }[];
-      };
-    };
-    const node = state.__effectProbe.nodes.filter(
-      (candidate) => candidate.processorName === processorName,
-    )[1];
-    const meterLevels = [...(node?.meterLevels ?? [])];
-    return { meterLevels, peak: Math.max(0, ...meterLevels) };
-  }, DRUMLINE_PROCESSOR);
-  expect(restored.peak).toBeGreaterThan(0);
-  expect(restored.peak).toBeLessThan(bypassed.insertedPeak * 0.6);
+  await distortionControl.press("End");
+  await expect(distortionControl).toHaveAttribute("aria-valuenow", "1");
+  await expect.poll(async () => (await readProbe()).distortionChanges[1]?.at(-1)).toBe(1);
+  await clearMeters();
+  await waitForMeters();
+  const restored = await readProbe();
+  expect(Math.abs(restored.distortedPeak - restored.dryPeak)).toBeGreaterThan(
+    restored.dryPeak * 0.05,
+  );
+  expect(restored.contextCount).toBe(1);
+  expect(restored.nodeCount).toBe(initial.nodeCount);
 
-  const runtimeEvidence = await page.evaluate(() => {
+  const context = await page.evaluate(() => {
     const state = window as unknown as {
-      __effectProbe: { contexts: AudioContext[]; nodes: unknown[] };
+      __distortionProbe: { contexts: AudioContext[] };
     };
-    const context = state.__effectProbe.contexts[0];
-    if (context === undefined) throw new Error("The Distortion context evidence is missing.");
+    const audioContext = state.__distortionProbe.contexts[0];
+    if (audioContext === undefined) throw new Error("The Distortion context evidence is missing.");
     return {
-      baseLatency: context.baseLatency,
-      contextState: context.state,
-      nodeCount: state.__effectProbe.nodes.length,
-      outputLatency: context.outputLatency,
-      sampleRate: context.sampleRate,
+      baseLatency: audioContext.baseLatency,
+      outputLatency: audioContext.outputLatency,
+      sampleRate: audioContext.sampleRate,
+      state: audioContext.state,
     };
   });
-  const renderLengthMilliseconds = Date.now() - renderStartedAt;
   const audioArtifactName = "distortion-live-meter-observations.json";
   const audioArtifact = JSON.stringify(
     {
-      bypassed: {
-        dry: bypassed.dryMeterLevels,
-        inserted: bypassed.insertedMeterLevels,
-      },
-      initial: {
-        dry: initial.dryMeterLevels,
-        inserted: initial.insertedMeterLevels,
-      },
-      restored: { inserted: restored.meterLevels },
+      drySetting: { dry: drySetting.dryLevels, changed: drySetting.distortedLevels },
+      initial: { dry: initial.dryLevels, distorted: initial.distortedLevels },
+      restored: { dry: restored.dryLevels, distorted: restored.distortedLevels },
     },
     null,
     2,
@@ -1139,14 +934,14 @@ test("saved Distortion reaches the production worklet and transitions while soun
   const audioArtifactHash = createHash("sha256").update(audioArtifact).digest("hex");
   const report = JSON.stringify(
     {
-      actualSampleRate: runtimeEvidence.sampleRate,
+      actualSampleRate: context.sampleRate,
       activeInstruments: [
-        { moduleId: fixture.dryModuleId, name: "Tin Soldier", voice: "Kick", effect: "None" },
+        { moduleId: fixture.dryModuleId, name: "Tin Soldier", voice: "Kick", distortion: 0 },
         {
-          moduleId: fixture.insertedModuleId,
+          moduleId: fixture.distortedModuleId,
           name: "Tin Soldier",
           voice: "Kick",
-          effect: "Distortion",
+          distortion: 1,
         },
       ],
       audioArtifact: { name: audioArtifactName, sha256: audioArtifactHash },
@@ -1154,29 +949,30 @@ test("saved Distortion reaches the production worklet and transitions while soun
       browserName: "Chrome",
       capturedAt: new Date().toISOString(),
       comparisonMethod:
-        "Compare real worklet meter frames for identical dry and inserted Kick patterns before, during, and after a sounding bypass transition.",
+        "Compare live worklet meters for identical Kick patterns at zero and full Distortion.",
       context: "live",
       deterministicPatternSeeds: fixture.document.patterns.map((pattern) => ({
         patternId: pattern.id,
         seed: pattern.seed,
       })),
-      effect: "Distortion on one Tin Soldier kick voice, with live bypass and restore.",
       fixture: "Two identical Tin Soldier modules with every step assigned to Kick.",
       operatingSystem: `${platform()} ${release()} ${arch()}`,
       productionBuild: captureProductionBuildEvidence(),
-      renderLengthMilliseconds,
+      renderLengthMilliseconds: Date.now() - renderStartedAt,
       requestedSampleRate: "browser-default",
       routing: "Each module routes through its mixer strip to the master output.",
-      runtime: runtimeEvidence,
+      runtime: context,
       sourceRevision: SOURCE_REVISION,
+      transition: "The second Kick Distortion control changed from 100% to 0% and back while sounding.",
       worktreeSourceSha256: WORKTREE_SOURCE_HASH,
-      workload: "Dry and inserted playback, then sounding-voice bypass and restore transitions.",
+      workload: "Two live Kick patterns while the second voice Distortion amount changes.",
       result: {
-        bypassedDryPeak: bypassed.dryPeak,
-        bypassedInsertedPeak: bypassed.insertedPeak,
+        drySettingDryPeak: drySetting.dryPeak,
+        drySettingChangedPeak: drySetting.distortedPeak,
         initialDryPeak: initial.dryPeak,
-        initialInsertedPeak: initial.insertedPeak,
-        restoredInsertedPeak: restored.peak,
+        initialDistortedPeak: initial.distortedPeak,
+        restoredDryPeak: restored.dryPeak,
+        restoredDistortedPeak: restored.distortedPeak,
       },
     },
     null,
@@ -1340,9 +1136,16 @@ test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ br
           () =>
             page.evaluate(() => {
               const state = window as unknown as {
-                __crossRateProbe: { nodes: { onsets: CrossRateOnsetEvidence[] }[] };
+                __crossRateProbe: {
+                  nodes: {
+                    onsets: CrossRateOnsetEvidence[];
+                    processorName: string;
+                  }[];
+                };
               };
-              return state.__crossRateProbe.nodes.length === 6;
+              return state.__crossRateProbe.nodes.filter(
+                (node) => node.processorName !== "pulsebox-effect",
+              ).length === 6;
             }),
           { timeout: 10_000 },
         )
@@ -1387,11 +1190,15 @@ test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ br
         if (runtime === undefined) throw new Error("The cross-rate runtime evidence is missing.");
         return {
           actualSampleRate: runtime.sampleRate,
-          nodes: state.__crossRateProbe.nodes.map((node) => ({
-            meterLevels: [...node.meterLevels],
-            onsets: [...node.onsets].sort((left, right) => left.sourceStep - right.sourceStep),
-            processorName: node.processorName,
-          })),
+          nodes: state.__crossRateProbe.nodes
+            .filter((node) => node.processorName !== "pulsebox-effect")
+            .map((node) => ({
+              meterLevels: [...node.meterLevels],
+              onsets: [...node.onsets].sort(
+                (left, right) => left.sourceStep - right.sourceStep,
+              ),
+              processorName: node.processorName,
+            })),
           runtime: {
             baseLatency: runtime.baseLatency,
             outputLatency: runtime.outputLatency,

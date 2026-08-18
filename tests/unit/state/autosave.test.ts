@@ -169,6 +169,33 @@ describe("autosave timing", () => {
     autosave.dispose();
   });
 
+  it("persists a flush after a slow write and supersedes queued snapshots", async () => {
+    const first = deferred();
+    const flushed = deferred();
+    const writes: StoredProject[] = [];
+    const saveAutosave = vi.fn((project: StoredProject) => {
+      writes.push(project);
+      return writes.length === 1 ? first.promise : flushed.promise;
+    });
+    const autosave = createController(repositoryWithSave(saveAutosave));
+
+    autosave.schedule(stateNamed("Slow first write"));
+    await vi.advanceTimersByTimeAsync(750);
+    autosave.schedule(stateNamed("Stale pending snapshot"));
+    const flush = autosave.flush(stateNamed("Page hide snapshot"));
+
+    first.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes.map((project) => project.name)).toEqual([
+      "Slow first write",
+      "Page hide snapshot",
+    ]);
+
+    flushed.resolve();
+    await flush;
+    autosave.dispose();
+  });
+
   it("discards pending work when disposed and ignores later schedules", async () => {
     const repository = createMemoryProjectRepository();
     const saveAutosave = vi.spyOn(repository, "saveAutosave");

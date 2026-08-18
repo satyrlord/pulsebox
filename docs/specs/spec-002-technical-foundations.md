@@ -156,7 +156,7 @@ Every plugin defines:
 ### 6.2 Parameter descriptor
 
 Every persistent instrument, voice, mixer, send, effect, master, tempo, and
-timing parameter is automatable. Structural commands, transient monitor state,
+timing parameter is automatable. Structural commands, transient meter state,
 meter values, and UI preferences are not parameters and are not automation
 targets.
 

@@ -6,7 +6,6 @@ import {
   DrumlineSixDsp,
   type DrumVoiceId,
 } from "../../../src/engine/modules/drumline-six/dsp-core";
-import { DISTORTION_PLUGIN_ID } from "../../../src/engine/effects";
 import { DRUMLINE_SIX_MANIFEST } from "../../../src/engine/modules/drumline-six/manifest";
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 
@@ -56,9 +55,9 @@ describe("Tin Soldier manifest", () => {
   });
 
   it("declares one parameter per voice field plus the module controls", () => {
-    // Six voices with five fields plus mute and solo each, plus tone, drive,
+    // Six voices with six fields plus mute and solo each, plus tone, drive,
     // and level.
-    expect(DRUMLINE_SIX_MANIFEST.parameters).toHaveLength(6 * 7 + 3);
+    expect(DRUMLINE_SIX_MANIFEST.parameters).toHaveLength(6 * 8 + 3);
     expect(DRUMLINE_SIX_MANIFEST.voices.map((voice) => voice.id)).toEqual([...DRUM_VOICE_IDS]);
   });
 
@@ -184,20 +183,42 @@ describe("DrumlineSixDsp", () => {
     expect(peak(left.left)).toBeGreaterThan(peak(left.right) * 4);
   });
 
-  it("processes a drum voice through its insert before voice level and pan", () => {
+  it("processes a drum voice through its Distortion control before level and pan", () => {
     const dry = render((dsp) => {
       dsp.trigger("kick");
     });
     const wet = render((dsp) => {
-      expect(
-        dsp.setVoiceInserts({ kick: { pluginId: DISTORTION_PLUGIN_ID, state: {} } }),
-      ).toBe(true);
+      dsp.setParameters({ voices: { kick: { distortion: 1 } } }, "immediate");
       dsp.trigger("kick");
     });
 
     expect([...wet.left]).not.toEqual([...dry.left]);
     expect(peak(wet.left)).toBeLessThanOrEqual(Math.fround(0.98));
     expect([...wet.left].every((sample) => Number.isFinite(sample))).toBe(true);
+  });
+
+  it.each([44_100, 48_000])("glides a full Distortion change at %i Hz", (sampleRate) => {
+    const renderChange = (mode: "dry" | "immediate" | "smooth"): Float32Array => {
+      const dsp = new DrumlineSixDsp(sampleRate);
+      dsp.trigger("kick", 1, false);
+      dsp.process(new Float32Array(128));
+      if (mode !== "dry") {
+        dsp.setParameters({ voices: { kick: { distortion: 1 } } }, mode);
+      }
+      const output = new Float32Array(32);
+      dsp.process(output);
+      return output;
+    };
+    const dry = renderChange("dry");
+    const smooth = renderChange("smooth");
+    const immediate = renderChange("immediate");
+    const difference = (left: Float32Array, right: Float32Array): number =>
+      left.reduce((total, sample, index) => total + Math.abs(sample - (right[index] ?? 0)), 0);
+
+    const smoothDifference = difference(smooth, dry);
+    const immediateDifference = difference(immediate, dry);
+    expect(smoothDifference).toBeGreaterThan(0);
+    expect(smoothDifference).toBeLessThan(immediateDifference * 0.35);
   });
 
   it("glides a committed voice level instead of cutting a ringing tail", () => {

@@ -4,7 +4,7 @@
 **Spec ID:** `spec-007`  
 **Build order:** 7 of 10  
 **Depends on:** [Pattern editing](spec-006-pattern-editing.md)  
-**Owns:** Mixer, routing, Monitor, inserts, send chains, master chain, and
+**Owns:** Mixer, routing, module pedalboards, send chains, master chain, and
 effects.  
 **Acceptance IDs:** `AC-018` through `AC-020`, `AC-022` through `AC-028`,
 `AC-062`, `AC-068`, `AC-074` through `AC-076`, and `AC-085` in
@@ -49,11 +49,9 @@ The established visible mixer contains:
 - Pan.
 - Mute.
 - Solo.
-- Monitor control for single-channel pre-fader audition.
 - Clip indicator.
 - Module short label.
 - Selection state.
-- Insert-chain access.
 - A clear indicator when any send is active.
 
 A fader or pan move is audible while the gesture is in progress. The engine
@@ -63,9 +61,8 @@ silent while its fader moves.
 
 The compact state keeps meter, fader, pan, mute, solo, module identity, and all
 four send buttons visible. Selecting a channel does not change strip width or
-create an expanded strip. Monitor, meter detail, and insert-chain editing use a
-transient focus-managed channel detail surface. Opening that surface does not
-resize the mixer or expose a duplicate effects bank.
+create an expanded strip. A mixer channel has no secondary expansion surface.
+The instrument rack is the only place that opens a module pedalboard.
 
 Each send button has a visible letter and an accessible name.
 The buttons remain in A, B / C, D reading order. A button opens the standard
@@ -75,19 +72,6 @@ buttons remain visible but disabled.
 
 Selecting a rack module selects its mixer channel. Selecting a mixer channel
 selects the matching module.
-
-Monitor performs exclusive single-channel pre-fader audition through a
-non-exported monitor bus. The tap occurs after the module insert chain and
-before the channel fader and send taps. While Monitor is active, the engine
-continues to render the master program internally. The engine does not send the
-master program to the physical output.
-
-Only the selected channel tap reaches the physical output through monitor
-safety gain and the protected limiter. Displayed master meters switch to the
-monitor signal and show a visible Monitor state. This prevents duplicate output
-from the selected channel. Monitor can select only one channel at a time.
-Pulsebox does not serialize or restore the transient Monitor selection. Project
-files and audio exports do not include it.
 
 The master strip and all eight instrument strips remain visible whenever the
 Mixer studio tab is active at a supported layout. Empty strips are disabled,
@@ -121,25 +105,25 @@ Voice output flow:
 
 1. Voice synthesis.
 2. Voice sample layer.
-3. Voice insert.
+3. Voice distortion.
 4. Voice pan and level.
 5. Module sum.
-6. Module insert chain.
-7. Main channel fader.
-8. Module send taps according to each send bus pre-fader or post-fader setting.
-9. Master.
+6. Module pedalboard.
+7. Fixed channel gate.
+8. Main channel fader and pan.
+9. Module send taps from the gate or pan according to each send bus pre-fader or
+   post-fader setting.
+10. Master.
 
 Voice-level send controls do not exist. The four send controls live only on the
 parent rack-slot mixer channel.
 
-### 19.4 Inserts
+### 19.4 Pedalboards and effect chains
 
 Approved hierarchy:
 
-- One insert slot per drum voice.
 - One eight-slot pedalboard per rack module.
-- The module pedalboard is the same chain opened from the rack and the mixer
-  channel detail surface.
+- The instrument rack is the only entry point for a module pedalboard.
 - Four send-bus chains.
 - One master chain with at least six slots.
 
@@ -186,30 +170,32 @@ from the module-scoped groups replaces and disarms the non-module parameter.
 
 ### 19.6 Mixer-strip modularity
 
-The channel-strip structure is fixed. Its insert processing, metering options,
-and processing modules are swappable through the shared effect plugin system.
-There are no replaceable channel-strip types in the MVP.
+The channel-strip structure is fixed. A channel has no swappable processing
+surface. Module processing belongs to the rack pedalboard.
 
 ### 19.7 Output routing
 
-Every rack module exposes output routing to the main output and the four send
-buses. The project model may reserve future routing destinations, but the MVP
-does not provide fixed subgroups or an arbitrary routing graph.
+Every rack module uses one fixed main output path and four fixed A–D send buses.
+The main path runs from the module sum through its pedalboard, channel gate,
+fader, and pan to the master chain. A send tap uses the gate for pre-fader mode
+or the pan for post-fader mode. It then returns through its fixed send chain to
+the main mix. The project model may reserve future routing destinations, but the
+MVP does not provide fixed subgroups or an arbitrary routing graph.
 
 ---
 
 ## 20. Effects
 
-Use one effect plugin system for voice inserts, module pedalboards, send chains,
-and the master chain.
+Use one effect plugin system for module pedalboards, send chains, and the master
+chain.
 
 ### 20.1 Effect locations
 
-1. Per-drum-voice insert: one slot.
-2. Per-module pedalboard: at least eight slots.
-3. Four send buses: each contains a chain.
-4. Master chain: at least six slots.
-5. Protected limiter: final master slot by default.
+1. Per-module pedalboard: at least eight slots.
+2. Four send buses: each contains a chain.
+3. Master chain: at least six slots.
+4. Protected limiter: final master slot by default. Its only placement is
+   `master-chain`.
 
 ### 20.2 Effect catalog
 
@@ -226,11 +212,11 @@ Build:
 - Parametric EQ.
 - Transient shaper.
 - Stereo width.
+- Limiter.
 
-The first shipped slice is Distortion in fixed Drive mode. It occupies the one
-voice-insert slot per drum voice. The rest of the catalog remains planned.
-An insert change on a silent voice applies before its next trigger. A change on
-a sounding voice uses the effect manifest's click-safe transition time.
+The built-in catalog contains all listed effects. Module, send, and master
+chains can use each effect that its manifest permits. Each drum voice also has a
+simple Distortion rotary control. This control is not an effect plugin slot.
 
 Effect variants or modes provide the compact default identities:
 
@@ -318,7 +304,7 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - At least six slots.
 - Compressor and EQ available by default.
 - Limiter in the last slot.
-- Limiter protected from removal.
+- Limiter is protected from removal or movement and is master-chain-only.
 - The user may bypass the limiter.
 - One master-effects bypass toggles all user master effects while leaving master
   gain and the protected limiter active.

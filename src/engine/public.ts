@@ -13,12 +13,20 @@ export {
   HYBRID_NINE_DEFAULT_PARAMETERS,
   HYBRID_NINE_MANIFEST,
 } from "./modules";
-export { BUILT_IN_EFFECTS } from "./effects";
+export {
+  BUILT_IN_EFFECTS,
+  createEffectWorkletPort,
+} from "./effects";
 export { auditionNoteFor, playableNotesFor } from "./modules/manifest-notes";
 export {
   TransportRuntime,
   type TransportModule,
+  type TransportRoutingProjection,
+  type TransportExternalAutomationProjection,
 } from "./transport/transport-runtime";
 export type { VoiceAdapterFactory } from "./transport/voice-adapter";
 export { SampleDecoder } from "./decoding/sample-decoder";
 export { createPluginRegistry } from "./registry";
+export {
+  type RoutingEffectInstance,
+} from "./routing";

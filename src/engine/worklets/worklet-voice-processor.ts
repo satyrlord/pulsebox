@@ -20,6 +20,9 @@ import {
 
 interface VoiceEvent {
   readonly atFrame: number;
+  readonly eventId: string;
+  readonly priority: number;
+  readonly occurrenceId?: string;
   readonly type: "note-on" | "note-off" | "reset";
   readonly note?: number;
   readonly velocity?: number;
@@ -43,6 +46,9 @@ const UNKNOWN_NODE_ID = "unknown-node";
  */
 export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletProcessor {
   readonly #frames = new Float64Array(EVENT_CAPACITY);
+  readonly #priorities = new Float64Array(EVENT_CAPACITY);
+  readonly #eventIds = new Array<string | undefined>(EVENT_CAPACITY);
+  readonly #occurrenceIds = new Array<string | undefined>(EVENT_CAPACITY);
   readonly #notes = new Uint8Array(EVENT_CAPACITY);
   readonly #velocities = new Float32Array(EVENT_CAPACITY);
   readonly #flags = new Uint8Array(EVENT_CAPACITY);
@@ -71,14 +77,6 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
   protected abstract decodeParameterChanges(value: unknown): TParameters | undefined;
 
   protected abstract applyParameters(parameters: TParameters, immediate: boolean): void;
-
-  /**
-   * Drum processors override this for their per-voice insert projection. A
-   * processor with no drum voices accepts only an absent insert section.
-   */
-  protected applyVoiceInserts(value: unknown): boolean {
-    return value === undefined;
-  }
 
   protected abstract triggerNoteOn(
     note: number,
@@ -241,7 +239,6 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
         const parameters = this.decodeParameterObject(payload.parameters);
         if (parameters === undefined) return this.#pluginPayloadFault(kind);
         this.applyParameters(parameters, true);
-        if (!this.applyVoiceInserts(payload.voiceInserts)) return this.#pluginPayloadFault(kind);
         return true;
       }
       case "parameter-batch": {
@@ -450,14 +447,20 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
 
   #enqueue(event: VoiceEvent): void {
     let insertion = this.#eventCount;
-    while (insertion > 0 && (this.#frames[insertion - 1] ?? 0) > event.atFrame) {
+    while (insertion > 0 && this.#queuedEventComesAfter(insertion - 1, event)) {
       this.#frames[insertion] = this.#frames[insertion - 1] ?? 0;
+      this.#priorities[insertion] = this.#priorities[insertion - 1] ?? 0;
+      this.#eventIds[insertion] = this.#eventIds[insertion - 1];
+      this.#occurrenceIds[insertion] = this.#occurrenceIds[insertion - 1];
       this.#notes[insertion] = this.#notes[insertion - 1] ?? 0;
       this.#velocities[insertion] = this.#velocities[insertion - 1] ?? 0;
       this.#flags[insertion] = this.#flags[insertion - 1] ?? 0;
       insertion -= 1;
     }
     this.#frames[insertion] = event.atFrame;
+    this.#priorities[insertion] = event.priority;
+    this.#eventIds[insertion] = event.eventId;
+    this.#occurrenceIds[insertion] = event.occurrenceId;
     this.#notes[insertion] = event.note ?? 0;
     this.#velocities[insertion] = event.velocity ?? 1;
     this.#flags[insertion] =
@@ -467,6 +470,14 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
           ? 2
           : (event.accent ? 4 : 0) | (event.slide ? 8 : 0);
     this.#eventCount += 1;
+  }
+
+  #queuedEventComesAfter(index: number, event: VoiceEvent): boolean {
+    const frame = this.#frames[index] ?? 0;
+    if (frame !== event.atFrame) return frame > event.atFrame;
+    const priority = this.#priorities[index] ?? 0;
+    if (priority !== event.priority) return priority > event.priority;
+    return (this.#eventIds[index] ?? "") > event.eventId;
   }
 
   #enqueueParameters(frame: number, parameters: TParameters): void {
@@ -521,10 +532,15 @@ export abstract class WorkletVoiceProcessor<TParameters> extends AudioWorkletPro
       this.#eventCount -= 1;
       for (let index = 0; index < this.#eventCount; index += 1) {
         this.#frames[index] = this.#frames[index + 1] ?? 0;
+        this.#priorities[index] = this.#priorities[index + 1] ?? 0;
+        this.#eventIds[index] = this.#eventIds[index + 1];
+        this.#occurrenceIds[index] = this.#occurrenceIds[index + 1];
         this.#notes[index] = this.#notes[index + 1] ?? 0;
         this.#velocities[index] = this.#velocities[index + 1] ?? 0;
         this.#flags[index] = this.#flags[index + 1] ?? 0;
       }
+      this.#eventIds[this.#eventCount] = undefined;
+      this.#occurrenceIds[this.#eventCount] = undefined;
     }
   }
 
@@ -614,8 +630,12 @@ function decodeEvent(value: unknown): VoiceEvent | undefined {
   }
   if (data.accent !== undefined && typeof data.accent !== "boolean") return undefined;
   if (data.slide !== undefined && typeof data.slide !== "boolean") return undefined;
+  if (data.occurrenceId !== undefined && typeof data.occurrenceId !== "string") return undefined;
   return {
     atFrame: scheduled.audioFrame,
+    eventId: scheduled.eventId,
+    priority: scheduled.priority,
+    ...(typeof data.occurrenceId === "string" ? { occurrenceId: data.occurrenceId } : {}),
     type: data.type,
     ...(data.note === undefined ? {} : { note: data.note }),
     ...(data.velocity === undefined ? {} : { velocity: data.velocity }),

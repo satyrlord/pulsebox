@@ -14,7 +14,7 @@ through `AC-066` in [release acceptance](spec-012-release-acceptance.md).
 ## 8. Application composition
 
 Pulsebox fills the viewport. Do not allow page-level scrolling. Major regions
-manage their own overflow.
+manage and contain their own overflow.
 
 ### 8.1 Main rows
 

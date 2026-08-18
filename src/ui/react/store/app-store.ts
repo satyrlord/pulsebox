@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from "zustand";
 
 import {
   createGestureId,
+  type EffectInstanceId,
   type GestureId,
   type IdFactory,
   type ModuleInstanceId,
@@ -11,6 +12,7 @@ import {
   type PluginId,
   type PluginManifest,
   type RackSlotId,
+  type SendBusId,
   type SongPlacementId,
 } from "../../../contracts";
 import {
@@ -21,6 +23,8 @@ import {
   type PatternEventEdit,
   type PatternEvent,
   type AutomationStepState,
+  type AutomationScope,
+  type AutomationTargetId,
   type PatternPartState,
   type PatternScale,
   type ProjectSaveResult,
@@ -61,18 +65,31 @@ export function masterMeterDisplayLevel(view: MasterMeterView): number {
   return Math.max(view.left, view.right);
 }
 
+function sameMeterFrame(left: MasterMeterView, right: MasterMeterView): boolean {
+  return (
+    left.left === right.left &&
+    left.right === right.right &&
+    left.mid === right.mid &&
+    left.side === right.side &&
+    left.peak === right.peak
+  );
+}
+
 /**
  * The frame the master meters should show. The engine's analysis branch carries
  * real signal whenever the runtime renders. The shell contract still requires
- * silence while transport is stopped, so both engine and transport state gate
- * the published frame.
+ * silence while the transport does not render.
  */
 export function masterMeterFrameFor(
   runtimeState: AudioRuntimeStateView,
   transportStatus: PulseState["transport"]["status"],
   readFrame: (() => MasterMeterView) | undefined,
 ): MasterMeterView {
-  if (runtimeState !== "active" || transportStatus !== "playing" || readFrame === undefined) {
+  if (
+    runtimeState !== "active" ||
+    transportStatus !== "playing" ||
+    readFrame === undefined
+  ) {
     return SILENT_MASTER_METER;
   }
   return readFrame();
@@ -111,6 +128,18 @@ export interface AudioControlPort {
     field: "level" | "pan",
     value: number,
   ) => void;
+  readonly previewChannelSendAmount?: (
+    moduleId: ModuleInstanceId,
+    sendBusId: SendBusId,
+    amount: number,
+  ) => void;
+  readonly previewSendReturnLevel?: (sendBusId: SendBusId, returnLevel: number) => void;
+  readonly previewEffectWetDry?: (effectInstanceId: EffectInstanceId, wetDry: number) => void;
+  readonly previewEffectParameter?: (
+    effectInstanceId: EffectInstanceId,
+    parameterId: string,
+    value: ParameterValue,
+  ) => void;
   /** Transient master level while the master fader is moving. */
   readonly previewMasterLevel?: (level: number) => void;
   readonly startAudition: (moduleId: ModuleInstanceId, note: number) => Promise<void>;
@@ -119,6 +148,10 @@ export interface AudioControlPort {
   readonly setSwing?: (swing: number) => void;
   /** Post-limiter master analysis, polled while the transport runs. */
   readonly getMasterMeter?: () => MasterMeterView;
+  /** Master-chain analysis on either side of user processing. */
+  readonly getMasterChainMeter?: (position: "pre" | "post") => MasterMeterView;
+  readonly getEffectMeter?: (effectInstanceId: EffectInstanceId, meterId: string) => number;
+  readonly resetMasterPeak?: () => void;
   readonly setMetronomeEnabled?: (enabled: boolean) => void;
   /** True resumes the engine; false suspends it. Both keep editing available. */
   readonly setPower?: (on: boolean) => Promise<void>;
@@ -128,6 +161,15 @@ export interface AudioControlPort {
 export type StudioView = "mixer" | "effects" | "master";
 export type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
 export type LiveInputQuantizeMode = "input" | "after" | "off";
+export type EffectChainTarget =
+  | { readonly scope: "module"; readonly targetId: ModuleInstanceId }
+  | { readonly scope: "send"; readonly targetId: SendBusId }
+  | { readonly scope: "master" };
+export interface ExternalAutomationTarget {
+  readonly scope: Exclude<AutomationScope, "module">;
+  readonly targetId: AutomationTargetId;
+  readonly parameterId: string;
+}
 
 export interface SavedProjectSummary {
   readonly id: string;
@@ -181,6 +223,8 @@ export interface AppStoreDependencies {
   readonly manifestFor: (pluginId: PluginId) => PluginManifest | undefined;
   /** Plugins an empty slot offers to add, in menu order. */
   readonly addablePluginIds: readonly PluginId[];
+  /** Effect plugins the shared chain editor can add, in registry order. */
+  readonly addableEffectPluginIds?: readonly PluginId[];
   readonly auditionNoteFor: (pluginId: PluginId, voiceId: string | undefined) => number;
   /**
    * Notes the plugin can sound, or undefined when every note maps. The swap
@@ -256,6 +300,8 @@ export interface AppState {
   readonly audioRuntimeState: AudioRuntimeStateView;
   /** Latest post-limiter master analysis frame, polled while playing. */
   readonly masterMeter: MasterMeterView;
+  readonly masterChainPreMeter: MasterMeterView;
+  readonly masterChainPostMeter: MasterMeterView;
   /** The header peak lamp, latched briefly after the last peak frame. */
   readonly masterPeakHeld: boolean;
   /** Pattern-launch boundary in sixteenth steps. A global UI preference. */
@@ -282,6 +328,11 @@ export interface AppState {
   readonly newPatternVariation: (patternId: PatternId) => void;
   readonly togglePower: () => Promise<void>;
   readonly setMasterMeterFrame: (frame: MasterMeterView) => void;
+  readonly setMasterChainMeterFrames: (
+    pre: MasterMeterView,
+    post: MasterMeterView,
+  ) => void;
+  readonly resetMasterPeak: () => void;
   readonly reportAudioRuntimeState: (state: AudioRuntimeStateView) => void;
   readonly setLaunchQuantization: (steps: number) => void;
   readonly setLiveInputQuantizeMode: (mode: LiveInputQuantizeMode) => void;
@@ -299,6 +350,18 @@ export interface AppState {
     moduleId: ModuleInstanceId,
     field: "level" | "pan",
     value: number,
+  ) => void;
+  readonly previewChannelSendAmount: (
+    moduleId: ModuleInstanceId,
+    sendBusId: SendBusId,
+    amount: number,
+  ) => void;
+  readonly previewSendReturnLevel: (sendBusId: SendBusId, returnLevel: number) => void;
+  readonly previewEffectWetDry: (effectInstanceId: EffectInstanceId, wetDry: number) => void;
+  readonly previewEffectParameter: (
+    effectInstanceId: EffectInstanceId,
+    parameterId: string,
+    value: ParameterValue,
   ) => void;
   readonly previewMasterLevel: (level: number) => void;
   readonly addModule: (slotId: RackSlotId, pluginId: PluginId) => void;
@@ -334,6 +397,53 @@ export interface AppState {
   readonly toggleMeterMode: () => void;
   readonly toggleMetronome: () => void;
   readonly openSend: (send: "A" | "B" | "C" | "D") => void;
+  readonly setChannelSendAmount: (
+    moduleId: ModuleInstanceId,
+    sendBusId: SendBusId,
+    amount: number,
+    gestureId?: GestureId,
+  ) => void;
+  readonly setChannelSendMode: (
+    moduleId: ModuleInstanceId,
+    sendBusId: SendBusId,
+    mode: "pre-fader" | "post-fader",
+  ) => void;
+  readonly addEffectToChain: (chain: EffectChainTarget, effectPluginId: PluginId) => void;
+  readonly removeEffectFromChain: (effectInstanceId: EffectInstanceId) => void;
+  readonly replaceEffectInChain: (
+    effectInstanceId: EffectInstanceId,
+    effectPluginId: PluginId,
+  ) => void;
+  readonly reorderEffectInChain: (
+    effectInstanceId: EffectInstanceId,
+    afterEffectId?: EffectInstanceId,
+  ) => void;
+  readonly setEffectBypassed: (effectInstanceId: EffectInstanceId, bypassed: boolean) => void;
+  readonly setEffectWetDry: (
+    effectInstanceId: EffectInstanceId,
+    wetDry: number,
+    gestureId?: GestureId,
+  ) => void;
+  readonly setEffectParameter: (
+    effectInstanceId: EffectInstanceId,
+    parameterId: string,
+    value: ParameterValue,
+    gestureId?: GestureId,
+  ) => void;
+  readonly setSendReturnLevel: (
+    sendBusId: SendBusId,
+    returnLevel: number,
+    gestureId?: GestureId,
+  ) => void;
+  readonly setSendChainBypassed: (sendBusId: SendBusId, bypassed: boolean) => void;
+  readonly setSendFocus: (sendBusId: SendBusId, effectInstanceId: EffectInstanceId | null) => void;
+  readonly toggleMasterEffectsBypass: () => void;
+  readonly openExternalAutomationTarget: (target: ExternalAutomationTarget) => void;
+  readonly setExternalAutomationLaneSteps: (
+    target: ExternalAutomationTarget,
+    patternId: PatternId,
+    steps: readonly AutomationStepState[],
+  ) => void;
 
   readonly selectPattern: (patternId: PatternId) => void;
   readonly addPattern: (name?: string, afterPatternId?: PatternId) => void;
@@ -382,6 +492,7 @@ export interface AppState {
   readonly addSongPlacement: (patternId: PatternId) => void;
   readonly removeSongPlacement: (placementId: SongPlacementId) => void;
   readonly setSongPlacementRepeats: (placementId: SongPlacementId, repeats: number) => void;
+  readonly setSongPlacementPattern: (placementId: SongPlacementId, patternId: PatternId) => void;
   readonly reorderSongPlacement: (
     placementId: SongPlacementId,
     afterPlacementId?: SongPlacementId,
@@ -469,6 +580,8 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     saveStatus: "clean",
     audioRuntimeState: "locked",
     masterMeter: SILENT_MASTER_METER,
+    masterChainPreMeter: SILENT_MASTER_METER,
+    masterChainPostMeter: SILENT_MASTER_METER,
     masterPeakHeld: false,
     launchQuantizationSteps: initialLaunchQuantization,
     liveInputQuantizeMode: initialLiveInputQuantizeMode,
@@ -588,6 +701,23 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       set({ masterMeter: frame, masterPeakHeld });
     },
 
+    setMasterChainMeterFrames: (masterChainPreMeter, masterChainPostMeter) => {
+      const current = get();
+      if (
+        sameMeterFrame(current.masterChainPreMeter, masterChainPreMeter) &&
+        sameMeterFrame(current.masterChainPostMeter, masterChainPostMeter)
+      ) {
+        return;
+      }
+      set({ masterChainPreMeter, masterChainPostMeter });
+    },
+
+    resetMasterPeak: () => {
+      lastPeakAt = 0;
+      audio.resetMasterPeak?.();
+      set({ masterPeakHeld: false, masterMeter: { ...get().masterMeter, peak: false } });
+    },
+
     reportAudioRuntimeState: (audioRuntimeState) => {
       if (get().audioRuntimeState === audioRuntimeState) return;
       set({ audioRuntimeState });
@@ -703,6 +833,22 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     previewChannelMix: (moduleId, field, value) => {
       audio.previewChannelMix?.(moduleId, field, value);
+    },
+
+    previewChannelSendAmount: (moduleId, sendBusId, amount) => {
+      audio.previewChannelSendAmount?.(moduleId, sendBusId, amount);
+    },
+
+    previewSendReturnLevel: (sendBusId, returnLevel) => {
+      audio.previewSendReturnLevel?.(sendBusId, returnLevel);
+    },
+
+    previewEffectWetDry: (effectInstanceId, wetDry) => {
+      audio.previewEffectWetDry?.(effectInstanceId, wetDry);
+    },
+
+    previewEffectParameter: (effectInstanceId, parameterId, value) => {
+      audio.previewEffectParameter?.(effectInstanceId, parameterId, value);
     },
 
     previewMasterLevel: (level) => {
@@ -881,6 +1027,111 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     openSend: (selectedSend) => {
       set({ selectedSend, studioView: "effects" });
+    },
+
+    setChannelSendAmount: (moduleId, sendBusId, amount, gestureId) => {
+      store.dispatch(
+        store.createCommand(
+          "mixer-send-amount-set",
+          { moduleId, sendBusId, amount },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    setChannelSendMode: (moduleId, sendBusId, mode) => {
+      store.dispatch(store.createCommand("mixer-send-mode-set", { moduleId, sendBusId, mode }));
+    },
+
+    addEffectToChain: (chain, effectPluginId) => {
+      store.dispatch(store.createCommand("effects-chain-effect-add", { chain, effectPluginId }));
+    },
+
+    removeEffectFromChain: (effectInstanceId) => {
+      store.dispatch(store.createCommand("effects-chain-effect-remove", { effectInstanceId }));
+    },
+
+    replaceEffectInChain: (effectInstanceId, effectPluginId) => {
+      store.dispatch(
+        store.createCommand("effects-chain-effect-replace", {
+          effectInstanceId,
+          effectPluginId,
+        }),
+      );
+    },
+
+    reorderEffectInChain: (effectInstanceId, afterEffectId) => {
+      store.dispatch(
+        store.createCommand(
+          "effects-chain-effect-reorder",
+          afterEffectId === undefined ? { effectInstanceId } : { effectInstanceId, afterEffectId },
+        ),
+      );
+    },
+
+    setEffectBypassed: (effectInstanceId, bypassed) => {
+      store.dispatch(store.createCommand("effects-instance-bypass-set", { effectInstanceId, bypassed }));
+    },
+
+    setEffectWetDry: (effectInstanceId, wetDry, gestureId) => {
+      store.dispatch(
+        store.createCommand(
+          "effects-instance-wet-dry-set",
+          { effectInstanceId, wetDry },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    setEffectParameter: (effectInstanceId, parameterId, value, gestureId) => {
+      store.dispatch(
+        store.createCommand(
+          "effects-instance-parameter-set",
+          { effectInstanceId, parameterId, value },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    setSendReturnLevel: (sendBusId, returnLevel, gestureId) => {
+      store.dispatch(
+        store.createCommand(
+          "effects-send-return-level-set",
+          { sendBusId, returnLevel },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    setSendChainBypassed: (sendBusId, bypassed) => {
+      store.dispatch(store.createCommand("effects-send-chain-bypass-set", { sendBusId, bypassed }));
+    },
+
+    setSendFocus: (sendBusId, effectInstanceId) => {
+      store.dispatch(store.createCommand("effects-send-focus-set", { sendBusId, effectInstanceId }));
+    },
+
+    toggleMasterEffectsBypass: () => {
+      store.dispatch(store.createCommand("effects-master-bypass-toggle", {}));
+    },
+
+    openExternalAutomationTarget: (target) => {
+      store.dispatch(store.createCommand("piano-roll-automation-target-set", { target }));
+      set({ editorExpanded: true });
+    },
+
+    setExternalAutomationLaneSteps: (target, patternId, steps) => {
+      const result = store.dispatch(
+        store.createCommand("automation-lane-steps-set", {
+          patternId,
+          scope: target.scope,
+          targetId: target.targetId,
+          parameterId: target.parameterId,
+          steps,
+        }),
+      );
+      if (result.status !== "accepted") return;
+      set({ undoNotice: notice("Updated the automation lane. Undo is available.") });
     },
 
     selectPattern: (patternId) => {
@@ -1066,6 +1317,10 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(
         store.createCommand("song-placement-repeat-count-set", { placementId, repeatCount }),
       );
+    },
+
+    setSongPlacementPattern: (placementId, patternId) => {
+      store.dispatch(store.createCommand("song-placement-pattern-set", { placementId, patternId }));
     },
 
     reorderSongPlacement: (placementId, afterPlacementId) => {

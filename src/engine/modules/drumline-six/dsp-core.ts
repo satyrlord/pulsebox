@@ -12,6 +12,7 @@
  */
 
 import {
+  applyVoiceDistortion,
   clamp,
   DeterministicNoise,
   EqualPowerPan,
@@ -24,7 +25,6 @@ import {
   StateVariableFilter,
   VoiceMixGates,
 } from "../../dsp/primitives";
-import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { DRUM_VOICE_IDS, type DrumVoiceId } from "./voices";
 
 export { DRUM_VOICE_IDS, type DrumVoiceId };
@@ -36,6 +36,7 @@ export interface DrumVoiceParameters {
   readonly snap: number;
   readonly decay: number;
   readonly level: number;
+  readonly distortion: number;
   /** -1 hard left to 1 hard right. */
   readonly pan: number;
   /** A muted voice keeps rendering but contributes silence to the mix. */
@@ -82,6 +83,7 @@ const DEFAULT_DRUM_VOICE_PARAMETERS: Readonly<Record<DrumVoiceId, DrumVoiceParam
           snap: VOICE_CHARACTER[id].snap,
           decay: VOICE_CHARACTER[id].decay,
           level: 0.8,
+          distortion: 0,
           pan: id === "rim" ? 0.22 : id === "clap" ? -0.18 : 0,
           mute: false,
           solo: false,
@@ -116,6 +118,8 @@ class DrumVoice {
    * change on a ringing voice glides instead of stepping in one sample.
    */
   readonly #level: ParameterGlide;
+  /** The Distortion descriptor declares the same 8 ms linear glide. */
+  readonly #distortion: ParameterGlide;
   /** Linear choke: spec-004 section 21.5 mandates a linear 4 ms fade-out. */
   readonly #chokeStep: number;
   #parameters: DrumVoiceParameters;
@@ -134,6 +138,7 @@ class DrumVoice {
     this.#parameters = parameters;
     this.#noise = new DeterministicNoise(this.#character.seed);
     this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
+    this.#distortion = new ParameterGlide(clamp(parameters.distortion, 0, 1), sampleRate);
     this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
@@ -146,7 +151,10 @@ class DrumVoice {
     mode: DrumlineParameterUpdateMode = "smooth",
   ): void {
     this.#parameters = parameters;
-    if (mode === "immediate") this.#level.set(clamp(parameters.level, 0, 1));
+    if (mode === "immediate") {
+      this.#level.set(clamp(parameters.level, 0, 1));
+      this.#distortion.set(clamp(parameters.distortion, 0, 1));
+    }
   }
 
   trigger(velocity: number, accent: boolean): void {
@@ -154,7 +162,10 @@ class DrumVoice {
     this.#noiseFilter.reset();
     // A hit that starts from silence takes the committed level directly; the
     // glide exists to protect a ringing tail, not to lag a fresh attack.
-    if (!this.#active) this.#level.set(clamp(this.#parameters.level, 0, 1));
+    if (!this.#active) {
+      this.#level.set(clamp(this.#parameters.level, 0, 1));
+      this.#distortion.set(clamp(this.#parameters.distortion, 0, 1));
+    }
     this.#phase = 0;
     this.#elapsed = 0;
     this.#velocity = clamp(velocity, 0, 1);
@@ -200,12 +211,13 @@ class DrumVoice {
     return sample * this.#amplitude * gain;
   }
 
-  /**
-   * Voice level belongs after the insert. This keeps an insert's response
-   * independent from its output gain, before the voice reaches pan and mix.
-   */
+  /** Voice level follows Distortion before the voice reaches pan and mix. */
   advanceLevel(): number {
     return this.#level.advance(clamp(this.#parameters.level, 0, 1));
+  }
+
+  advanceDistortion(): number {
+    return this.#distortion.advance(clamp(this.#parameters.distortion, 0, 1));
   }
 
   #renderVoice(frequency: number, snap: number, decaySeconds: number): number {
@@ -296,7 +308,6 @@ export class DrumlineSixDsp {
   readonly #tone: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<DrumVoiceId, EqualPowerPan>>;
-  readonly #voiceInserts: Readonly<Record<DrumVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly DrumVoice[];
   #parameters: DrumlineSixParameters = DEFAULT_DRUMLINE_PARAMETERS;
@@ -316,9 +327,6 @@ export class DrumlineSixDsp {
         new EqualPowerPan(DEFAULT_DRUM_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<DrumVoiceId, EqualPowerPan>;
-    this.#voiceInserts = Object.fromEntries(
-      DRUM_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
-    ) as Record<DrumVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       DRUM_VOICE_IDS.map((id) => [
         id,
@@ -360,17 +368,6 @@ export class DrumlineSixDsp {
 
   getParameterSnapshot(): DrumlineSixParameters {
     return this.#parameters;
-  }
-
-  setVoiceInserts(
-    configurations: Readonly<Partial<Record<DrumVoiceId, VoiceInsertConfiguration | null>>>,
-  ): boolean {
-    let accepted = true;
-    for (const voiceId of DRUM_VOICE_IDS) {
-      const host = this.#voiceInserts[voiceId];
-      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.active === true) && accepted;
-    }
-    return accepted;
   }
 
   trigger(voiceId: DrumVoiceId, velocity = 1, accent = false): void {
@@ -436,7 +433,7 @@ export class DrumlineSixDsp {
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
         const source = voice.render();
-        const sample = this.#voiceInserts[voice.id].process(source) * voice.advanceLevel();
+        const sample = applyVoiceDistortion(source, voice.advanceDistortion()) * voice.advanceLevel();
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

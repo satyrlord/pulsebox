@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { IdFactory, ModuleInstanceId } from "../../../src/contracts/ids";
+import type {
+  EffectInstanceId,
+  IdFactory,
+  ModuleInstanceId,
+  SendBusId,
+} from "../../../src/contracts/ids";
 import { toTransportDelta } from "../../../src/composition/audio-delta-projection";
 import { createDefaultProjectState } from "../../../src/composition/default-project";
 import type { PulseEngineDelta } from "../../../src/state/public";
@@ -81,5 +86,46 @@ describe("audio delta projection", () => {
     expect(
       toTransportDelta(delta(state, "pattern-events-set", {}, [firstModule]), state).payload,
     ).toEqual({ moduleId: firstModule });
+  });
+
+  it("keeps effect edits bounded to their owning audio target", () => {
+    if (firstModule === undefined) throw new Error("Expected default content.");
+    const effectId = "20000000-0000-4000-8000-000000000001" as EffectInstanceId;
+    const sendBusId = "send-a" as SendBusId;
+
+    const sendProjection = toTransportDelta(
+      delta(state, "module-effects-set", {
+        effectId,
+        parameterId: "mix",
+        value: 0.4,
+        chain: { scope: "send", targetId: sendBusId },
+      }),
+      state,
+    );
+    expect(sendProjection.kind).toBe("module-effects-set");
+    expect(sendProjection.payload.audioScope).toBe("send");
+    expect(sendProjection.payload.sendBusId).toBe(sendBusId);
+    expect(
+      toTransportDelta(
+        delta(state, "module-effects-set", {
+          effectId,
+          chain: { scope: "module", targetId: firstModule },
+        }),
+        state,
+      ).payload,
+    ).toEqual(expect.objectContaining({ audioScope: "module", moduleId: firstModule }));
+    expect(
+      toTransportDelta(
+        delta(state, "module-effects-set", { audioUnchanged: true }),
+        state,
+      ).payload,
+    ).toEqual(expect.objectContaining({ audioScope: "none" }));
+  });
+
+  it("uses a full projection when an effect delta has no bounded target", () => {
+    expect(
+      toTransportDelta(delta(state, "module-effects-set", { effectId: "missing" }), state)
+        .kind,
+    ).toBe("project-replace");
   });
 });

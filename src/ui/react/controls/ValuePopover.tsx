@@ -21,22 +21,39 @@ export interface ValuePopoverProps {
  */
 export function ValuePopover(props: ValuePopoverProps) {
   const { value, onCommit } = props;
+  const [draft, setDraft] = useState(value);
+  const editing = useRef(false);
+
+  // External state changes, including Undo and Redo, must update the numeric
+  // control. Keep a focused draft intact so a preview does not overwrite input.
+  useEffect(() => {
+    if (!editing.current) setDraft(value);
+  }, [value]);
+
   return (
     <input
-      key={value}
       id={props.id}
       data-component="value-popover"
       className={props.className}
       type="number"
       aria-label={props.label}
-      defaultValue={value}
+      value={draft}
       min={props.min}
       max={props.max}
       step={props.step}
       disabled={props.disabled}
       inputMode="decimal"
+      onFocus={() => {
+        editing.current = true;
+      }}
+      onChange={(event) => {
+        setDraft(event.currentTarget.value);
+      }}
       onBlur={(event) => {
-        onCommit(event.currentTarget.valueAsNumber);
+        editing.current = false;
+        const next = event.currentTarget.valueAsNumber;
+        if (Number.isFinite(next)) onCommit(next);
+        else setDraft(value);
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
@@ -45,10 +62,11 @@ export function ValuePopover(props: ValuePopoverProps) {
         }
         if (event.key === "Escape") {
           event.preventDefault();
-          event.currentTarget.value = value;
+          setDraft(value);
           event.currentTarget.blur();
         }
       }}
     />
   );
 }
+import { useEffect, useRef, useState } from "react";

@@ -1,14 +1,21 @@
 import {
   RACK_SLOT_IDS,
+  SEND_BUS_IDS,
   isCanonicalUuid,
   type AutomationLaneId,
   type EffectInstanceId,
   type ModuleInstanceId,
   type PatternId,
   type ProjectRevision,
-  type VoiceId,
 } from "../../contracts/ids";
-import type { EffectInstanceState, EffectsState } from "../../contracts/effects";
+import {
+  MASTER_EFFECT_CHAIN_SLOT_COUNT,
+  MODULE_EFFECT_CHAIN_SLOT_COUNT,
+  PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
+  SEND_EFFECT_CHAIN_SLOT_COUNT,
+  type EffectInstanceState,
+  type EffectsState,
+} from "../../contracts/effects";
 import {
   parseParameterId,
   parsePluginId,
@@ -79,6 +86,9 @@ export interface ProjectMetadataDocument {
 
 export interface PluginRequirementDocument {
   readonly pluginId: string;
+  readonly kind: "instrument" | "effect";
+  readonly pluginVersion: string;
+  readonly apiVersion: 1;
   readonly stateSchemaVersion: number;
 }
 
@@ -113,6 +123,7 @@ export interface RackSlotDocument {
   readonly solo?: boolean;
   readonly level?: number;
   readonly pan?: number;
+  readonly sends?: readonly MixerSendDocument[];
 }
 
 export interface SongPlacementDocument {
@@ -133,7 +144,7 @@ export interface AutomationStepDocument {
 
 export interface AutomationLaneDocument {
   readonly id: string;
-  readonly scope: "module";
+  readonly scope: AutomationLaneState["scope"];
   readonly targetId: string;
   readonly parameterId: string;
   readonly patternId: string;
@@ -141,8 +152,32 @@ export interface AutomationLaneDocument {
   readonly steps: readonly AutomationStepDocument[];
 }
 
+export interface MixerSendDocument {
+  readonly busId: string;
+  readonly amount: number;
+  readonly mode: "pre-fader" | "post-fader";
+}
+
+export interface MixerChannelDocument {
+  readonly slotId: string;
+  readonly moduleId: string | null;
+  readonly level: number;
+  readonly pan: number;
+  readonly muted: boolean;
+  readonly solo: boolean;
+  readonly sends: readonly MixerSendDocument[];
+  /** The module ID keys its ordered module effect chain, or null for an empty slot. */
+  readonly moduleChainId: string | null;
+}
+
+export interface MixerSendDefinitionDocument {
+  readonly busId: string;
+}
+
 export interface MixerDocument {
-  readonly masterLevel?: number;
+  readonly channels: readonly MixerChannelDocument[];
+  readonly sends: readonly MixerSendDefinitionDocument[];
+  readonly master: { readonly level: number };
 }
 
 export interface EffectInstanceDocument {
@@ -150,17 +185,33 @@ export interface EffectInstanceDocument {
   readonly pluginId: string;
   readonly stateVersion: number;
   readonly state: Readonly<Record<string, ParameterValue>>;
+  readonly bypassed: boolean;
+  readonly wetDry: number;
 }
 
-export interface VoiceInsertDocument {
+export interface ModuleChainDocument {
   readonly moduleId: string;
-  readonly voiceId: string;
-  readonly effectInstanceId: string | null;
+  readonly slots: readonly (string | null)[];
+}
+
+export interface SendChainDocument {
+  readonly busId: string;
+  readonly slots: readonly (string | null)[];
+  readonly returnLevel: number;
+  readonly bypassed: boolean;
+  readonly pinnedEffectId: string | null;
+}
+
+export interface MasterChainDocument {
+  readonly slots: readonly (string | null)[];
 }
 
 export interface EffectsDocument {
   readonly instances: readonly EffectInstanceDocument[];
-  readonly voiceInserts: readonly VoiceInsertDocument[];
+  readonly moduleChains: readonly ModuleChainDocument[];
+  readonly sendChains: readonly SendChainDocument[];
+  readonly masterChain: MasterChainDocument;
+  readonly masterEffectsBypassed: boolean;
 }
 
 export interface MigrationRecord {
@@ -246,6 +297,8 @@ export interface SerializeOptions {
   /** Last committed token, never the runtime StateRevision. */
   readonly projectRevision: ProjectRevision;
   readonly manifestVersionFor?: (pluginId: string) => number;
+  /** Installed plugin identity contracts from the composition registry. */
+  readonly pluginMetadataByPluginId?: Readonly<Record<string, ImportPluginMetadata>>;
 }
 
 export function serializeProject(
@@ -255,12 +308,33 @@ export function serializeProject(
   const project = state.project;
   const modules = Object.values(project.modules);
   const versionFor = options.manifestVersionFor ?? (() => 1);
+  const requirementFor = (
+    pluginId: string,
+    kind: "instrument" | "effect",
+  ): PluginRequirementDocument => {
+    const metadata = options.pluginMetadataByPluginId?.[pluginId];
+    if (metadata !== undefined && metadata.kind !== kind) {
+      throw new Error(`Plugin ${pluginId} has an incompatible registry kind.`);
+    }
+    return {
+      pluginId,
+      kind,
+      pluginVersion: metadata?.pluginVersion ?? "1.0.0",
+      apiVersion: metadata?.apiVersion ?? 1,
+      stateSchemaVersion: metadata?.stateSchemaVersion ?? versionFor(pluginId),
+    };
+  };
 
   const effectInstances = Object.values(project.effects.instances);
-  const plugins = [...new Set([...modules.map((module) => module.pluginId), ...effectInstances.map((instance) => instance.pluginId)])].map((pluginId) => ({
-    pluginId,
-    stateSchemaVersion: versionFor(pluginId),
-  }));
+  const instrumentRequirements: PluginRequirementDocument[] = [
+    ...new Set(modules.map((module) => module.pluginId)),
+  ].map((pluginId) => requirementFor(pluginId, "instrument"));
+  const effectRequirements: PluginRequirementDocument[] = [
+    ...new Set(effectInstances.map((instance) => instance.pluginId)),
+  ].map((pluginId) => requirementFor(pluginId, "effect"));
+  const plugins = [...instrumentRequirements, ...effectRequirements].toSorted(
+    (left, right) => left.kind.localeCompare(right.kind) || left.pluginId.localeCompare(right.pluginId),
+  );
 
   return {
     format: PROJECT_FORMAT,
@@ -293,6 +367,11 @@ export function serializeProject(
         solo: module.solo,
         level: module.level,
         pan: module.pan,
+        sends: SEND_BUS_IDS.map((busId) => ({
+          busId,
+          amount: module.sends[busId]?.amount ?? 0,
+          mode: module.sends[busId]?.mode ?? "post-fader",
+        })),
       };
     }),
     patterns: project.patterns.map((pattern) => ({
@@ -319,11 +398,33 @@ export function serializeProject(
       playlist: project.song.placements.map((placement) => ({ ...placement })),
     },
     activePatternId: project.activePatternId,
-    automation: Object.values(project.automationLanes).map((lane) => ({
-      ...lane,
-      steps: lane.steps.map((step) => ({ ...step })),
-    })),
-    mixer: { masterLevel: project.masterLevel },
+    automation: Object.values(project.automationLanes)
+      .toSorted((left, right) => left.id.localeCompare(right.id))
+      .map((lane) => ({
+        ...lane,
+        steps: lane.steps.map((step) => ({ ...step })),
+      })),
+    mixer: {
+      channels: project.rackSlots.map((slot) => {
+        const module = slot.moduleId === undefined ? undefined : project.modules[slot.moduleId];
+        return {
+          slotId: slot.id,
+          moduleId: module?.id ?? null,
+          level: module?.level ?? DEFAULT_MODULE_LEVEL,
+          pan: module?.pan ?? 0,
+          muted: module?.muted ?? false,
+          solo: module?.solo ?? false,
+          sends: SEND_BUS_IDS.map((busId) => ({
+            busId,
+            amount: module?.sends[busId]?.amount ?? 0,
+            mode: module?.sends[busId]?.mode ?? "post-fader",
+          })),
+          moduleChainId: module?.id ?? null,
+        };
+      }),
+      sends: SEND_BUS_IDS.map((busId) => ({ busId })),
+      master: { level: project.masterLevel },
+    },
     effects: {
       instances: effectInstances
         .toSorted((left, right) => left.id.localeCompare(right.id))
@@ -332,19 +433,27 @@ export function serializeProject(
           pluginId: instance.pluginId,
           stateVersion: instance.stateVersion,
           state: { ...instance.state },
+          bypassed: instance.bypassed,
+          wetDry: instance.wetDry,
         })),
-      voiceInserts: Object.entries(project.effects.voiceInserts)
-        .flatMap(([moduleId, slots]) =>
-          Object.entries(slots).map(([voiceId, effectInstanceId]) => ({
-            moduleId,
-            voiceId,
-            effectInstanceId,
-          })),
-        )
-        .toSorted(
-          (left, right) =>
-            left.moduleId.localeCompare(right.moduleId) || left.voiceId.localeCompare(right.voiceId),
-        ),
+      moduleChains: Object.entries(project.effects.moduleChains)
+        .map(([moduleId, slots]) => ({ moduleId, slots: [...slots] }))
+        .toSorted((left, right) => left.moduleId.localeCompare(right.moduleId)),
+      sendChains: SEND_BUS_IDS.map((busId) => {
+        const chain = project.effects.sendChains[busId];
+        if (chain === undefined) {
+          throw new Error(`Send ${busId} is missing from the project state.`);
+        }
+        return {
+          busId,
+          slots: [...chain.slots],
+          returnLevel: chain.returnLevel,
+          bypassed: chain.bypassed,
+          pinnedEffectId: chain.pinnedEffectId,
+        };
+      }),
+      masterChain: { slots: [...project.effects.masterChain] },
+      masterEffectsBypassed: project.effects.masterEffectsBypassed,
     },
     assets: [],
     migrations: [],
@@ -400,16 +509,14 @@ export interface ParseOptions {
   readonly parameterDescriptorsByPluginId: Readonly<
     Record<string, readonly ImportParameterDescriptor[]>
   >;
-  /** Effect IDs that the running build can instantiate in a drum voice slot. */
-  readonly knownVoiceInsertEffectPluginIds?: readonly string[];
   /** Registered current state schema versions for every installed plugin. */
   readonly stateSchemaVersionByPluginId?: Readonly<Record<string, number>>;
-  /** State contracts for effects that can occupy a drum voice insert slot. */
-  readonly voiceInsertEffectsByPluginId?: Readonly<
-    Record<string, ImportVoiceInsertEffectDescriptor>
-  >;
   /** Stable drum voice IDs by instrument plugin. Pitched instruments omit an entry. */
   readonly voiceIdsByPluginId?: Readonly<Record<string, readonly string[]>>;
+  /** State and placement contracts for every installed effect plugin. */
+  readonly effectDescriptorsByPluginId?: Readonly<Record<string, ImportEffectDescriptor>>;
+  /** Installed plugin identity contracts. The browser composition passes its registry here. */
+  readonly pluginMetadataByPluginId?: Readonly<Record<string, ImportPluginMetadata>>;
 }
 
 export type ImportParameterDescriptor = Pick<
@@ -418,16 +525,27 @@ export type ImportParameterDescriptor = Pick<
 >;
 
 /**
- * The data-only effect state contract used at the import boundary. It matches
- * the persisted scalar state that a voice insert runtime can receive.
+ * The data-only effect state contract used at the import boundary.
  */
-export interface ImportVoiceInsertEffectDescriptor {
+export interface ImportEffectStateDescriptor {
   readonly stateSchemaVersion: number;
   readonly parameters: readonly ImportParameterDescriptor[];
 }
 
+export interface ImportEffectDescriptor extends ImportEffectStateDescriptor {
+  readonly placements: readonly ("module-pedalboard" | "send-chain" | "master-chain")[];
+}
+
+export interface ImportPluginMetadata {
+  readonly kind: "instrument" | "effect";
+  readonly pluginVersion: string;
+  readonly apiVersion: 1;
+  readonly stateSchemaVersion: number;
+}
+
 const MAXIMUM_REPORTED_ISSUES = 100;
 const TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const SEMANTIC_VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*)?$/;
 const PROJECT_KEYS = new Set([
   "id",
   "name",
@@ -440,7 +558,7 @@ const PROJECT_KEYS = new Set([
   "tempo",
   "swing",
 ]);
-const PLUGIN_KEYS = new Set(["pluginId", "stateSchemaVersion"]);
+const PLUGIN_KEYS = new Set(["pluginId", "kind", "pluginVersion", "apiVersion", "stateSchemaVersion"]);
 const RACK_KEYS = new Set([
   "id",
   "moduleId",
@@ -450,6 +568,7 @@ const RACK_KEYS = new Set([
   "solo",
   "level",
   "pan",
+  "sends",
 ]);
 const PATTERN_KEYS = new Set([
   "id",
@@ -494,9 +613,31 @@ const AUTOMATION_LANE_KEYS = new Set([
   "steps",
 ]);
 const AUTOMATION_STEP_KEYS = new Set(["tick", "value"]);
-const EFFECTS_KEYS = new Set(["instances", "voiceInserts"]);
-const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state"]);
-const VOICE_INSERT_KEYS = new Set(["moduleId", "voiceId", "effectInstanceId"]);
+const MIXER_KEYS = new Set(["channels", "sends", "master"]);
+const MIXER_CHANNEL_KEYS = new Set([
+  "slotId",
+  "moduleId",
+  "level",
+  "pan",
+  "muted",
+  "solo",
+  "sends",
+  "moduleChainId",
+]);
+const MIXER_SEND_KEYS = new Set(["busId", "amount", "mode"]);
+const MIXER_SEND_DEFINITION_KEYS = new Set(["busId"]);
+const MASTER_KEYS = new Set(["level"]);
+const EFFECTS_KEYS = new Set([
+  "instances",
+  "moduleChains",
+  "sendChains",
+  "masterChain",
+  "masterEffectsBypassed",
+]);
+const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state", "bypassed", "wetDry"]);
+const MODULE_CHAIN_KEYS = new Set(["moduleId", "slots"]);
+const SEND_CHAIN_KEYS = new Set(["busId", "slots", "returnLevel", "bypassed", "pinnedEffectId"]);
+const MASTER_CHAIN_KEYS = new Set(["slots"]);
 
 class IssueCollector {
   readonly issues: ValidationIssue[] = [];
@@ -524,6 +665,10 @@ function validTimestamp(value: unknown): value is string {
   if (typeof value !== "string" || !TIMESTAMP_PATTERN.test(value)) return false;
   const milliseconds = Date.parse(value);
   return !Number.isNaN(milliseconds) && new Date(milliseconds).toISOString() === value;
+}
+
+function isSemanticVersion(value: string): boolean {
+  return value.length <= 64 && SEMANTIC_VERSION_PATTERN.test(value);
 }
 
 function validName(value: unknown): value is string {
@@ -630,9 +775,12 @@ function validateAutomationLanes(
   collector: IssueCollector,
   patternIds: ReadonlySet<string>,
   occupiedModules: ReadonlyMap<string, string>,
+  effects: EffectsDocument,
   options: ParseOptions,
 ): void {
   const laneIds = new Set<string>();
+  const effectById = new Map(effects.instances.map((instance) => [instance.id, instance]));
+  const effectDescriptors = options.effectDescriptorsByPluginId ?? {};
   for (const [index, lane] of lanes.entries()) {
     const path = `automation[${String(index)}]`;
     if (!isPlainRecord(lane)) {
@@ -643,20 +791,90 @@ function validateAutomationLanes(
     if (!isCanonicalUuid(lane.id) || laneIds.has(lane.id))
       collector.add(`${path}.id`, "Automation lane IDs must be unique canonical UUIDs.");
     else laneIds.add(lane.id);
-    if (lane.scope !== "module") collector.add(`${path}.scope`, "Only module automation is supported.");
-    if (!isCanonicalUuid(lane.targetId) || !occupiedModules.has(lane.targetId))
-      collector.add(`${path}.targetId`, "Automation target must resolve to an occupied module.");
-    if (typeof lane.parameterId !== "string" || lane.parameterId.length === 0)
+    const validScope =
+      lane.scope === "module" ||
+      lane.scope === "mixer" ||
+      lane.scope === "send" ||
+      lane.scope === "send-return" ||
+      lane.scope === "effect" ||
+      lane.scope === "master";
+    if (!validScope) collector.add(`${path}.scope`, "Automation scope is not supported.");
+    const parameterId = typeof lane.parameterId === "string" ? lane.parameterId : undefined;
+    if (parameterId === undefined || parameterId.length === 0)
       collector.add(`${path}.parameterId`, "Automation parameter ID must not be empty.");
-    const pluginId = typeof lane.targetId === "string" ? occupiedModules.get(lane.targetId) : undefined;
-    const descriptor =
-      pluginId === undefined || typeof lane.parameterId !== "string"
-        ? undefined
-        : options.parameterDescriptorsByPluginId[pluginId]?.find(
-            (candidate) => candidate.id === lane.parameterId,
+    let descriptor: ImportParameterDescriptor | undefined;
+    let validateValue: ((value: ParameterValue) => string | undefined) | undefined;
+    if (validScope && parameterId !== undefined) {
+      if (lane.scope === "module") {
+        const pluginId = typeof lane.targetId === "string" ? occupiedModules.get(lane.targetId) : undefined;
+        if (!isCanonicalUuid(lane.targetId) || pluginId === undefined) {
+          collector.add(`${path}.targetId`, "Automation target must resolve to an occupied module.");
+        } else {
+          descriptor = options.parameterDescriptorsByPluginId[pluginId]?.find(
+            (candidate) => candidate.id === parameterId,
           );
-    if (pluginId !== undefined && descriptor === undefined) {
-      collector.add(`${path}.parameterId`, "Automation parameter is not declared by the target module plugin.");
+          if (descriptor === undefined) {
+            collector.add(
+              `${path}.parameterId`,
+              "Automation parameter is not declared by the target module plugin.",
+            );
+          }
+        }
+      } else if (lane.scope === "mixer") {
+        if (!isCanonicalUuid(lane.targetId) || !occupiedModules.has(lane.targetId)) {
+          collector.add(`${path}.targetId`, "Mixer automation target must resolve to an occupied module.");
+        }
+        validateValue = mixerAutomationValueValidator(parameterId, `${path}.parameterId`, collector);
+      } else if (lane.scope === "send") {
+        if (!isCanonicalUuid(lane.targetId) || !occupiedModules.has(lane.targetId)) {
+          collector.add(`${path}.targetId`, "Send automation target must resolve to an occupied module.");
+        }
+        validateValue = sendAutomationValueValidator(parameterId, `${path}.parameterId`, collector);
+      } else if (lane.scope === "send-return") {
+        if (
+          typeof lane.targetId !== "string" ||
+          !SEND_BUS_IDS.some((busId) => busId === lane.targetId)
+        ) {
+          collector.add(`${path}.targetId`, "Send-return automation target must be send A through D.");
+        }
+        validateValue = sendReturnAutomationValueValidator(
+          parameterId,
+          `${path}.parameterId`,
+          collector,
+        );
+      } else if (lane.scope === "effect") {
+        const effect = typeof lane.targetId === "string" ? effectById.get(lane.targetId) : undefined;
+        if (!isCanonicalUuid(lane.targetId) || effect === undefined) {
+          collector.add(`${path}.targetId`, "Effect automation target must resolve to an effect instance.");
+        } else if (parameterId === "wet-dry") {
+          validateValue = unitAutomationValue;
+        } else if (parameterId === "bypassed") {
+          validateValue = booleanAutomationValue;
+        } else {
+          descriptor = effectDescriptors[effect.pluginId]?.parameters.find(
+            (candidate) => candidate.id === parameterId,
+          );
+          if (descriptor === undefined && Object.keys(effectDescriptors).length > 0) {
+            collector.add(
+              `${path}.parameterId`,
+              "Automation parameter is not declared by the target effect plugin.",
+            );
+          }
+        }
+      } else {
+        if (lane.targetId !== "master") {
+          collector.add(`${path}.targetId`, "Master automation target must be the master bus.");
+        }
+        validateValue = masterAutomationValueValidator(
+          parameterId,
+          `${path}.parameterId`,
+          collector,
+        );
+      }
+      if (descriptor !== undefined) {
+        const declaredDescriptor = descriptor;
+        validateValue = (value) => validateImportedParameter(value, declaredDescriptor);
+      }
     }
     if (!isCanonicalUuid(lane.patternId) || !patternIds.has(lane.patternId))
       collector.add(`${path}.patternId`, "Automation Pattern reference must resolve in this project.");
@@ -695,12 +913,75 @@ function validateAutomationLanes(
         typeof step.value !== "boolean"
       )
         collector.add(`${stepPath}.value`, "Automation value must be a finite JSON scalar.");
-      else if (descriptor !== undefined) {
-        const message = validateImportedParameter(step.value, descriptor);
+      else if (validateValue !== undefined) {
+        const message = validateValue(step.value);
         if (message !== undefined) collector.add(`${stepPath}.value`, message);
       }
     }
   }
+}
+
+function mixerAutomationValueValidator(
+  parameterId: string,
+  path: string,
+  collector: IssueCollector,
+): (value: ParameterValue) => string | undefined {
+  if (parameterId === "level") return unitAutomationValue;
+  if (parameterId === "pan") {
+    return (value) => finiteNumber(value, -1, 1) ? undefined : "Automation value must be from -1 through 1.";
+  }
+  if (parameterId === "muted" || parameterId === "solo") return booleanAutomationValue;
+  collector.add(path, "Mixer automation parameter is not supported.");
+  return invalidAutomationValue;
+}
+
+function sendAutomationValueValidator(
+  parameterId: string,
+  path: string,
+  collector: IssueCollector,
+): (value: ParameterValue) => string | undefined {
+  if (/^send-[abcd]-amount$/u.test(parameterId)) return unitAutomationValue;
+  if (/^send-[abcd]-mode$/u.test(parameterId)) {
+    return (value) => value === "pre-fader" || value === "post-fader"
+      ? undefined
+      : "Automation value must be pre-fader or post-fader.";
+  }
+  collector.add(path, "Send automation parameter is not supported.");
+  return invalidAutomationValue;
+}
+
+function sendReturnAutomationValueValidator(
+  parameterId: string,
+  path: string,
+  collector: IssueCollector,
+): (value: ParameterValue) => string | undefined {
+  if (parameterId === "return-level") return unitAutomationValue;
+  if (parameterId === "chain-bypassed") return booleanAutomationValue;
+  collector.add(path, "Send-return automation parameter is not supported.");
+  return invalidAutomationValue;
+}
+
+function masterAutomationValueValidator(
+  parameterId: string,
+  path: string,
+  collector: IssueCollector,
+): (value: ParameterValue) => string | undefined {
+  if (parameterId === "level") return unitAutomationValue;
+  if (parameterId === "effects-bypassed") return booleanAutomationValue;
+  collector.add(path, "Master automation parameter is not supported.");
+  return invalidAutomationValue;
+}
+
+function unitAutomationValue(value: ParameterValue): string | undefined {
+  return finiteNumber(value, 0, 1) ? undefined : "Automation value must be from 0 through 1.";
+}
+
+function booleanAutomationValue(value: ParameterValue): string | undefined {
+  return typeof value === "boolean" ? undefined : "Automation value must be boolean.";
+}
+
+function invalidAutomationValue(): string {
+  return "Automation value has no supported parameter contract.";
 }
 
 function validateAutomationStepBounds(
@@ -715,6 +996,24 @@ function validateAutomationStepBounds(
   }
   for (const pattern of patterns) {
     if (!isPlainRecord(pattern) || !Array.isArray(pattern.parts)) continue;
+    const patternLength =
+      typeof pattern.durationBars === "number" && Number.isSafeInteger(pattern.durationBars)
+        ? pattern.durationBars * 16 * PATTERN_TICKS_PER_STEP
+        : undefined;
+    if (patternLength !== undefined && Array.isArray(pattern.automationLaneIds)) {
+      for (const laneId of pattern.automationLaneIds) {
+        if (typeof laneId !== "string") continue;
+        const record = laneById.get(laneId);
+        if (
+          record === undefined ||
+          record.lane.scope === "module" ||
+          !Array.isArray(record.lane.steps)
+        ) {
+          continue;
+        }
+        validateLaneStepMaximum(record, patternLength, "Pattern", collector);
+      }
+    }
     for (const part of pattern.parts) {
       const length = isPlainRecord(part) ? part.length : undefined;
       if (
@@ -731,16 +1030,34 @@ function validateAutomationStepBounds(
         if (typeof laneId !== "string") continue;
         const record = laneById.get(laneId);
         if (record === undefined || !Array.isArray(record.lane.steps)) continue;
-        for (const [stepIndex, step] of record.lane.steps.entries()) {
-          if (!isPlainRecord(step) || typeof step.tick !== "number") continue;
-          if (step.tick >= length * PATTERN_TICKS_PER_STEP) {
-            collector.add(
-              `automation[${String(record.index)}].steps[${String(stepIndex)}].tick`,
-              "Automation step must stay inside its Pattern part length.",
-            );
-          }
-        }
+        validateLaneStepMaximum(
+          record,
+          length * PATTERN_TICKS_PER_STEP,
+          "Pattern part",
+          collector,
+        );
       }
+    }
+  }
+}
+
+function validateLaneStepMaximum(
+  record: {
+    readonly lane: Readonly<Record<string, unknown>>;
+    readonly index: number;
+  },
+  maximumTick: number,
+  owner: "Pattern" | "Pattern part",
+  collector: IssueCollector,
+): void {
+  if (!Array.isArray(record.lane.steps)) return;
+  for (const [stepIndex, step] of record.lane.steps.entries()) {
+    if (!isPlainRecord(step) || typeof step.tick !== "number") continue;
+    if (step.tick >= maximumTick) {
+      collector.add(
+        `automation[${String(record.index)}].steps[${String(stepIndex)}].tick`,
+        `Automation step must stay inside its ${owner} length.`,
+      );
     }
   }
 }
@@ -794,7 +1111,10 @@ function validateAutomationReferences(
     if (!patternLaneIds.get(lane.patternId)?.has(laneId)) {
       collector.add(path, "Automation lane must be referenced by its owning Pattern.");
     }
-    if (!partLaneIds.get(automationOwnerKey(lane.patternId, lane.targetId))?.has(laneId)) {
+    if (
+      lane.scope === "module" &&
+      !partLaneIds.get(automationOwnerKey(lane.patternId, lane.targetId))?.has(laneId)
+    ) {
       collector.add(path, "Automation lane must be referenced by its owning Pattern part.");
     }
   }
@@ -822,7 +1142,10 @@ function validateLaneReferenceList(
     const lane = lanesById.get(rawId);
     if (lane === undefined) {
       collector.add(`${path}[${String(index)}]`, "Automation lane reference does not resolve.");
-    } else if (lane.patternId !== patternId || (moduleId !== undefined && lane.targetId !== moduleId)) {
+    } else if (
+      lane.patternId !== patternId ||
+      (moduleId !== undefined && (lane.scope !== "module" || lane.targetId !== moduleId))
+    ) {
       collector.add(`${path}[${String(index)}]`, "Automation lane reference has the wrong Pattern or module owner.");
     }
   }
@@ -983,55 +1306,113 @@ interface ParsedEffects {
   readonly referencedPluginIds: ReadonlySet<string>;
 }
 
-function voiceSlotKey(moduleId: string, voiceId: string): string {
-  return `${moduleId}\u0000${voiceId}`;
+function validateSendDocuments(value: unknown, path: string, collector: IssueCollector): void {
+  if (!Array.isArray(value) || value.length !== SEND_BUS_IDS.length) {
+    collector.add(path, "A channel must contain exactly four sends.");
+    return;
+  }
+  for (const [index, send] of value.entries()) {
+    const sendPath = `${path}[${String(index)}]`;
+    if (!isPlainRecord(send)) {
+      collector.add(sendPath, "A send must be an object.");
+      continue;
+    }
+    collector.exactKeys(send, MIXER_SEND_KEYS, sendPath);
+    if (send.busId !== SEND_BUS_IDS[index]) collector.add(`${sendPath}.busId`, "Send buses must stay in A through D order.");
+    if (!finiteNumber(send.amount, 0, 1)) collector.add(`${sendPath}.amount`, "Send amount must be from 0 through 1.");
+    if (send.mode !== "pre-fader" && send.mode !== "post-fader")
+      collector.add(`${sendPath}.mode`, "Send mode must be pre-fader or post-fader.");
+  }
 }
 
-function expectedVoiceInsertDocuments(
-  occupiedModules: ReadonlyMap<string, string>,
-  options: ParseOptions,
-): readonly VoiceInsertDocument[] {
-  const voiceIdsByPluginId = options.voiceIdsByPluginId ?? {};
-  return [...occupiedModules.entries()]
-    .flatMap(([moduleId, pluginId]) =>
-      (voiceIdsByPluginId[pluginId] ?? []).map((voiceId) => ({
-        moduleId,
-        voiceId,
-        effectInstanceId: null,
-      })),
-    )
-    .toSorted(
-      (left, right) =>
-        left.moduleId.localeCompare(right.moduleId) || left.voiceId.localeCompare(right.voiceId),
-    );
+function sameSendDocuments(left: unknown, right: unknown): boolean {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const leftItems: readonly unknown[] = left;
+  const rightItems: readonly unknown[] = right;
+  return leftItems.every((send, index) => {
+    const other = rightItems[index];
+    return isPlainRecord(send) && isPlainRecord(other) &&
+      send.busId === other.busId && send.amount === other.amount && send.mode === other.mode;
+  });
+}
+
+function validateMixerDocument(
+  value: unknown,
+  rack: readonly unknown[],
+  collector: IssueCollector,
+): void {
+  if (!isPlainRecord(value)) {
+    collector.add("mixer", "Mixer must be an object.");
+    return;
+  }
+  collector.exactKeys(value, MIXER_KEYS, "mixer");
+  if (!Array.isArray(value.channels) || value.channels.length !== RACK_SLOT_IDS.length) {
+    collector.add("mixer.channels", "Mixer must contain exactly eight fixed channels.");
+  } else {
+    for (const [index, channel] of value.channels.entries()) {
+      const path = `mixer.channels[${String(index)}]`;
+      if (!isPlainRecord(channel)) {
+        collector.add(path, "Mixer channel must be an object.");
+        continue;
+      }
+      collector.exactKeys(channel, MIXER_CHANNEL_KEYS, path);
+      if (channel.slotId !== RACK_SLOT_IDS[index]) collector.add(`${path}.slotId`, "Mixer channels must stay in fixed slot order.");
+      if (!finiteNumber(channel.level, 0, 1)) collector.add(`${path}.level`, "Channel level must be from 0 through 1.");
+      if (!finiteNumber(channel.pan, -1, 1)) collector.add(`${path}.pan`, "Channel pan must be from -1 through 1.");
+      if (typeof channel.muted !== "boolean") collector.add(`${path}.muted`, "Channel muted must be boolean.");
+      if (typeof channel.solo !== "boolean") collector.add(`${path}.solo`, "Channel solo must be boolean.");
+      validateSendDocuments(channel.sends, `${path}.sends`, collector);
+      const slot = rack[index];
+      if (!isPlainRecord(slot)) continue;
+      const moduleId = typeof slot.moduleId === "string" ? slot.moduleId : null;
+      if (channel.moduleId !== moduleId) collector.add(`${path}.moduleId`, "Mixer channel must match its rack slot module.");
+      if (channel.moduleChainId !== moduleId) collector.add(`${path}.moduleChainId`, "Mixer channel must reference its matching module chain.");
+      if (moduleId === null) {
+        if (channel.level !== DEFAULT_MODULE_LEVEL || channel.pan !== 0 || channel.muted !== false || channel.solo !== false)
+          collector.add(path, "An empty mixer channel must use its neutral state.");
+      } else {
+        for (const key of ["level", "pan", "muted", "solo"] as const) {
+          if (channel[key] !== slot[key]) collector.add(`${path}.${key}`, "Mixer channel does not match its rack module state.");
+        }
+        if (!sameSendDocuments(channel.sends, slot.sends))
+          collector.add(`${path}.sends`, "Mixer channel sends do not match its rack module state.");
+      }
+    }
+  }
+  if (!Array.isArray(value.sends) || value.sends.length !== SEND_BUS_IDS.length) {
+    collector.add("mixer.sends", "Mixer must contain exactly four send definitions.");
+  } else {
+    for (const [index, send] of value.sends.entries()) {
+      const path = `mixer.sends[${String(index)}]`;
+      if (!isPlainRecord(send)) {
+        collector.add(path, "Send definition must be an object.");
+        continue;
+      }
+      collector.exactKeys(send, MIXER_SEND_DEFINITION_KEYS, path);
+      if (send.busId !== SEND_BUS_IDS[index]) collector.add(`${path}.busId`, "Send definitions must stay in A through D order.");
+    }
+  }
+  if (!isPlainRecord(value.master)) {
+    collector.add("mixer.master", "Master must be an object.");
+  } else {
+    collector.exactKeys(value.master, MASTER_KEYS, "mixer.master");
+    if (!finiteNumber(value.master.level, 0, 1)) collector.add("mixer.master.level", "Master level must be from 0 through 1.");
+  }
 }
 
 function parseEffects(
   value: unknown,
   collector: IssueCollector,
   occupiedModules: ReadonlyMap<string, string>,
-  requirements: ReadonlySet<string>,
+  requirements: ReadonlyMap<string, PluginRequirementDocument>,
   options: ParseOptions,
 ): ParsedEffects {
-  const expectedSlots = expectedVoiceInsertDocuments(occupiedModules, options);
-  const empty: ParsedEffects = {
-    document: { instances: [], voiceInserts: expectedSlots },
-    referencedPluginIds: new Set(),
-  };
   if (!isPlainRecord(value)) {
     collector.add("effects", "Effects must be an object.");
-    return empty;
+    return { document: emptyEffectsDocument(), referencedPluginIds: new Set() };
   }
-  // Existing phase-one documents wrote an empty object. Read it as the new
-  // all-null slot set instead of making saved projects unreadable.
-  if (Object.keys(value).length === 0) return empty;
-
   collector.exactKeys(value, EFFECTS_KEYS, "effects");
-  const effectDescriptors = options.voiceInsertEffectsByPluginId ?? {};
-  const knownEffectPlugins = new Set([
-    ...(options.knownVoiceInsertEffectPluginIds ?? []),
-    ...Object.keys(effectDescriptors),
-  ]);
+  const effectDescriptors = options.effectDescriptorsByPluginId ?? {};
   const instances: EffectInstanceDocument[] = [];
   const instanceIds = new Set<string>();
   if (!Array.isArray(value.instances)) {
@@ -1053,36 +1434,32 @@ function parseEffects(
         instanceIds.add(instance.id);
       }
       const pluginId = parsePluginId(instance.pluginId, `${path}.pluginId`);
-      let effectDescriptor: ImportVoiceInsertEffectDescriptor | undefined;
+      let effectDescriptor: ImportEffectDescriptor | undefined;
       if (!pluginId.ok) collector.issues.push(...pluginId.issues);
       else {
-        if (!knownEffectPlugins.has(pluginId.value)) {
-          collector.add(`${path}.pluginId`, "Effect plugin is not available for a voice insert.");
-        }
+        if (Object.keys(effectDescriptors).length > 0 && effectDescriptors[pluginId.value] === undefined)
+          collector.add(`${path}.pluginId`, "Effect plugin is not available in this build.");
         effectDescriptor = effectDescriptors[pluginId.value];
-        if (effectDescriptor === undefined) {
-          collector.add(
-            `${path}.pluginId`,
-            "Effect plugin has no registered voice-insert state contract.",
-          );
-        }
-        if (!requirements.has(pluginId.value)) {
+        const requirement = requirements.get(pluginId.value);
+        if (requirement === undefined) {
           collector.add(`${path}.pluginId`, "Effect plugin has no matching requirement.");
-        }
+        } else if (requirement.kind !== "effect") collector.add(`${path}.pluginId`, "Effect instance requires an effect plugin.");
       }
       if (!Number.isSafeInteger(instance.stateVersion) || Number(instance.stateVersion) < 1) {
-        collector.add(`${path}.stateVersion`, "Voice insert state version must be a positive integer.");
+        collector.add(`${path}.stateVersion`, "Effect state version must be a positive integer.");
       } else if (
         effectDescriptor !== undefined &&
         instance.stateVersion !== effectDescriptor.stateSchemaVersion
       ) {
         collector.add(
           `${path}.stateVersion`,
-          `Voice insert state version must be ${String(effectDescriptor.stateSchemaVersion)}.`,
+          `Effect state version must be ${String(effectDescriptor.stateSchemaVersion)}.`,
         );
       }
       if (effectDescriptor !== undefined)
-        validateVoiceInsertEffectState(instance.state, effectDescriptor, `${path}.state`, collector);
+        validateEffectState(instance.state, effectDescriptor, `${path}.state`, collector);
+      if (typeof instance.bypassed !== "boolean") collector.add(`${path}.bypassed`, "Effect bypassed must be boolean.");
+      if (!finiteNumber(instance.wetDry, 0, 1)) collector.add(`${path}.wetDry`, "Effect wet and dry mix must be from 0 through 1.");
       if (
         typeof instance.id === "string" &&
         typeof instance.pluginId === "string" &&
@@ -1094,99 +1471,128 @@ function parseEffects(
           pluginId: instance.pluginId,
           stateVersion: instance.stateVersion,
           state: instance.state as Readonly<Record<string, ParameterValue>>,
+          bypassed: instance.bypassed === true,
+          wetDry: typeof instance.wetDry === "number" ? instance.wetDry : 0,
         });
       }
     }
   }
 
-  const expectedByKey = new Map(
-    expectedSlots.map((slot) => [voiceSlotKey(slot.moduleId, slot.voiceId), slot]),
-  );
-  const voiceInserts: VoiceInsertDocument[] = [];
-  const seenSlots = new Set<string>();
   const references = new Map<string, number>();
-  if (!Array.isArray(value.voiceInserts)) {
-    collector.add("effects.voiceInserts", "Voice insert slots must be an array.");
-  } else {
-    for (const [index, slot] of value.voiceInserts.entries()) {
-      if (collector.full) break;
-      const path = `effects.voiceInserts[${String(index)}]`;
-      if (!isPlainRecord(slot)) {
-        collector.add(path, "Voice insert slot must be an object.");
-        continue;
-      }
-      collector.exactKeys(slot, VOICE_INSERT_KEYS, path);
-      const key =
-        typeof slot.moduleId === "string" && typeof slot.voiceId === "string"
-          ? voiceSlotKey(slot.moduleId, slot.voiceId)
-          : undefined;
-      if (key === undefined || !expectedByKey.has(key)) {
-        collector.add(path, "Voice insert slot does not resolve to a supported drum voice.");
-      } else if (seenSlots.has(key)) {
-        collector.add(path, "Voice insert slots must be unique.");
-      } else {
-        seenSlots.add(key);
-      }
-      if (slot.effectInstanceId !== null && !isCanonicalUuid(slot.effectInstanceId)) {
-        collector.add(`${path}.effectInstanceId`, "Expected a lowercase canonical UUID version 4 or null.");
-      } else if (typeof slot.effectInstanceId === "string") {
-        if (!instanceIds.has(slot.effectInstanceId)) {
-          collector.add(`${path}.effectInstanceId`, "Voice insert references an unknown effect instance.");
-        }
-        references.set(slot.effectInstanceId, (references.get(slot.effectInstanceId) ?? 0) + 1);
-      }
-      if (
-        typeof slot.moduleId === "string" &&
-        typeof slot.voiceId === "string" &&
-        (slot.effectInstanceId === null || typeof slot.effectInstanceId === "string")
-      ) {
-        voiceInserts.push({
-          moduleId: slot.moduleId,
-          voiceId: slot.voiceId,
-          effectInstanceId: slot.effectInstanceId,
-        });
-      }
+  const registerReference = (id: unknown, placement: "module-pedalboard" | "send-chain" | "master-chain", path: string): void => {
+    if (id === null) return;
+    if (!isCanonicalUuid(id)) {
+      collector.add(path, "Expected a lowercase canonical UUID version 4 or null.");
+      return;
+    }
+    if (!instanceIds.has(id)) collector.add(path, "Effect chain references an unknown effect instance.");
+    else {
+      references.set(id, (references.get(id) ?? 0) + 1);
+      const instance = instances.find((candidate) => candidate.id === id);
+      const descriptor = instance === undefined ? undefined : effectDescriptors[instance.pluginId];
+      if (descriptor !== undefined && !descriptor.placements.includes(placement))
+        collector.add(path, "Effect plugin does not support this chain placement.");
+      if (descriptor === undefined && Object.keys(effectDescriptors).length > 0)
+        collector.add(path, "Effect plugin has no registered chain placement contract.");
+    }
+  };
+  const moduleChains: ModuleChainDocument[] = [];
+  const moduleChainIds = new Set<string>();
+  if (!Array.isArray(value.moduleChains)) collector.add("effects.moduleChains", "Module chains must be an array.");
+  else for (const [index, chain] of value.moduleChains.entries()) {
+    const path = `effects.moduleChains[${String(index)}]`;
+    if (!isPlainRecord(chain)) { collector.add(path, "Module chain must be an object."); continue; }
+    collector.exactKeys(chain, MODULE_CHAIN_KEYS, path);
+    if (!isCanonicalUuid(chain.moduleId) || !occupiedModules.has(chain.moduleId) || moduleChainIds.has(chain.moduleId))
+      collector.add(`${path}.moduleId`, "Module chain must uniquely resolve to an occupied module.");
+    else moduleChainIds.add(chain.moduleId);
+    validateEffectSlots(chain.slots, MODULE_EFFECT_CHAIN_SLOT_COUNT, `${path}.slots`, "module-pedalboard", registerReference, collector);
+    if (typeof chain.moduleId === "string" && Array.isArray(chain.slots)) moduleChains.push({ moduleId: chain.moduleId, slots: chain.slots as readonly (string | null)[] });
+  }
+  for (const moduleId of occupiedModules.keys()) if (!moduleChainIds.has(moduleId)) collector.add("effects.moduleChains", `Missing module chain for ${moduleId}.`);
+
+  const sendChains: SendChainDocument[] = [];
+  const sendChainIds = new Set<string>();
+  if (!Array.isArray(value.sendChains) || value.sendChains.length !== SEND_BUS_IDS.length) collector.add("effects.sendChains", "Effects must contain exactly four send chains.");
+  else for (const [index, chain] of value.sendChains.entries()) {
+    const path = `effects.sendChains[${String(index)}]`;
+    if (!isPlainRecord(chain)) { collector.add(path, "Send chain must be an object."); continue; }
+    collector.exactKeys(chain, SEND_CHAIN_KEYS, path);
+    if (chain.busId !== SEND_BUS_IDS[index] || sendChainIds.has(String(chain.busId))) collector.add(`${path}.busId`, "Send chains must stay in A through D order.");
+    else sendChainIds.add(String(chain.busId));
+    validateEffectSlots(chain.slots, SEND_EFFECT_CHAIN_SLOT_COUNT, `${path}.slots`, "send-chain", registerReference, collector);
+    if (!finiteNumber(chain.returnLevel, 0, 1)) collector.add(`${path}.returnLevel`, "Send return level must be from 0 through 1.");
+    if (typeof chain.bypassed !== "boolean") collector.add(`${path}.bypassed`, "Send chain bypassed must be boolean.");
+    if (chain.pinnedEffectId !== null) {
+      if (!isCanonicalUuid(chain.pinnedEffectId) || !Array.isArray(chain.slots) || !chain.slots.includes(chain.pinnedEffectId)) collector.add(`${path}.pinnedEffectId`, "Pinned effect must reference an effect in this send chain or be null.");
+    }
+    if (typeof chain.busId === "string" && Array.isArray(chain.slots) && typeof chain.returnLevel === "number" && typeof chain.bypassed === "boolean" && (chain.pinnedEffectId === null || typeof chain.pinnedEffectId === "string")) sendChains.push({ busId: chain.busId, slots: chain.slots as readonly (string | null)[], returnLevel: chain.returnLevel, bypassed: chain.bypassed, pinnedEffectId: chain.pinnedEffectId });
+  }
+
+  let masterChain: MasterChainDocument = { slots: [] };
+  if (!isPlainRecord(value.masterChain)) collector.add("effects.masterChain", "Master chain must be an object.");
+  else {
+    collector.exactKeys(value.masterChain, MASTER_CHAIN_KEYS, "effects.masterChain");
+    validateEffectSlots(value.masterChain.slots, MASTER_EFFECT_CHAIN_SLOT_COUNT, "effects.masterChain.slots", "master-chain", registerReference, collector);
+    if (Array.isArray(value.masterChain.slots)) {
+      const slots: readonly unknown[] = value.masterChain.slots;
+      masterChain = { slots: slots as readonly (string | null)[] };
+      const limiterId = slots.at(-1);
+      const limiter = typeof limiterId === "string"
+        ? instances.find((instance) => instance.id === limiterId)
+        : undefined;
+      if (limiter?.pluginId !== PROTECTED_LIMITER_EFFECT_PLUGIN_ID) collector.add("effects.masterChain.slots", "The final master slot must be the protected limiter.");
     }
   }
-  for (const [key, slot] of expectedByKey) {
-    if (!seenSlots.has(key)) {
-      collector.add(
-        "effects.voiceInserts",
-        `Missing voice insert slot for ${slot.moduleId}/${slot.voiceId}.`,
-      );
-    }
-  }
+  if (typeof value.masterEffectsBypassed !== "boolean") collector.add("effects.masterEffectsBypassed", "Master effects bypassed must be boolean.");
+
   for (const instance of instances) {
     const count = references.get(instance.id) ?? 0;
     if (count !== 1) {
       collector.add(
         "effects.instances",
         count === 0
-          ? "Each effect instance must have one voice insert reference."
-          : "An effect instance cannot occupy more than one voice insert slot.",
+          ? "Each effect instance must have one chain reference."
+          : "An effect instance cannot occupy more than one chain slot.",
       );
     }
   }
   return {
-    document: { instances, voiceInserts },
+    document: { instances, moduleChains, sendChains, masterChain, masterEffectsBypassed: value.masterEffectsBypassed === true },
     referencedPluginIds: new Set(instances.map((instance) => instance.pluginId)),
   };
 }
 
-function validateVoiceInsertEffectState(
+function validateEffectSlots(
   value: unknown,
-  descriptor: ImportVoiceInsertEffectDescriptor,
+  count: number,
+  path: string,
+  placement: "module-pedalboard" | "send-chain" | "master-chain",
+  registerReference: (id: unknown, placement: "module-pedalboard" | "send-chain" | "master-chain", path: string) => void,
+  collector: IssueCollector,
+): void {
+  if (!Array.isArray(value) || value.length !== count) { collector.add(path, `Effect chain must contain exactly ${String(count)} slots.`); return; }
+  for (const [index, id] of value.entries()) registerReference(id, placement, `${path}[${String(index)}]`);
+}
+
+function emptyEffectsDocument(): EffectsDocument {
+  return { instances: [], moduleChains: [], sendChains: [], masterChain: { slots: [] }, masterEffectsBypassed: false };
+}
+
+function validateEffectState(
+  value: unknown,
+  descriptor: ImportEffectStateDescriptor,
   path: string,
   collector: IssueCollector,
 ): void {
   if (!isPlainRecord(value)) {
-    collector.add(path, "Voice insert state must be an object.");
+    collector.add(path, "Effect state must be an object.");
     return;
   }
   collector.exactKeys(value, new Set(descriptor.parameters.map((parameter) => parameter.id)), path);
   for (const parameter of descriptor.parameters) {
     if (!Object.hasOwn(value, parameter.id)) {
-      collector.add(`${path}.${parameter.id}`, "Voice insert state is missing a required value.");
+      collector.add(`${path}.${parameter.id}`, "Effect state is missing a required value.");
       continue;
     }
     const message = validateImportedParameter(value[parameter.id], parameter);
@@ -1355,24 +1761,142 @@ function migrateFormatOneDocument(
             repeatCount: entry.repeats,
           };
         });
+  const migratedRack = (value.rack as readonly unknown[]).map((raw) => {
+    if (!isPlainRecord(raw) || typeof raw.moduleId !== "string") return raw;
+    return {
+      ...raw,
+      sends: SEND_BUS_IDS.map((busId) => ({ busId, amount: 0, mode: "post-fader" as const })),
+    };
+  });
+  const migratedMixer = formatOneMixerDocument(migratedRack, value.mixer);
+  const migratedEffects = formatOneEffectsDocument(value.effects, projectId, migratedRack);
+  const migratedPlugins = formatOnePluginRequirements(value.plugins, migratedRack, migratedEffects.instances);
   return {
     ok: true,
     value: {
       format: value.format,
       formatVersion: 2,
       project: value.project,
-      plugins: value.plugins,
-      rack: value.rack,
+      plugins: migratedPlugins,
+      rack: migratedRack,
       patterns: migratedPatterns,
       song: { enabled: value.songEnabled === true, playlist },
       activePatternId,
       automation: [],
-      mixer: value.mixer,
-      effects: value.effects,
+      mixer: migratedMixer,
+      effects: migratedEffects,
       assets: [],
       migrations: [migratedRecord],
     },
   };
+}
+
+function formatOneMixerDocument(rack: readonly unknown[], legacyMixer: unknown): MixerDocument {
+  const legacyMaster = isPlainRecord(legacyMixer) && finiteNumber(legacyMixer.masterLevel, 0, 1)
+    ? legacyMixer.masterLevel
+    : DEFAULT_MASTER_LEVEL;
+  return {
+    channels: RACK_SLOT_IDS.map((slotId, index) => {
+      const slot = rack[index];
+      const module = isPlainRecord(slot) && typeof slot.moduleId === "string" ? slot : undefined;
+      const sends = SEND_BUS_IDS.map((busId) => ({ busId, amount: 0, mode: "post-fader" as const }));
+      return {
+        slotId,
+        moduleId: typeof module?.moduleId === "string" ? module.moduleId : null,
+        level: typeof module?.level === "number" ? module.level : DEFAULT_MODULE_LEVEL,
+        pan: typeof module?.pan === "number" ? module.pan : 0,
+        muted: module?.muted === true,
+        solo: module?.solo === true,
+        sends,
+        moduleChainId: typeof module?.moduleId === "string" ? module.moduleId : null,
+      };
+    }),
+    sends: SEND_BUS_IDS.map((busId) => ({ busId })),
+    master: { level: legacyMaster },
+  };
+}
+
+function formatOneEffectsDocument(value: unknown, projectId: string, rack: readonly unknown[]): EffectsDocument {
+  const old = isPlainRecord(value) ? value : {};
+  const oldInstances = Array.isArray(old.instances) ? old.instances : [];
+  const instances: EffectInstanceDocument[] = oldInstances.flatMap((raw) => {
+    if (!isPlainRecord(raw) || typeof raw.id !== "string" || typeof raw.pluginId !== "string" ||
+      typeof raw.stateVersion !== "number" || !isPlainRecord(raw.state)) return [];
+    return [{ id: raw.id, pluginId: raw.pluginId, stateVersion: raw.stateVersion, state: raw.state as Readonly<Record<string, ParameterValue>>, bypassed: false, wetDry: 1 }];
+  });
+  if (
+    Array.isArray(old.moduleChains) &&
+    Array.isArray(old.sendChains) &&
+    isPlainRecord(old.masterChain) &&
+    typeof old.masterEffectsBypassed === "boolean"
+  ) {
+    const moduleIds = new Set(
+      rack.flatMap((slot) =>
+        isPlainRecord(slot) && typeof slot.moduleId === "string" ? [slot.moduleId] : [],
+      ),
+    );
+    const moduleChains = (old.moduleChains as readonly ModuleChainDocument[]).filter((chain) =>
+      moduleIds.has(chain.moduleId),
+    );
+    const sendChains = old.sendChains as readonly SendChainDocument[];
+    const masterChain = old.masterChain as unknown as MasterChainDocument;
+    const referencedIds = new Set<string>();
+    for (const chain of [...moduleChains, ...sendChains, masterChain]) {
+      for (const id of chain.slots) if (id !== null) referencedIds.add(id);
+    }
+    return {
+      instances: instances.filter((instance) => referencedIds.has(instance.id)),
+      moduleChains,
+      sendChains,
+      masterChain,
+      masterEffectsBypassed: old.masterEffectsBypassed,
+    };
+  }
+  const add = (pluginId: string, key: string): string => {
+    const id = stableMigrationUuid(`${projectId}:effect:${key}`);
+    instances.push({ id, pluginId, stateVersion: 1, state: {}, bypassed: false, wetDry: 1 });
+    return id;
+  };
+  const sendChains = SEND_BUS_IDS.map((busId, index) => {
+    const pluginId = ["delay", "reverb", "stereo-width", "distortion"][index] ?? "distortion";
+    const id = add(pluginId, busId);
+    return { busId, slots: [id, ...Array.from({ length: SEND_EFFECT_CHAIN_SLOT_COUNT - 1 }, () => null)], returnLevel: 1, bypassed: false, pinnedEffectId: id };
+  });
+  const compressor = add("compressor", "master-compressor");
+  const equalizer = add("parametric-eq", "master-parametric-eq");
+  const limiter = add(PROTECTED_LIMITER_EFFECT_PLUGIN_ID, "master-limiter");
+  return {
+    instances,
+    moduleChains: rack.flatMap((slot) => isPlainRecord(slot) && typeof slot.moduleId === "string"
+      ? [{ moduleId: slot.moduleId, slots: Array.from({ length: MODULE_EFFECT_CHAIN_SLOT_COUNT }, () => null) }]
+      : []),
+    sendChains,
+    masterChain: {
+      slots: [
+        compressor,
+        equalizer,
+        ...Array.from({ length: MASTER_EFFECT_CHAIN_SLOT_COUNT - 3 }, () => null),
+        limiter,
+      ],
+    },
+    masterEffectsBypassed: false,
+  };
+}
+
+function formatOnePluginRequirements(
+  value: unknown,
+  rack: readonly unknown[],
+  effectInstances: readonly EffectInstanceDocument[],
+): readonly PluginRequirementDocument[] {
+  const existing = Array.isArray(value) ? value : [];
+  const effectIds = new Set(effectInstances.map((instance) => instance.pluginId));
+  const rackIds = new Set(rack.flatMap((slot) => isPlainRecord(slot) && typeof slot.pluginId === "string" ? [slot.pluginId] : []));
+  return existing.flatMap((raw) => {
+    if (!isPlainRecord(raw) || typeof raw.pluginId !== "string" || typeof raw.stateSchemaVersion !== "number") return [];
+    return [{ pluginId: raw.pluginId, kind: effectIds.has(raw.pluginId) && !rackIds.has(raw.pluginId) ? "effect" as const : "instrument" as const, pluginVersion: "1.0.0", apiVersion: 1 as const, stateSchemaVersion: raw.stateSchemaVersion }];
+  }).concat(
+    [...effectIds].filter((pluginId) => !existing.some((raw) => isPlainRecord(raw) && raw.pluginId === pluginId)).map((pluginId) => ({ pluginId, kind: "effect" as const, pluginVersion: "1.0.0", apiVersion: 1 as const, stateSchemaVersion: 1 })),
+  );
 }
 
 function normalizeFormatOneEvent(value: unknown): unknown {
@@ -1479,12 +2003,10 @@ export function parseProjectDocument(
       collector.add("project.swing", "Swing must be between 0 and 100 percent.");
   }
 
-  const known = new Set([
-    ...options.knownPluginIds,
-    ...(options.knownVoiceInsertEffectPluginIds ?? []),
-    ...Object.keys(options.voiceInsertEffectsByPluginId ?? {}),
-  ]);
-  const requirements = new Set<string>();
+  const knownInstruments = new Set(options.knownPluginIds);
+  const effectDescriptors = options.effectDescriptorsByPluginId ?? {};
+  const knownEffects = new Set(Object.keys(effectDescriptors));
+  const requirements = new Map<string, PluginRequirementDocument>();
   if (!Array.isArray(value.plugins)) {
     collector.add("plugins", "Plugins must be an array.");
   } else {
@@ -1502,13 +2024,43 @@ export function parseProjectDocument(
       else {
         if (requirements.has(pluginId.value))
           collector.add(`${path}.pluginId`, "Plugin requirement IDs must be unique.");
-        requirements.add(pluginId.value);
-        if (!known.has(pluginId.value))
+        const kind = requirement.kind;
+        if (kind !== "instrument" && kind !== "effect") {
+          collector.add(`${path}.kind`, "Plugin kind must be instrument or effect.");
+        } else if (
+          (kind === "instrument" && !knownInstruments.has(pluginId.value)) ||
+          (kind === "effect" && knownEffects.size > 0 && !knownEffects.has(pluginId.value))
+        ) {
           collector.add(
             `${path}.pluginId`,
             `This build cannot open a project that requires plugin ${pluginId.value}.`,
           );
-        expectedStateSchemaVersion = options.stateSchemaVersionByPluginId?.[pluginId.value];
+        }
+        if (typeof requirement.pluginVersion !== "string" || !isSemanticVersion(requirement.pluginVersion))
+          collector.add(`${path}.pluginVersion`, "Plugin version must be semantic version text.");
+        if (requirement.apiVersion !== 1)
+          collector.add(`${path}.apiVersion`, "This build supports plugin API version 1 only.");
+        const metadata = options.pluginMetadataByPluginId?.[pluginId.value];
+        if (metadata !== undefined) {
+          if (metadata.kind !== kind)
+            collector.add(`${path}.kind`, "Plugin requirement kind does not match the installed plugin.");
+          if (metadata.pluginVersion !== requirement.pluginVersion)
+            collector.add(`${path}.pluginVersion`, "Plugin version does not match the installed plugin.");
+          if (metadata.apiVersion !== requirement.apiVersion)
+            collector.add(`${path}.apiVersion`, "Plugin API version does not match the installed plugin.");
+          expectedStateSchemaVersion = metadata.stateSchemaVersion;
+        } else {
+          expectedStateSchemaVersion = options.stateSchemaVersionByPluginId?.[pluginId.value];
+        }
+        if (kind === "instrument" || kind === "effect") {
+          requirements.set(pluginId.value, {
+            pluginId: pluginId.value,
+            kind,
+            pluginVersion: typeof requirement.pluginVersion === "string" ? requirement.pluginVersion : "",
+            apiVersion: requirement.apiVersion === 1 ? 1 : 1,
+            stateSchemaVersion: typeof requirement.stateSchemaVersion === "number" ? requirement.stateSchemaVersion : 0,
+          });
+        }
       }
       if (
         !Number.isSafeInteger(requirement.stateSchemaVersion) ||
@@ -1557,7 +2109,7 @@ export function parseProjectDocument(
         collector.add(`${path}.id`, `Expected fixed slot ${RACK_SLOT_IDS[index]}.`);
       const hasModule = slot.moduleId !== undefined;
       if (!hasModule) {
-        for (const key of ["pluginId", "parameters", "muted", "solo", "level", "pan"]) {
+        for (const key of ["pluginId", "parameters", "muted", "solo", "level", "pan", "sends"]) {
           if (slot[key] !== undefined)
             collector.add(`${path}.${key}`, "Empty slots must not contain module state.");
         }
@@ -1571,8 +2123,11 @@ export function parseProjectDocument(
       let parameterDescriptors: readonly ImportParameterDescriptor[] | undefined;
       if (!parsedPlugin.ok) collector.issues.push(...parsedPlugin.issues);
       else {
-        if (!requirements.has(parsedPlugin.value))
+        const requirement = requirements.get(parsedPlugin.value);
+        if (requirement === undefined)
           collector.add(`${path}.pluginId`, "Rack plugin has no matching requirement.");
+        else if (requirement.kind !== "instrument")
+          collector.add(`${path}.pluginId`, "Rack plugin requirement must be an instrument.");
         parameterDescriptors = options.parameterDescriptorsByPluginId[parsedPlugin.value];
         if (parameterDescriptors === undefined) {
           collector.add(
@@ -1617,6 +2172,7 @@ export function parseProjectDocument(
         collector.add(`${path}.level`, "Level must be from 0 through 1.");
       if (!finiteNumber(slot.pan, -1, 1))
         collector.add(`${path}.pan`, "Pan must be from -1 through 1.");
+      validateSendDocuments(slot.sends, `${path}.sends`, collector);
     }
   }
 
@@ -1735,11 +2291,11 @@ export function parseProjectDocument(
     collector.add("patterns", "The document exceeds its total event-record limit.");
   const effects = parseEffects(value.effects, collector, occupiedModules, requirements, options);
   const referencedPlugins = new Set([...occupiedModules.values(), ...effects.referencedPluginIds]);
-  for (const requirement of requirements) {
-    if (!referencedPlugins.has(requirement)) {
+  for (const [pluginId] of requirements) {
+    if (!referencedPlugins.has(pluginId)) {
       collector.add(
         "plugins",
-        `Plugin requirement ${requirement} is not referenced by a module or effect instance.`,
+        `Plugin requirement ${pluginId} is not referenced by a module or effect instance.`,
       );
     }
   }
@@ -1776,15 +2332,17 @@ export function parseProjectDocument(
   }
   if (!isCanonicalUuid(value.activePatternId) || !patternIds.has(value.activePatternId))
     collector.add("activePatternId", "Active Pattern reference must resolve in this project.");
-  if (!isPlainRecord(value.mixer)) collector.add("mixer", "Mixer must be an object.");
-  else {
-    collector.exactKeys(value.mixer, new Set(["masterLevel"]), "mixer");
-    if (value.mixer.masterLevel !== undefined && !finiteNumber(value.mixer.masterLevel, 0, 1))
-      collector.add("mixer.masterLevel", "Master level must be from 0 through 1.");
-  }
+  validateMixerDocument(value.mixer, Array.isArray(value.rack) ? value.rack : [], collector);
   if (!Array.isArray(value.automation)) collector.add("automation", "automation must be an array.");
   else {
-    validateAutomationLanes(value.automation, collector, patternIds, occupiedModules, options);
+    validateAutomationLanes(
+      value.automation,
+      collector,
+      patternIds,
+      occupiedModules,
+      effects.document,
+      options,
+    );
     if (Array.isArray(value.patterns)) {
       validateAutomationReferences(value.patterns, value.automation, collector);
       validateAutomationStepBounds(value.patterns, value.automation, collector);
@@ -2003,17 +2561,26 @@ export function parseProjectJson(
  */
 export function documentToState(document: ProjectDocument, base: Readonly<PulseState>): PulseState {
   const modules: Record<ModuleInstanceId, RackModuleState> = {};
+  const channelsByModuleId = new Map(
+    document.mixer.channels.flatMap((channel) => channel.moduleId === null ? [] : [[channel.moduleId, channel] as const]),
+  );
   for (const slot of document.rack) {
     if (slot.moduleId === undefined || slot.pluginId === undefined) continue;
     const moduleId = slot.moduleId as ModuleInstanceId;
+    const channel = channelsByModuleId.get(slot.moduleId);
+    if (channel === undefined) continue;
     modules[moduleId] = Object.freeze({
       id: moduleId,
       pluginId: slot.pluginId as PluginId,
       parameters: Object.freeze({ ...slot.parameters }),
-      muted: slot.muted ?? false,
-      solo: slot.solo ?? false,
-      level: clampUnit(slot.level, DEFAULT_MODULE_LEVEL, 0),
-      pan: clampUnit(slot.pan, 0, -1),
+      muted: channel.muted,
+      solo: channel.solo,
+      level: channel.level,
+      pan: channel.pan,
+      sends: Object.freeze(Object.fromEntries(channel.sends.map((send) => [
+        send.busId,
+        Object.freeze({ amount: send.amount, mode: send.mode }),
+      ]))) as RackModuleState["sends"],
     } as RackModuleState);
   }
   const patterns = document.patterns.map((record) => {
@@ -2058,7 +2625,7 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
       Object.freeze({
         id: lane.id as AutomationLaneId,
         scope: lane.scope,
-        targetId: lane.targetId as ModuleInstanceId,
+        targetId: lane.targetId as AutomationLaneState["targetId"],
         parameterId: lane.parameterId,
         patternId: lane.patternId as PatternId,
         stepTicks: lane.stepTicks as typeof PATTERN_TICKS_PER_STEP,
@@ -2082,7 +2649,7 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
         0,
         0,
       ),
-      masterLevel: clampUnit(document.mixer.masterLevel, DEFAULT_MASTER_LEVEL, 0),
+      masterLevel: document.mixer.master.level,
       rackSlots: Object.freeze(
         document.rack.map((slot) =>
           Object.freeze(
@@ -2126,26 +2693,27 @@ function effectsStateFromDocument(document: EffectsDocument): EffectsState {
       pluginId: instance.pluginId as PluginId,
       stateVersion: instance.stateVersion,
       state: Object.freeze({ ...instance.state }),
+      bypassed: instance.bypassed,
+      wetDry: instance.wetDry,
     });
-  }
-  const voiceInserts: Record<ModuleInstanceId, Record<VoiceId, EffectInstanceId | null>> = {};
-  for (const slot of document.voiceInserts) {
-    const moduleId = slot.moduleId as ModuleInstanceId;
-    const slots = voiceInserts[moduleId] ?? {};
-    slots[slot.voiceId as VoiceId] =
-      slot.effectInstanceId === null ? null : (slot.effectInstanceId as EffectInstanceId);
-    voiceInserts[moduleId] = slots;
   }
   return Object.freeze({
     instances: Object.freeze(instances),
-    voiceInserts: Object.freeze(
-      Object.fromEntries(
-        Object.entries(voiceInserts).map(([moduleId, slots]) => [
-          moduleId,
-          Object.freeze(slots),
-        ]),
-      ),
-    ),
+    moduleChains: Object.freeze(Object.fromEntries(document.moduleChains.map((chain) => [
+      chain.moduleId as ModuleInstanceId,
+      Object.freeze(chain.slots.map((id) => id === null ? null : id as EffectInstanceId)),
+    ]))),
+    sendChains: Object.freeze(Object.fromEntries(document.sendChains.map((chain) => [
+      chain.busId,
+      Object.freeze({
+        slots: Object.freeze(chain.slots.map((id) => id === null ? null : id as EffectInstanceId)),
+        returnLevel: chain.returnLevel,
+        bypassed: chain.bypassed,
+        pinnedEffectId: chain.pinnedEffectId === null ? null : chain.pinnedEffectId as EffectInstanceId,
+      }),
+    ]))) as EffectsState["sendChains"],
+    masterChain: Object.freeze(document.masterChain.slots.map((id) => id === null ? null : id as EffectInstanceId)),
+    masterEffectsBypassed: document.masterEffectsBypassed,
   });
 }
 

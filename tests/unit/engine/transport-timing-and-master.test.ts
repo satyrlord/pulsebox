@@ -1,7 +1,14 @@
 import { stubAudioParam, stubMixerNodes } from "./stub-audio-graph";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ModuleInstanceId, StateRevision } from "../../../src/contracts/ids";
+import type {
+  EffectInstanceId,
+  ModuleInstanceId,
+  SendBusId,
+  StateRevision,
+} from "../../../src/contracts/ids";
+import type { PluginId } from "../../../src/contracts/parameters";
+import { EFFECT_TRANSPORT_TEMPO_PARAMETER } from "../../../src/engine/effects/dsp";
 import { BASS_MONO_MANIFEST } from "../../../src/engine/modules/bass-mono/manifest";
 import {
   loopingStepResolver,
@@ -23,6 +30,8 @@ import { TEST_UUID } from "../contracts/fixtures";
 const REVISION = { epoch: TEST_UUID, counter: 0 } as StateRevision;
 const DEFAULT_MIX = { level: 0.8, pan: 0, muted: false, solo: false } as const;
 const MODULE_ID = "10000000-0000-4000-8000-000000000001" as ModuleInstanceId;
+const EFFECT_ID = "20000000-0000-4000-8000-000000000001" as EffectInstanceId;
+const SEND_A = "send-a" as SendBusId;
 
 function steps(note: number): PatternPartView {
   return {
@@ -573,6 +582,151 @@ describe("quantized Pattern launch", () => {
 });
 
 describe("live re-anchor release", () => {
+  it("sends committed and preview transport tempo to active effects", async () => {
+    vi.useFakeTimers();
+    const { context } = stubContext();
+    const adapter = recordingAdapter();
+    const scheduleParameter = vi.fn();
+    const effectNode = { connect: vi.fn(), disconnect: vi.fn() };
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => () => adapter,
+      effectChainNodeFactory: () => Promise.resolve({
+        input: effectNode as unknown as AudioNode,
+        output: effectNode as unknown as AudioNode,
+        scheduleParameter,
+        dispose: vi.fn(),
+      }),
+    });
+    runtime.setRoutingProjection({
+      sends: [{
+        busId: SEND_A,
+        returnLevel: 0.8,
+        effectsBypassed: false,
+        effects: [{
+          id: EFFECT_ID,
+          pluginId: "delay" as PluginId,
+          state: { "tempo-sync": true, "beat-time": 0.5 },
+          bypassed: false,
+          wetDry: 1,
+          wetDryLaw: "equal-power",
+        }],
+      }],
+      master: {
+        level: 0.8,
+        effects: [],
+        effectsBypassed: false,
+        limiterBypassed: false,
+      },
+    });
+    await runtime.replaceFromCurrentState([bassModule([steps(36)])], REVISION);
+    await runtime.play(120);
+    scheduleParameter.mockClear();
+
+    runtime.setTempo(150);
+    expect(scheduleParameter).toHaveBeenCalledWith(
+      0,
+      EFFECT_TRANSPORT_TEMPO_PARAMETER,
+      150,
+    );
+
+    scheduleParameter.mockClear();
+    runtime.previewTempo(90);
+    await vi.advanceTimersByTimeAsync(25);
+    expect(scheduleParameter).toHaveBeenCalledWith(
+      0,
+      EFFECT_TRANSPORT_TEMPO_PARAMETER,
+      90,
+    );
+
+    runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it("applies bounded effect deltas without replacing unrelated routing", async () => {
+    vi.useFakeTimers();
+    const { context } = stubContext();
+    const adapter = recordingAdapter();
+    const scheduleParameter = vi.fn();
+    const effectNode = { connect: vi.fn(), disconnect: vi.fn() };
+    const effectFactory = vi.fn(() => Promise.resolve({
+      input: effectNode as unknown as AudioNode,
+      output: effectNode as unknown as AudioNode,
+      scheduleParameter,
+      dispose: vi.fn(),
+    }));
+    const runtime = new TransportRuntime({
+      createContext: () => context as unknown as AudioContext,
+      adapterFactoryFor: () => () => adapter,
+      effectChainNodeFactory: effectFactory,
+    });
+    const routing = {
+      sends: [{
+        busId: SEND_A,
+        returnLevel: 0.8,
+        effectsBypassed: false,
+        effects: [{
+          id: EFFECT_ID,
+          pluginId: "delay" as PluginId,
+          state: { mix: 0.3 },
+          bypassed: false,
+          wetDry: 1,
+          wetDryLaw: "equal-power" as const,
+        }],
+      }],
+      master: {
+        level: 0.8,
+        effects: [],
+        effectsBypassed: false,
+        limiterBypassed: false,
+      },
+    };
+    runtime.setRoutingProjection(routing);
+    await runtime.replaceFromCurrentState([bassModule([steps(36)])], REVISION);
+    await runtime.activate();
+    effectFactory.mockClear();
+    scheduleParameter.mockClear();
+
+    const initialSend = routing.sends[0];
+    const initialEffect = initialSend?.effects[0];
+    if (initialSend === undefined || initialEffect === undefined) {
+      throw new Error("Expected the routed send effect fixture.");
+    }
+
+    runtime.setRoutingProjection({
+      ...routing,
+      sends: [{
+        ...initialSend,
+        effects: [{ ...initialEffect, state: { mix: 0.6 } }],
+      }],
+    });
+    await runtime.project({
+      kind: "module-effects-set",
+      projectRevision: { epoch: TEST_UUID, counter: 1 } as StateRevision,
+      targetIds: [EFFECT_ID],
+      payload: {
+        audioScope: "send",
+        sendBusId: SEND_A,
+        effectId: EFFECT_ID,
+        parameterId: "mix",
+        value: 0.6,
+      },
+    });
+    expect(scheduleParameter).toHaveBeenCalledWith(0, "mix", 0.6);
+    expect(effectFactory).not.toHaveBeenCalled();
+
+    await runtime.project({
+      kind: "module-effects-set",
+      projectRevision: { epoch: TEST_UUID, counter: 2 } as StateRevision,
+      targetIds: [EFFECT_ID],
+      payload: { audioScope: "send", sendBusId: SEND_A, effectId: EFFECT_ID },
+    });
+    expect(effectFactory).toHaveBeenCalledTimes(1);
+
+    runtime.dispose();
+    vi.useRealTimers();
+  });
+
   it("coalesces pointer-rate timing previews into one shared re-anchor", async () => {
     vi.useFakeTimers();
     const { context } = stubContext();
@@ -1227,7 +1381,12 @@ describe("master chain and analysis", () => {
     };
     expect(limiter.threshold.value).toBeLessThanOrEqual(-1);
     expect(limiter.ratio.value).toBeGreaterThanOrEqual(20);
-    expect(limiter.connect).toHaveBeenCalledWith(context.destination);
+    let stage: unknown = limiter;
+    for (let hop = 0; hop < 8 && stage !== context.destination; hop += 1) {
+      const connect = (stage as { connect?: ReturnType<typeof vi.fn> }).connect;
+      stage = connect?.mock.calls[0]?.[0];
+    }
+    expect(stage).toBe(context.destination);
 
     runtime.dispose();
   });

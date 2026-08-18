@@ -1,6 +1,14 @@
 import type { EngineDelta } from "../../contracts/commands";
-import type { ModuleInstanceId, StateRevision } from "../../contracts/ids";
+import type { EffectInstanceId, ModuleInstanceId, SendBusId, StateRevision } from "../../contracts/ids";
 import type { ParameterValue, PluginId } from "../../contracts/parameters";
+import {
+  MixerRoutingGraph,
+  type EffectChainNodeFactory,
+  type MasterRoutingProjection,
+  type RoutingEffectInstance,
+  type SendRoutingProjection,
+  type RoutingAutomationChange,
+} from "../routing";
 import {
   chainedStepResolver,
   loopingStepResolver,
@@ -27,7 +35,6 @@ import type {
   VoiceAdapterPort,
   VoiceAdapterStatus,
   VoiceFault,
-  VoiceInsertRuntime,
 } from "./voice-adapter";
 
 export interface TransportModuleMix {
@@ -35,17 +42,40 @@ export interface TransportModuleMix {
   readonly pan: number;
   readonly muted: boolean;
   readonly solo: boolean;
+  readonly sends?: readonly {
+    readonly busId: SendBusId;
+    readonly amount: number;
+    readonly mode: "pre" | "post";
+  }[];
 }
 
 export interface TransportModule {
   readonly id: ModuleInstanceId;
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
-  /** Saved per-drum-voice insert instances resolved for the audio thread. */
-  readonly voiceInserts?: Readonly<Record<string, VoiceInsertRuntime | null>>;
+  readonly effects?: readonly RoutingEffectInstance[];
   /** One event part per project Pattern slot. */
   readonly parts: readonly PatternPartView[];
   readonly mix: TransportModuleMix;
+}
+
+export interface TransportRoutingProjection {
+  readonly sends: readonly SendRoutingProjection[];
+  readonly master: MasterRoutingProjection;
+  readonly automation?: TransportExternalAutomationProjection;
+}
+
+export interface TransportExternalAutomationTarget {
+  readonly scope: RoutingAutomationChange["scope"];
+  readonly targetId: ModuleInstanceId | SendBusId | EffectInstanceId | "master";
+  readonly parameterId: string;
+}
+
+export interface TransportExternalAutomationProjection {
+  /** One automation-only part per Pattern bank position. */
+  readonly parts: readonly PatternPartView[];
+  /** Scheduler parameter keys resolve to stable routing targets here. */
+  readonly targets: Readonly<Record<string, TransportExternalAutomationTarget>>;
 }
 
 export interface TransportArrangement {
@@ -100,9 +130,6 @@ const SILENT_MASTER_METER: MasterMeterFrame = Object.freeze({
   peak: false,
 });
 
-/** Post-limiter level that lights the header peak indicator. */
-const PEAK_DISPLAY_THRESHOLD = 0.98;
-
 export type TransportRuntimeStatus =
   | {
       readonly moduleId: ModuleInstanceId;
@@ -148,6 +175,8 @@ const BEATS_PER_BAR = 4;
 export interface TransportRuntimeOptions {
   readonly createContext?: () => AudioContext;
   readonly adapterFactoryFor: (pluginId: PluginId) => VoiceAdapterFactory | undefined;
+  /** Creates prepared AudioWorklet-backed nodes for generic effect chains. */
+  readonly effectChainNodeFactory?: EffectChainNodeFactory;
   readonly onStatus?: (status: TransportRuntimeStatus) => void;
   /** Peak output level per module, at the worklet protocol's frame rate. */
   readonly onMeter?: (moduleId: ModuleInstanceId, level: number) => void;
@@ -180,6 +209,11 @@ interface CapturedLeadWindow {
     ModuleInstanceId,
     ReadonlyMap<string, readonly ScheduledParameterChange[]>
   >;
+  readonly keptExternalAutomationOccurrences: ReadonlySet<string>;
+  readonly fallbackExternalAutomationOccurrences: ReadonlyMap<
+    string,
+    readonly RoutingAutomationOccurrence[]
+  >;
   /**
    * The one release per module that the bounded clear drops: the note-off owed
    * by the newest kept onset when that note-off lies at or past the rebuild
@@ -205,6 +239,7 @@ interface MetronomeVoice {
 export class TransportRuntime {
   readonly #createContext: () => AudioContext;
   readonly #adapterFactoryFor: (pluginId: PluginId) => VoiceAdapterFactory | undefined;
+  readonly #effectChainNodeFactory: EffectChainNodeFactory | undefined;
   readonly #onStatus: (status: TransportRuntimeStatus) => void;
   readonly #onMeter: (moduleId: ModuleInstanceId, level: number) => void;
   readonly #onStateChange: (state: AudioRuntimeState) => void;
@@ -212,8 +247,8 @@ export class TransportRuntime {
   readonly #adapters = new Map<ModuleInstanceId, VoiceAdapterPort>();
   readonly #queuedEvents = new Map<ModuleInstanceId, ScheduledVoiceEvent[]>();
   readonly #queuedParameters = new Map<ModuleInstanceId, ScheduledParameterChange[]>();
+  #queuedExternalAutomation: RoutingAutomationOccurrence[] = [];
   readonly #auditions = new Map<ModuleInstanceId, AuditionSession>();
-  readonly #channels = new Map<ModuleInstanceId, MixerChannel>();
   /**
    * Step resolvers keyed by module, held against the `parts` array they were
    * built from. A parameter or mixer change reuses the same array and keeps the
@@ -224,12 +259,7 @@ export class TransportRuntime {
     { readonly parts: TransportModule["parts"]; readonly resolve: StepResolver }
   >();
   readonly #metronomeVoices = new Set<MetronomeVoice>();
-  #master: GainNode | undefined;
-  #limiter: DynamicsCompressorNode | undefined;
-  #analyserLeft: AnalyserNode | undefined;
-  #analyserRight: AnalyserNode | undefined;
-  #analysisLeft: Float32Array<ArrayBuffer> | undefined;
-  #analysisRight: Float32Array<ArrayBuffer> | undefined;
+  #routing: MixerRoutingGraph | undefined;
   #metronomeOutput: GainNode | undefined;
   #metronomeEnabled = false;
   #masterLevel = 0.8;
@@ -239,6 +269,8 @@ export class TransportRuntime {
   #projectRevision: StateRevision | undefined;
   #patternStartFrame = 0;
   #nextScheduleFrame = 0;
+  #nextAutomationFrame = 0;
+  #tempo = 120;
   #swing = 0;
   #patternTiming: readonly PatternTiming[] = [];
   #previewTempo: number | undefined;
@@ -246,6 +278,10 @@ export class TransportRuntime {
   #previewPatternTiming: readonly PatternTiming[] | undefined;
   #timingPreviewTimer: ReturnType<typeof setTimeout> | undefined;
   #arrangement: TransportArrangement = DEFAULT_ARRANGEMENT;
+  #routingProjection: TransportRoutingProjection | undefined;
+  #externalAutomationResolver:
+    | { readonly parts: readonly PatternPartView[]; readonly arrangement: TransportArrangement; readonly resolve: StepResolver }
+    | undefined;
   /** A Pattern launch waiting for its quantization boundary. */
   #pendingArrangement: TransportArrangement | undefined;
   #pendingArrangementFrame: number | undefined;
@@ -258,6 +294,7 @@ export class TransportRuntime {
     this.#createContext =
       options.createContext ?? (() => new AudioContext({ latencyHint: "interactive" }));
     this.#adapterFactoryFor = options.adapterFactoryFor;
+    this.#effectChainNodeFactory = options.effectChainNodeFactory;
     this.#onStatus = options.onStatus ?? (() => undefined);
     this.#onMeter = options.onMeter ?? (() => undefined);
     this.#onStateChange = options.onStateChange ?? (() => undefined);
@@ -376,6 +413,8 @@ export class TransportRuntime {
           arrangement,
         );
       }
+      this.#clearExternalAutomation(boundary);
+      this.#nextAutomationFrame = boundary;
       return;
     }
 
@@ -421,27 +460,24 @@ export class TransportRuntime {
 
   setMasterLevel(level: number): void {
     this.#masterLevel = clamp01(level);
-    const master = this.#master;
-    if (master === undefined || this.#context === undefined) return;
-    setSmoothed(master.gain, this.#masterLevel, this.#context.currentTime);
+    this.#routing?.setMasterLevel(this.#masterLevel);
   }
 
   /** Applies level, pan, mute, and the solo-implies-others-muted rule. */
   #applyMix(): void {
     const context = this.#context;
     if (context === undefined) return;
-    const anySolo = [...this.#modules.values()].some((module) => module.mix.solo);
     for (const [id, module] of this.#modules) {
-      const channel = this.#channels.get(id);
-      if (channel === undefined) continue;
-      const audible = !module.mix.muted && (!anySolo || module.mix.solo);
-      setSmoothed(channel.gain.gain, audible ? clamp01(module.mix.level) : 0, context.currentTime);
-      setSmoothed(
-        channel.panner.pan,
-        Math.min(1, Math.max(-1, module.mix.pan)),
-        context.currentTime,
+      this.#routing?.setChannelMix(
+        id,
+        module.mix.level,
+        module.mix.pan,
+        module.mix.muted,
       );
     }
+    this.#routing?.applySoloMute(
+      new Map([...this.#modules].map(([id, module]) => [id, module.mix])),
+    );
   }
 
   /** The UI reads its playhead from here. The audio clock is always the source. */
@@ -457,43 +493,33 @@ export class TransportRuntime {
    * the audible path.
    */
   getMasterMeter(): MasterMeterFrame {
-    const left = this.#analyserLeft;
-    const right = this.#analyserRight;
-    const leftData = this.#analysisLeft;
-    const rightData = this.#analysisRight;
-    if (
-      left === undefined ||
-      right === undefined ||
-      leftData === undefined ||
-      rightData === undefined
-    ) {
-      return SILENT_MASTER_METER;
-    }
-    left.getFloatTimeDomainData(leftData);
-    right.getFloatTimeDomainData(rightData);
-    let leftPeak = 0;
-    let rightPeak = 0;
-    let midPeak = 0;
-    let sidePeak = 0;
-    for (let index = 0; index < leftData.length; index += 1) {
-      const sampleLeft = leftData[index] ?? 0;
-      const sampleRight = rightData[index] ?? 0;
-      const absLeft = Math.abs(sampleLeft);
-      const absRight = Math.abs(sampleRight);
-      if (absLeft > leftPeak) leftPeak = absLeft;
-      if (absRight > rightPeak) rightPeak = absRight;
-      const mid = Math.abs((sampleLeft + sampleRight) / 2);
-      const side = Math.abs((sampleLeft - sampleRight) / 2);
-      if (mid > midPeak) midPeak = mid;
-      if (side > sidePeak) sidePeak = side;
-    }
-    return {
-      left: leftPeak,
-      right: rightPeak,
-      mid: midPeak,
-      side: sidePeak,
-      peak: Math.max(leftPeak, rightPeak) >= PEAK_DISPLAY_THRESHOLD,
-    };
+    return this.#routing?.getMeter() ?? SILENT_MASTER_METER;
+  }
+
+  getMasterChainMeter(position: "pre" | "post"): MasterMeterFrame {
+    return this.#routing?.getMasterChainMeter(position) ?? SILENT_MASTER_METER;
+  }
+
+  getEffectMeter(effectId: EffectInstanceId, meterId: string): number {
+    return this.#routing?.getEffectMeter(effectId, meterId) ?? 0;
+  }
+
+  resetMasterPeak(): void {
+    this.#routing?.resetPeak();
+  }
+
+  setRoutingProjection(projection: TransportRoutingProjection): void {
+    const previous = this.#routingProjection;
+    this.#routingProjection = projection;
+    this.#externalAutomationResolver = undefined;
+    const context = this.#context;
+    const clock = this.#clock;
+    if (previous === undefined || context === undefined || clock === undefined) return;
+    const frame = this.#currentFrame(context);
+    if (clock.getSnapshot(frame).status !== "playing") return;
+    const boundary = frame + this.#leadFrames(context);
+    this.#clearExternalAutomation(boundary);
+    this.#nextAutomationFrame = boundary;
   }
 
   async activate(): Promise<void> {
@@ -559,9 +585,20 @@ export class TransportRuntime {
       context !== undefined &&
       clock?.getSnapshot(this.#currentFrame(context)).status === "playing";
     this.#projectRevision = projectRevision;
+    const previousModules = new Map(this.#modules);
     this.#modules.clear();
     this.#resolvers.clear();
     for (const module of modules) this.#modules.set(module.id, module);
+    for (const [moduleId, previous] of previousModules) {
+      const replacement = this.#modules.get(moduleId);
+      if (replacement === undefined) this.#disposeChannel(moduleId);
+      if (replacement?.pluginId !== previous.pluginId) {
+        this.#adapters.get(moduleId)?.dispose();
+        this.#adapters.delete(moduleId);
+        this.#queuedEvents.delete(moduleId);
+        this.#queuedParameters.delete(moduleId);
+      }
+    }
     if (context !== undefined) {
       await this.#syncFullProjection();
       this.#applyMix();
@@ -603,11 +640,8 @@ export class TransportRuntime {
         this.#modules.set(moduleProjection.id, moduleProjection);
         if (this.#context !== undefined) {
           const adapter = await this.#ensureAdapter(moduleProjection);
-          adapter?.replaceState(
-            moduleProjection.parameters,
-            delta.projectRevision,
-            moduleProjection.voiceInserts,
-          );
+          adapter?.replaceState(moduleProjection.parameters, delta.projectRevision);
+          await this.#applyChannelRouting(moduleProjection);
           this.#scheduleRecoveredModule(moduleProjection.id);
         }
         return;
@@ -643,36 +677,90 @@ export class TransportRuntime {
         this.#queuedParameters.delete(moduleId);
         if (this.#context !== undefined) {
           const adapter = await this.#ensureAdapter(moduleProjection);
-          adapter?.replaceState(
-            moduleProjection.parameters,
-            delta.projectRevision,
-            moduleProjection.voiceInserts,
-          );
+          adapter?.replaceState(moduleProjection.parameters, delta.projectRevision);
+          await this.#applyChannelRouting(moduleProjection);
           this.#scheduleRecoveredModule(moduleProjection.id);
         }
         return;
       }
       case "module-effects-set": {
-        if (moduleProjection === undefined) {
-          throw new Error("Voice-insert update requires its bounded module projection.");
-        }
         this.#setRevision(delta.projectRevision);
-        this.#modules.set(moduleProjection.id, moduleProjection);
-        this.#adapters
-          .get(moduleProjection.id)
-          ?.replaceState(
-            moduleProjection.parameters,
-            delta.projectRevision,
-            moduleProjection.voiceInserts,
+        const audioScope = delta.payload.audioScope;
+        if (audioScope === "none") return;
+        if (audioScope === "module") {
+          if (moduleProjection === undefined) {
+            throw new Error("A module effect update requires its bounded module projection.");
+          }
+          this.#modules.set(moduleProjection.id, moduleProjection);
+        }
+
+        const effectId = readOptionalEffectId(delta.payload.effectId);
+        if (
+          effectId !== undefined &&
+          typeof delta.payload.parameterId === "string" &&
+          isParameterValue(delta.payload.value)
+        ) {
+          this.#routing?.setEffectParameter(
+            effectId,
+            delta.payload.parameterId,
+            delta.payload.value,
           );
-        this.#auditions
-          .get(moduleProjection.id)
-          ?.adapter?.replaceState(
-            moduleProjection.parameters,
-            delta.projectRevision,
-            moduleProjection.voiceInserts,
+          return;
+        }
+        if (effectId !== undefined && typeof delta.payload.wetDry === "number") {
+          this.#routing?.setEffectWetDry(effectId, delta.payload.wetDry);
+          return;
+        }
+        if (effectId !== undefined && typeof delta.payload.bypassed === "boolean") {
+          this.#routing?.setEffectBypassed(effectId, delta.payload.bypassed);
+          return;
+        }
+
+        if (audioScope === "send") {
+          const busId = readOptionalSendBusId(delta.payload.sendBusId);
+          if (busId === undefined) {
+            throw new Error("A send effect update requires its send bus ID.");
+          }
+          if (typeof delta.payload.returnLevel === "number") {
+            this.#routing?.setSendReturnLevel(busId, delta.payload.returnLevel);
+            return;
+          }
+          if (typeof delta.payload.bypassed === "boolean") {
+            this.#routing?.setSendEffectsBypassed(busId, delta.payload.bypassed);
+            return;
+          }
+          const send = this.#routingProjection?.sends.find(
+            (candidate) => candidate.busId === busId,
           );
-        return;
+          if (send === undefined) {
+            throw new Error("A send effect update requires its bounded routing projection.");
+          }
+          await this.#routing?.setSendEffects(busId, send.effects, send.effectsBypassed);
+          return;
+        }
+
+        if (audioScope === "master") {
+          if (typeof delta.payload.masterEffectsBypassed === "boolean") {
+            this.#routing?.setMasterEffectsBypassed(delta.payload.masterEffectsBypassed);
+            return;
+          }
+          const master = this.#routingProjection?.master;
+          if (master === undefined) {
+            throw new Error("A master effect update requires its bounded routing projection.");
+          }
+          await this.#routing?.setMasterEffects(master);
+          return;
+        }
+
+        if (audioScope === "module" && moduleProjection !== undefined) {
+          await this.#routing?.setChannelEffects(
+            moduleProjection.id,
+            moduleProjection.effects ?? [],
+            false,
+          );
+          return;
+        }
+        throw new Error("The effect update has no bounded audio target.");
       }
       case "parameter-set": {
         const { moduleId, parameter, value } = readParameterDelta(delta.payload);
@@ -689,7 +777,10 @@ export class TransportRuntime {
       }
       case "pattern-events-set": {
         if (moduleProjection === undefined) {
-          throw new Error("Pattern event update requires its bounded module projection.");
+          // External mixer and effect lanes do not own a module part. The
+          // routing projection was replaced before this delta reached us.
+          this.#setRevision(delta.projectRevision);
+          return;
         }
         this.#setRevision(delta.projectRevision);
         this.#modules.set(moduleProjection.id, moduleProjection);
@@ -749,7 +840,12 @@ export class TransportRuntime {
         const moduleId = readModuleId(delta.payload);
         const module = this.#modules.get(moduleId);
         if (module === undefined) return;
-        this.#modules.set(moduleId, { ...module, mix: readMix(module.mix, delta.payload) });
+        this.#modules.set(
+          moduleId,
+          moduleProjection ?? { ...module, mix: readMix(module.mix, delta.payload) },
+        );
+        const updated = this.#modules.get(moduleId);
+        if (updated !== undefined) this.#applyChannelMixer(updated);
         this.#applyMix();
         return;
       }
@@ -781,25 +877,23 @@ export class TransportRuntime {
    */
   previewChannelMix(moduleId: ModuleInstanceId, field: "level" | "pan", value: number): void {
     const context = this.#context;
-    const channel = this.#channels.get(moduleId);
-    if (context === undefined || channel === undefined || !Number.isFinite(value)) return;
+    if (context === undefined || !Number.isFinite(value)) return;
     const module = this.#modules.get(moduleId);
     if (field === "pan") {
-      setSmoothed(channel.panner.pan, Math.min(1, Math.max(-1, value)), context.currentTime);
+      this.#routing?.previewChannelMix(moduleId, field, value);
       return;
     }
     // A muted or solo-silenced channel stays silent while its fader moves.
     const anySolo = [...this.#modules.values()].some((one) => one.mix.solo);
     const audible = module === undefined || (!module.mix.muted && (!anySolo || module.mix.solo));
-    setSmoothed(channel.gain.gain, audible ? clamp01(value) : 0, context.currentTime);
+    this.#routing?.previewChannelMix(moduleId, field, audible ? clamp01(value) : 0);
   }
 
   /** Transient master move while the master fader is being dragged. */
   previewMasterLevel(level: number): void {
     const context = this.#context;
-    const master = this.#master;
-    if (context === undefined || master === undefined || !Number.isFinite(level)) return;
-    setSmoothed(master.gain, clamp01(level), context.currentTime);
+    if (context === undefined || !Number.isFinite(level)) return;
+    this.#routing?.setMasterLevel(level);
   }
 
   /**
@@ -853,8 +947,8 @@ export class TransportRuntime {
       adapter.dispose();
       return;
     }
-    adapter.activate(this.#ensureChannel(context, moduleId).input);
-    adapter.replaceState(module.parameters, revision, module.voiceInserts);
+    adapter.activate(this.#ensureRouting(context).ensureChannel(moduleId));
+    adapter.replaceState(module.parameters, revision);
     adapter.schedule([
       {
         atFrame: this.#currentFrame(context) + this.#leadFrames(context),
@@ -916,8 +1010,8 @@ export class TransportRuntime {
       adapter.dispose();
       return;
     }
-    adapter.activate(this.#ensureChannel(context, moduleId).input);
-    adapter.replaceState(module.parameters, revision, module.voiceInserts);
+    adapter.activate(this.#ensureRouting(context).ensureChannel(moduleId));
+    adapter.replaceState(module.parameters, revision);
 
     const patternStartFrame = this.#currentFrame(context) + this.#leadFrames(context);
     const stepFrames =
@@ -962,6 +1056,7 @@ export class TransportRuntime {
   }
 
   setTempo(tempo: number): void {
+    if (!Number.isFinite(tempo) || tempo < 40 || tempo > 240) return;
     this.#previewTempo = undefined;
     this.#applyTimingChange({ tempo });
   }
@@ -1000,6 +1095,7 @@ export class TransportRuntime {
     const swingChanged = nextSwing !== this.#swing;
 
     if (context === undefined || clock === undefined) {
+      if (change.tempo !== undefined) this.#tempo = change.tempo;
       this.#swing = nextSwing;
       this.#patternTiming = nextPatternTiming;
       return;
@@ -1007,7 +1103,10 @@ export class TransportRuntime {
     const frame = this.#currentFrame(context);
     const snapshot = clock.getSnapshot(frame);
     const tempoChanged = change.tempo !== undefined && change.tempo !== snapshot.tempo;
-    if (!tempoChanged && !swingChanged && !timingChanged) return;
+    if (!tempoChanged && !swingChanged && !timingChanged) {
+      if (change.tempo !== undefined) this.#tempo = change.tempo;
+      return;
+    }
     // Capture the lead-window events before the change. The re-anchor below
     // clears each queue, and these events are still due under the timing the
     // listener hears now, so they must survive the rebuild.
@@ -1022,7 +1121,11 @@ export class TransportRuntime {
               : this.#timingRebuildLeadFrames(context),
           )
         : undefined;
-    if (tempoChanged) clock.setTempo(change.tempo ?? snapshot.tempo, frame);
+    if (tempoChanged) {
+      this.#tempo = change.tempo ?? snapshot.tempo;
+      clock.setTempo(this.#tempo, frame);
+      this.#routing?.setTransportTempo(this.#tempo);
+    }
     this.#swing = nextSwing;
     this.#patternTiming = nextPatternTiming;
     if (preserved !== undefined) {
@@ -1080,20 +1183,26 @@ export class TransportRuntime {
   }
 
   async play(tempo: number): Promise<void> {
+    if (!Number.isFinite(tempo) || tempo < 40 || tempo > 240) {
+      throw new RangeError("Tempo must be from 40 through 240 BPM.");
+    }
     await this.activate();
     const context = this.#requiredContext();
     const clock = this.#clock;
     if (clock === undefined) throw new Error("Transport clock has not been created.");
     const frame = this.#currentFrame(context) + this.#leadFrames(context);
     const positionTicks = clock.getSnapshot(frame).positionTicks;
+    this.#tempo = tempo;
     clock.setTempo(tempo, frame);
+    this.#routing?.setTransportTempo(tempo);
     // A second Play while already playing must not rewind the schedule window:
     // that would re-emit onsets the adapters already hold and double the notes.
     if (!clock.play(frame)) return;
     for (const adapter of this.#adapters.values()) adapter.resume();
     this.#patternStartFrame = frame - clock.ticksToFrames(positionTicks);
     this.#nextScheduleFrame = frame;
-    this.#startScheduler();
+    this.#nextAutomationFrame = frame;
+    this.#startScheduler(frame);
   }
 
   pause(): number {
@@ -1103,6 +1212,8 @@ export class TransportRuntime {
     this.#clock?.pause(frame);
     this.#stopScheduler();
     this.#stopScheduledClicks(frame);
+    this.#clearExternalAutomation(frame);
+    this.#nextAutomationFrame = frame;
     this.#applyPendingArrangement();
     for (const adapter of this.#adapters.values()) adapter.suspend();
     return this.#clock?.getSnapshot(frame).positionTicks ?? 0;
@@ -1115,6 +1226,8 @@ export class TransportRuntime {
     this.#clock?.stop(frame);
     this.#stopScheduler();
     this.#stopScheduledClicks(frame);
+    this.#clearExternalAutomation(frame);
+    this.#nextAutomationFrame = frame;
     this.#applyPendingArrangement();
     for (const adapter of this.#adapters.values()) adapter.suspend();
   }
@@ -1129,15 +1242,8 @@ export class TransportRuntime {
     this.#adapters.clear();
     this.#queuedEvents.clear();
     this.#queuedParameters.clear();
-    for (const moduleId of [...this.#channels.keys()]) this.#disposeChannel(moduleId);
-    this.#master?.disconnect();
-    this.#master = undefined;
-    this.#limiter?.disconnect();
-    this.#limiter = undefined;
-    this.#analyserLeft = undefined;
-    this.#analyserRight = undefined;
-    this.#analysisLeft = undefined;
-    this.#analysisRight = undefined;
+    this.#routing?.dispose();
+    this.#routing = undefined;
     this.#metronomeOutput?.disconnect();
     this.#metronomeOutput = undefined;
     if (this.#context !== undefined) {
@@ -1239,6 +1345,12 @@ export class TransportRuntime {
       if (parameters.length === 0) this.#queuedParameters.delete(moduleId);
       else this.#queuedParameters.set(moduleId, parameters);
     }
+    this.#queuedExternalAutomation = this.#boundedLedgerEntries(
+      this.#queuedExternalAutomation,
+      frame - historyFrames,
+      frame,
+      SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+    );
   }
 
   #boundedLedgerEntries<T extends { readonly atFrame: number }>(
@@ -1328,6 +1440,7 @@ export class TransportRuntime {
       }
       this.#stopScheduledClicks(releaseFrame);
     }
+    this.#clearExternalAutomation(releaseFrame);
     // A Swing or Humanize change keeps the anchor: re-deriving it through the
     // clock's float path can move the whole grid by a frame per flush.
     if (repinGrid) this.#patternStartFrame = frame - clock.ticksToFrames(positionTicks);
@@ -1345,10 +1458,17 @@ export class TransportRuntime {
       this.#scheduleCatchUpWindows(context, preserved, stepFrames, frame, releaseFrame);
     }
     this.#nextScheduleFrame = releaseFrame;
+    this.#nextAutomationFrame = releaseFrame;
     // The filter matters only inside this first rebuilt window: a shifted step
     // near the boundary cannot move past the current lookahead horizon, and
     // every later window holds only higher step indexes.
-    this.#schedule(preserved?.keptOccurrences, preserved?.keptParameterOccurrences);
+    this.#schedule(
+      preserved?.keptOccurrences,
+      preserved?.keptParameterOccurrences,
+      undefined,
+      preserved?.keptExternalAutomationOccurrences,
+      preserved?.fallbackExternalAutomationOccurrences,
+    );
   }
 
   /**
@@ -1457,6 +1577,42 @@ export class TransportRuntime {
       }
       due.sort(compareScheduledVoiceEvents);
       if (due.length > 0) this.#scheduleAdapterEvents(moduleId, adapter, due);
+    }
+    const externalProjection = this.#routingProjection?.automation;
+    if (externalProjection !== undefined && this.#routing !== undefined) {
+      const replacements = scheduleExternalAutomationWindow(externalProjection, {
+        resolveStep: this.#externalResolverFor(externalProjection.parts, this.#arrangement),
+        stepFrames,
+        swing: this.#swing,
+        patternTiming: this.#patternTiming,
+        windowStartFrame: frame + 1,
+        windowEndFrame: releaseFrame,
+        patternStartFrame: this.#patternStartFrame,
+        maximumEvents: SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+      }).filter(
+        (change) =>
+          change.occurrenceId === undefined ||
+          !preserved.keptExternalAutomationOccurrences.has(change.occurrenceId),
+      );
+      const expiredIds = new Set(
+        replacements.flatMap((change) =>
+          change.atFrame < sendFrame && change.occurrenceId !== undefined
+            ? [change.occurrenceId]
+            : [],
+        ),
+      );
+      const due = replacements.filter(
+        (change) =>
+          change.atFrame >= sendFrame &&
+          (change.occurrenceId === undefined || !expiredIds.has(change.occurrenceId)),
+      );
+      for (const occurrenceId of expiredIds) {
+        const fallback = preserved.fallbackExternalAutomationOccurrences.get(occurrenceId);
+        if (fallback?.some((change) => change.atFrame >= sendFrame) === true) {
+          due.push(...fallback);
+        }
+      }
+      this.#scheduleExternalAutomationChanges(due);
     }
   }
 
@@ -1585,11 +1741,32 @@ export class TransportRuntime {
       const release = pendingReleaseEvent(request, releaseFrame);
       if (release !== undefined) releases.set(module.id, release);
     }
+    const keptExternalAutomationOccurrences = new Set(
+      this.#queuedExternalAutomation
+        .filter((change) => change.atFrame < releaseFrame)
+        .map((change) => change.occurrenceId)
+        .filter((id): id is string => id !== undefined),
+    );
+    const fallbackExternalAutomationOccurrences = new Map<
+      string,
+      RoutingAutomationOccurrence[]
+    >();
+    for (const change of this.#queuedExternalAutomation) {
+      if (change.atFrame < releaseFrame || change.occurrenceId === undefined) continue;
+      const existing = fallbackExternalAutomationOccurrences.get(change.occurrenceId);
+      if (existing === undefined) {
+        fallbackExternalAutomationOccurrences.set(change.occurrenceId, [change]);
+      } else {
+        existing.push(change);
+      }
+    }
     return {
       keptOccurrences,
       keptParameterOccurrences,
       fallbackOccurrences,
       fallbackParameterOccurrences,
+      keptExternalAutomationOccurrences,
+      fallbackExternalAutomationOccurrences,
       releases,
       launchBoundaryInside,
     };
@@ -1621,7 +1798,80 @@ export class TransportRuntime {
     if (revision === undefined) return;
     for (const module of this.#modules.values()) {
       const adapter = await this.#ensureAdapter(module);
-      adapter?.replaceState(module.parameters, revision, module.voiceInserts);
+      adapter?.replaceState(module.parameters, revision);
+      await this.#applyChannelRouting(module);
+    }
+    const routing = this.#routing;
+    if (routing !== undefined && this.#routingProjection !== undefined) {
+      await Promise.all(
+        this.#routingProjection.sends.map((send) => routing.setSend(send)),
+      );
+      await routing.setMaster(this.#routingProjection.master);
+    }
+    this.#applyMix();
+  }
+
+  #clearExternalAutomation(fromFrame?: number): void {
+    const routing = this.#routing;
+    if (routing === undefined) return;
+    if (fromFrame === undefined) {
+      const frame = this.#context === undefined ? 0 : this.#currentFrame(this.#context);
+      routing.clearAutomation(frame);
+      this.#queuedExternalAutomation = [];
+      return;
+    }
+    routing.clearAutomation(fromFrame);
+    this.#queuedExternalAutomation = this.#queuedExternalAutomation.filter(
+      (change) => change.atFrame < fromFrame,
+    );
+  }
+
+  /** Transient channel-send amount while its control is moving. */
+  previewChannelSendAmount(moduleId: ModuleInstanceId, busId: SendBusId, amount: number): void {
+    if (this.#context === undefined || !Number.isFinite(amount)) return;
+    this.#routing?.previewChannelSendAmount(moduleId, busId, amount);
+  }
+
+  /** Transient send-return level while its Mix control is moving. */
+  previewSendReturnLevel(busId: SendBusId, returnLevel: number): void {
+    if (this.#context === undefined || !Number.isFinite(returnLevel)) return;
+    this.#routing?.previewSendReturnLevel(busId, returnLevel);
+  }
+
+  /** Transient effect wet/dry value while its control is moving. */
+  previewEffectWetDry(effectId: EffectInstanceId, wetDry: number): void {
+    if (this.#context === undefined || !Number.isFinite(wetDry)) return;
+    this.#routing?.previewEffectWetDry(effectId, wetDry);
+  }
+
+  /** Transient numeric effect parameter while its control is moving. */
+  previewEffectParameter(
+    effectId: EffectInstanceId,
+    parameterId: string,
+    value: ParameterValue,
+  ): void {
+    if (this.#context === undefined) return;
+    this.#routing?.previewEffectParameter(effectId, parameterId, value);
+  }
+
+  async #applyChannelRouting(module: TransportModule): Promise<void> {
+    await this.#routing?.setChannel(module.id, {
+      level: module.mix.level,
+      pan: module.mix.pan,
+      muted: module.mix.muted,
+      solo: module.mix.solo,
+      sends: module.mix.sends ?? [],
+      effects: module.effects ?? [],
+      effectsBypassed: false,
+    });
+  }
+
+  #applyChannelMixer(module: TransportModule): void {
+    const routing = this.#routing;
+    if (routing === undefined) return;
+    routing.setChannelMix(module.id, module.mix.level, module.mix.pan, module.mix.muted);
+    for (const send of module.mix.sends ?? []) {
+      routing.setChannelSend(module.id, send.busId, send.amount, send.mode);
     }
   }
 
@@ -1648,83 +1898,40 @@ export class TransportRuntime {
     await adapter.prepare();
     // Every voice lands on its own mixer channel, never on the destination, so a
     // level or pan change is an AudioParam ramp and never rebuilds a voice.
-    adapter.activate(this.#ensureChannel(context, module.id).input);
+    adapter.activate(this.#ensureRouting(context, module.id).ensureChannel(module.id));
     this.#adapters.set(module.id, adapter);
     this.#applyMix();
     return adapter;
   }
 
-  /**
-   * Builds the master chain once: master gain, then the always-on protective
-   * limiter, then the physical destination. The header meters observe the
-   * post-limiter signal through a non-audible splitter and two analysers.
-   */
-  #ensureMaster(context: AudioContext): GainNode {
-    let master = this.#master;
-    if (master === undefined) {
-      master = context.createGain();
-      master.gain.value = this.#masterLevel;
-      const limiter = context.createDynamicsCompressor();
-      limiter.threshold.value = -1;
-      limiter.knee.value = 0;
-      limiter.ratio.value = 20;
-      limiter.attack.value = 0.003;
-      limiter.release.value = 0.05;
-      master.connect(limiter);
-      limiter.connect(context.destination);
-
-      const splitter = context.createChannelSplitter(2);
-      limiter.connect(splitter);
-      const analyserLeft = context.createAnalyser();
-      const analyserRight = context.createAnalyser();
-      for (const analyser of [analyserLeft, analyserRight]) {
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0;
-      }
-      splitter.connect(analyserLeft, 0);
-      splitter.connect(analyserRight, 1);
-
-      // The metronome bypasses the master fader but keeps limiter protection,
-      // so pulling the mix down never silences the click the user asked for.
+  #ensureRouting(context: AudioContext, initialModuleId?: ModuleInstanceId): MixerRoutingGraph {
+    let routing = this.#routing;
+    if (routing === undefined) {
+      routing = new MixerRoutingGraph(context, this.#effectChainNodeFactory, initialModuleId);
+      routing.setMasterLevel(this.#masterLevel);
+      routing.setTransportTempo(this.#tempo);
+      this.#routing = routing;
+      // The metronome bypasses the master fader but keeps limiter protection.
       const metronomeOutput = context.createGain();
       metronomeOutput.gain.value = 1;
-      metronomeOutput.connect(limiter);
-
-      this.#master = master;
-      this.#limiter = limiter;
-      this.#analyserLeft = analyserLeft;
-      this.#analyserRight = analyserRight;
-      this.#analysisLeft = new Float32Array(analyserLeft.fftSize);
-      this.#analysisRight = new Float32Array(analyserRight.fftSize);
+      routing.connectMetronome(metronomeOutput);
       this.#metronomeOutput = metronomeOutput;
     }
-    return master;
-  }
-
-  #ensureChannel(context: AudioContext, moduleId: ModuleInstanceId): MixerChannel {
-    let channel = this.#channels.get(moduleId);
-    if (channel === undefined) {
-      const gain = context.createGain();
-      const panner = context.createStereoPanner();
-      gain.connect(panner);
-      panner.connect(this.#ensureMaster(context));
-      channel = { gain, panner, input: gain };
-      this.#channels.set(moduleId, channel);
-    }
-    return channel;
+    return routing;
   }
 
   #disposeChannel(moduleId: ModuleInstanceId): void {
-    const channel = this.#channels.get(moduleId);
-    if (channel === undefined) return;
-    channel.gain.disconnect();
-    channel.panner.disconnect();
-    this.#channels.delete(moduleId);
+    this.#routing?.removeChannel(moduleId);
   }
 
-  #startScheduler(): void {
+  /**
+   * The first scheduling pass owns the Play anchor. A later `currentFrame`
+   * read would move its lead boundary forward and exclude step zero before it
+   * can reach every processor. Later passes always use the current lead.
+   */
+  #startScheduler(initialWindowStart?: number): void {
     this.#stopScheduler();
-    this.#schedule();
+    this.#schedule(undefined, undefined, initialWindowStart);
     // The timer only decides when to look ahead. Every note carries an absolute
     // frame, so a late or coalesced tick shifts no note.
     this.#timer = setInterval(() => {
@@ -1740,6 +1947,9 @@ export class TransportRuntime {
   #schedule(
     excludedOccurrences?: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>,
     excludedParameterOccurrences?: ReadonlyMap<ModuleInstanceId, ReadonlySet<string>>,
+    initialWindowStart?: number,
+    excludedExternalAutomationOccurrences?: ReadonlySet<string>,
+    externalAutomationFallbacks?: ReadonlyMap<string, readonly RoutingAutomationOccurrence[]>,
   ): void {
     const context = this.#context;
     const clock = this.#clock;
@@ -1750,7 +1960,7 @@ export class TransportRuntime {
     // A late pass starts at one shared future boundary. It never replays an
     // expired sequence at the first sample of the next render block. All module
     // adapters receive the same boundary, so recovery cannot split the rack.
-    const windowStart = Math.max(
+    const windowStart = initialWindowStart ?? Math.max(
       this.#nextScheduleFrame,
       currentFrame + this.#leadFrames(context),
     );
@@ -1794,7 +2004,120 @@ export class TransportRuntime {
       }
     }
     this.#scheduleMetronome(context, stepFrames, windowStart, windowEnd);
+    this.#scheduleExternalAutomation(
+      stepFrames,
+      currentFrame,
+      windowEnd,
+      excludedExternalAutomationOccurrences,
+      externalAutomationFallbacks,
+    );
     this.#nextScheduleFrame = windowEnd;
+  }
+
+  #scheduleExternalAutomation(
+    stepFrames: number,
+    currentFrame: number,
+    windowEnd: number,
+    excludedOccurrences?: ReadonlySet<string>,
+    fallbackOccurrences?: ReadonlyMap<string, readonly RoutingAutomationOccurrence[]>,
+  ): void {
+    const projection = this.#routingProjection?.automation;
+    const routing = this.#routing;
+    if (projection === undefined || routing === undefined) return;
+    const windowStart = this.#nextAutomationFrame;
+    if (windowStart >= windowEnd) return;
+    const pending = this.#pendingArrangement;
+    const boundary = this.#pendingArrangementFrame;
+    if (pending !== undefined && boundary !== undefined && boundary > windowStart && boundary < windowEnd) {
+      this.#scheduleExternalAutomationRange(projection, stepFrames, windowStart, boundary, this.#arrangement, currentFrame, excludedOccurrences, fallbackOccurrences);
+      this.#scheduleExternalAutomationRange(projection, stepFrames, boundary, windowEnd, pending, currentFrame, excludedOccurrences, fallbackOccurrences);
+    } else {
+      const arrangement = pending !== undefined && boundary !== undefined && boundary <= windowStart
+        ? pending
+        : this.#arrangement;
+      this.#scheduleExternalAutomationRange(projection, stepFrames, windowStart, windowEnd, arrangement, currentFrame, excludedOccurrences, fallbackOccurrences);
+    }
+    this.#nextAutomationFrame = windowEnd;
+  }
+
+  #scheduleExternalAutomationRange(
+    projection: TransportExternalAutomationProjection,
+    stepFrames: number,
+    windowStartFrame: number,
+    windowEndFrame: number,
+    arrangement: TransportArrangement,
+    currentFrame: number,
+    excludedOccurrences?: ReadonlySet<string>,
+    fallbackOccurrences?: ReadonlyMap<string, readonly RoutingAutomationOccurrence[]>,
+  ): void {
+    const replacements = scheduleExternalAutomationWindow(projection, {
+      resolveStep: this.#externalResolverFor(projection.parts, arrangement),
+      stepFrames,
+      swing: this.#swing,
+      patternTiming: this.#patternTiming,
+      windowStartFrame,
+      windowEndFrame,
+      patternStartFrame: this.#patternStartFrame,
+      maximumEvents: SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+    }).filter(
+      (change) =>
+        change.occurrenceId === undefined || !excludedOccurrences?.has(change.occurrenceId),
+    );
+    const expiredIds = new Set(
+      replacements.flatMap((change) =>
+        change.atFrame < currentFrame && change.occurrenceId !== undefined
+          ? [change.occurrenceId]
+          : [],
+      ),
+    );
+    const changes = replacements.filter(
+      (change) =>
+        change.atFrame >= currentFrame &&
+        (change.occurrenceId === undefined || !expiredIds.has(change.occurrenceId)),
+    );
+    for (const occurrenceId of expiredIds) {
+      const fallback = fallbackOccurrences?.get(occurrenceId);
+      if (fallback?.some((change) => change.atFrame >= currentFrame) === true) {
+        changes.push(...fallback);
+      }
+    }
+    this.#scheduleExternalAutomationChanges(changes);
+  }
+
+  #scheduleExternalAutomationChanges(
+    changes: readonly RoutingAutomationOccurrence[],
+  ): void {
+    if (changes.length === 0) return;
+    this.#routing?.scheduleAutomation(changes);
+    this.#queuedExternalAutomation.push(...changes);
+    this.#queuedExternalAutomation = this.#boundedLedgerEntries(
+      this.#queuedExternalAutomation,
+      Number.NEGATIVE_INFINITY,
+      this.#context === undefined ? 0 : this.#currentFrame(this.#context),
+      SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+    );
+  }
+
+  #externalResolverFor(
+    parts: readonly PatternPartView[],
+    arrangement: TransportArrangement,
+  ): StepResolver {
+    const cached = this.#externalAutomationResolver;
+    if (cached?.parts === parts && cached.arrangement === arrangement) return cached.resolve;
+    const { activePatternIndex, songEnabled, songEntries } = arrangement;
+    let resolve: StepResolver;
+    if (!songEnabled || songEntries.length === 0) {
+      const part = parts[activePatternIndex];
+      resolve = part === undefined ? () => undefined : loopingStepResolver(part, activePatternIndex);
+    } else {
+      const chain = songEntries.flatMap((entry) => {
+        const part = parts[entry.patternIndex];
+        return part === undefined ? [] : [{ part, patternIndex: entry.patternIndex, repeats: entry.repeats }];
+      });
+      resolve = chainedStepResolver(chain);
+    }
+    this.#externalAutomationResolver = { parts, arrangement, resolve };
+    return resolve;
   }
 
   #scheduleWindow(
@@ -1887,7 +2210,7 @@ export class TransportRuntime {
     if (!this.#metronomeEnabled) return;
     // An empty rack builds no mixer channel, so the master chain the click
     // needs may not exist yet.
-    if (this.#metronomeOutput === undefined) this.#ensureMaster(context);
+    if (this.#metronomeOutput === undefined) this.#ensureRouting(context);
     const output = this.#metronomeOutput;
     if (output === undefined) return;
     // Each click rounds once from the exact step size, so the clicks stay on
@@ -2061,11 +2384,55 @@ export class TransportRuntime {
   }
 }
 
+export interface RoutingAutomationOccurrence extends RoutingAutomationChange {
+  readonly occurrenceId?: string;
+}
+
+/** Resolves external Pattern lanes into absolute-frame routing changes. */
+export function scheduleExternalAutomationWindow(
+  projection: TransportExternalAutomationProjection,
+  request: PatternWindowRequest,
+): readonly RoutingAutomationOccurrence[] {
+  return schedulePatternAutomationWindow(request).flatMap(
+    (change): readonly RoutingAutomationChange[] => {
+      const target = projection.targets[change.parameterId];
+      return target === undefined
+        ? []
+        : [{
+            atFrame: change.atFrame,
+            ...(change.occurrenceId === undefined
+              ? {}
+              : { occurrenceId: change.occurrenceId }),
+            scope: target.scope,
+            targetId: target.targetId,
+            parameterId: target.parameterId,
+            value: change.value,
+          }];
+    },
+  );
+}
+
 function readModuleId(payload: Readonly<Record<string, unknown>>): ModuleInstanceId {
   if (typeof payload.moduleId !== "string") {
     throw new TypeError("Engine module delta requires a stable module ID.");
   }
   return payload.moduleId as ModuleInstanceId;
+}
+
+function readOptionalEffectId(value: unknown): EffectInstanceId | undefined {
+  return typeof value === "string" ? (value as EffectInstanceId) : undefined;
+}
+
+function readOptionalSendBusId(value: unknown): SendBusId | undefined {
+  return typeof value === "string" ? (value as SendBusId) : undefined;
+}
+
+function isParameterValue(value: unknown): value is ParameterValue {
+  return (
+    (typeof value === "number" && Number.isFinite(value)) ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  );
 }
 
 function readParameterDelta(payload: Readonly<Record<string, unknown>>): {
@@ -2083,12 +2450,6 @@ function readParameterDelta(payload: Readonly<Record<string, unknown>>): {
     throw new TypeError("Engine parameter delta is malformed.");
   }
   return { moduleId, parameter: payload.parameter, value: payload.value };
-}
-
-interface MixerChannel {
-  readonly gain: GainNode;
-  readonly panner: StereoPannerNode;
-  readonly input: AudioNode;
 }
 
 function clamp01(value: number): number {
@@ -2160,17 +2521,6 @@ function voiceSaltFor(moduleId: string): number {
 
 function audioContextEvents(context: AudioContext): Partial<EventTarget> {
   return context;
-}
-
-/**
- * Mixer moves ramp rather than step, so a fader drag cannot produce a click.
- */
-const MIX_RAMP_SECONDS = 0.015;
-
-function setSmoothed(param: AudioParam, value: number, now: number): void {
-  param.cancelScheduledValues(now);
-  param.setValueAtTime(param.value, now);
-  param.linearRampToValueAtTime(value, now + MIX_RAMP_SECONDS);
 }
 
 function readMix(

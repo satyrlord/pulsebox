@@ -127,7 +127,7 @@ must be newly created for Pulsebox.
    directly manipulate, perform with the computer keyboard, generate, and
    transform events.
 2. **The system is modular.** Instruments and effects use plugin contracts. Rack
-   slots, insert chains, send chains, and the master chain are data-driven.
+   slots, module pedalboards, send chains, and the master chain are data-driven.
 3. **Playback remains continuous.** Playback continues without a dropout or
    click while you edit, save, load compatible data, switch themes, open
    editors, and reorder modules.

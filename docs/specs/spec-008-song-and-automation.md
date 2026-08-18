@@ -44,9 +44,19 @@ Interactions:
 The user edits Pattern names on the shared Pattern record. Playlist rows do not
 copy Pattern names.
 
+The selected state shows each placement that refers to the Pattern open in the
+editor. More than one placement can show this state. In Song mode, one current
+placement shows a visible `Playing` marker during playback. This marker does
+not replace or change the selected state.
+
 On compact layouts, Playlist action buttons use original inline SVG icons. Each
-icon-only button has a full accessible name and a tooltip. The mode and Add
-controls also use icons. Pattern names and repeat counts remain visible.
+icon-only button has a full accessible name and a tooltip. The mode control also
+uses an icon. The Add control includes an icon and visible target text. The text
+names the selected Pattern and its new final Playlist row. Pattern names and
+repeat counts remain visible.
+
+The drag handle is the row movement control. It supports pointer drag and Arrow
+Up and Arrow Down. The row menu contains Duplicate and Delete only.
 
 In Pattern mode, the transport loops the selected named Pattern. In Song mode,
 it plays Playlist rows in order, honoring each row's repeat count. Switching

@@ -14,6 +14,7 @@ import { PopupMenu, type PopupMenuItem } from "../controls/PopupMenu";
 import { Toggle } from "../controls/Toggle";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { cx } from "../class-names";
+import { EffectEditor } from "./EffectEditor";
 import styles from "./RackModule.module.css";
 
 interface RackModuleProps {
@@ -122,6 +123,7 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
   const { manifestFor, addablePluginIds } = useDependencies();
 
   const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
+  const selectModule = useAppStore((state) => state.selectModule);
   const removeModule = useAppStore((state) => state.removeModule);
   const duplicateModule = useAppStore((state) => state.duplicateModule);
   const swapModule = useAppStore((state) => state.swapModule);
@@ -136,8 +138,13 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
   const stopAudition = useAppStore((state) => state.stopAudition);
   const commitParameter = useAppStore((state) => state.commitParameter);
   const previewParameter = useAppStore((state) => state.previewParameter);
+  const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
+  const moduleChain = useAppStore((state) =>
+    module === undefined ? undefined : state.project.project.effects.moduleChains[module.id],
+  );
 
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+  const [effectsOpen, setEffectsOpen] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   // True when the trigger press found its own menu already open. The menu's
@@ -360,9 +367,12 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
       data-selected={selected}
       data-drop-target={props.dropTarget === true ? true : undefined}
       aria-label={`Rack slot ${slotLabel(slotNumber)}, ${manifest.productName}`}
+      onPointerDownCapture={() => selectModule(module.id)}
+      onFocusCapture={() => selectModule(module.id)}
       onContextMenu={(event) => {
         // The loaded module's context menu owns `Delete module` (section 13.2).
         event.preventDefault();
+        selectModule(module.id);
         openMenuAt(event.clientX, event.clientY);
       }}
       onKeyDown={(event) => {
@@ -446,6 +456,13 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
             onToggle={() => {
               toggleMute(module.id);
             }}
+            onAutomate={() =>
+              openExternalAutomationTarget({
+                scope: "mixer",
+                targetId: module.id,
+                parameterId: "muted",
+              })
+            }
           />
           <Toggle
             label={`Solo ${manifest.productName} on the rack faceplate`}
@@ -455,6 +472,13 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
             onToggle={() => {
               toggleSolo(module.id);
             }}
+            onAutomate={() =>
+              openExternalAutomationTarget({
+                scope: "mixer",
+                targetId: module.id,
+                parameterId: "solo",
+              })
+            }
           />
           <AuditionButton
             label={manifest.productName}
@@ -467,6 +491,14 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
             }}
           />
           <ModuleLevelMeter moduleId={module.id} productName={manifest.productName} />
+          <button
+            type="button"
+            className={styles.action}
+            disabled={moduleChain === undefined}
+            onClick={() => setEffectsOpen(true)}
+          >
+            Effects
+          </button>
           <button
             ref={menuButtonRef}
             type="button"
@@ -502,6 +534,14 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
           items={menuItems}
         />
       )}
+      {effectsOpen && moduleChain !== undefined ? (
+        <EffectEditor
+          chain={{ scope: "module", targetId: module.id }}
+          title={`${manifest.productName} pedalboard`}
+          slots={moduleChain}
+          onClose={() => setEffectsOpen(false)}
+        />
+      ) : null}
     </section>
   );
 });

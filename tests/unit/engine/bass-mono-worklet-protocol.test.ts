@@ -205,6 +205,33 @@ describe("Silver Serpent worklet protocol", () => {
     expect(atDropped).toBeLessThan(attackPeak);
   });
 
+  it("orders equal-frame events across separate batches by priority", () => {
+    const processor = readyProcessor();
+    processor.port.receive(controllerEnvelope(1, "resume", {}, 7));
+    processor.port.receive(controllerEnvelope(2, "event-batch", {
+      events: [{
+        eventId: "occurrence-1:note-on",
+        audioFrame: 32,
+        priority: 2,
+        data: { type: "note-on", occurrenceId: "occurrence-1", note: 36, velocity: 0.8 },
+      }],
+    }, 7));
+    processor.port.receive(controllerEnvelope(3, "event-batch", {
+      events: [{
+        eventId: "occurrence-0:note-off",
+        audioFrame: 32,
+        priority: 0,
+        data: { type: "note-off", occurrenceId: "occurrence-0" },
+      }],
+    }, 7));
+
+    const left = new Float32Array(128);
+    processor.process([], [[left]], {});
+
+    expect(left.slice(0, 32).every((sample) => sample === 0)).toBe(true);
+    expect(left.slice(33).some((sample) => Math.abs(sample) > 0)).toBe(true);
+  });
+
   it("faults and closes the session on a sequence gap", () => {
     const processor = readyProcessor();
     processor.port.receive(controllerEnvelope(2, "resume", {}, 7));

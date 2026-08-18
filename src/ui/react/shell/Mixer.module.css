@@ -1,4 +1,5 @@
 .mixer {
+  position: relative;
   block-size: 100%;
   display: flex;
   justify-content: space-between;
@@ -6,6 +7,49 @@
   padding: 4px;
   overflow: hidden;
 }
+
+.sendGrid button[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+
+.sendGrid button i {
+  position: absolute;
+  inset-inline-end: 3px;
+  inset-block-end: 3px;
+  inline-size: 3px;
+  block-size: 3px;
+  background: currentColor;
+}
+
+.sendSurface {
+  position: absolute;
+  z-index: 4;
+  inset-inline: 6px;
+  inset-block-start: 6px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--pulse-color-overlay, #101317);
+  border: 1px solid var(--pulse-color-border-strong, #aab4bc);
+  border-radius: var(--pulse-radius-panel, 6px);
+  box-shadow: var(--lift-2);
+}
+
+.sendSurface > div,
+.sendSurface label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sendSurface label input { flex: 1; }
+.sendSurface output { min-inline-size: 34px; font-family: var(--pulse-font-mono, ui-monospace, monospace); text-align: end; }
 
 /* Each channel is its own shallow column on the chassis, divided by a hairline
    rather than by a drawn border. */
@@ -23,8 +67,12 @@
   padding: 3px 1px;
   overflow: hidden;
   border-radius: var(--pulse-radius-control, 4px);
-  background: linear-gradient(180deg, #ffffff06, transparent 40%);
-  box-shadow: inset 1px 0 0 #ffffff09;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 4%, transparent),
+    transparent 40%
+  );
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 6%, transparent);
 }
 
 .emptyStrip {
@@ -52,7 +100,7 @@
 
 .strip[data-selected="true"] {
   box-shadow:
-    inset 1px 0 0 #ffffff09,
+    inset 1px 0 0 color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 6%, transparent),
     inset 0 0 0 1px var(--k);
 }
 
@@ -69,7 +117,7 @@
   letter-spacing: 0.04em;
   line-height: 17px;
   color: var(--k);
-  text-shadow: 0 1px 0 #000000;
+  text-shadow: 0 1px 0 var(--text-engraved-lo);
   filter: brightness(0.95);
   background: none;
   box-shadow: none;
@@ -95,20 +143,21 @@
   text-underline-offset: 3px;
 }
 
-/* The slot number wears the channel-tag voice, muted, so an empty strip reads
-   as a channel awaiting a name rather than a different kind of column. */
-.emptyStrip > strong {
+/* The disabled slot selector keeps the loaded strip silhouette. */
+.emptyStrip > .channelName {
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.masterBypass {
   inline-size: 100%;
   min-block-size: 24px;
-  overflow: hidden;
-  text-align: center;
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-12, 12px);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 24px;
-  color: var(--pulse-color-text-muted, #919ba3);
-  text-shadow: 0 1px 0 var(--text-engraved-lo);
+  padding-inline: 1px;
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0;
+}
+
+.masterBypass[data-bypassed="true"] {
+  text-decoration: line-through;
 }
 
 /* The pan ring keeps its engraved caption. The hover readout shows the value. */
@@ -136,7 +185,7 @@
 /* Pan rings use the muted channel color around the complete ring, so the ring
    reads as a legend rather than as a lit value. */
 .panControl :global([data-component="knob"] path) {
-  stroke: color-mix(in srgb, var(--k) 78%, #0a0c0d);
+  stroke: color-mix(in srgb, var(--k) 78%, var(--surface-well));
   stroke-width: 2;
   filter: none;
 }
@@ -177,6 +226,34 @@
 
 .faderWell :global([data-component="level-meter"]) {
   flex: 0 0 auto;
+}
+
+.meterStack {
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.meterStack :global([data-component="level-meter"]) {
+  min-block-size: 0;
+}
+
+.clipIndicator {
+  inline-size: 8px;
+  block-size: 10px;
+  color: var(--pulse-color-text-muted, #919ba3);
+  line-height: 10px;
+  text-align: center;
+}
+
+.clipIndicator[data-active="true"] {
+  color: var(--pulse-color-status-danger, #ff8178);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  outline: 1px solid currentColor;
 }
 
 .faderWell :global([data-component="fader"] > span),
@@ -241,8 +318,8 @@
   border-radius: 3px;
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--k) 82%, transparent),
-    inset 0 1px 0 #ffffff14,
-    0 1px 2px #00000080;
+    inset 0 1px 0 color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 8%, transparent),
+    0 1px 2px var(--edge-shadow);
 }
 
 .sendGrid button > [data-part="send-label"] {
@@ -261,8 +338,8 @@
 .sendGrid button:disabled::before {
   background: none;
   box-shadow:
-    inset 0 0 0 1px #ffffff0f,
-    0 1px 2px #00000080;
+    inset 0 0 0 1px color-mix(in srgb, var(--pulse-color-text-primary, #f3f5f6) 6%, transparent),
+    0 1px 2px var(--edge-shadow);
 }
 
 .muteSolo {
@@ -280,7 +357,7 @@
   box-shadow:
     inset 0 1px 0 var(--edge-highlight),
     0 0 0 1px var(--edge-hairline),
-    0 1px 2px #00000080;
+    0 1px 2px var(--edge-shadow);
 }
 
 @media (max-width: 1439px) {

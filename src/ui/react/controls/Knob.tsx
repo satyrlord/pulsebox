@@ -4,6 +4,7 @@ import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
 import styles from "./Knob.module.css";
 import { Tooltip } from "./Tooltip";
+import { automationShortcut } from "./automation-shortcut";
 import { useRangeGesture } from "./use-range-gesture";
 import { ValuePopover } from "./ValuePopover";
 
@@ -22,9 +23,16 @@ export interface KnobProps {
   readonly defaultValue: number;
   readonly unit?: string | undefined;
   readonly precision?: number;
+  readonly formatValue?: (value: number) => number;
+  readonly parseValue?: (value: number) => number;
+  readonly displayMin?: number;
+  readonly displayMax?: number;
+  readonly displayStep?: number;
   readonly disabled?: boolean;
   readonly onInput: (value: number) => void;
   readonly onCommit: (value: number, gestureId: GestureId) => void;
+  /** Arms this control as the active Piano Roll lane. */
+  readonly onAutomate?: () => void;
 }
 
 /** Degrees of dial travel. A real panel knob does not turn a full circle. */
@@ -67,7 +75,22 @@ function arcPath(fromDegrees: number, toDegrees: number): string {
 }
 
 export function Knob(props: KnobProps) {
-  const { controlId, label, min, max, step, defaultValue, unit, precision = 2, disabled } = props;
+  const {
+    controlId,
+    label,
+    min,
+    max,
+    step,
+    defaultValue,
+    unit,
+    precision = 2,
+    formatValue = (next) => next,
+    parseValue = (next) => next,
+    displayMin = min,
+    displayMax = max,
+    displayStep = step,
+    disabled,
+  } = props;
   const {
     displayValue,
     dragging,
@@ -92,6 +115,7 @@ export function Knob(props: KnobProps) {
     onCommit: props.onCommit,
   });
   const readoutId = useId();
+  const automation = automationShortcut(props.onAutomate);
   /** Scoped so several knobs on one plate cannot share a paint server. */
   const domeId = useId();
 
@@ -110,7 +134,7 @@ export function Knob(props: KnobProps) {
   const fraction = max === min ? 0 : (displayValue - min) / (max - min);
   const angle = START_ANGLE + fraction * SWEEP;
   const pointer = useMemo(() => ({ from: polar(angle, 3), to: polar(angle, RADIUS - 4) }), [angle]);
-  const formatted = displayValue.toFixed(precision);
+  const formatted = formatValue(displayValue).toFixed(precision);
   const text = unit === undefined ? formatted : `${formatted} ${unit}`;
 
   // The default marker sits with the tick ring, spec-003 section 22.1, so the
@@ -135,19 +159,28 @@ export function Knob(props: KnobProps) {
         role="slider"
         tabIndex={disabled === true ? -1 : 0}
         aria-label={label}
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={displayValue}
+        aria-valuemin={displayMin}
+        aria-valuemax={displayMax}
+        aria-valuenow={formatValue(displayValue)}
         aria-valuetext={text}
         aria-describedby={readoutId}
         aria-disabled={disabled === true ? true : undefined}
+        aria-keyshortcuts={automation.ariaKeyShortcuts}
         title={text}
         className={cx(styles.dial, dragging && styles.dragging)}
         onPointerDown={disabled === true ? undefined : onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        onKeyDown={disabled === true ? undefined : onKeyDown}
+        onKeyDown={
+          disabled === true
+            ? undefined
+            : (event) => {
+                if (automation.onKeyDown(event)) return;
+                onKeyDown(event);
+              }
+        }
+        onContextMenu={props.onAutomate === undefined ? undefined : automation.onContextMenu}
         onKeyUp={onKeyUp}
         onBlur={onBlur}
         onDoubleClick={disabled === true ? undefined : onDoubleClick}
@@ -232,11 +265,13 @@ export function Knob(props: KnobProps) {
           id={readoutId}
           label={`${label} value`}
           value={formatted}
-          min={min}
-          max={max}
-          step={step}
+          min={displayMin}
+          max={displayMax}
+          step={displayStep}
           disabled={disabled}
-          onCommit={setFromNumeric}
+          onCommit={(next) => {
+            setFromNumeric(parseValue(next));
+          }}
         />
       </div>
     </div>

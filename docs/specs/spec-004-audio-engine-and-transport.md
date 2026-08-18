@@ -94,13 +94,8 @@ Behavior:
 
 The `L/R`/`M/S` control changes analysis only. It never changes live audio,
 project state, automation, undo history, or export. Meter mode is a transient
-monitoring preference. `M = (L + R) / 2` and `S = (L - R) / 2` for displayed
+display preference. `M = (L + R) / 2` and `S = (L - R) / 2` for displayed
 analysis.
-
-The separate master Mono control remains in the Master studio view. The engine
-places this monitor-only fold-down after the master chain. It affects live
-listening and the displayed master meters. Exclude it from project audio state,
-master WAV export, and stem export.
 
 ---
 

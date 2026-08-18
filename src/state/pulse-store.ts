@@ -6,10 +6,11 @@ import type {
   Unsubscribe,
 } from "../contracts/commands";
 import type {
+  EffectChainSlots,
   EffectInstanceState,
   EffectsState,
-  VoiceInsertSlots,
 } from "../contracts/effects";
+import { PROTECTED_LIMITER_EFFECT_PLUGIN_ID } from "../contracts/effects";
 import {
   createCommandId,
   createEffectInstanceId,
@@ -19,6 +20,7 @@ import {
   createSongPlacementId,
   createStateRevisionEpoch,
   isCanonicalUuid,
+  SEND_BUS_IDS,
   type AutomationLaneId,
   type EffectInstanceId,
   type GestureId,
@@ -28,6 +30,7 @@ import {
   type PatternId,
   type SongPlacementId,
   type StateRevision,
+  type SendBusId,
   type VoiceId,
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
@@ -48,6 +51,8 @@ import {
   type PatternEvent,
   type PatternEventData,
   type AutomationLaneState,
+  type AutomationScope,
+  type AutomationTargetId,
   type AutomationStepState,
   type PatternPartState,
   type PatternScale,
@@ -111,10 +116,13 @@ export type PulseEngineDelta = EngineDelta<
   Readonly<Record<string, unknown>>
 >;
 
-/** The composition boundary supplies effect instances from the shared registry. */
-export type VoiceInsertEffectFactory = (
+/** The composition boundary supplies all effect instances from the effect registry. */
+export type ChainEffectPlacement = "module-pedalboard" | "send-chain" | "master-chain";
+
+export type EffectInstanceFactory = (
   id: EffectInstanceId,
   pluginId: PluginId,
+  placement: ChainEffectPlacement,
 ) => EffectInstanceState | undefined;
 
 export class PulseStore {
@@ -126,7 +134,10 @@ export class PulseStore {
     parameter: string,
     value: number | boolean | string,
   ) => boolean;
-  readonly #createVoiceInsertEffect: VoiceInsertEffectFactory | undefined;
+  readonly #createEffectInstance: EffectInstanceFactory | undefined;
+  readonly #validateEffectParameter:
+    | ((effect: EffectInstanceState, parameter: string, value: number | boolean | string) => boolean)
+    | undefined;
   readonly #now: () => string;
   readonly #subscriptions = new Set<Subscription>();
   readonly #undo: HistoryEntry[] = [];
@@ -146,8 +157,13 @@ export class PulseStore {
       parameter: string,
       value: number | boolean | string,
     ) => boolean,
-    createVoiceInsertEffect?: VoiceInsertEffectFactory,
     now: () => string = () => new Date().toISOString(),
+    validateEffectParameter?: (
+      effect: EffectInstanceState,
+      parameter: string,
+      value: number | boolean | string,
+    ) => boolean,
+    createEffectInstance?: EffectInstanceFactory,
   ) {
     this.#state = {
       ...initialState,
@@ -160,8 +176,9 @@ export class PulseStore {
         : (pluginId) => (pluginId === moduleSeed.pluginId ? moduleSeed : undefined);
     this.#onEngineDelta = onEngineDelta;
     this.#validateParameter = validateParameter;
-    this.#createVoiceInsertEffect = createVoiceInsertEffect;
+    this.#createEffectInstance = createEffectInstance;
     this.#now = now;
+    this.#validateEffectParameter = validateEffectParameter;
   }
 
   getState(): Readonly<PulseState> {
@@ -212,52 +229,18 @@ export class PulseStore {
     const entry = this.#undo.at(-1);
     if (entry === undefined) return accepted(false, this.#state.project.revision);
     const previous = this.#state;
-    const project = {
-      ...entry.before,
-      revision: incrementRevision(previous.project.revision, this.#idFactory),
-    };
     this.#undo.pop();
     this.#redo.push(entry);
-    this.#state = {
-      ...previous,
-      project,
-      ui: reconcileUiReferences(project, previous.ui),
-      history: this.#historyAvailability(),
-    };
-    this.#notify();
-    this.#onEngineDelta({
-      kind: "project-replace",
-      projectRevision: project.revision,
-      targetIds: [],
-      payload: {},
-    });
-    return accepted(true, project.revision);
+    return this.#replaceProject(entry.before, previous, {}, this.#historyAvailability());
   }
 
   redo(): CommandResult {
     const entry = this.#redo.at(-1);
     if (entry === undefined) return accepted(false, this.#state.project.revision);
     const previous = this.#state;
-    const project = {
-      ...entry.after,
-      revision: incrementRevision(previous.project.revision, this.#idFactory),
-    };
     this.#redo.pop();
     this.#undo.push(entry);
-    this.#state = {
-      ...previous,
-      project,
-      ui: reconcileUiReferences(project, previous.ui),
-      history: this.#historyAvailability(),
-    };
-    this.#notify();
-    this.#onEngineDelta({
-      kind: "project-replace",
-      projectRevision: project.revision,
-      targetIds: [],
-      payload: {},
-    });
-    return accepted(true, project.revision);
+    return this.#replaceProject(entry.after, previous, {}, this.#historyAvailability());
   }
 
   saveProject(): ProjectState {
@@ -267,25 +250,43 @@ export class PulseStore {
   loadProject(project: ProjectState): CommandResult {
     const previous = this.#state;
     const nextProject = this.#cloneProject(project);
-    const revision = incrementRevision(previous.project.revision, this.#idFactory);
-    const candidate = { ...nextProject, revision };
+    const candidate = {
+      ...nextProject,
+      revision: incrementRevision(previous.project.revision, this.#idFactory),
+    };
     if (sameProjectContent(previous.project, candidate)) {
       return accepted(false, previous.project.revision);
     }
     this.#undo.length = 0;
     this.#redo.length = 0;
+    return this.#replaceProject(nextProject, previous, { source: "loadProject" }, {
+      canUndo: false,
+      canRedo: false,
+    });
+  }
+
+  #replaceProject(
+    project: ProjectState,
+    previous: PulseState,
+    payload: Readonly<Record<string, unknown>>,
+    history: PulseState["history"],
+  ): CommandResult {
+    const candidate = {
+      ...this.#cloneProject(project),
+      revision: incrementRevision(previous.project.revision, this.#idFactory),
+    };
     this.#state = {
       ...previous,
       project: candidate,
       ui: reconcileUiReferences(candidate, previous.ui),
-      history: { canUndo: false, canRedo: false },
+      history,
     };
     this.#notify();
     this.#onEngineDelta({
       kind: "project-replace",
       projectRevision: candidate.revision,
       targetIds: [],
-      payload: { source: "loadProject" },
+      payload,
     });
     return accepted(true, candidate.revision);
   }
@@ -420,6 +421,7 @@ export class PulseStore {
               selectedModuleId: command.payload.moduleId,
               pianoRollSelection: undefined,
               pianoRollParameter: "velocity",
+              pianoRollAutomationTarget: undefined,
             },
           },
           projectChanged: false,
@@ -441,12 +443,6 @@ export class PulseStore {
           command.payload.parameter,
           command.payload.value,
         );
-      case "voice-insert-set":
-        return this.#setVoiceInsert(
-          command.payload.moduleId,
-          command.payload.voiceId,
-          command.payload.effectPluginId,
-        );
       case "pattern-events-edit":
         return this.#editPatternEvents(
           command.payload.moduleId,
@@ -461,6 +457,8 @@ export class PulseStore {
         );
       case "piano-roll-parameter-set":
         return this.#setPianoRollParameter(command.payload.parameter);
+      case "piano-roll-automation-target-set":
+        return this.#setPianoRollAutomationTarget(command.payload.target);
       case "transport-swing-set":
         return this.#setSwing(command.payload.swing);
       case "pattern-humanize-set":
@@ -541,6 +539,35 @@ export class PulseStore {
         return this.#setMixScalar(command.payload.moduleId, "pan", command.payload.pan, -1, 1);
       case "mixer-master-level-set":
         return this.#setMasterLevel(command.payload.level);
+      case "mixer-send-amount-set":
+        return this.#setSendAmount(command.payload.moduleId, command.payload.sendBusId, command.payload.amount);
+      case "mixer-send-mode-set":
+        return this.#setSendMode(command.payload.moduleId, command.payload.sendBusId, command.payload.mode);
+      case "effects-chain-effect-add":
+        return this.#addChainEffect(command.payload.chain, command.payload.effectPluginId, command.payload.afterEffectId);
+      case "effects-chain-effect-remove":
+        return this.#removeChainEffect(command.payload.effectInstanceId);
+      case "effects-chain-effect-replace":
+        return this.#replaceChainEffect(
+          command.payload.effectInstanceId,
+          command.payload.effectPluginId,
+        );
+      case "effects-chain-effect-reorder":
+        return this.#reorderChainEffect(command.payload.effectInstanceId, command.payload.afterEffectId);
+      case "effects-instance-bypass-set":
+        return this.#setEffectBypass(command.payload.effectInstanceId, command.payload.bypassed);
+      case "effects-instance-wet-dry-set":
+        return this.#setEffectWetDry(command.payload.effectInstanceId, command.payload.wetDry);
+      case "effects-instance-parameter-set":
+        return this.#setEffectParameter(command.payload.effectInstanceId, command.payload.parameterId, command.payload.value);
+      case "effects-send-return-level-set":
+        return this.#setSendReturnLevel(command.payload.sendBusId, command.payload.returnLevel);
+      case "effects-send-chain-bypass-set":
+        return this.#setSendChainBypass(command.payload.sendBusId, command.payload.bypassed);
+      case "effects-send-focus-set":
+        return this.#setSendFocus(command.payload.sendBusId, command.payload.effectInstanceId);
+      case "effects-master-bypass-toggle":
+        return this.#toggleMasterEffectsBypass();
     }
   }
 
@@ -1151,6 +1178,329 @@ export class PulseStore {
     );
   }
 
+  #setSendAmount(moduleId: ModuleInstanceId, sendBusId: SendBusId, amount: number) {
+    const module = this.#state.project.modules[moduleId];
+    if (module === undefined) return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
+    const send = module.sends[sendBusId];
+    if (send === undefined || !SEND_BUS_IDS.includes(sendBusId)) {
+      return { error: rejected("payload.sendBusId", "Send bus does not exist.", "Choose send A through D.") };
+    }
+    if (!Number.isFinite(amount) || amount < 0 || amount > 1) {
+      return { error: rejected("payload.amount", "Send amount must be between 0 and 1.", "Choose a value in range.") };
+    }
+    if (send.amount === amount) return { state: this.#state, projectChanged: false as const };
+    const next: RackModuleState = { ...module, sends: { ...module.sends, [sendBusId]: { ...send, amount } } };
+    return this.#projectTransition(
+      { ...this.#state.project, modules: { ...this.#state.project.modules, [moduleId]: next } },
+      "mixer-set", [moduleId, sendBusId], { moduleId, sendBusId, amount },
+    );
+  }
+
+  #setSendMode(moduleId: ModuleInstanceId, sendBusId: SendBusId, mode: unknown) {
+    const module = this.#state.project.modules[moduleId];
+    if (module === undefined) return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
+    const send = module.sends[sendBusId];
+    if (send === undefined || !SEND_BUS_IDS.includes(sendBusId)) {
+      return { error: rejected("payload.sendBusId", "Send bus does not exist.", "Choose send A through D.") };
+    }
+    if (mode !== "pre-fader" && mode !== "post-fader") {
+      return { error: rejected("payload.mode", "Send mode must be pre-fader or post-fader.", "Choose a send tap mode.") };
+    }
+    if (send.mode === mode) return { state: this.#state, projectChanged: false as const };
+    const next: RackModuleState = { ...module, sends: { ...module.sends, [sendBusId]: { ...send, mode } } };
+    return this.#projectTransition(
+      { ...this.#state.project, modules: { ...this.#state.project.modules, [moduleId]: next } },
+      "mixer-set", [moduleId, sendBusId], { moduleId, sendBusId, mode },
+    );
+  }
+
+  #addChainEffect(
+    chain: Extract<PulseCommand, { readonly type: "effects-chain-effect-add" }> ["payload"]["chain"],
+    pluginId: PluginId,
+    afterEffectId: EffectInstanceId | undefined,
+  ) {
+    const located = locateEffectChain(this.#state.project.effects, chain);
+    if (located === undefined) return { error: rejected("payload.chain", "Effect chain does not exist.", "Choose a current effect chain.") };
+    const effectId = createEffectInstanceId(this.#idFactory);
+    const created = this.#createEffectInstance?.(
+      effectId,
+      pluginId,
+      effectPlacementForChain(chain),
+    );
+    if (created?.id !== effectId || created.pluginId !== pluginId) {
+      return { error: rejected("payload.effectPluginId", "Effect plugin is not registered.", "Choose an available effect.") };
+    }
+    const effect = normalizeEffectInstance(created);
+    const nextSlots = insertEffectInChain(located.slots, effectId, afterEffectId, located.isMaster);
+    if (nextSlots === undefined) {
+      return { error: rejected("payload.chain", "Effect chain has no free slot or insertion point.", "Remove an effect or choose a current effect.") };
+    }
+    let effects = replaceEffectChain({
+      ...this.#state.project.effects,
+      instances: { ...this.#state.project.effects.instances, [effectId]: effect },
+    }, chain, nextSlots);
+    if (chain.scope === "send") {
+      const send = effects.sendChains[chain.targetId];
+      if (send?.pinnedEffectId === null) {
+        effects = {
+          ...effects,
+          sendChains: {
+            ...effects.sendChains,
+            [chain.targetId]: { ...send, pinnedEffectId: effectId },
+          },
+        };
+      }
+    }
+    return this.#projectTransition(
+      { ...this.#state.project, effects }, "module-effects-set", [effectId], { chain, effectId, pluginId },
+    );
+  }
+
+  #removeChainEffect(effectId: EffectInstanceId) {
+    const located = locateEffectInstance(this.#state.project.effects, effectId);
+    if (located === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist in a removable chain.", "Choose an effect in a module, send, or master chain.") };
+    if (located.isProtectedLimiter) {
+      return { error: rejected("payload.effectInstanceId", "The final limiter is protected.", "Bypass the limiter when needed.") };
+    }
+    const remaining = located.slots.filter(
+      (id): id is EffectInstanceId => id !== effectId && id !== null,
+    );
+    const nextSlots = located.isMaster
+      ? packMasterChain(remaining.slice(0, -1), remaining.at(-1), located.slots.length)
+      : packChainSlots(remaining, located.slots.length);
+    let effects = replaceEffectChain(this.#state.project.effects, located.chain, nextSlots);
+    if (located.chain.scope === "send") {
+      const send = effects.sendChains[located.chain.targetId];
+      if (send === undefined) return { error: rejected("payload.effectInstanceId", "Effect chain does not exist.", "Choose a current effect.") };
+      if (send.pinnedEffectId === effectId) {
+        const removedIndex = located.slots.indexOf(effectId);
+        const nextFocus =
+          located.slots
+            .slice(removedIndex + 1)
+            .find((id): id is EffectInstanceId => id !== null && id !== effectId) ??
+          [...located.slots.slice(0, removedIndex)]
+            .reverse()
+            .find((id): id is EffectInstanceId => id !== null && id !== effectId) ??
+          null;
+        effects = { ...effects, sendChains: { ...effects.sendChains, [located.chain.targetId]: { ...send, pinnedEffectId: nextFocus } } };
+      }
+    }
+    effects = pruneUnreferencedEffects(effects);
+    const removedLaneIds = new Set(
+      Object.values(this.#state.project.automationLanes)
+        .filter((lane) => lane.scope === "effect" && lane.targetId === effectId)
+        .map((lane) => lane.id),
+    );
+    const automationLanes = Object.fromEntries(
+      Object.entries(this.#state.project.automationLanes).filter(
+        ([id]) => !removedLaneIds.has(id as AutomationLaneId),
+      ),
+    ) as Readonly<Record<AutomationLaneId, AutomationLaneState>>;
+    const patterns = removeAutomationLaneReferences(
+      this.#state.project.patterns,
+      removedLaneIds,
+      this.#now,
+    );
+    return this.#projectTransition(
+      { ...this.#state.project, effects, automationLanes, patterns },
+      "module-effects-set",
+      [effectId],
+      { effectId, chain: located.chain },
+    );
+  }
+
+  #replaceChainEffect(effectId: EffectInstanceId, pluginId: PluginId) {
+    const located = locateEffectInstance(this.#state.project.effects, effectId);
+    if (located === undefined) {
+      return {
+        error: rejected(
+          "payload.effectInstanceId",
+          "Effect does not exist in a replaceable chain.",
+          "Choose an effect in a module, send, or master chain.",
+        ),
+      };
+    }
+    if (located.isProtectedLimiter) {
+      return {
+        error: rejected(
+          "payload.effectInstanceId",
+          "The final limiter is protected.",
+          "Replace another master effect.",
+        ),
+      };
+    }
+    const current = this.#state.project.effects.instances[effectId];
+    if (current?.pluginId === pluginId) {
+      return { state: this.#state, projectChanged: false as const };
+    }
+    const created = this.#createEffectInstance?.(
+      effectId,
+      pluginId,
+      effectPlacementForChain(located.chain),
+    );
+    if (created?.id !== effectId || created.pluginId !== pluginId) {
+      return {
+        error: rejected(
+          "payload.effectPluginId",
+          "Effect plugin is not registered.",
+          "Choose an available effect.",
+        ),
+      };
+    }
+    const replacement = normalizeEffectInstance(created);
+    const removedLaneIds = new Set(
+      Object.values(this.#state.project.automationLanes)
+        .filter(
+          (lane) =>
+            lane.scope === "effect" &&
+            lane.targetId === effectId &&
+            lane.parameterId !== "bypassed" &&
+            lane.parameterId !== "wet-dry",
+        )
+        .map((lane) => lane.id),
+    );
+    const automationLanes = Object.fromEntries(
+      Object.entries(this.#state.project.automationLanes).filter(
+        ([id]) => !removedLaneIds.has(id as AutomationLaneId),
+      ),
+    ) as Readonly<Record<AutomationLaneId, AutomationLaneState>>;
+    const patterns = removeAutomationLaneReferences(
+      this.#state.project.patterns,
+      removedLaneIds,
+      this.#now,
+    );
+    const effects = {
+      ...this.#state.project.effects,
+      instances: { ...this.#state.project.effects.instances, [effectId]: replacement },
+    };
+    return this.#projectTransition(
+      { ...this.#state.project, effects, automationLanes, patterns },
+      "module-effects-set",
+      [effectId],
+      { effectId, pluginId, chain: located.chain },
+    );
+  }
+
+  #reorderChainEffect(effectId: EffectInstanceId, afterEffectId: EffectInstanceId | undefined) {
+    const located = locateEffectInstance(this.#state.project.effects, effectId);
+    if (located === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist in a reorderable chain.", "Choose an effect in a chain.") };
+    if (located.isProtectedLimiter) return { error: rejected("payload.effectInstanceId", "The final limiter cannot move.", "Move another master effect.") };
+    const nextSlots = reorderEffectInChain(located.slots, effectId, afterEffectId, located.isMaster);
+    if (nextSlots === undefined) return { error: rejected("payload.afterEffectId", "The target effect is not in the same chain.", "Choose an effect in this chain.") };
+    if (sameStructuredValue(nextSlots, located.slots)) return { state: this.#state, projectChanged: false as const };
+    const effects = replaceEffectChain(this.#state.project.effects, located.chain, nextSlots);
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [effectId],
+      { effectId, afterEffectId, chain: located.chain },
+    );
+  }
+
+  #setEffectBypass(effectId: EffectInstanceId, bypassed: boolean) {
+    const effect = this.#state.project.effects.instances[effectId];
+    if (effect === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist.", "Choose a current effect.") };
+    if (typeof bypassed !== "boolean") return { error: rejected("payload.bypassed", "Bypass must be true or false.", "Choose a bypass state.") };
+    if (effect.bypassed === bypassed) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, instances: { ...this.#state.project.effects.instances, [effectId]: { ...effect, bypassed } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [effectId],
+      effectAudioPayload(this.#state.project.effects, effectId, { effectId, bypassed }),
+    );
+  }
+
+  #setEffectWetDry(effectId: EffectInstanceId, wetDry: number) {
+    const effect = this.#state.project.effects.instances[effectId];
+    if (effect === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist.", "Choose a current effect.") };
+    if (!Number.isFinite(wetDry) || wetDry < 0 || wetDry > 1) return { error: rejected("payload.wetDry", "Wet and dry mix must be between 0 and 1.", "Choose a value in range.") };
+    if (effect.wetDry === wetDry) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, instances: { ...this.#state.project.effects.instances, [effectId]: { ...effect, wetDry } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [effectId],
+      effectAudioPayload(this.#state.project.effects, effectId, { effectId, wetDry }),
+    );
+  }
+
+  #setEffectParameter(effectId: EffectInstanceId, parameterId: string, value: number | boolean | string) {
+    const effect = this.#state.project.effects.instances[effectId];
+    if (effect === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist.", "Choose a current effect.") };
+    if (!isParameterId(parameterId)) return { error: rejected("payload.parameterId", "Effect parameter ID is invalid.", "Choose an effect parameter.") };
+    if (!isParameterValue(value) || (this.#validateEffectParameter !== undefined && !this.#validateEffectParameter(effect, parameterId, value))) {
+      return { error: rejected("payload.value", "Effect parameter value is invalid.", "Use a value in the parameter range.") };
+    }
+    if (effect.state[parameterId] === value) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, instances: { ...this.#state.project.effects.instances, [effectId]: { ...effect, state: { ...effect.state, [parameterId]: value } } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [effectId],
+      effectAudioPayload(this.#state.project.effects, effectId, {
+        effectId,
+        parameterId,
+        value,
+      }),
+    );
+  }
+
+  #setSendReturnLevel(sendBusId: SendBusId, returnLevel: number) {
+    const chain = this.#state.project.effects.sendChains[sendBusId];
+    if (chain === undefined) return { error: rejected("payload.sendBusId", "Send bus does not exist.", "Choose send A through D.") };
+    if (!Number.isFinite(returnLevel) || returnLevel < 0 || returnLevel > 1) return { error: rejected("payload.returnLevel", "Return level must be between 0 and 1.", "Choose a value in range.") };
+    if (chain.returnLevel === returnLevel) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, sendChains: { ...this.#state.project.effects.sendChains, [sendBusId]: { ...chain, returnLevel } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [sendBusId],
+      { sendBusId, returnLevel, chain: { scope: "send", targetId: sendBusId } },
+    );
+  }
+
+  #setSendFocus(sendBusId: SendBusId, effectId: EffectInstanceId | null) {
+    const chain = this.#state.project.effects.sendChains[sendBusId];
+    if (chain === undefined) return { error: rejected("payload.sendBusId", "Send bus does not exist.", "Choose send A through D.") };
+    if (effectId !== null && !chain.slots.includes(effectId)) return { error: rejected("payload.effectInstanceId", "Effect is not in this send chain.", "Choose an effect in this send chain.") };
+    if (chain.pinnedEffectId === effectId) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, sendChains: { ...this.#state.project.effects.sendChains, [sendBusId]: { ...chain, pinnedEffectId: effectId } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      effectId === null ? [sendBusId] : [sendBusId, effectId],
+      { sendBusId, effectId, audioUnchanged: true },
+    );
+  }
+
+  #setSendChainBypass(sendBusId: SendBusId, bypassed: boolean) {
+    const chain = this.#state.project.effects.sendChains[sendBusId];
+    if (chain === undefined) return { error: rejected("payload.sendBusId", "Send bus does not exist.", "Choose send A through D.") };
+    if (typeof bypassed !== "boolean") return { error: rejected("payload.bypassed", "Bypass must be true or false.", "Choose a bypass state.") };
+    if (chain.bypassed === bypassed) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, sendChains: { ...this.#state.project.effects.sendChains, [sendBusId]: { ...chain, bypassed } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [sendBusId],
+      { sendBusId, bypassed, chain: { scope: "send", targetId: sendBusId } },
+    );
+  }
+
+  #toggleMasterEffectsBypass() {
+    const effects = { ...this.#state.project.effects, masterEffectsBypassed: !this.#state.project.effects.masterEffectsBypassed };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [],
+      {
+        masterEffectsBypassed: effects.masterEffectsBypassed,
+        chain: { scope: "master" },
+      },
+    );
+  }
+
   #transport(patch: Partial<PulseState["transport"]>) {
     return {
       state: { ...this.#state, transport: { ...this.#state.transport, ...patch } },
@@ -1196,7 +1546,7 @@ export class PulseStore {
           candidate.id === slotId ? { ...candidate, moduleId: module.id } : candidate,
         ),
         modules: { ...this.#state.project.modules, [module.id]: module },
-        effects: withNullVoiceInsertSlots(this.#state.project.effects, module.id, seed.voiceIds),
+        effects: withModuleEffectChain(this.#state.project.effects, module.id),
       },
       "module-add",
       [module.id, slotId],
@@ -1276,7 +1626,7 @@ export class PulseStore {
         modules: { ...this.#state.project.modules, [module.id]: module },
         patterns,
         automationLanes,
-        effects: this.#duplicateVoiceInserts(this.#state.project.effects, moduleId, module.id, seed.voiceIds),
+        effects: this.#duplicateModuleChain(this.#state.project.effects, moduleId, module.id),
       },
       "module-add",
       [module.id, slotId],
@@ -1292,26 +1642,35 @@ export class PulseStore {
     const modules = Object.fromEntries(
       Object.entries(this.#state.project.modules).filter(([id]) => id !== moduleId),
     ) as Readonly<Record<ModuleInstanceId, RackModuleState>>;
+    const removedEffectIds = new Set(
+      (this.#state.project.effects.moduleChains[moduleId] ?? []).filter(
+        (effectId): effectId is EffectInstanceId => effectId !== null,
+      ),
+    );
     const removedLaneIds = new Set(
       Object.values(this.#state.project.automationLanes)
-        .filter((lane) => lane.targetId === moduleId)
+        .filter(
+          (lane) =>
+            lane.targetId === moduleId ||
+            (lane.scope === "effect" && removedEffectIds.has(lane.targetId as EffectInstanceId)),
+        )
         .map((lane) => lane.id),
     );
     const automationLanes = Object.fromEntries(
       Object.entries(this.#state.project.automationLanes).filter(([id]) => !removedLaneIds.has(id as never)),
     );
-    const patterns = this.#state.project.patterns.map((pattern) => {
-      if (pattern.parts[moduleId] === undefined && removedLaneIds.size === 0) return pattern;
-      const parts = Object.fromEntries(
-        Object.entries(pattern.parts).filter(([id]) => id !== moduleId),
-      ) as Readonly<Record<ModuleInstanceId, PatternPartState>>;
-      return {
-        ...pattern,
-        parts,
-        automationLaneIds: pattern.automationLaneIds.filter((id) => !removedLaneIds.has(id)),
-        modifiedAt: this.#now(),
-      };
-    });
+    const patterns = removeAutomationLaneReferences(
+      this.#state.project.patterns.map((pattern) => {
+        if (pattern.parts[moduleId] === undefined) return pattern;
+        return {
+          ...pattern,
+          parts: Object.fromEntries(Object.entries(pattern.parts).filter(([id]) => id !== moduleId)),
+          modifiedAt: this.#now(),
+        };
+      }),
+      removedLaneIds,
+      this.#now,
+    );
     return this.#projectTransition(
       {
         ...this.#state.project,
@@ -1321,7 +1680,7 @@ export class PulseStore {
         modules,
         patterns,
         automationLanes,
-        effects: withoutModuleVoiceInserts(this.#state.project.effects, moduleId),
+        effects: withoutModuleEffectChain(this.#state.project.effects, moduleId),
       },
       "module-remove",
       [moduleId],
@@ -1406,11 +1765,7 @@ export class PulseStore {
       {
         ...this.#state.project,
         modules: { ...this.#state.project.modules, [moduleId]: nextModule },
-        effects: withNullVoiceInsertSlots(
-          withoutModuleVoiceInserts(this.#state.project.effects, moduleId),
-          moduleId,
-          seed.voiceIds,
-        ),
+        effects: withModuleEffectChain(this.#state.project.effects, moduleId),
       },
       "module-swap",
       [moduleId],
@@ -1453,105 +1808,31 @@ export class PulseStore {
     );
   }
 
-  #setVoiceInsert(moduleId: ModuleInstanceId, voiceId: VoiceId, effectPluginId: PluginId | null) {
-    if (this.#state.project.modules[moduleId] === undefined) {
-      return {
-        error: rejected("payload.moduleId", "Module does not exist.", "Edit a loaded module."),
-      };
-    }
-    const slots = this.#state.project.effects.voiceInserts[moduleId];
-    if (slots === undefined || !Object.hasOwn(slots, voiceId)) {
-      return {
-        error: rejected(
-          "payload.voiceId",
-          "Voice does not support an insert slot.",
-          "Choose a drum voice with an insert slot.",
-        ),
-      };
-    }
-    const currentEffectId = slots[voiceId] ?? null;
-    const currentEffect =
-      currentEffectId === null ? undefined : this.#state.project.effects.instances[currentEffectId];
-    if (effectPluginId !== null && currentEffect?.pluginId === effectPluginId) {
-      return { state: this.#state, projectChanged: false as const };
-    }
-    if (effectPluginId === null && currentEffectId === null) {
-      return { state: this.#state, projectChanged: false as const };
-    }
-
-    const nextSlots: Record<VoiceId, EffectInstanceId | null> = { ...slots };
-    const nextInstances: Record<EffectInstanceId, EffectInstanceState> = {
-      ...this.#state.project.effects.instances,
-    };
-    let nextEffectId: EffectInstanceId | null = null;
-    if (effectPluginId !== null) {
-      const candidateId = createEffectInstanceId(this.#idFactory);
-      const effect = this.#createVoiceInsertEffect?.(candidateId, effectPluginId);
-      if (effect?.id !== candidateId || effect.pluginId !== effectPluginId) {
-        return {
-          error: rejected(
-            "payload.effectPluginId",
-            "Voice insert effect is not registered.",
-            "Choose an available voice insert effect.",
-          ),
-        };
-      }
-      nextEffectId = candidateId;
-      nextInstances[candidateId] = effect;
-    }
-    nextSlots[voiceId] = nextEffectId;
-    const effects = pruneUnreferencedEffects({
-      instances: nextInstances,
-      voiceInserts: { ...this.#state.project.effects.voiceInserts, [moduleId]: nextSlots },
-    });
-    const targetIds =
-      nextEffectId === null
-        ? currentEffectId === null
-          ? [moduleId, voiceId]
-          : [moduleId, voiceId, currentEffectId]
-        : [moduleId, voiceId, nextEffectId];
-    return this.#projectTransition(
-      { ...this.#state.project, effects },
-      "module-effects-set",
-      targetIds,
-      { moduleId, voiceId, effectInstanceId: nextEffectId, effectPluginId },
-    );
-  }
-
-  #duplicateVoiceInserts(
+  #duplicateModuleChain(
     effects: EffectsState,
     sourceModuleId: ModuleInstanceId,
     targetModuleId: ModuleInstanceId,
-    targetVoiceIds: readonly VoiceId[] | undefined,
   ): EffectsState {
-    const sourceSlots = effects.voiceInserts[sourceModuleId];
-    if (sourceSlots === undefined) {
-      return withNullVoiceInsertSlots(effects, targetModuleId, targetVoiceIds);
-    }
     const instances: Record<EffectInstanceId, EffectInstanceState> = { ...effects.instances };
-    const slots: Record<VoiceId, EffectInstanceId | null> = {};
-    for (const [rawVoiceId, sourceEffectId] of Object.entries(sourceSlots)) {
-      const voiceId = rawVoiceId as VoiceId;
-      if (sourceEffectId === null) {
-        slots[voiceId] = null;
-        continue;
-      }
-      const sourceEffect = effects.instances[sourceEffectId];
-      if (sourceEffect === undefined) {
-        slots[voiceId] = null;
-        continue;
-      }
-      const cloneId = createEffectInstanceId(this.#idFactory);
-      instances[cloneId] = {
-        ...sourceEffect,
-        id: cloneId,
-        state: { ...sourceEffect.state },
-      };
-      slots[voiceId] = cloneId;
+    const sourceChain = effects.moduleChains[sourceModuleId];
+    const moduleChains: Record<ModuleInstanceId, EffectChainSlots> = { ...effects.moduleChains };
+    if (sourceChain === undefined) {
+      moduleChains[targetModuleId] = Array.from({ length: 8 }, () => null);
+    } else {
+      const clonedSlots = sourceChain.map((sourceEffectId) => {
+        if (sourceEffectId === null) return null;
+        const sourceEffect = effects.instances[sourceEffectId];
+        if (sourceEffect === undefined) return null;
+        const cloneId = createEffectInstanceId(this.#idFactory);
+        instances[cloneId] = { ...sourceEffect, id: cloneId, state: { ...sourceEffect.state } };
+        return cloneId;
+      });
+      moduleChains[targetModuleId] = clonedSlots;
     }
     return {
+      ...effects,
       instances,
-      voiceInserts: { ...effects.voiceInserts, [targetModuleId]: slots },
+      moduleChains,
     };
   }
 
@@ -1614,7 +1895,40 @@ export class PulseStore {
     return {
       state: {
         ...this.#state,
-        ui: { ...this.#state.ui, pianoRollParameter: normalized },
+        ui: { ...this.#state.ui, pianoRollParameter: normalized, pianoRollAutomationTarget: undefined },
+      },
+      projectChanged: false as const,
+    };
+  }
+
+  #setPianoRollAutomationTarget(target: PulseState["ui"]["pianoRollAutomationTarget"]) {
+    if (target === undefined) {
+      if (this.#state.ui.pianoRollAutomationTarget === undefined)
+        return { state: this.#state, projectChanged: false as const };
+      return {
+        state: { ...this.#state, ui: { ...this.#state.ui, pianoRollAutomationTarget: undefined } },
+        projectChanged: false as const,
+      };
+    }
+    const issue = validateExternalAutomationTarget(
+      this.#state.project,
+      target.scope,
+      target.targetId,
+      target.parameterId,
+    );
+    if (issue !== undefined) {
+      return { error: rejected("payload.target", issue, "Choose an automatable current control.") };
+    }
+    if (sameStructuredValue(this.#state.ui.pianoRollAutomationTarget, target))
+      return { state: this.#state, projectChanged: false as const };
+    return {
+      state: {
+        ...this.#state,
+        ui: {
+          ...this.#state.ui,
+          pianoRollParameter: target.parameterId,
+          pianoRollAutomationTarget: { ...target },
+        },
       },
       projectChanged: false as const,
     };
@@ -1756,8 +2070,12 @@ export class PulseStore {
   }
 
   #setAutomationLaneSteps(
-    payload: Extract<PulseCommand, { readonly type: "automation-lane-steps-set" }>["payload"],
+    commandPayload: Extract<PulseCommand, { readonly type: "automation-lane-steps-set" }>["payload"],
   ) {
+    if (commandPayload.scope !== undefined && commandPayload.scope !== "module") {
+      return this.#setExternalAutomationLaneSteps(commandPayload);
+    }
+    const payload = commandPayload;
     const pattern = this.#requirePattern("payload.patternId", payload.patternId);
     if ("error" in pattern) return pattern;
     const module = this.#state.project.modules[payload.moduleId];
@@ -1877,6 +2195,77 @@ export class PulseStore {
     );
   }
 
+  #setExternalAutomationLaneSteps(
+    payload: Extract<PulseCommand, { readonly type: "automation-lane-steps-set" }>["payload"],
+  ) {
+    if (payload.scope === undefined || payload.scope === "module") {
+      return { error: rejected("payload.scope", "Automation scope is invalid.", "Choose a mixer, send, effect, or master control.") };
+    }
+    const pattern = this.#requirePattern("payload.patternId", payload.patternId);
+    if ("error" in pattern) return pattern;
+    const targetId = payload.targetId;
+    if (targetId === undefined) {
+      return {
+        error: rejected(
+          "payload.targetId",
+          "Automation target is missing.",
+          "Choose an automatable current control.",
+        ),
+      };
+    }
+    const issue = validateExternalAutomationTarget(this.#state.project, payload.scope, targetId, payload.parameterId);
+    if (issue !== undefined) return { error: rejected("payload", issue, "Choose an automatable current control.") };
+    const maximumTick = pattern.durationBars * 16 * PATTERN_TICKS_PER_STEP;
+    const seenTicks = new Set<number>();
+    const steps = payload.steps.map((step) => ({ tick: step.tick, value: step.value })).sort((left, right) => left.tick - right.tick);
+    for (const [index, step] of steps.entries()) {
+      if (!Number.isSafeInteger(step.tick) || step.tick < 0 || step.tick >= maximumTick || step.tick % PATTERN_TICKS_PER_STEP !== 0 || seenTicks.has(step.tick)) {
+        return { error: rejected(`payload.steps[${String(index)}].tick`, "Automation steps must use unique 1/16 positions inside the Pattern.", "Use one fixed-grid step inside the Pattern.") };
+      }
+      const effect =
+        payload.scope === "effect"
+          ? this.#state.project.effects.instances[targetId as EffectInstanceId]
+          : undefined;
+      const effectValueIsValid =
+        effect === undefined ||
+        payload.parameterId === "wet-dry" ||
+        payload.parameterId === "bypassed" ||
+        this.#validateEffectParameter === undefined ||
+        this.#validateEffectParameter(effect, payload.parameterId, step.value);
+      if (
+        !isExternalAutomationValueValid(
+          this.#state.project,
+          payload.scope,
+          targetId,
+          payload.parameterId,
+          step.value,
+        ) ||
+        !effectValueIsValid
+      ) {
+        return { error: rejected(`payload.steps[${String(index)}].value`, "Automation value is invalid.", "Use a value in the parameter range.") };
+      }
+      seenTicks.add(step.tick);
+    }
+    const existing = Object.values(this.#state.project.automationLanes).find((lane) => lane.patternId === pattern.id && lane.scope === payload.scope && lane.targetId === targetId && lane.parameterId === payload.parameterId);
+    if (existing !== undefined && sameStructuredValue(existing.steps, steps)) return { state: this.#state, projectChanged: false as const };
+    let automationLanes = this.#state.project.automationLanes;
+    let automationLaneIds = pattern.automationLaneIds;
+    if (steps.length === 0) {
+      if (existing === undefined) return { state: this.#state, projectChanged: false as const };
+      automationLanes = Object.fromEntries(Object.entries(automationLanes).filter(([id]) => id !== existing.id));
+      automationLaneIds = automationLaneIds.filter((id) => id !== existing.id);
+    } else if (existing === undefined) {
+      const id = createAutomationLaneId(this.#idFactory);
+      automationLanes = { ...automationLanes, [id]: { id, scope: payload.scope, targetId, parameterId: payload.parameterId, patternId: pattern.id, stepTicks: PATTERN_TICKS_PER_STEP, steps } };
+      automationLaneIds = [...automationLaneIds, id];
+    } else automationLanes = { ...automationLanes, [existing.id]: { ...existing, steps } };
+    const nextPattern = { ...pattern, automationLaneIds, modifiedAt: this.#now() };
+    return this.#projectTransition(
+      { ...this.#state.project, automationLanes, patterns: this.#state.project.patterns.map((candidate) => candidate.id === pattern.id ? nextPattern : candidate) },
+      "pattern-events-set", [], { patternId: pattern.id, scope: payload.scope, targetId, parameterId: payload.parameterId, steps },
+    );
+  }
+
   #transferPatternPartEvents(payload: Extract<PulseCommand, { readonly type: "pattern-part-events-transfer" }> ["payload"]) {
     const sourcePattern = this.#requirePattern("payload.fromPatternId", payload.fromPatternId);
     if ("error" in sourcePattern) return sourcePattern;
@@ -1950,7 +2339,11 @@ export class PulseStore {
     const revision = incrementRevision(this.#state.project.revision, this.#idFactory);
     const nextProject = { ...project, revision };
     return {
-      state: { ...this.#state, project: nextProject, ui: { ...this.#state.ui, ...uiPatch } },
+      state: {
+        ...this.#state,
+        project: nextProject,
+        ui: reconcileUiReferences(nextProject, { ...this.#state.ui, ...uiPatch }),
+      },
       projectChanged: true as const,
       delta: { kind, projectRevision: revision, targetIds, payload },
     };
@@ -2090,7 +2483,7 @@ function cloneAutomationLane(
   lane: AutomationLaneState,
   id: AutomationLaneId,
   patternId: PatternId,
-  targetId: ModuleInstanceId,
+  targetId: AutomationTargetId,
 ): AutomationLaneState {
   return {
     ...lane,
@@ -2520,7 +2913,18 @@ function reconcileUiReferences(project: ProjectState, ui: PulseState["ui"]): Pul
     selection !== undefined && selectedModuleId === selection.moduleId && eventIds.length > 0
       ? { ...selection, eventIds }
       : undefined;
-  return { ...ui, selectedModuleId, pianoRollSelection };
+  const automationTarget = ui.pianoRollAutomationTarget;
+  const pianoRollAutomationTarget =
+    automationTarget !== undefined &&
+    validateExternalAutomationTarget(
+      project,
+      automationTarget.scope,
+      automationTarget.targetId,
+      automationTarget.parameterId,
+    ) === undefined
+      ? automationTarget
+      : undefined;
+  return { ...ui, selectedModuleId, pianoRollSelection, pianoRollAutomationTarget };
 }
 
 function sameProjectContent(left: ProjectState, right: ProjectState): boolean {
@@ -2541,45 +2945,264 @@ function sameProjectContent(left: ProjectState, right: ProjectState): boolean {
   );
 }
 
-function withNullVoiceInsertSlots(
-  effects: EffectsState,
-  moduleId: ModuleInstanceId,
-  voiceIds: readonly VoiceId[] | undefined,
-): EffectsState {
-  const voiceInserts: Record<ModuleInstanceId, VoiceInsertSlots> = { ...effects.voiceInserts };
-  if (voiceIds === undefined || voiceIds.length === 0) {
-    return withoutModuleVoiceInserts(effects, moduleId);
-  }
-  const slots: Record<VoiceId, EffectInstanceId | null> = {};
-  for (const voiceId of voiceIds) slots[voiceId] = null;
-  voiceInserts[moduleId] = slots;
-  return pruneUnreferencedEffects({ instances: effects.instances, voiceInserts });
+function withModuleEffectChain(effects: EffectsState, moduleId: ModuleInstanceId): EffectsState {
+  const moduleChains = effects.moduleChains[moduleId] === undefined
+    ? { ...effects.moduleChains, [moduleId]: Array.from({ length: 8 }, () => null) }
+    : effects.moduleChains;
+  return pruneUnreferencedEffects({ ...effects, moduleChains });
 }
 
-function withoutModuleVoiceInserts(effects: EffectsState, moduleId: ModuleInstanceId): EffectsState {
-  if (effects.voiceInserts[moduleId] === undefined) return effects;
-  const voiceInserts = Object.entries(effects.voiceInserts).reduce<
-    Record<ModuleInstanceId, VoiceInsertSlots>
-  >((next, [rawModuleId, slots]) => {
-    if (rawModuleId !== moduleId) next[rawModuleId as ModuleInstanceId] = slots;
-    return next;
-  }, {});
-  return pruneUnreferencedEffects({ instances: effects.instances, voiceInserts });
+function withoutModuleEffectChain(effects: EffectsState, moduleId: ModuleInstanceId): EffectsState {
+  const moduleChains = Object.entries(effects.moduleChains).reduce<Record<ModuleInstanceId, EffectChainSlots>>(
+    (next, [rawModuleId, slots]) => {
+      if (rawModuleId !== moduleId) next[rawModuleId as ModuleInstanceId] = slots;
+      return next;
+    },
+    {},
+  );
+  return pruneUnreferencedEffects({ ...effects, moduleChains });
 }
 
 function pruneUnreferencedEffects(effects: EffectsState): EffectsState {
   const referenced = new Set<EffectInstanceId>();
-  for (const slots of Object.values(effects.voiceInserts)) {
-    for (const effectId of Object.values(slots)) {
-      if (effectId !== null) referenced.add(effectId);
-    }
+  for (const slots of Object.values(effects.moduleChains)) {
+    for (const effectId of slots) if (effectId !== null) referenced.add(effectId);
   }
+  for (const chain of Object.values(effects.sendChains)) {
+    for (const effectId of chain.slots) if (effectId !== null) referenced.add(effectId);
+  }
+  for (const effectId of effects.masterChain) if (effectId !== null) referenced.add(effectId);
   const instances: Record<EffectInstanceId, EffectInstanceState> = {};
   for (const [rawId, instance] of Object.entries(effects.instances)) {
     const id = rawId as EffectInstanceId;
     if (referenced.has(id)) instances[id] = instance;
   }
-  return { instances, voiceInserts: effects.voiceInserts };
+  return { ...effects, instances };
+}
+
+type EffectChainTarget =
+  | { readonly scope: "module"; readonly targetId: ModuleInstanceId }
+  | { readonly scope: "send"; readonly targetId: SendBusId }
+  | { readonly scope: "master" };
+
+function effectPlacementForChain(chain: EffectChainTarget): ChainEffectPlacement {
+  if (chain.scope === "module") return "module-pedalboard";
+  if (chain.scope === "send") return "send-chain";
+  return "master-chain";
+}
+
+function removeAutomationLaneReferences(
+  patterns: readonly PatternState[],
+  removedLaneIds: ReadonlySet<AutomationLaneId>,
+  now: () => string,
+): readonly PatternState[] {
+  if (removedLaneIds.size === 0) return patterns;
+  return patterns.map((pattern) => {
+    const automationLaneIds = pattern.automationLaneIds.filter(
+      (id) => !removedLaneIds.has(id),
+    );
+    const parts = Object.fromEntries(
+      Object.entries(pattern.parts).map(([moduleId, part]) => [
+        moduleId,
+        {
+          ...part,
+          automationLaneIds: part.automationLaneIds.filter(
+            (id) => !removedLaneIds.has(id),
+          ),
+        },
+      ]),
+    ) as Readonly<Record<ModuleInstanceId, PatternPartState>>;
+    const changed =
+      automationLaneIds.length !== pattern.automationLaneIds.length ||
+      Object.values(pattern.parts).some(
+        (part) => parts[part.moduleId]?.automationLaneIds.length !== part.automationLaneIds.length,
+      );
+    return changed
+      ? { ...pattern, automationLaneIds, parts, modifiedAt: now() }
+      : pattern;
+  });
+}
+
+interface LocatedEffectChain {
+  readonly chain: EffectChainTarget;
+  readonly slots: EffectChainSlots;
+  readonly isMaster: boolean;
+}
+
+interface LocatedEffectInstance extends LocatedEffectChain {
+  readonly isProtectedLimiter: boolean;
+}
+
+function locateEffectChain(effects: EffectsState, chain: EffectChainTarget): LocatedEffectChain | undefined {
+  if (chain.scope === "module") {
+    const slots = effects.moduleChains[chain.targetId];
+    return slots === undefined ? undefined : { chain, slots, isMaster: false };
+  }
+  if (chain.scope === "send") {
+    const send = effects.sendChains[chain.targetId];
+    return send === undefined ? undefined : { chain, slots: send.slots, isMaster: false };
+  }
+  return { chain, slots: effects.masterChain, isMaster: true };
+}
+
+function locateEffectInstance(effects: EffectsState, effectId: EffectInstanceId): LocatedEffectInstance | undefined {
+  for (const [rawModuleId, slots] of Object.entries(effects.moduleChains)) {
+    if (!slots.includes(effectId)) continue;
+    return {
+      chain: { scope: "module", targetId: rawModuleId as ModuleInstanceId },
+      slots,
+      isMaster: false,
+      isProtectedLimiter: false,
+    };
+  }
+  for (const sendBusId of SEND_BUS_IDS) {
+    const send = effects.sendChains[sendBusId];
+    if (!send?.slots.includes(effectId)) continue;
+    return { chain: { scope: "send", targetId: sendBusId }, slots: send.slots, isMaster: false, isProtectedLimiter: false };
+  }
+  if (effects.masterChain.includes(effectId)) {
+    const finalId = [...effects.masterChain].reverse().find((id) => id !== null);
+    const instance = effects.instances[effectId];
+    return {
+      chain: { scope: "master" },
+      slots: effects.masterChain,
+      isMaster: true,
+      isProtectedLimiter: finalId === effectId && instance?.pluginId === PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
+    };
+  }
+  return undefined;
+}
+
+function effectAudioPayload(
+  effects: EffectsState,
+  effectId: EffectInstanceId,
+  payload: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const located = locateEffectInstance(effects, effectId);
+  if (located !== undefined) return { ...payload, chain: located.chain };
+  return payload;
+}
+
+function replaceEffectChain(effects: EffectsState, chain: EffectChainTarget, slots: EffectChainSlots): EffectsState {
+  if (chain.scope === "module") {
+    return { ...effects, moduleChains: { ...effects.moduleChains, [chain.targetId]: slots } };
+  }
+  if (chain.scope === "send") {
+    const current = effects.sendChains[chain.targetId];
+    if (current === undefined) return effects;
+    return { ...effects, sendChains: { ...effects.sendChains, [chain.targetId]: { ...current, slots } } };
+  }
+  return { ...effects, masterChain: slots };
+}
+
+function insertEffectInChain(
+  slots: EffectChainSlots,
+  effectId: EffectInstanceId,
+  afterEffectId: EffectInstanceId | undefined,
+  isMaster: boolean,
+): EffectChainSlots | undefined {
+  const occupied = slots.filter((id): id is EffectInstanceId => id !== null);
+  if (occupied.length >= slots.length) return undefined;
+  const protectedId = isMaster ? occupied.at(-1) : undefined;
+  const editable = protectedId === undefined ? occupied : occupied.slice(0, -1);
+  if (afterEffectId !== undefined && !editable.includes(afterEffectId)) return undefined;
+  const index = afterEffectId === undefined ? editable.length : editable.indexOf(afterEffectId) + 1;
+  const nextEditable = [...editable.slice(0, index), effectId, ...editable.slice(index)];
+  return isMaster
+    ? packMasterChain(nextEditable, protectedId, slots.length)
+    : packChainSlots(nextEditable, slots.length);
+}
+
+function reorderEffectInChain(
+  slots: EffectChainSlots,
+  effectId: EffectInstanceId,
+  afterEffectId: EffectInstanceId | undefined,
+  isMaster: boolean,
+): EffectChainSlots | undefined {
+  const occupied = slots.filter((id): id is EffectInstanceId => id !== null);
+  const protectedId = isMaster ? occupied.at(-1) : undefined;
+  const editable = protectedId === undefined ? occupied : occupied.slice(0, -1);
+  if (!editable.includes(effectId) || (afterEffectId !== undefined && !editable.includes(afterEffectId))) return undefined;
+  const without = editable.filter((id) => id !== effectId);
+  const index = afterEffectId === undefined ? 0 : without.indexOf(afterEffectId) + 1;
+  const nextEditable = [...without.slice(0, index), effectId, ...without.slice(index)];
+  return isMaster
+    ? packMasterChain(nextEditable, protectedId, slots.length)
+    : packChainSlots(nextEditable, slots.length);
+}
+
+function packChainSlots(occupied: readonly EffectInstanceId[], length: number): EffectChainSlots {
+  return [...occupied, ...Array.from({ length: length - occupied.length }, () => null)];
+}
+
+function packMasterChain(
+  editable: readonly EffectInstanceId[],
+  protectedId: EffectInstanceId | undefined,
+  length: number,
+): EffectChainSlots {
+  if (protectedId === undefined) return packChainSlots(editable, length);
+  return [
+    ...editable,
+    ...Array.from({ length: length - editable.length - 1 }, () => null),
+    protectedId,
+  ];
+}
+
+function normalizeEffectInstance(effect: EffectInstanceState): EffectInstanceState {
+  return { ...effect, state: { ...effect.state } };
+}
+
+function isParameterId(value: string): boolean {
+  return /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value) && value.length <= 64;
+}
+
+function isParameterValue(value: unknown): value is number | boolean | string {
+  return (typeof value === "number" && Number.isFinite(value)) || typeof value === "boolean" || typeof value === "string";
+}
+
+function validateExternalAutomationTarget(
+  project: ProjectState,
+  scope: Exclude<AutomationScope, "module">,
+  targetId: AutomationTargetId,
+  parameterId: string,
+): string | undefined {
+  if (!isParameterId(parameterId)) return "Automation parameter ID is invalid.";
+  if (scope === "mixer" || scope === "send") {
+    return project.modules[targetId as ModuleInstanceId] === undefined ? "Automation target module does not exist." : undefined;
+  }
+  if (scope === "effect") return project.effects.instances[targetId as EffectInstanceId] === undefined ? "Automation target effect does not exist." : undefined;
+  if (scope === "send-return") return project.effects.sendChains[targetId as SendBusId] === undefined ? "Automation target send does not exist." : undefined;
+  return targetId === "master" ? undefined : "Automation target must be the master bus.";
+}
+
+function isExternalAutomationValueValid(
+  project: ProjectState,
+  scope: Exclude<AutomationScope, "module">,
+  targetId: AutomationTargetId,
+  parameterId: string,
+  value: unknown,
+): boolean {
+  if (scope === "mixer") {
+    return (parameterId === "level" && typeof value === "number" && value >= 0 && value <= 1) ||
+      (parameterId === "pan" && typeof value === "number" && value >= -1 && value <= 1) ||
+      ((parameterId === "muted" || parameterId === "solo") && typeof value === "boolean");
+  }
+  if (scope === "send") {
+    return (
+      (/^send-[abcd]-amount$/.test(parameterId) && typeof value === "number" && value >= 0 && value <= 1) ||
+      (/^send-[abcd]-mode$/.test(parameterId) &&
+        (value === "pre-fader" || value === "post-fader"))
+    );
+  }
+  if (scope === "send-return") {
+    return (
+      (parameterId === "return-level" && typeof value === "number" && value >= 0 && value <= 1) ||
+      (parameterId === "chain-bypassed" && typeof value === "boolean")
+    );
+  }
+  if (scope === "master") return (parameterId === "level" && typeof value === "number" && value >= 0 && value <= 1) || (parameterId === "effects-bypassed" && typeof value === "boolean");
+  const effect = project.effects.instances[targetId as EffectInstanceId];
+  return effect !== undefined && (parameterId === "wet-dry" ? typeof value === "number" && value >= 0 && value <= 1 : parameterId === "bypassed" ? typeof value === "boolean" : isParameterValue(value));
 }
 
 /** Compares immutable project data without serializing the full project. */

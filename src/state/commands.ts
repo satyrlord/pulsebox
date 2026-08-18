@@ -1,17 +1,19 @@
 import type { CommandEnvelope } from "../contracts/commands";
 import type {
+  EffectInstanceId,
   ModuleInstanceId,
   NoteEventId,
   PatternId,
   RackSlotId,
+  SendBusId,
   SongPlacementId,
-  VoiceId,
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
 import type {
   PatternEvent,
   PatternEventDataInput,
   PatternScale,
+  AutomationScope,
   VoiceCycleLengthKey,
 } from "./model";
 
@@ -87,14 +89,6 @@ export type PulseCommand =
       }
     >
   | CommandEnvelope<
-      "voice-insert-set",
-      {
-        readonly moduleId: ModuleInstanceId;
-        readonly voiceId: VoiceId;
-        readonly effectPluginId: PluginId | null;
-      }
-    >
-  | CommandEnvelope<
       "pattern-events-edit",
       {
         readonly moduleId: ModuleInstanceId;
@@ -111,6 +105,10 @@ export type PulseCommand =
       }
     >
   | CommandEnvelope<"piano-roll-parameter-set", { readonly parameter: string }>
+  | CommandEnvelope<
+      "piano-roll-automation-target-set",
+      { readonly target?: { readonly scope: Exclude<AutomationScope, "module">; readonly targetId: ModuleInstanceId | SendBusId | EffectInstanceId | "master"; readonly parameterId: string } }
+    >
   | CommandEnvelope<"transport-swing-set", { readonly swing: number }>
   | CommandEnvelope<"transport-seek", { readonly positionTicks: number }>
   | CommandEnvelope<
@@ -149,12 +147,21 @@ export type PulseCommand =
     >
   | CommandEnvelope<
       "automation-lane-steps-set",
-      {
+      ({
         readonly patternId: PatternId;
         readonly moduleId: ModuleInstanceId;
         readonly parameterId: string;
         readonly steps: readonly { readonly tick: number; readonly value: number | boolean | string }[];
-      }
+        readonly scope?: "module";
+        readonly targetId?: never;
+      } | {
+        readonly patternId: PatternId;
+        readonly scope: Exclude<AutomationScope, "module">;
+        readonly targetId: ModuleInstanceId | SendBusId | EffectInstanceId | "master";
+        readonly parameterId: string;
+        readonly steps: readonly { readonly tick: number; readonly value: number | boolean | string }[];
+        readonly moduleId?: never;
+      })
     >
   | CommandEnvelope<
       "pattern-part-length-set",
@@ -207,4 +214,54 @@ export type PulseCommand =
       { readonly moduleId: ModuleInstanceId; readonly level: number }
     >
   | CommandEnvelope<"mixer-pan-set", { readonly moduleId: ModuleInstanceId; readonly pan: number }>
-  | CommandEnvelope<"mixer-master-level-set", { readonly level: number }>;
+  | CommandEnvelope<"mixer-master-level-set", { readonly level: number }>
+  | CommandEnvelope<
+      "mixer-send-amount-set",
+      { readonly moduleId: ModuleInstanceId; readonly sendBusId: SendBusId; readonly amount: number }
+    >
+  | CommandEnvelope<
+      "mixer-send-mode-set",
+      { readonly moduleId: ModuleInstanceId; readonly sendBusId: SendBusId; readonly mode: "pre-fader" | "post-fader" }
+    >
+  | CommandEnvelope<
+      "effects-chain-effect-add",
+      {
+        readonly chain: { readonly scope: "module"; readonly targetId: ModuleInstanceId } | { readonly scope: "send"; readonly targetId: SendBusId } | { readonly scope: "master" };
+        readonly effectPluginId: PluginId;
+        readonly afterEffectId?: EffectInstanceId;
+      }
+    >
+  | CommandEnvelope<"effects-chain-effect-remove", { readonly effectInstanceId: EffectInstanceId }>
+  | CommandEnvelope<
+      "effects-chain-effect-replace",
+      { readonly effectInstanceId: EffectInstanceId; readonly effectPluginId: PluginId }
+    >
+  | CommandEnvelope<
+      "effects-chain-effect-reorder",
+      { readonly effectInstanceId: EffectInstanceId; readonly afterEffectId?: EffectInstanceId }
+    >
+  | CommandEnvelope<
+      "effects-instance-bypass-set",
+      { readonly effectInstanceId: EffectInstanceId; readonly bypassed: boolean }
+    >
+  | CommandEnvelope<
+      "effects-instance-wet-dry-set",
+      { readonly effectInstanceId: EffectInstanceId; readonly wetDry: number }
+    >
+  | CommandEnvelope<
+      "effects-instance-parameter-set",
+      { readonly effectInstanceId: EffectInstanceId; readonly parameterId: string; readonly value: number | boolean | string }
+    >
+  | CommandEnvelope<
+      "effects-send-return-level-set",
+      { readonly sendBusId: SendBusId; readonly returnLevel: number }
+    >
+  | CommandEnvelope<
+      "effects-send-chain-bypass-set",
+      { readonly sendBusId: SendBusId; readonly bypassed: boolean }
+    >
+  | CommandEnvelope<
+      "effects-send-focus-set",
+      { readonly sendBusId: SendBusId; readonly effectInstanceId: EffectInstanceId | null }
+    >
+  | CommandEnvelope<"effects-master-bypass-toggle", Record<string, never>>;

@@ -31,6 +31,13 @@ The built-in `Neon Basement` template creates a fresh copy of the default
 project. The project selector contains New, Open, Import, and Export. A New
 action saves the active project before it loads the template.
 
+The specification 007 mixer and effects slice is also runnable. It includes
+eight fixed instrument strips, four send chains, module pedalboards, the master
+chain, and the complete effect catalog, including the protected master-chain
+limiter. The fixed main path and A–D channel sends are implemented. Project
+state retains routing, effect instances, pinned send focus, and master-effects
+bypass.
+
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications
 are arranged in normative build order.
@@ -165,19 +172,14 @@ Command plus A selects all events. Control or Command plus D duplicates them.
 
 ## Known limitations
 
-- Asset packs, advanced editors, rendered-audio export, and user-facing effect
-  editing belong to later roadmap phases. The drum-voice Distortion engine and
-  state foundation is present.
+- Asset packs, advanced instrument editors, and rendered-audio export belong to
+  later roadmap phases.
 - The Pattern bank holds five named Patterns and selects Verse by default. The
   lower editor creates, selects, moves, resizes, duplicates, and deletes notes.
   It also paints fixed drum triggers and edits event velocity. Swing and
-  Humanize controls remain in the shared header. Automation editing remains
-  planned.
+  Humanize controls remain in the shared header.
 - Record arms and disarms only. Live recording and its count-in settings belong
   to the specification 006 phase.
-- The mixer covers level, pan, mute, solo, and master level. Send buttons open
-  the applicable empty send-chain summary. Send routing, module and master
-  inserts, master-effects bypass, and the master chain remain planned.
 - Silver Serpent and Tin Soldier implement their Phase 1 sound and compact-rack
   foundation. Expanded per-module editors remain planned for all six
   instruments: manifests declare editor sections, but no UI reads them yet.
@@ -185,17 +187,16 @@ Command plus A selects all events. Control or Command plus D duplicates them.
   detune, clean or dirty filter model, or the compact filter-response
   visualization from specification 005 section 15.1. Twin Engine does not yet
   draw its waveform preview.
-- Per-slot enable or bypass and per-slot output routing are not yet
-  implemented. Drum voices have one saved Distortion insert slot, but its
-  control waits for the expanded instrument editor. Generated sample layers use
-  click-safe playback boundaries where the drum module uses them. User
+- The fixed main path and A–D channel sends are implemented. Arbitrary output
+  destinations and fixed subgroups are outside the MVP. Drum voices have a
+  direct Distortion control. Generated sample layers use click-safe playback
+  boundaries where the drum module uses them. User
   choke-group assignment and per-voice metering remain planned.
   Per-step probability, micro-timing, flam, and roll wait for the specification
   006 editing surface.
 - The default project stores sixteen-step Patterns. The specification 005
   named-Pattern bar lengths, the time-signature field, and a stored
-  quantize-strength value remain planned. Default send effects and the master
-  chain wait for the specification 007 effect plugins.
+  quantize-strength value remain planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
 - Files under `design/` are normally non-normative prototypes, not production

@@ -61,14 +61,16 @@ The merged MVP is complete only when:
     numbers identify them visually. They expose their Empty state accessibly.
 19. **AC-019.** No mixer banking, channels 9–16, or horizontal mixer scrolling exists in the
     MVP.
-20. **AC-020.** Mute, solo, fader, pan, the visible 2 × 2 A–D module-send grid,
-    and exclusive single-channel pre-fader Monitor audition affect audio as
-    specified. Monitor never doubles the selected channel, and displayed master
-    meters follow the physical monitor signal while it is active.
-21. **AC-021.** Voice level, tune, decay, pan, blend, mute, solo, and voice inserts affect
-    audio. Voice-level sends do not exist.
-22. **AC-022.** Voice inserts work.
-23. **AC-023.** Module pedalboards work.
+20. **AC-020.** Mute, solo, fader, pan, and the visible 2 × 2 A–D module-send
+    grid affect audio as specified. Each channel uses the fixed main path and
+    four sends. Fixed subgroups and arbitrary routing are outside the MVP.
+    Mixer channels have no expansion controls.
+21. **AC-021.** Voice level, tune, decay, pan, blend, mute, solo, and Distortion
+    affect audio. Voice-level sends do not exist.
+22. **AC-022.** Each drum voice has a direct Distortion rotary control. Zero is
+    dry, and a non-zero value affects only that voice.
+23. **AC-023.** Module pedalboards work. The instrument rack is their only entry
+    point.
 24. **AC-024.** Four modular send chains work. Each compact card uses a pinned
     focus effect and that plugin's four declared compact controls.
 25. **AC-025.** The master chain works.
@@ -96,7 +98,7 @@ The merged MVP is complete only when:
 35. **AC-035.** Multiple tabs follow last-writer-wins behavior.
 36. **AC-036.** Master WAV export is unnormalized 16-bit, 44.1 kHz PCM with deterministic
     TPDF dither and high-quality deterministic resampling.
-37. **AC-037.** Stem export produces post-module-insert, post-fader rack stems and separate
+37. **AC-037.** Stem export produces post-module-pedalboard, post-fader rack stems and separate
     send-return stems before the master chain, plus a master mix that includes
     the master chain.
 38. **AC-038.** Projects reload and sound the same within the deterministic manifest,
@@ -154,8 +156,8 @@ The merged MVP is complete only when:
 59. **AC-059.** No visible control is fake or decorative.
 60. **AC-060.** Final documentation is complete.
 61. **AC-061.** Final self-critique fixes all acceptance-blocking gaps.
-62. **AC-062.** Mixer strips use a fixed structure with swappable processing modules and
-    insert chains.
+62. **AC-062.** Mixer strips use a fixed structure without a processing expansion.
+    Each module pedalboard is available only from the instrument rack.
 63. **AC-063.** On a warm cache, audible playback begins within three seconds in every run
     of the five-run Chrome procedure in section 21.8.
 64. **AC-064.** The compact Pattern/Song toggle sits left of transport and
@@ -175,7 +177,7 @@ The merged MVP is complete only when:
     defines beats per minute.
 68. **AC-068.** The visible mixer uses fixed compact strips. Every instrument
     strip keeps its A–D sends visible as a 2 × 2 button grid. Channel selection
-    or detail editing does not resize the mixer. Empty strips remain
+    does not resize the mixer. Empty strips remain
     visible under their two-digit slot numbers, and the master strip carries no
     A–D send or return grid.
 69. **AC-069.** One module-aware Piano Roll switches between monophonic pitched
@@ -207,11 +209,14 @@ The merged MVP is complete only when:
     sources.
 76. **AC-076.** The header always shows two master meters and one L/R or M/S
     analysis toggle. The toggle changes no audio, project state, automation,
-    Undo, or export. Mono remains a separate transient control in the Master
-    studio view. It folds down live monitoring after the master chain. It does
-    not affect WAV or stem export.
-77. **AC-077.** At least four of five unfamiliar participants start the supplied loop
-    without assistance within one minute under the procedure in section 24.4.
+    Undo, or export.
+77. **AC-077.** A fresh persistent Chrome profile at
+    `http://127.0.0.1:4173` loads the supplied `Neon Basement` loop. The project
+    selector reads `Current project: Neon Basement`. Six rack modules are loaded.
+    The Play control has title `Play. Space.`. The selected Pattern has a stable
+    UUID. The `Silver Serpent events in Verse` group is visible. The stored
+    project list reads `No stored projects yet.`. The owner-run procedure is in
+    `tests/e2e/first-sound-release.spec.ts`.
 78. **AC-078.** Development and built-product launch use
     `http://127.0.0.1:4173`. A busy port fails visibly instead of selecting a
     different origin.

@@ -4,7 +4,6 @@ import {
   decodeVoiceParameterChanges,
   decodeVoiceParameterObject,
 } from "../../dsp/voice-parameter-routing";
-import { decodeVoiceInsertConfigurations } from "../../effects";
 import { WorkletVoiceProcessor } from "../../worklets/worklet-voice-processor";
 import { BoomEightDsp, type BoomEightParameters, type BoomVoiceParameters } from "./dsp-core";
 import { BOOM_VOICE_IDS, boomVoiceForNote, type BoomVoiceId } from "./voices";
@@ -20,7 +19,7 @@ function isBoomVoiceId(value: string): value is BoomVoiceId {
 
 const SHAPE = {
   moduleFields: new Set(["level", "compression", "tone"]),
-  voiceFields: new Set<string>(["tune", "punch", "decay", "level", "pan"]),
+  voiceFields: new Set<string>(["tune", "punch", "decay", "distortion", "level", "pan"]),
   booleanVoiceFields: new Set<string>(["mute", "solo"]),
   isVoiceId: isBoomVoiceId,
 } as const;
@@ -55,12 +54,6 @@ class BoomEightProcessor extends WorkletVoiceProcessor<PartialParameters> {
       // knob drag ramps, so the audible mix-bus controls cannot step or click.
       immediate ? "immediate" : "smooth",
     );
-  }
-
-  protected override applyVoiceInserts(value: unknown): boolean {
-    if (value === undefined) return this.#dsp.setVoiceInserts({});
-    const inserts = decodeVoiceInsertConfigurations(value, isBoomVoiceId);
-    return inserts !== undefined && this.#dsp.setVoiceInserts(inserts);
   }
 
   protected triggerNoteOn(note: number, velocity: number, accent: boolean): void {

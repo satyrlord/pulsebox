@@ -19,5 +19,17 @@ export default defineConfig({
     // Decision D96 makes Chrome the only supported browser, so one Chromium
     // baseline replaces the former multi-engine list.
     target: "chrome111",
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "vendor",
+              test: /node_modules[\\/]/,
+            },
+          ],
+        },
+      },
+    },
   },
 });

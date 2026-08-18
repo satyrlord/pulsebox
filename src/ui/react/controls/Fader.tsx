@@ -4,6 +4,7 @@ import type { GestureId } from "../../../contracts";
 import { cx } from "../class-names";
 import styles from "./Fader.module.css";
 import { Tooltip } from "./Tooltip";
+import { automationShortcut } from "./automation-shortcut";
 import { useRangeGesture } from "./use-range-gesture";
 import { ValuePopover } from "./ValuePopover";
 
@@ -24,6 +25,8 @@ export interface FaderProps {
   readonly disabled?: boolean;
   readonly onInput?: (value: number) => void;
   readonly onCommit: (value: number, gestureId: GestureId) => void;
+  /** Arms this control as the active Piano Roll lane. */
+  readonly onAutomate?: () => void;
 }
 
 /** The machined fader cap height in CSS pixels. */
@@ -62,7 +65,9 @@ export function Fader({
   disabled = false,
   onInput,
   onCommit,
+  onAutomate,
 }: FaderProps) {
+  const automation = automationShortcut(onAutomate);
   const [dragRange, setDragRange] = useState(MINIMUM_DRAG_RANGE);
   const {
     displayValue,
@@ -137,7 +142,16 @@ export function Fader({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        onKeyDown={disabled ? undefined : onKeyDown}
+        aria-keyshortcuts={automation.ariaKeyShortcuts}
+        onKeyDown={
+          disabled
+            ? undefined
+            : (event) => {
+                if (automation.onKeyDown(event)) return;
+                onKeyDown(event);
+              }
+        }
+        onContextMenu={onAutomate === undefined ? undefined : automation.onContextMenu}
         onKeyUp={onKeyUp}
         onBlur={onBlur}
         onDoubleClick={disabled ? undefined : onDoubleClick}

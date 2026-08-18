@@ -28,7 +28,6 @@ import {
   softClip,
   VoiceMixGates,
 } from "../../dsp/primitives";
-import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { DIGIT_FIVE_VOICE_IDS, type DigitFiveVoiceId } from "./voices";
 
 /**
@@ -104,6 +103,7 @@ const DEFAULT_DIGIT_FIVE_VOICE_PARAMETERS: Readonly<
         tune: 0,
         decay: VOICE_CHARACTER[id].decay,
         level: 0.8,
+        distortion: 0,
         // Percussion spreads across the field; the kit core stays centred.
         pan:
           id === "conga"
@@ -151,7 +151,6 @@ export class DigitFiveDsp {
   readonly #filter: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<DigitFiveVoiceId, EqualPowerPan>>;
-  readonly #voiceInserts: Readonly<Record<DigitFiveVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly DigitalDrumVoice[];
   #parameters: DigitFiveParameters = DEFAULT_DIGIT_FIVE_PARAMETERS;
@@ -170,9 +169,6 @@ export class DigitFiveDsp {
         new EqualPowerPan(DEFAULT_DIGIT_FIVE_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<DigitFiveVoiceId, EqualPowerPan>;
-    this.#voiceInserts = Object.fromEntries(
-      DIGIT_FIVE_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
-    ) as Record<DigitFiveVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       DIGIT_FIVE_VOICE_IDS.map((id) => [
         id,
@@ -221,19 +217,6 @@ export class DigitFiveDsp {
 
   getParameterSnapshot(): DigitFiveParameters {
     return this.#parameters;
-  }
-
-  setVoiceInserts(
-    configurations: Readonly<
-      Partial<Record<DigitFiveVoiceId, VoiceInsertConfiguration | null>>
-    >,
-  ): boolean {
-    let accepted = true;
-    for (const voiceId of DIGIT_FIVE_VOICE_IDS) {
-      const host = this.#voiceInserts[voiceId];
-      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.isActive() === true) && accepted;
-    }
-    return accepted;
   }
 
   trigger(voiceId: DigitFiveVoiceId, velocity = 1, accent = false): void {
@@ -301,7 +284,7 @@ export class DigitFiveDsp {
         if (!voice.isActive()) continue;
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
-        const sample = voice.render(bits, rate, this.#voiceInserts[voiceId]);
+        const sample = voice.render(bits, rate);
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

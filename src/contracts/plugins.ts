@@ -162,7 +162,7 @@ export interface InstrumentPluginManifest extends BasePluginManifest {
   readonly renderCapabilities: PluginRenderCapabilities;
 }
 
-export type EffectPlacement = "voice-insert" | "module-pedalboard" | "send-chain" | "master-chain";
+export type EffectPlacement = "module-pedalboard" | "send-chain" | "master-chain";
 
 export interface EffectLatencyDescriptor {
   readonly mode: "zero" | "fixed-frames";
@@ -773,7 +773,7 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
     if (
       manifest.placements.some(
         (placement) =>
-          !isOneOf(placement, ["voice-insert", "module-pedalboard", "send-chain", "master-chain"]),
+          !isOneOf(placement, ["module-pedalboard", "send-chain", "master-chain"]),
       ) ||
       manifest.inputChannels.length === 0 ||
       manifest.inputChannels.some((channels) => !isChannelCount(channels, false)) ||

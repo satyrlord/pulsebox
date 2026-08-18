@@ -35,7 +35,12 @@ describe("EditorWorkspace", () => {
     expect(screen.getByRole("combobox", { name: "Selected Pattern" })).toHaveValue(
       activePattern(harness).id,
     );
-    expect(screen.getByRole<HTMLOptionElement>("option", { name: "Verse" }).selected).toBe(true);
+    expect(
+      within(screen.getByRole("combobox", { name: "Selected Pattern" })).getByRole<HTMLOptionElement>(
+        "option",
+        { name: "Verse" },
+      ).selected,
+    ).toBe(true);
     expect(screen.queryByRole("tab", { name: "Pattern" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Song" })).toBeNull();
   });
@@ -270,7 +275,8 @@ describe("EditorWorkspace", () => {
     // Decision D92: the default project ships a five-entry Song chain, so the
     // added entry lands after it.
     const baseline = harness.domain.getState().project.song.placements;
-    fireEvent.click(screen.getByRole("button", { name: "Add selected Pattern" }));
+    const addLabel = `Add ${activePattern(harness).name} at the end as Playlist row ${String(baseline.length + 1)}`;
+    fireEvent.click(screen.getByRole("button", { name: addLabel }));
 
     expect(harness.domain.getState().project.song.placements).toEqual([
       ...baseline,
@@ -279,7 +285,28 @@ describe("EditorWorkspace", () => {
     expect(screen.getAllByRole("button", { name: /Verse/ }).length).toBeGreaterThan(0);
   });
 
-  it("uses compact SVG icons with accessible names for Playlist actions", () => {
+  it("keeps editor selection separate from the current Song placement", async () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const playlist = screen.getByRole("complementary", { name: "Playlist" });
+
+    const addedRowNumber = harness.domain.getState().project.song.placements.length + 1;
+    const addLabel = `Add ${activePattern(harness).name} at the end as Playlist row ${String(addedRowNumber)}`;
+    fireEvent.click(within(playlist).getByRole("button", { name: addLabel }));
+    const selectedVerseRows = within(playlist)
+      .getAllByRole("button", { name: /Verse/u })
+      .filter((row) => row.getAttribute("aria-pressed") === "true");
+    expect(selectedVerseRows).toHaveLength(2);
+
+    fireEvent.click(within(playlist).getByRole("button", { name: "Pattern playback mode" }));
+    await harness.store.getState().play();
+    harness.store.getState().setPositionTicks(0);
+
+    expect(within(playlist).getAllByText("Playing")).toHaveLength(1);
+    expect(playlist.querySelectorAll('[data-component="playlist-playback-marker"]')).toHaveLength(1);
+  });
+
+  it("meets the compact Playlist row contract", () => {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
     const playlist = screen.getByRole("complementary", { name: "Playlist" });
@@ -288,22 +315,43 @@ describe("EditorWorkspace", () => {
     expect(mode.querySelector("svg")).toBeInTheDocument();
     expect(mode).toHaveAttribute("title", expect.stringContaining("switch to Song"));
 
-    for (const [name, text] of [
-      ["Move Playlist row 2 earlier", "Earlier"],
-      ["Move Playlist row 1 later", "Later"],
-      ["Duplicate Playlist row 1", "Duplicate"],
-      ["Remove Playlist row 1", "Remove"],
-    ] as const) {
-      const action = within(playlist).getByRole("button", { name });
-      expect(action.querySelector("svg")).toBeInTheDocument();
-      expect(action.textContent.trim()).not.toContain(text);
-      expect(action).toHaveAttribute("title");
-    }
+    const firstPlacement = harness.domain.getState().project.song.placements[0];
+    const firstPattern = harness.domain
+      .getState()
+      .project.patterns.find((pattern) => pattern.id === firstPlacement?.patternId);
+    expect(firstPattern).toBeDefined();
+    const selection = within(playlist).getByRole("button", {
+      name: new RegExp(`${firstPattern?.name ?? ""}.*${String(firstPattern?.durationBars)} bar`, "u"),
+    });
+    expect(selection).toBeVisible();
 
-    const add = within(playlist).getByRole("button", { name: "Add selected Pattern" });
+    const handle = within(playlist).getByRole("button", { name: "Reorder Playlist row 1" });
+    expect(handle.querySelector("svg")).toBeInTheDocument();
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(harness.domain.getState().project.song.placements[1]?.id).toBe(firstPlacement?.id);
+
+    const picker = within(playlist).getByRole("combobox", { name: "Playlist row 2 Pattern" });
+    fireEvent.change(picker, { target: { value: harness.domain.getState().project.patterns[2]?.id } });
+    expect(harness.domain.getState().project.song.placements[1]?.patternId).toBe(
+      harness.domain.getState().project.patterns[2]?.id,
+    );
+
+    const menu = within(playlist).getByRole("button", { name: "Playlist row 2 menu" });
+    expect(menu.querySelector("svg")).toBeInTheDocument();
+    fireEvent.click(menu);
+    expect(screen.getByRole("menu", { name: "Playlist row 2 menu" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: /Move /u })).not.toBeInTheDocument();
+
+    const addedRowNumber = harness.domain.getState().project.song.placements.length + 1;
+    const addLabel = `Add ${activePattern(harness).name} at the end as Playlist row ${String(addedRowNumber)}`;
+    const add = within(playlist).getByRole("button", { name: addLabel });
     expect(add.querySelector("svg")).toBeInTheDocument();
-    expect(add.textContent.trim()).toBe("");
-    expect(add).toHaveAttribute("title", "Add the selected Pattern to the Playlist.");
+    expect(add).toHaveTextContent(`Add at end. Row ${String(addedRowNumber)}.${activePattern(harness).name}`);
+    expect(add).toHaveAttribute("title", `${addLabel}.`);
+    fireEvent.click(add);
+    expect(harness.domain.getState().project.song.placements.at(-1)?.patternId).toBe(activePattern(harness).id);
   });
 
   it("edits the active Pattern's Humanize through the tapered header slider", () => {
@@ -697,6 +745,11 @@ describe("Mixer", () => {
     const empty = container.querySelector('[data-empty="true"]');
     expect(empty).not.toBeNull();
     const emptyStrip = within(empty as HTMLElement);
+    expect(
+      emptyStrip.getByRole("button", {
+        name: "Select rack slot 02 channel, no module loaded",
+      }),
+    ).toBeDisabled();
     expect(emptyStrip.getAllByRole("button", { name: /^Send/ })).toHaveLength(4);
     expect(emptyStrip.getByRole("slider", { name: "Rack slot 02 pan" })).toHaveAttribute(
       "aria-disabled",
@@ -714,6 +767,11 @@ describe("Mixer", () => {
     expect(pan).toHaveAttribute("aria-valuenow", "0");
     expect(level).toHaveAttribute("aria-valuenow", "0.4");
     expect(emptyStrip.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(
+      emptyStrip.getByRole("button", {
+        name: "Select rack slot 02 channel, no module loaded",
+      }),
+    ).toBeDisabled();
     for (const button of emptyStrip.getAllByRole("button")) {
       expect(button).toBeDisabled();
     }
@@ -798,13 +856,14 @@ describe("Mixer", () => {
 describe("master meter", () => {
   it("shows the louder engine analysis channel in the Master view", () => {
     const harness = createHarness();
-    renderWithHarness(<MasterPanel />, harness);
+    const view = renderWithHarness(<MasterPanel />, harness);
     const valueNow = () =>
       Number(
         screen.getByRole("meter", { name: "Master output level" }).getAttribute("aria-valuenow"),
       );
 
     act(() => {
+      harness.domain.dispatch(harness.domain.createCommand("transport-play", {}));
       harness.store
         .getState()
         .setMasterMeterFrame({ left: 0.3, right: 0.8, mid: 0.55, side: 0.25, peak: false });
@@ -817,6 +876,15 @@ describe("master meter", () => {
       harness.store.getState().setMeterLevel(firstModuleId(harness), 1);
     });
     expect(valueNow()).toBeCloseTo(0.8, 5);
+
+    act(() => {
+      harness.domain.dispatch(harness.domain.createCommand("transport-stop", {}));
+    });
+    expect(valueNow()).toBe(0);
+
+    view.unmount();
+    renderWithHarness(<MasterPanel />, harness);
+    expect(valueNow()).toBe(0);
   });
 
   it("reads the engine frame while the runtime and transport are active", () => {
@@ -826,7 +894,8 @@ describe("master meter", () => {
   });
 
   it("holds silence while the runtime or transport is not rendering", () => {
-    const readFrame = vi.fn(() => ({ left: 1, right: 1, mid: 1, side: 0, peak: true }));
+    const frame = { left: 1, right: 1, mid: 1, side: 0, peak: true };
+    const readFrame = vi.fn(() => frame);
     for (const state of ["locked", "suspended", "unavailable"] as const) {
       expect(masterMeterFrameFor(state, "playing", readFrame)).toBe(SILENT_MASTER_METER);
     }
@@ -841,7 +910,11 @@ describe("EffectsBank", () => {
     const { container } = renderWithHarness(<EffectsBank />);
     const cards = container.querySelectorAll('[data-component="effect-slot"]');
     expect(cards).toHaveLength(4);
-    expect(screen.getAllByText("Empty chain")).toHaveLength(4);
+    expect(screen.getByText("Analog Echo")).toBeVisible();
+    expect(screen.getByText("Plate Reverb")).toBeVisible();
+    expect(screen.getByText("Stereo Width")).toBeVisible();
+    expect(screen.getAllByText("Drive").some((element) => element.tagName === "P")).toBe(true);
+    expect(screen.getByRole("combobox", { name: "Send D Distortion Model macro" })).toHaveValue("drive");
     expect(screen.queryByRole("button", { name: "Details" })).toBeNull();
   });
 });
@@ -871,17 +944,14 @@ describe("StudioPanel", () => {
     expect(screen.getByRole("tab", { name: "Effects" })).toHaveFocus();
   });
 
-  it("opens an instrument send in the Effects pane", () => {
+  it("opens an instrument send value surface without changing the mixer pane", () => {
     const harness = createHarness();
     renderWithHarness(<StudioPanel />, harness);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open send A for Silver Serpent" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Open send A for Silver Serpent\./ }));
 
-    expect(harness.store.getState().studioView).toBe("effects");
-    expect(harness.store.getState().selectedSend).toBe("A");
-    expect(document.querySelector('[data-component="effect-slot"][data-selected="true"]')).toHaveTextContent(
-      "Send A",
-    );
+    expect(harness.store.getState().studioView).toBe("mixer");
+    expect(screen.getByRole("region", { name: "Send A value" })).toBeVisible();
   });
 });
 

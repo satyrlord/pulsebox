@@ -25,6 +25,16 @@ export function softClip(value: number): number {
   return value / (1 + Math.abs(value));
 }
 
+/** Per-voice distortion. Zero returns the input without a transfer change. */
+export function applyVoiceDistortion(input: number, amount: number): number {
+  const dry = Number.isFinite(input) ? input : 0;
+  const mix = clamp(amount, 0, 1);
+  if (mix === 0) return dry;
+  const gain = 1 + mix * 11;
+  const wet = Math.tanh(dry * gain);
+  return dry * (1 - mix) + wet * mix;
+}
+
 /**
  * The ramp length every drum manifest declares for its smoothed float fields
  * (`smoothing: { curve: "linear", durationMilliseconds: 8 }`). The DSP cores

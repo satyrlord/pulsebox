@@ -113,6 +113,17 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     defaultFor: (voiceId) => DEFAULT_HYBRID_PARAMETERS.voices[voiceId].attack,
   },
   {
+    field: "distortion",
+    label: "Distortion",
+    minimum: 0,
+    maximum: 1,
+    step: 0.01,
+    unit: "percent",
+    precision: 2,
+    smoothing,
+    defaultFor: (voiceId) => DEFAULT_HYBRID_PARAMETERS.voices[voiceId].distortion,
+  },
+  {
     field: "level",
     label: "Level",
     minimum: 0,
@@ -227,7 +238,7 @@ export const HYBRID_NINE_MANIFEST = Object.freeze({
       position,
       parameterId: parameter.id,
     })),
-    voiceCompactControls: ["start", "tune", "decay", "attack", "level"].map(
+    voiceCompactControls: ["start", "tune", "decay", "distortion", "attack", "level"].map(
       (parameterSuffix, position) => ({ position, parameterSuffix }),
     ),
     detailedEditorSections: [

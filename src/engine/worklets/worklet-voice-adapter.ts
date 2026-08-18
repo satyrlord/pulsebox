@@ -25,7 +25,6 @@ import type {
   VoiceAdapterPort,
   VoiceAdapterStatus,
   VoiceFault,
-  VoiceInsertRuntime,
 } from "../transport/voice-adapter";
 
 /**
@@ -86,10 +85,8 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   readonly #onMeter: (level: number) => void;
   readonly #pending = new Map<number, EngineMessageEnvelope>();
   #acknowledgedParameterSnapshot: Record<string, ParameterValue> = {};
-  #acknowledgedVoiceInserts: Record<string, VoiceInsertRuntime | null> | undefined;
   #acknowledgedProjectRevision: StateRevision;
   #currentParameterSnapshot: Record<string, ParameterValue> = {};
-  #currentVoiceInserts: Record<string, VoiceInsertRuntime | null> | undefined;
   #deferredParameters: Record<string, ParameterValue> = {};
   #previewParameters: Record<string, ParameterValue> = {};
   #previewTimer: ReturnType<typeof setTimeout> | undefined;
@@ -136,6 +133,10 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#state = "preparing";
     try {
       await this.#context.audioWorklet.addModule(this.#descriptor.moduleUrl);
+      const state = this.#currentState();
+      if (state === "disposed" || state === "disposing") {
+        throw new Error(`${this.#descriptor.displayName} was disposed during preparation.`);
+      }
       await this.#openSession();
     } catch (error) {
       if (this.fault === undefined) {
@@ -233,19 +234,16 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   readonly replaceState = (
     parameters: Readonly<Record<string, ParameterValue>>,
     projectRevision: StateRevision,
-    voiceInserts?: Readonly<Record<string, VoiceInsertRuntime | null>>,
   ): void => {
     const mapped = this.#descriptor.mapParameters(parameters);
-    const snapshotVoiceInserts = cloneVoiceInserts(voiceInserts);
     this.#projectRevision = projectRevision;
     this.#currentParameterSnapshot = { ...mapped };
-    this.#currentVoiceInserts = snapshotVoiceInserts;
     this.#deferredParameters = {};
     this.#clearPreviewParameters();
     if (this.#canSendMusicalControl()) {
       this.#postControl(
         "state-snapshot",
-        stateSnapshotPayload(mapped, snapshotVoiceInserts),
+        { parameters: mapped },
       );
     }
   };
@@ -275,7 +273,10 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
         return;
       }
       scheduled.push({
-        eventId: `${this.#sessionId}:${this.#eventId.toString()}`,
+        eventId:
+          event.occurrenceId === undefined
+            ? `${this.#sessionId}:${this.#eventId.toString()}`
+            : `${event.occurrenceId}:${event.type}`,
         audioFrame: event.atFrame,
         priority: eventPriority(event),
         data: voiceEventData(event),
@@ -615,11 +616,6 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
           ...(parameters as Record<string, ParameterValue>),
         };
       }
-      this.#acknowledgedVoiceInserts = cloneVoiceInserts(
-        message.payload.voiceInserts as
-          | Readonly<Record<string, VoiceInsertRuntime | null>>
-          | undefined,
-      );
       return;
     }
     if (message.kind !== "parameter-batch" || !Array.isArray(message.payload.changes)) {
@@ -694,26 +690,23 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
   async #recover(priorState: "ready" | "active" | "suspended"): Promise<void> {
     const acknowledgedProjectRevision = this.#acknowledgedProjectRevision;
     const acknowledgedParameters = { ...this.#acknowledgedParameterSnapshot };
-    const acknowledgedVoiceInserts = cloneVoiceInserts(this.#acknowledgedVoiceInserts);
     this.#state = "preparing";
     await this.#openSession(acknowledgedProjectRevision);
     this.#postControl(
       "state-snapshot",
-      stateSnapshotPayload(acknowledgedParameters, acknowledgedVoiceInserts),
+      { parameters: acknowledgedParameters },
       acknowledgedProjectRevision,
     );
 
     const currentProjectRevision = this.#projectRevision;
     const currentParameters = { ...this.#currentParameterSnapshot };
-    const currentVoiceInserts = cloneVoiceInserts(this.#currentVoiceInserts);
     if (
       !sameRevision(acknowledgedProjectRevision, currentProjectRevision) ||
-      !sameParameters(acknowledgedParameters, currentParameters) ||
-      !sameVoiceInserts(acknowledgedVoiceInserts, currentVoiceInserts)
+      !sameParameters(acknowledgedParameters, currentParameters)
     ) {
       this.#postControl(
         "state-snapshot",
-        stateSnapshotPayload(currentParameters, currentVoiceInserts),
+        { parameters: currentParameters },
         currentProjectRevision,
       );
     }
@@ -753,6 +746,7 @@ function eventPriority(event: ScheduledVoiceEvent): number {
 function voiceEventData(event: ScheduledVoiceEvent): Readonly<Record<string, unknown>> {
   const data: Record<string, unknown> = { type: event.type };
   if (event.sourceStep !== undefined) data.sourceStep = event.sourceStep;
+  if (event.occurrenceId !== undefined) data.occurrenceId = event.occurrenceId;
   if (event.note !== undefined) data.note = event.note;
   if (event.velocity !== undefined) data.velocity = event.velocity;
   if (event.accent !== undefined) data.accent = event.accent;
@@ -770,49 +764,4 @@ function sameParameters(
 ): boolean {
   const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
   return [...keys].every((key) => Object.is(left[key], right[key]));
-}
-
-function cloneVoiceInserts(
-  voiceInserts: Readonly<Record<string, VoiceInsertRuntime | null>> | undefined,
-): Record<string, VoiceInsertRuntime | null> | undefined {
-  if (voiceInserts === undefined) return undefined;
-  const copy: Record<string, VoiceInsertRuntime | null> = {};
-  for (const [voiceId, configuration] of Object.entries(voiceInserts)) {
-    copy[voiceId] =
-      configuration === null
-        ? null
-        : { pluginId: configuration.pluginId, state: { ...configuration.state } };
-  }
-  return copy;
-}
-
-function stateSnapshotPayload(
-  parameters: Readonly<Record<string, ParameterValue>>,
-  voiceInserts: Readonly<Record<string, VoiceInsertRuntime | null>> | undefined,
-): Readonly<Record<string, unknown>> {
-  return voiceInserts === undefined ? { parameters } : { parameters, voiceInserts };
-}
-
-function sameVoiceInserts(
-  left: Readonly<Record<string, VoiceInsertRuntime | null>> | undefined,
-  right: Readonly<Record<string, VoiceInsertRuntime | null>> | undefined,
-): boolean {
-  if (left === undefined || right === undefined) return left === right;
-  const voiceIds = new Set([...Object.keys(left), ...Object.keys(right)]);
-  for (const voiceId of voiceIds) {
-    const first = left[voiceId];
-    const second = right[voiceId];
-    if (first === undefined || second === undefined) {
-      if (first !== second) return false;
-      continue;
-    }
-    if (first === null || second === null) {
-      if (first !== second) return false;
-      continue;
-    }
-    if (first.pluginId !== second.pluginId || !sameParameters(first.state, second.state)) {
-      return false;
-    }
-  }
-  return true;
 }

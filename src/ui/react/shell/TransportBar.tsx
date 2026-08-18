@@ -137,8 +137,9 @@ function MasterMeterReadout(props: {
   const masterMeter = useAppStore((state) => state.masterMeter);
   const peakHeld = useAppStore((state) => state.masterPeakHeld);
   const { playing, meterMode } = props;
-  const channelOne = playing ? (meterMode === "lr" ? masterMeter.left : masterMeter.mid) : 0;
-  const channelTwo = playing ? (meterMode === "lr" ? masterMeter.right : masterMeter.side) : 0;
+  const rendering = playing;
+  const channelOne = rendering ? (meterMode === "lr" ? masterMeter.left : masterMeter.mid) : 0;
+  const channelTwo = rendering ? (meterMode === "lr" ? masterMeter.right : masterMeter.side) : 0;
   return (
     <>
       <div className={styles.masterMeters} aria-label="Two-channel master meter">
@@ -164,7 +165,7 @@ function MasterMeterReadout(props: {
         <span aria-hidden="true">Peak</span>
       </div>
       <output className={styles.masterDb} aria-label="Master level in decibels">
-        {formatMasterDb(playing ? Math.max(masterMeter.left, masterMeter.right) : 0)}
+        {formatMasterDb(rendering ? Math.max(masterMeter.left, masterMeter.right) : 0)}
         <span> dB</span>
       </output>
     </>
@@ -477,7 +478,10 @@ export function TransportBar() {
         >
           {meterMode === "lr" ? "L/R" : "M/S"}
         </button>
-        <MasterMeterReadout playing={playing} meterMode={meterMode} />
+        <MasterMeterReadout
+          playing={playing}
+          meterMode={meterMode}
+        />
         <output className={`${styles.audioStatus} audio-status`} aria-live="polite">
           <Led label="Audio engine" lit={audioRuntimeState === "active"} decorative />
           {statusText}

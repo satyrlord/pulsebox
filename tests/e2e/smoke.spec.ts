@@ -699,8 +699,8 @@ test("song mode chains Patterns and reports the chain length", async ({ page }) 
   const playlist = page.locator('[data-component="playlist-summary"]');
   // Decision D92: the default project ships the five-entry section 9.1 chain.
   await expect(playlist.locator("ol > li")).toHaveCount(5);
-  await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
-  await playlist.getByRole("button", { name: "Add selected Pattern" }).click();
+  await playlist.getByRole("button", { name: /Add .* at the end as Playlist row \d+/u }).click();
+  await playlist.getByRole("button", { name: /Add .* at the end as Playlist row \d+/u }).click();
   await expect(playlist.locator("ol > li")).toHaveCount(7);
 
   const songMode = page.getByRole("button", { name: "Pattern playback mode" });

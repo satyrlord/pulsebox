@@ -260,15 +260,18 @@ Each instrument has:
 - Audition control.
 - Per-module output level.
 - Mute and solo.
-- Insert-chain access.
+- Rack-only pedalboard access.
 - Metering.
 - Original visualization.
 - Full keyboard accessibility.
 - Automation support.
 
+Only the instrument rack opens a module pedalboard. Mixer channels and the
+Effects studio do not expose a second module-chain editor.
+
 Compact faceplates expose the established fast-control set defined for each
 instrument below. The controls use the one-row groups from section 14.
-Additional synthesis, sample, voice, insert, and routing parameters live in the
+Additional synthesis, sample, voice, pedalboard, and routing parameters live in the
 playback-safe expanded editor. Faceplate pages are not user-configurable in the
 MVP.
 
@@ -303,7 +306,7 @@ Audition control:
   [pattern editing](spec-006-pattern-editing.md) section 16.4.
 - Works while the transport is stopped, playing, or paused, and does not alter
   transport state or position.
-- Respects module mute, solo, routing, inserts, and sends, so an auditioned
+- Respects module mute, solo, routing, pedalboard processing, and sends, so an auditioned
   voice reaches the module's assigned route.
 - Releases its voice when the module is removed, when the project is replaced,
   and when audio is interrupted. If a held control loses pointer capture, it
@@ -339,7 +342,7 @@ Expanded controls:
 - Glide mode.
 - Accent response.
 - Real-time filter response curve moving with the envelope.
-- Voice and note monitor.
+- Voice and note analysis display.
 
 Sequencing states:
 
@@ -370,7 +373,7 @@ Each voice supports:
 - Pan.
 - Mute.
 - Solo.
-- One voice insert slot.
+- Distortion rotary control from 0 through 100 percent. The default is 0.
 - Choke-group assignment.
 - Musically appropriate original choke defaults for open and closed hat
   relationships.
@@ -419,7 +422,7 @@ Expanded editor:
 - Voice mixer.
 - Choke groups.
 - Sample layer.
-- Voice inserts.
+- Per-voice Distortion controls.
 - Parent module send controls and routing.
 - Per-step properties.
 - Synthesis-specific voice controls.
@@ -474,7 +477,7 @@ Expanded editor includes:
   their relative levels.
 - Voice mixer.
 - Per-step properties.
-- Voice inserts plus parent module send controls and routing.
+- Per-voice Distortion plus parent module send controls and routing.
 
 ### 15.6 Gray Ghost
 

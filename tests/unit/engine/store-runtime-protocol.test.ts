@@ -200,6 +200,35 @@ describe("worklet voice adapter bounds and disposal", () => {
     ]);
   });
 
+  it("keeps occurrence identity and deterministic event identity in the payload", async () => {
+    vi.stubGlobal("AudioWorkletNode", ProtocolNode);
+    const adapter = createBassVoiceAdapter(adapterContext(), {
+      projectRevision: REVISION,
+    });
+    await adapter.prepare();
+    adapter.activate({} as unknown as AudioNode);
+
+    adapter.schedule([
+      {
+        atFrame: 1_000,
+        type: "note-on",
+        occurrenceId: "event-1:4:main",
+        note: 36,
+        velocity: 0.8,
+      },
+    ]);
+
+    const batch = ProtocolNode.instances.at(-1)?.port.sent.find(
+      (message) => message.kind === "event-batch",
+    );
+    const events = batch?.payload.events as readonly unknown[] | undefined;
+    expect(events?.[0]).toMatchObject({
+      eventId: "event-1:4:main:note-on",
+      priority: 2,
+      data: { occurrenceId: "event-1:4:main" },
+    });
+  });
+
   it("splits scheduled automation into bounded protocol batches", async () => {
     vi.stubGlobal("AudioWorkletNode", ProtocolNode);
     const statuses: VoiceAdapterStatus[] = [];
@@ -274,6 +303,31 @@ describe("worklet voice adapter bounds and disposal", () => {
     adapter.dispose();
     await expectation;
     expect(adapter.state).toBe("disposing");
+  });
+
+  it("rejects prepare when disposal occurs during addModule", async () => {
+    vi.stubGlobal("AudioWorkletNode", ProtocolNode);
+    let finishModule: (() => void) | undefined;
+    const addModule = vi.fn(
+      () => new Promise<void>((resolve) => { finishModule = resolve; }),
+    );
+    const adapter = createBassVoiceAdapter(
+      {
+        audioWorklet: { addModule },
+        currentTime: 0,
+        sampleRate: 48_000,
+      } as unknown as AudioContext,
+      { projectRevision: REVISION },
+    ) as WorkletVoiceAdapter;
+
+    const pending = adapter.prepare();
+    await vi.waitFor(() => expect(addModule).toHaveBeenCalledTimes(1));
+    adapter.dispose();
+    finishModule?.();
+
+    await expect(pending).rejects.toThrow("disposed during preparation");
+    expect(ProtocolNode.instances).toHaveLength(0);
+    expect(adapter.state).toBe("disposed");
   });
 });
 

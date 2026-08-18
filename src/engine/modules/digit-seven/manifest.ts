@@ -85,6 +85,17 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     defaultFor: (voiceId) => DEFAULT_DIGIT_SEVEN_PARAMETERS.voices[voiceId].decay,
   },
   {
+    field: "distortion",
+    label: "Distortion",
+    minimum: 0,
+    maximum: 1,
+    step: 0.01,
+    unit: "percent",
+    precision: 2,
+    smoothing,
+    defaultFor: (voiceId) => DEFAULT_DIGIT_SEVEN_PARAMETERS.voices[voiceId].distortion,
+  },
+  {
     field: "level",
     label: "Level",
     minimum: 0,
@@ -241,7 +252,7 @@ export const DIGIT_SEVEN_MANIFEST = Object.freeze({
       },
     ],
     // Section 15.6 selected-voice fast controls.
-    voiceCompactControls: ["tune", "decay", "pan", "mute", "solo"].map(
+    voiceCompactControls: ["tune", "decay", "distortion", "pan", "mute", "solo"].map(
       (parameterSuffix, position) => ({ position, parameterSuffix }),
     ),
     detailedEditorSections: [

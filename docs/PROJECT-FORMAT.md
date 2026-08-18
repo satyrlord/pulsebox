@@ -390,11 +390,10 @@ parameter descriptors validate every automation value.
 send definitions in bus order, and one master record. Channel records reference
 fixed slot IDs. They contain finite parameter values, four send amounts and
 pre/post modes, mute, solo, and stable module-chain references. Transient
-Monitor selection, monitor-only Mono state, and L/R or M/S meter mode are absent.
+meter frames and L/R or M/S meter mode are absent.
 
 `EffectsState` contains:
 
-- one voice-insert reference per supported drum voice.
 - one ordered module chain per occupied module.
 - four ordered send chains.
 - one ordered master chain.
@@ -402,7 +401,9 @@ Monitor selection, monitor-only Mono state, and L/R or M/S meter mode are absent
 - the pinned compact-focus instance for each send chain or `null`.
 
 Every effect slot is `null` or contains a stable effect instance. Routing is
-limited to the main path and sends A through D. Cycles, feedback edges, unknown
+fixed to one main path and sends A through D. An effect can appear only in a
+chain allowed by its manifest. The master chain must end with the protected
+limiter, whose only placement is `master-chain`. Cycles, feedback edges, unknown
 destinations, a missing protected final limiter, or more slots than the owning
 chain contract permits are structural errors. `masterEffectsBypassed` bypasses
 the user master effects before the protected limiter. It never bypasses master

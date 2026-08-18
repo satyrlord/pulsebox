@@ -1,4 +1,4 @@
-import type { ModuleInstanceId, PatternId } from "../contracts/ids";
+import type { ModuleInstanceId, PatternId, SendBusId } from "../contracts/ids";
 import type { PulseEngineDelta, PulseState } from "../state/public";
 
 /**
@@ -9,6 +9,36 @@ export function toTransportDelta(
   delta: PulseEngineDelta,
   state: Readonly<PulseState>,
 ): PulseEngineDelta {
+  if (delta.kind === "module-effects-set") {
+    if (delta.payload.audioUnchanged === true) {
+      return { ...delta, payload: { ...delta.payload, audioScope: "none" } };
+    }
+    const chain = readEffectChain(delta.payload.chain);
+    if (chain?.scope === "module") {
+      return {
+        ...delta,
+        payload: {
+          ...delta.payload,
+          audioScope: "module",
+          moduleId: chain.targetId,
+        },
+      };
+    }
+    if (chain?.scope === "send") {
+      return {
+        ...delta,
+        payload: {
+          ...delta.payload,
+          audioScope: "send",
+          sendBusId: chain.targetId,
+        },
+      };
+    }
+    if (chain?.scope === "master") {
+      return { ...delta, payload: { ...delta.payload, audioScope: "master" } };
+    }
+    return { ...delta, kind: "project-replace", payload: {} };
+  }
   if (delta.kind === "pattern-select") {
     return {
       ...delta,
@@ -57,6 +87,25 @@ export function toTransportDelta(
   }
 
   return delta;
+}
+
+function readEffectChain(
+  value: unknown,
+):
+  | { readonly scope: "module"; readonly targetId: ModuleInstanceId }
+  | { readonly scope: "send"; readonly targetId: SendBusId }
+  | { readonly scope: "master" }
+  | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const chain = value as Record<string, unknown>;
+  if (chain.scope === "master") return { scope: "master" };
+  if (chain.scope === "module" && typeof chain.targetId === "string") {
+    return { scope: "module", targetId: chain.targetId as ModuleInstanceId };
+  }
+  if (chain.scope === "send" && typeof chain.targetId === "string") {
+    return { scope: "send", targetId: chain.targetId as SendBusId };
+  }
+  return undefined;
 }
 
 function affectedModuleIds(

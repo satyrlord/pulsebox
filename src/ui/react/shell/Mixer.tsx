@@ -1,9 +1,16 @@
-import type { ModuleInstanceId } from "../../../contracts";
+import { useState } from "react";
+
+import {
+  SEND_BUS_IDS,
+  type ModuleInstanceId,
+  type SendBusId,
+} from "../../../contracts";
 import { DEFAULT_MASTER_LEVEL, DEFAULT_MODULE_LEVEL } from "../../../state/public";
 import { Fader } from "../controls/Fader";
 import { Knob } from "../controls/Knob";
 import { LevelMeter } from "../controls/LevelMeter";
 import { Toggle } from "../controls/Toggle";
+import { automationShortcut } from "../controls/automation-shortcut";
 import { masterMeterDisplayLevel } from "../store/app-store";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
@@ -11,13 +18,142 @@ import styles from "./Mixer.module.css";
 
 const SENDS = ["A", "B", "C", "D"] as const;
 
+function sendIdFor(index: number): SendBusId {
+  const id = SEND_BUS_IDS[index];
+  if (id === undefined) throw new Error("A fixed send bus is missing.");
+  return id;
+}
+
+interface OpenSendSurface {
+  readonly moduleId: ModuleInstanceId;
+  readonly moduleName: string;
+  readonly send: (typeof SENDS)[number];
+  readonly sendBusId: SendBusId;
+}
+
+function SendValueSurface(props: {
+  readonly active: OpenSendSurface;
+  readonly amount: number;
+  readonly mode: "pre-fader" | "post-fader";
+  readonly onClose: () => void;
+}) {
+  const setChannelSendAmount = useAppStore((state) => state.setChannelSendAmount);
+  const previewChannelSendAmount = useAppStore((state) => state.previewChannelSendAmount);
+  const setChannelSendMode = useAppStore((state) => state.setChannelSendMode);
+  const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
+  const tapAutomation = automationShortcut(() =>
+    openExternalAutomationTarget({
+      scope: "send",
+      targetId: props.active.moduleId,
+      parameterId: `${props.active.sendBusId}-mode`,
+    }),
+  );
+  return (
+    <section className={styles.sendSurface} data-component="send-value-surface" aria-label={`Send ${props.active.send} value`}>
+      <div>
+        <strong>{`${props.active.moduleName} send ${props.active.send}`}</strong>
+        <button type="button" aria-label="Close send value" onClick={props.onClose}>
+          Close
+        </button>
+      </div>
+      <Knob
+        controlId={`send-${props.active.moduleId}-${props.active.sendBusId}-amount`}
+        label="Amount"
+        value={props.amount}
+        min={0}
+        max={1}
+        step={0.01}
+        defaultValue={0}
+        precision={2}
+        onInput={(value) =>
+          previewChannelSendAmount(props.active.moduleId, props.active.sendBusId, value)
+        }
+        onCommit={(value, gestureId) =>
+          setChannelSendAmount(
+            props.active.moduleId,
+            props.active.sendBusId,
+            value,
+            gestureId,
+          )
+        }
+        onAutomate={() =>
+          openExternalAutomationTarget({
+            scope: "send",
+            targetId: props.active.moduleId,
+            parameterId: `${props.active.sendBusId}-amount`,
+          })
+        }
+      />
+      <label>
+        <span>Tap</span>
+        <select
+          aria-label={`Send ${props.active.send} tap mode`}
+          aria-keyshortcuts={tapAutomation.ariaKeyShortcuts}
+          value={props.mode}
+          onChange={(event) =>
+            setChannelSendMode(
+              props.active.moduleId,
+              props.active.sendBusId,
+              event.currentTarget.value as "pre-fader" | "post-fader",
+            )
+          }
+          onKeyDown={tapAutomation.onKeyDown}
+          onContextMenu={tapAutomation.onContextMenu}
+        >
+          <option value="post-fader">Post-fader</option>
+          <option value="pre-fader">Pre-fader</option>
+        </select>
+      </label>
+      <button
+        type="button"
+        title={`Automate ${props.active.moduleName} send ${props.active.send}.`}
+        onClick={() =>
+          openExternalAutomationTarget({
+            scope: "send",
+            targetId: props.active.moduleId,
+            parameterId: `${props.active.sendBusId}-amount`,
+          })
+        }
+      >
+        Automate
+      </button>
+      <button
+        type="button"
+        title={`Automate ${props.active.moduleName} send ${props.active.send} tap mode.`}
+        onClick={() =>
+          openExternalAutomationTarget({
+            scope: "send",
+            targetId: props.active.moduleId,
+            parameterId: `${props.active.sendBusId}-mode`,
+          })
+        }
+      >
+        Automate tap
+      </button>
+    </section>
+  );
+}
+
 /**
  * Leaf meter subscription for one strip. Meter frames arrive per animation
  * frame, so only this small component re-renders, not the nine-strip mixer.
  */
 function StripMeter(props: { readonly moduleId: ModuleInstanceId; readonly label: string }) {
   const level = useAppStore((state) => state.meterLevels[props.moduleId] ?? 0);
-  return <LevelMeter label={props.label} level={level} width={6} stretch />;
+  const clipped = level >= 0.98;
+  return (
+    <div className={styles.meterStack}>
+      <output
+        className={styles.clipIndicator}
+        data-active={clipped}
+        aria-label={`${props.label} clip indicator, ${clipped ? "clipping" : "clear"}`}
+        title={clipped ? "Clip" : "No clip"}
+      >
+        C
+      </output>
+      <LevelMeter label={props.label} level={level} width={6} stretch />
+    </div>
+  );
 }
 
 /** Leaf meter subscription for the master strip, for the same reason. */
@@ -27,20 +163,32 @@ function MasterStripMeter() {
 }
 
 export function Mixer() {
+  const [openSendSurface, setOpenSendSurface] = useState<OpenSendSurface | undefined>(undefined);
   const { visibleSlotCount, manifestFor } = useDependencies();
   const rackSlots = useAppStore((state) => state.project.project.rackSlots);
   const modules = useAppStore((state) => state.project.project.modules);
   const masterLevel = useAppStore((state) => state.project.project.masterLevel);
+  const masterEffectsBypassed = useAppStore(
+    (state) => state.project.project.effects.masterEffectsBypassed,
+  );
   const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
   const toggleMute = useAppStore((state) => state.toggleMute);
   const toggleSolo = useAppStore((state) => state.toggleSolo);
   const setChannelLevel = useAppStore((state) => state.setChannelLevel);
   const setChannelPan = useAppStore((state) => state.setChannelPan);
   const setMasterLevel = useAppStore((state) => state.setMasterLevel);
+  const toggleMasterEffectsBypass = useAppStore((state) => state.toggleMasterEffectsBypass);
   const previewChannelMix = useAppStore((state) => state.previewChannelMix);
   const previewMasterLevel = useAppStore((state) => state.previewMasterLevel);
   const selectModule = useAppStore((state) => state.selectModule);
-  const openSend = useAppStore((state) => state.openSend);
+  const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
+  const masterBypassAutomation = automationShortcut(() =>
+    openExternalAutomationTarget({
+      scope: "master",
+      targetId: "master",
+      parameterId: "effects-bypassed",
+    }),
+  );
   const visible = rackSlots.slice(0, visibleSlotCount);
   const loaded = visible.flatMap((slot) => {
     const module = slot.moduleId === undefined ? undefined : modules[slot.moduleId];
@@ -63,7 +211,15 @@ export function Mixer() {
               data-component="channel-strip"
               data-empty="true"
             >
-              <strong>{slotNumber}</strong>
+              <button
+                type="button"
+                className={styles.channelName}
+                disabled
+                aria-label={`Select rack slot ${slotNumber} channel, no module loaded`}
+                title={`Rack slot ${slotNumber} has no module.`}
+              >
+                {slotNumber}
+              </button>
               {/* The empty channel keeps the loaded strip's silhouette. Each
                   visible control is disabled until the user loads a module. */}
               <div className={styles.panControl}>
@@ -181,22 +337,35 @@ export function Mixer() {
                 precision={2}
                 onInput={(value) => previewChannelMix(module.id, "pan", value)}
                 onCommit={(value, gestureId) => setChannelPan(module.id, value, gestureId)}
+                onAutomate={() =>
+                  openExternalAutomationTarget({
+                    scope: "mixer",
+                    targetId: module.id,
+                    parameterId: "pan",
+                  })
+                }
               />
             </div>
             <div className={styles.sendGrid} aria-label={`${name} sends`}>
-              {SENDS.map((send) => (
-                <button
-                  key={send}
-                  type="button"
-                  aria-label={`Open send ${send} for ${name}`}
-                  title={`Open send ${send} for ${name}.`}
-                  onClick={() => openSend(send)}
-                >
-                  <span data-part="send-label" aria-hidden="true">
-                    {send}
-                  </span>
-                </button>
-              ))}
+              {SENDS.map((send, sendIndex) => {
+                const sendBusId = sendIdFor(sendIndex);
+                const state = module.sends[sendBusId];
+                if (state === undefined) return null;
+                const active = state.amount > 0;
+                return (
+                  <button
+                    key={send}
+                    type="button"
+                    data-active={active}
+                    aria-label={`${active ? "Edit active" : "Open"} send ${send} for ${name}. ${Math.round(state.amount * 100)} percent, ${state.mode}.`}
+                    title={`Open send ${send} for ${name}.`}
+                    onClick={() => setOpenSendSurface({ moduleId: module.id, moduleName: name, send, sendBusId })}
+                  >
+                    <span data-part="send-label" aria-hidden="true">{send}</span>
+                    {active ? <i aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
             </div>
             <div className={styles.faderWell}>
               <Fader
@@ -215,6 +384,13 @@ export function Mixer() {
                 displayStep={0.1}
                 onInput={(value) => previewChannelMix(module.id, "level", value)}
                 onCommit={(value, gestureId) => setChannelLevel(module.id, value, gestureId)}
+                onAutomate={() =>
+                  openExternalAutomationTarget({
+                    scope: "mixer",
+                    targetId: module.id,
+                    parameterId: "level",
+                  })
+                }
               />
               <StripMeter moduleId={module.id} label={`${name} output`} />
             </div>
@@ -226,6 +402,13 @@ export function Mixer() {
                 tone="warn"
                 pressed={module.solo}
                 onToggle={() => toggleSolo(module.id)}
+                onAutomate={() =>
+                  openExternalAutomationTarget({
+                    scope: "mixer",
+                    targetId: module.id,
+                    parameterId: "solo",
+                  })
+                }
               />
               <Toggle
                 label={`Mute ${name}`}
@@ -233,6 +416,13 @@ export function Mixer() {
                 tone="neutral"
                 pressed={module.muted}
                 onToggle={() => toggleMute(module.id)}
+                onAutomate={() =>
+                  openExternalAutomationTarget({
+                    scope: "mixer",
+                    targetId: module.id,
+                    parameterId: "muted",
+                  })
+                }
               />
             </div>
           </article>
@@ -260,10 +450,43 @@ export function Mixer() {
             displayStep={0.1}
             onInput={previewMasterLevel}
             onCommit={(value, gestureId) => setMasterLevel(value, gestureId)}
+            onAutomate={() =>
+              openExternalAutomationTarget({
+                scope: "master",
+                targetId: "master",
+                parameterId: "level",
+              })
+            }
           />
           <MasterStripMeter />
         </div>
+        <button
+          type="button"
+          className={styles.masterBypass}
+          aria-label="Bypass master effects"
+          aria-pressed={masterEffectsBypassed}
+          data-bypassed={masterEffectsBypassed}
+          title="Bypass all user master effects. The master gain and protected limiter stay active."
+          aria-keyshortcuts={masterBypassAutomation.ariaKeyShortcuts}
+          onClick={toggleMasterEffectsBypass}
+          onKeyDown={masterBypassAutomation.onKeyDown}
+          onContextMenu={masterBypassAutomation.onContextMenu}
+        >
+          {masterEffectsBypassed ? "FX OFF" : "FX ON"}
+        </button>
       </article>
+      {openSendSurface !== undefined ? (() => {
+        const module = modules[openSendSurface.moduleId];
+        const send = module?.sends[openSendSurface.sendBusId];
+        return send === undefined ? null : (
+          <SendValueSurface
+            active={openSendSurface}
+            amount={send.amount}
+            mode={send.mode}
+            onClose={() => setOpenSendSurface(undefined)}
+          />
+        );
+      })() : null}
     </section>
   );
 }

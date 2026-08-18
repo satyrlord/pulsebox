@@ -15,6 +15,7 @@
  */
 
 import {
+  applyVoiceDistortion,
   clamp,
   DeterministicNoise,
   EqualPowerPan,
@@ -28,7 +29,6 @@ import {
   VoiceMixGates,
 } from "../../dsp/primitives";
 import { SampleBoundaryPlayer } from "../../dsp/sample-boundary-player";
-import { VoiceInsertHost, type VoiceInsertConfiguration } from "../../effects";
 import { HYBRID_VOICE_IDS, type HybridVoiceId } from "./voices";
 
 export interface HybridVoiceParameters {
@@ -42,6 +42,7 @@ export interface HybridVoiceParameters {
   /** Attack softening, in seconds at full value. 0 keeps the raw transient. */
   readonly attack: number;
   readonly level: number;
+  readonly distortion: number;
   /** -1 hard left to 1 hard right. */
   readonly pan: number;
   /** A muted voice keeps rendering but contributes silence to the mix. */
@@ -133,6 +134,7 @@ const DEFAULT_HYBRID_VOICE_PARAMETERS: Readonly<
         start: 0,
         attack: 0,
         level: 0.8,
+        distortion: 0,
         pan:
           id === "low-tom"
             ? -0.28
@@ -231,6 +233,7 @@ class HybridVoice {
    */
   readonly #level: ParameterGlide;
   readonly #blend: ParameterGlide;
+  readonly #distortion: ParameterGlide;
   /** Linear choke: spec-004 section 21.5 mandates a linear 4 ms fade-out. */
   readonly #chokeStep: number;
   #amplitude = 0;
@@ -254,6 +257,7 @@ class HybridVoice {
     this.#noise = new DeterministicNoise(this.#character.seed);
     this.#level = new ParameterGlide(clamp(parameters.level, 0, 1), sampleRate);
     this.#blend = new ParameterGlide(clamp(parameters.blend, 0, 1), sampleRate);
+    this.#distortion = new ParameterGlide(clamp(parameters.distortion, 0, 1), sampleRate);
     this.#chokeStep = 1 / Math.max(1, Math.round(CHOKE_RELEASE_SECONDS * sampleRate));
   }
 
@@ -269,6 +273,7 @@ class HybridVoice {
     if (mode === "immediate") {
       this.#level.set(clamp(parameters.level, 0, 1));
       this.#blend.set(clamp(parameters.blend, 0, 1));
+      this.#distortion.set(clamp(parameters.distortion, 0, 1));
     }
   }
 
@@ -281,6 +286,7 @@ class HybridVoice {
     if (!restarting) {
       this.#level.set(clamp(this.#parameters.level, 0, 1));
       this.#blend.set(clamp(this.#parameters.blend, 0, 1));
+      this.#distortion.set(clamp(this.#parameters.distortion, 0, 1));
     }
     this.#phase = 0;
     this.#elapsed = 0;
@@ -344,9 +350,13 @@ class HybridVoice {
     return mixed * attackGain * this.#amplitude * gain;
   }
 
-  /** The outer machine applies this after the per-voice insert. */
+  /** The outer machine applies this after the per-voice distortion. */
   advanceLevel(): number {
     return this.#level.advance(clamp(this.#parameters.level, 0, 1));
+  }
+
+  advanceDistortion(): number {
+    return this.#distortion.advance(clamp(this.#parameters.distortion, 0, 1));
   }
 
   #renderSynthLayer(frequency: number): number {
@@ -391,7 +401,6 @@ export class HybridNineDsp {
   readonly #filter: ParameterGlide;
   readonly #voiceGates: VoiceMixGates;
   readonly #voicePans: Readonly<Record<HybridVoiceId, EqualPowerPan>>;
-  readonly #voiceInserts: Readonly<Record<HybridVoiceId, VoiceInsertHost>>;
   /** Iterated by index in `process()`, so the per-frame loop allocates nothing. */
   readonly #voiceList: readonly HybridVoice[];
   #parameters: HybridNineParameters = DEFAULT_HYBRID_PARAMETERS;
@@ -410,9 +419,6 @@ export class HybridNineDsp {
         new EqualPowerPan(DEFAULT_HYBRID_VOICE_PARAMETERS[id].pan, sampleRate),
       ]),
     ) as Record<HybridVoiceId, EqualPowerPan>;
-    this.#voiceInserts = Object.fromEntries(
-      HYBRID_VOICE_IDS.map((id) => [id, new VoiceInsertHost(sampleRate)]),
-    ) as Record<HybridVoiceId, VoiceInsertHost>;
     this.#voices = new Map(
       HYBRID_VOICE_IDS.map((id) => [
         id,
@@ -457,17 +463,6 @@ export class HybridNineDsp {
 
   getParameterSnapshot(): HybridNineParameters {
     return this.#parameters;
-  }
-
-  setVoiceInserts(
-    configurations: Readonly<Partial<Record<HybridVoiceId, VoiceInsertConfiguration | null>>>,
-  ): boolean {
-    let accepted = true;
-    for (const voiceId of HYBRID_VOICE_IDS) {
-      const host = this.#voiceInserts[voiceId];
-      accepted = host.set(configurations[voiceId], this.#voices.get(voiceId)?.active === true) && accepted;
-    }
-    return accepted;
   }
 
   trigger(voiceId: HybridVoiceId, velocity = 1, accent = false): void {
@@ -531,7 +526,7 @@ export class HybridNineDsp {
         // Rendered even when gated, so envelopes and chokes keep their place
         // in time and un-muting mid-tail resumes where the voice really is.
         const source = voice.render();
-        const sample = this.#voiceInserts[voice.id].process(source) * voice.advanceLevel();
+        const sample = applyVoiceDistortion(source, voice.advanceDistortion()) * voice.advanceLevel();
         if (sample === 0 || gate === 0) continue;
         mixLeft += sample * gate * voicePan.left;
         mixRight += sample * gate * voicePan.right;

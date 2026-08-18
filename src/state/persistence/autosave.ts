@@ -4,6 +4,7 @@ import {
   documentToState,
   serializeProject,
   type ParseOptions,
+  type ImportPluginMetadata,
   type ProjectDocument,
 } from "./project-document";
 import {
@@ -22,6 +23,8 @@ export interface AutosaveOptions {
   readonly projectRevision: () => ProjectRevision;
   /** Current registered schema version for each persisted plugin. */
   readonly manifestVersionFor?: (pluginId: string) => number;
+  /** Installed plugin identity contracts from the composition registry. */
+  readonly pluginMetadataByPluginId?: Readonly<Record<string, ImportPluginMetadata>>;
   /** Quiet period after the last edit before a snapshot is written. */
   readonly debounceMilliseconds?: number;
   readonly onError?: (error: unknown) => void;
@@ -35,6 +38,11 @@ export interface AutosaveController {
   readonly dispose: () => void;
 }
 
+interface AutosaveSnapshot {
+  readonly sequence: number;
+  readonly stored: StoredProject;
+}
+
 const DEFAULT_DEBOUNCE_MILLISECONDS = 750;
 const MAXIMUM_AUTOSAVE_DELAY_MILLISECONDS = 5_000;
 
@@ -44,6 +52,7 @@ function toStored(
   now: string,
   projectRevision: ProjectRevision,
   manifestVersionFor: ((pluginId: string) => number) | undefined,
+  pluginMetadataByPluginId: Readonly<Record<string, ImportPluginMetadata>> | undefined,
 ): StoredProject {
   return {
     id: state.project.id,
@@ -54,6 +63,7 @@ function toStored(
       modifiedAt: now,
       projectRevision,
       ...(manifestVersionFor === undefined ? {} : { manifestVersionFor }),
+      ...(pluginMetadataByPluginId === undefined ? {} : { pluginMetadataByPluginId }),
     }),
   };
 }
@@ -66,23 +76,29 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
   const debounce = options.debounceMilliseconds ?? DEFAULT_DEBOUNCE_MILLISECONDS;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
-  let pendingState: Readonly<PulseState> | undefined;
+  let pendingSnapshot: AutosaveSnapshot | undefined;
   let queue = Promise.resolve();
   let disposed = false;
+  let latestSequence = 0;
 
-  const write = (state: Readonly<PulseState>): Promise<void> => {
+  const capture = (state: Readonly<PulseState>): AutosaveSnapshot => ({
+    sequence: ++latestSequence,
+    stored: toStored(
+      state,
+      options.createdAt(),
+      options.now(),
+      options.projectRevision(),
+      options.manifestVersionFor,
+      options.pluginMetadataByPluginId,
+    ),
+  });
+
+  const write = (snapshot: AutosaveSnapshot, force = false): Promise<void> => {
     queue = queue
-      .then(() =>
-        options.repository.saveAutosave(
-          toStored(
-            state,
-            options.createdAt(),
-            options.now(),
-            options.projectRevision(),
-            options.manifestVersionFor,
-          ),
-        ),
-      )
+      .then(() => {
+        if ((!force && disposed) || (!force && snapshot.sequence !== latestSequence)) return;
+        return options.repository.saveAutosave(snapshot.stored);
+      })
       .catch((error: unknown) => {
         options.onError?.(error);
       });
@@ -97,16 +113,16 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
   };
 
   const writePending = (): void => {
-    const state = pendingState;
-    pendingState = undefined;
+    const snapshot = pendingSnapshot;
+    pendingSnapshot = undefined;
     clearPendingTimers();
-    if (state !== undefined) void write(state);
+    if (snapshot !== undefined) void write(snapshot);
   };
 
   return {
     schedule: (state) => {
       if (disposed) return;
-      pendingState = state;
+      pendingSnapshot = capture(state);
       if (debounceTimer !== undefined) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(writePending, debounce);
       // The deadline belongs to the first edit in the unsaved series. Later
@@ -114,13 +130,15 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
       deadlineTimer ??= setTimeout(writePending, MAXIMUM_AUTOSAVE_DELAY_MILLISECONDS);
     },
     flush: (state) => {
-      pendingState = undefined;
+      if (disposed) return Promise.resolve();
+      pendingSnapshot = undefined;
       clearPendingTimers();
-      return write(state);
+      return write(capture(state), true);
     },
     dispose: () => {
       disposed = true;
-      pendingState = undefined;
+      latestSequence += 1;
+      pendingSnapshot = undefined;
       clearPendingTimers();
     },
   };
@@ -151,6 +169,7 @@ export async function restoreAutosave(
     const parsed = parseStoredProject(stored, options.parseOptions);
     if (!parsed.ok) {
       options.onError?.(parsed.issues);
+      await options.repository.clearAutosave();
       return { state: base };
     }
     return {
