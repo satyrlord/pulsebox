@@ -117,11 +117,11 @@ contains the normative requirements. This table is the traceability record.
   Patterns into a Song, and the bottom bar only collapses or expands the editor.
 - **D44.** The user pins one effect as each send card's focus. By default, the
   application pins the first effect. Its declared compact controls supply the
-  four macros.
+  up to four macros.
 - **D45.** Sixteen rack slots remain an explicit post-MVP target. The MVP permits
   a maximum of eight.
-- **D46.** The compact `Mix` control is send-chain return level from silence to
-  unity. The source stays dry. Individual effects retain wet/dry controls.
+- **D46.** The compact `Return Level` control sets send-chain return level from
+  silence to unity. The source stays dry. It is not an effect Mix control.
 - **D47.** Pause preserves position. Stop returns to the last explicit start
   marker. The default marker is Pattern step 1 or the first Playlist row.
   Repeated Stop has no second action.
@@ -334,7 +334,7 @@ contains the normative requirements. This table is the traceability record.
   duplicates the displayed state without added capability.
 - **D74.** The specifications define four contract values. The MVP Pattern scale
   choices are Chromatic, Minor, Dorian, Phrygian, and
-  Pentatonic (section 16.0). The limiter's compact controls are Ceiling, Gain,
+  Pentatonic (section 16.0). The limiter's compact controls are Ceiling, Input,
   and Release (section 20.7). The default project sets each occupied instrument
   channel near -8 dB. The master stays near -6 dB (section 9.1).
 
@@ -355,7 +355,7 @@ contains the normative requirements. This table is the traceability record.
   own compressor, EQ, and protected limiter. Thus, section 8.5 gives it a
   dedicated Master studio view. It does not put this processing in a mixer
   strip. Return levels stay on the compact A–D cards in the Effects view. Each
-  chain already owns its circular `Mix` return control.
+  chain already owns its circular `Return Level` control.
 
   One rejected alternative kept the letters as a static legend. That design
   uses master-strip height for a label that controls nothing. It appears as a
@@ -617,3 +617,21 @@ contains the normative requirements. This table is the traceability record.
   Duplicate and Delete, which removes the repeated move, duplicate, and delete
   caps from every row. Section 18.1 of
   [song and automation](spec-008-song-and-automation.md) owns this behavior.
+- **D100.** Each effect has one equal-power Mix and one post-mix Gain. The
+  stage order is input, effect result, Mix, Gain, and next stage. Mix is 0
+  through 1. Gain is -24 dB through +24 dB, with 0 dB as default and 0.1 dB
+  steps. Both parameters are automatable and smoothed. Bypass is click-free,
+  passes the stage input at unity, and does not depend on Mix or Gain.
+
+  Rack Volume or Level is pre-effect. The mixer fader is post-effect. Each
+  channel sends only its pre-fader signal to A-D. Send returns join the main mix
+  independently. A send card uses `Return Level`, not `Mix`. There is no
+  per-chain Mix, continuously summed chain-wide dry copy, or post-fader send
+  mode. A click-free chain bypass can switch to dry at unity.
+
+  Format 3 stores `mix` and `gainDecibels` on each effect instance. It migrates
+  format 2 with the equal-power coefficient transform in `PROJECT-FORMAT.md`.
+  It removes the old crossfade fields and send mode. It renames limiter state
+  and limiter `gain` automation lanes to `input`, and it drops send-mode
+  automation lanes. Sections 19.7 and 20.7 of
+  [mixer and effects](spec-007-mixer-and-effects.md) own the behavior.

@@ -10,7 +10,12 @@ import type {
   EffectInstanceState,
   EffectsState,
 } from "../contracts/effects";
-import { PROTECTED_LIMITER_EFFECT_PLUGIN_ID } from "../contracts/effects";
+import {
+  EFFECT_GAIN_MAXIMUM_DECIBELS,
+  EFFECT_GAIN_MINIMUM_DECIBELS,
+  isEffectStageParameterId,
+  PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
+} from "../contracts/effects";
 import {
   createCommandId,
   createEffectInstanceId,
@@ -541,8 +546,6 @@ export class PulseStore {
         return this.#setMasterLevel(command.payload.level);
       case "mixer-send-amount-set":
         return this.#setSendAmount(command.payload.moduleId, command.payload.sendBusId, command.payload.amount);
-      case "mixer-send-mode-set":
-        return this.#setSendMode(command.payload.moduleId, command.payload.sendBusId, command.payload.mode);
       case "effects-chain-effect-add":
         return this.#addChainEffect(command.payload.chain, command.payload.effectPluginId, command.payload.afterEffectId);
       case "effects-chain-effect-remove":
@@ -556,8 +559,10 @@ export class PulseStore {
         return this.#reorderChainEffect(command.payload.effectInstanceId, command.payload.afterEffectId);
       case "effects-instance-bypass-set":
         return this.#setEffectBypass(command.payload.effectInstanceId, command.payload.bypassed);
-      case "effects-instance-wet-dry-set":
-        return this.#setEffectWetDry(command.payload.effectInstanceId, command.payload.wetDry);
+      case "effects-instance-mix-set":
+        return this.#setEffectMix(command.payload.effectInstanceId, command.payload.mix);
+      case "effects-instance-gain-set":
+        return this.#setEffectGain(command.payload.effectInstanceId, command.payload.gainDecibels);
       case "effects-instance-parameter-set":
         return this.#setEffectParameter(command.payload.effectInstanceId, command.payload.parameterId, command.payload.value);
       case "effects-send-return-level-set":
@@ -1196,24 +1201,6 @@ export class PulseStore {
     );
   }
 
-  #setSendMode(moduleId: ModuleInstanceId, sendBusId: SendBusId, mode: unknown) {
-    const module = this.#state.project.modules[moduleId];
-    if (module === undefined) return { error: rejected("payload.moduleId", "Module does not exist.", "Choose a loaded module.") };
-    const send = module.sends[sendBusId];
-    if (send === undefined || !SEND_BUS_IDS.includes(sendBusId)) {
-      return { error: rejected("payload.sendBusId", "Send bus does not exist.", "Choose send A through D.") };
-    }
-    if (mode !== "pre-fader" && mode !== "post-fader") {
-      return { error: rejected("payload.mode", "Send mode must be pre-fader or post-fader.", "Choose a send tap mode.") };
-    }
-    if (send.mode === mode) return { state: this.#state, projectChanged: false as const };
-    const next: RackModuleState = { ...module, sends: { ...module.sends, [sendBusId]: { ...send, mode } } };
-    return this.#projectTransition(
-      { ...this.#state.project, modules: { ...this.#state.project.modules, [moduleId]: next } },
-      "mixer-set", [moduleId, sendBusId], { moduleId, sendBusId, mode },
-    );
-  }
-
   #addChainEffect(
     chain: Extract<PulseCommand, { readonly type: "effects-chain-effect-add" }> ["payload"]["chain"],
     pluginId: PluginId,
@@ -1355,7 +1342,8 @@ export class PulseStore {
             lane.scope === "effect" &&
             lane.targetId === effectId &&
             lane.parameterId !== "bypassed" &&
-            lane.parameterId !== "wet-dry",
+            lane.parameterId !== "mix" &&
+            lane.parameterId !== "gain",
         )
         .map((lane) => lane.id),
     );
@@ -1411,17 +1399,31 @@ export class PulseStore {
     );
   }
 
-  #setEffectWetDry(effectId: EffectInstanceId, wetDry: number) {
+  #setEffectMix(effectId: EffectInstanceId, mix: number) {
     const effect = this.#state.project.effects.instances[effectId];
     if (effect === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist.", "Choose a current effect.") };
-    if (!Number.isFinite(wetDry) || wetDry < 0 || wetDry > 1) return { error: rejected("payload.wetDry", "Wet and dry mix must be between 0 and 1.", "Choose a value in range.") };
-    if (effect.wetDry === wetDry) return { state: this.#state, projectChanged: false as const };
-    const effects = { ...this.#state.project.effects, instances: { ...this.#state.project.effects.instances, [effectId]: { ...effect, wetDry } } };
+    if (!Number.isFinite(mix) || mix < 0 || mix > 1) return { error: rejected("payload.mix", "Effect Mix must be between 0 and 1.", "Choose a value in range.") };
+    if (effect.mix === mix) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, instances: { ...this.#state.project.effects.instances, [effectId]: { ...effect, mix } } };
     return this.#projectTransition(
       { ...this.#state.project, effects },
       "module-effects-set",
       [effectId],
-      effectAudioPayload(this.#state.project.effects, effectId, { effectId, wetDry }),
+      effectAudioPayload(this.#state.project.effects, effectId, { effectId, mix }),
+    );
+  }
+
+  #setEffectGain(effectId: EffectInstanceId, gainDecibels: number) {
+    const effect = this.#state.project.effects.instances[effectId];
+    if (effect === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist.", "Choose a current effect.") };
+    if (!Number.isFinite(gainDecibels) || gainDecibels < EFFECT_GAIN_MINIMUM_DECIBELS || gainDecibels > EFFECT_GAIN_MAXIMUM_DECIBELS) return { error: rejected("payload.gainDecibels", "Effect Gain must be from -24 dB through 24 dB.", "Choose a value in range.") };
+    if (effect.gainDecibels === gainDecibels) return { state: this.#state, projectChanged: false as const };
+    const effects = { ...this.#state.project.effects, instances: { ...this.#state.project.effects.instances, [effectId]: { ...effect, gainDecibels } } };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [effectId],
+      effectAudioPayload(this.#state.project.effects, effectId, { effectId, gainDecibels }),
     );
   }
 
@@ -1429,6 +1431,7 @@ export class PulseStore {
     const effect = this.#state.project.effects.instances[effectId];
     if (effect === undefined) return { error: rejected("payload.effectInstanceId", "Effect does not exist.", "Choose a current effect.") };
     if (!isParameterId(parameterId)) return { error: rejected("payload.parameterId", "Effect parameter ID is invalid.", "Choose an effect parameter.") };
+    if (isEffectStageParameterId(parameterId)) return { error: rejected("payload.parameterId", "Mix and Gain are shared effect stage controls.", "Use the shared effect control.") };
     if (!isParameterValue(value) || (this.#validateEffectParameter !== undefined && !this.#validateEffectParameter(effect, parameterId, value))) {
       return { error: rejected("payload.value", "Effect parameter value is invalid.", "Use a value in the parameter range.") };
     }
@@ -2228,7 +2231,8 @@ export class PulseStore {
           : undefined;
       const effectValueIsValid =
         effect === undefined ||
-        payload.parameterId === "wet-dry" ||
+        payload.parameterId === "mix" ||
+        payload.parameterId === "gain" ||
         payload.parameterId === "bypassed" ||
         this.#validateEffectParameter === undefined ||
         this.#validateEffectParameter(effect, payload.parameterId, step.value);
@@ -3188,11 +3192,7 @@ function isExternalAutomationValueValid(
       ((parameterId === "muted" || parameterId === "solo") && typeof value === "boolean");
   }
   if (scope === "send") {
-    return (
-      (/^send-[abcd]-amount$/.test(parameterId) && typeof value === "number" && value >= 0 && value <= 1) ||
-      (/^send-[abcd]-mode$/.test(parameterId) &&
-        (value === "pre-fader" || value === "post-fader"))
-    );
+    return /^send-[abcd]-amount$/.test(parameterId) && typeof value === "number" && value >= 0 && value <= 1;
   }
   if (scope === "send-return") {
     return (
@@ -3202,7 +3202,15 @@ function isExternalAutomationValueValid(
   }
   if (scope === "master") return (parameterId === "level" && typeof value === "number" && value >= 0 && value <= 1) || (parameterId === "effects-bypassed" && typeof value === "boolean");
   const effect = project.effects.instances[targetId as EffectInstanceId];
-  return effect !== undefined && (parameterId === "wet-dry" ? typeof value === "number" && value >= 0 && value <= 1 : parameterId === "bypassed" ? typeof value === "boolean" : isParameterValue(value));
+  return effect !== undefined && (
+    parameterId === "mix"
+      ? typeof value === "number" && value >= 0 && value <= 1
+      : parameterId === "gain"
+        ? typeof value === "number" && value >= EFFECT_GAIN_MINIMUM_DECIBELS && value <= EFFECT_GAIN_MAXIMUM_DECIBELS
+        : parameterId === "bypassed"
+          ? typeof value === "boolean"
+          : isParameterValue(value)
+  );
 }
 
 /** Compares immutable project data without serializing the full project. */

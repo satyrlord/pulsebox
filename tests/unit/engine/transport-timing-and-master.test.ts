@@ -608,8 +608,8 @@ describe("live re-anchor release", () => {
           pluginId: "delay" as PluginId,
           state: { "tempo-sync": true, "beat-time": 0.5 },
           bypassed: false,
-          wetDry: 1,
-          wetDryLaw: "equal-power",
+          mix: 1,
+          gainDecibels: 0,
         }],
       }],
       master: {
@@ -668,10 +668,10 @@ describe("live re-anchor release", () => {
         effects: [{
           id: EFFECT_ID,
           pluginId: "delay" as PluginId,
-          state: { mix: 0.3 },
+          state: { feedback: 0.3 },
           bypassed: false,
-          wetDry: 1,
-          wetDryLaw: "equal-power" as const,
+          mix: 1,
+          gainDecibels: 0,
         }],
       }],
       master: {
@@ -697,7 +697,7 @@ describe("live re-anchor release", () => {
       ...routing,
       sends: [{
         ...initialSend,
-        effects: [{ ...initialEffect, state: { mix: 0.6 } }],
+        effects: [{ ...initialEffect, state: { feedback: 0.6 } }],
       }],
     });
     await runtime.project({
@@ -708,11 +708,11 @@ describe("live re-anchor release", () => {
         audioScope: "send",
         sendBusId: SEND_A,
         effectId: EFFECT_ID,
-        parameterId: "mix",
+        parameterId: "feedback",
         value: 0.6,
       },
     });
-    expect(scheduleParameter).toHaveBeenCalledWith(0, "mix", 0.6);
+    expect(scheduleParameter).toHaveBeenCalledWith(0, "feedback", 0.6);
     expect(effectFactory).not.toHaveBeenCalled();
 
     await runtime.project({

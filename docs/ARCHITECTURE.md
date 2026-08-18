@@ -452,7 +452,7 @@ An effect manifest shall add:
 - declared latency in frames for every sample rate.
 - finite tail policy and maximum tail duration, or an explicitly bounded
   generated tail.
-- bypass transition and wet/dry law.
+- click-safe bypass transition, equal-power Mix law, and post-mix Gain stage.
 - safety clamps and feedback limits.
 - the four or fewer compact controls and detailed editor sections.
 - a processor or native-adapter factory key.
@@ -464,12 +464,19 @@ and chain operations shall reject a missing, moved, or removed limiter. The user
 may bypass the limiter instance, but master-effects bypass shall leave it active.
 
 An effect shall preserve channel count unless its manifest declares an allowed
-conversion. Bypass and reorder shall use bounded click-safe transitions and
-shall not rebuild unrelated graph branches.
+conversion. Every effect instance has one automatable Mix from 0 through 1 and
+one automatable post-mix Gain from -24 dB through +24 dB. Gain defaults to 0 dB
+and has a 0.1 dB step. The engine smooths both changes. Each stage processes its
+input, combines the input and effect result with the equal-power Mix law, then
+applies Gain before it feeds the next stage. Bypass and reorder shall use
+bounded click-safe transitions and shall not rebuild unrelated graph branches.
+Bypass passes the stage input at unity and is independent of Mix and Gain.
+The shared automation IDs are `mix` and `gain`. An effect plugin must not use
+either ID in its plugin-owned parameter state.
 
 ### 6.6 Required plugin behavior
 
-Every instrument and effect referenced by a format-1 project is required. The
+Every instrument and effect referenced by a format-3 project is required. The
 MVP project manifest has no optional-plugin mode and no plugin placeholder.
 
 - The reader shall reject the whole import before project state changes if a
@@ -518,7 +525,7 @@ transition is accepted.
 The MVP musical structure is fixed at 4/4 and its Pattern grid is fixed at 1/16.
 Playlist placement, reorder, repeat-count, duplicate, and delete operations are
 undoable structural commands. There are no time-signature events, Song
-automation lanes, or arrangement-timeline commands in format version 2.
+automation lanes, or arrangement-timeline commands in format version 3.
 
 ### 7.2 Engine projection
 
@@ -951,11 +958,12 @@ can be rebuilt deterministically.
 
 The program path shall follow the routing in the
 [mixer and effects specification](specs/spec-007-mixer-and-effects.md). The path
-goes through voice processing, module sum, the module pedalboard, a fixed channel
-gate, fader, and pan. Each channel has fixed A–D send taps from the gate
-pre-fader or the pan post-fader. Each send return joins the main mix. The mixed
-signal then goes through the master chain, the meter-analysis branch, and the
-physical output.
+goes through voice processing, module sum, Rack Volume or Level, and the module
+pedalboard. Each pedal stage processes its input, applies equal-power Mix, then
+applies post-mix Gain before the next stage. The channel gate feeds fixed A-D
+pre-fader send taps. The dry channel then passes through its fader and pan. Each
+send return joins the main mix independently. The mixed signal then goes through
+the master chain, the meter-analysis branch, and the physical output.
 Offline rack and return stems shall branch at their specified pre-master points.
 Only the master export shall include the master chain.
 

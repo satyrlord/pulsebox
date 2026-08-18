@@ -7,8 +7,8 @@ export interface RoutingEffectInstance {
   readonly pluginId: PluginId;
   readonly state: Readonly<Record<string, ParameterValue>>;
   readonly bypassed: boolean;
-  readonly wetDry: number;
-  readonly wetDryLaw: "linear" | "equal-power";
+  readonly mix: number;
+  readonly gainDecibels: number;
 }
 
 /**
@@ -41,9 +41,18 @@ interface EffectControl {
   readonly node: EffectAudioNodePort;
   readonly dry: GainNode;
   readonly wet: GainNode;
-  wetDry: number;
+  readonly output: GainNode;
+  mix: number;
+  gainDecibels: number;
   bypassed: boolean;
-  readonly wetDryLaw: "linear" | "equal-power";
+  mixAutomation: ScheduledValue<number>[];
+  gainAutomation: ScheduledValue<number>[];
+  bypassAutomation: ScheduledValue<boolean>[];
+}
+
+interface ScheduledValue<T> {
+  readonly atFrame: number;
+  readonly value: T;
 }
 
 const CHAIN_SWITCH_SECONDS = 0.004;
@@ -62,6 +71,7 @@ export class EffectChainNode {
   #active: ChainBranch;
   #generation = 0;
   #bypassed = false;
+  #bypassAutomation: ScheduledValue<boolean>[] = [];
   readonly #cleanupTimers = new Set<ReturnType<typeof setTimeout>>();
   readonly #retiring = new Set<ChainBranch>();
 
@@ -120,7 +130,11 @@ export class EffectChainNode {
   }
 
   scheduleBypass(atFrame: number, bypassed: boolean): void {
-    this.#setBypassAtTime(bypassed, frameTime(this.#context, atFrame));
+    const prior = scheduledValueAt(this.#bypassAutomation, atFrame, this.#bypassed);
+    const time = frameTime(this.#context, atFrame);
+    scheduleRamp(this.#bypassDry.gain, prior ? 1 : 0, bypassed ? 1 : 0, time, CHAIN_SWITCH_SECONDS);
+    scheduleRamp(this.#bypassWet.gain, prior ? 0 : 1, bypassed ? 0 : 1, time, CHAIN_SWITCH_SECONDS);
+    recordScheduledValue(this.#bypassAutomation, atFrame, bypassed);
   }
 
   setBypassed(bypassed: boolean): void {
@@ -134,40 +148,81 @@ export class EffectChainNode {
     const control = this.#active.controls.get(effectId);
     if (control === undefined) return;
     const time = frameTime(this.#context, atFrame);
-    const gains = wetDryGains(control.wetDry, control.wetDryLaw);
-    const priorDry = control.bypassed ? 1 : gains.dry;
-    const priorWet = control.bypassed ? 0 : gains.wet;
-    control.bypassed = bypassed;
+    const mix = scheduledValueAt(control.mixAutomation, atFrame, control.mix);
+    const gainDecibels = scheduledValueAt(control.gainAutomation, atFrame, control.gainDecibels);
+    const priorBypassed = scheduledValueAt(control.bypassAutomation, atFrame, control.bypassed);
+    const gains = mixGains(mix);
+    const priorDry = priorBypassed ? 1 : gains.dry;
+    const priorWet = priorBypassed ? 0 : gains.wet;
+    const priorOutput = priorBypassed ? 1 : decibelsToGain(gainDecibels);
     scheduleRamp(control.dry.gain, priorDry, bypassed ? 1 : gains.dry, time, CHAIN_SWITCH_SECONDS);
     scheduleRamp(control.wet.gain, priorWet, bypassed ? 0 : gains.wet, time, CHAIN_SWITCH_SECONDS);
+    scheduleRamp(control.output.gain, priorOutput, bypassed ? 1 : decibelsToGain(gainDecibels), time, CHAIN_SWITCH_SECONDS);
+    recordScheduledValue(control.bypassAutomation, atFrame, bypassed);
   }
 
-  scheduleEffectWetDry(atFrame: number, effectId: EffectInstanceId, wetDry: number): void {
+  scheduleEffectMix(atFrame: number, effectId: EffectInstanceId, mix: number): void {
     const control = this.#active.controls.get(effectId);
     if (control === undefined) return;
-    const value = clamp01(wetDry);
-    const prior = wetDryGains(control.wetDry, control.wetDryLaw);
-    control.wetDry = value;
+    const value = clamp01(mix);
+    const priorMix = scheduledValueAt(control.mixAutomation, atFrame, control.mix);
+    const bypassed = scheduledValueAt(control.bypassAutomation, atFrame, control.bypassed);
+    const prior = mixGains(priorMix);
     const time = frameTime(this.#context, atFrame);
-    const gains = wetDryGains(value, control.wetDryLaw);
-    scheduleRamp(control.dry.gain, control.bypassed ? 1 : prior.dry, control.bypassed ? 1 : gains.dry, time, CHAIN_SWITCH_SECONDS);
-    scheduleRamp(control.wet.gain, control.bypassed ? 0 : prior.wet, control.bypassed ? 0 : gains.wet, time, CHAIN_SWITCH_SECONDS);
+    const gains = mixGains(value);
+    scheduleRamp(control.dry.gain, bypassed ? 1 : prior.dry, bypassed ? 1 : gains.dry, time, CHAIN_SWITCH_SECONDS);
+    scheduleRamp(control.wet.gain, bypassed ? 0 : prior.wet, bypassed ? 0 : gains.wet, time, CHAIN_SWITCH_SECONDS);
+    recordScheduledValue(control.mixAutomation, atFrame, value);
   }
 
-  /** Applies a transient wet/dry value without changing the project projection. */
-  previewEffectWetDry(effectId: EffectInstanceId, wetDry: number): void {
-    this.setEffectWetDry(effectId, wetDry);
+  /** Applies a transient Mix value without changing the project projection. */
+  previewEffectMix(effectId: EffectInstanceId, mix: number): void {
+    this.setEffectMix(effectId, mix);
   }
 
-  setEffectWetDry(effectId: EffectInstanceId, wetDry: number): boolean {
+  setEffectMix(effectId: EffectInstanceId, mix: number): boolean {
     const control = this.#active.controls.get(effectId);
     if (control === undefined) return false;
-    const value = clamp01(wetDry);
-    control.wetDry = value;
+    const value = clamp01(mix);
+    control.mix = value;
     const now = this.#context.currentTime;
-    const gains = wetDryGains(value, control.wetDryLaw);
+    const gains = mixGains(value);
     ramp(control.dry.gain, control.bypassed ? 1 : gains.dry, now, CHAIN_SWITCH_SECONDS);
     ramp(control.wet.gain, control.bypassed ? 0 : gains.wet, now, CHAIN_SWITCH_SECONDS);
+    return true;
+  }
+
+  scheduleEffectGain(atFrame: number, effectId: EffectInstanceId, gainDecibels: number): void {
+    const control = this.#active.controls.get(effectId);
+    if (control === undefined) return;
+    const prior = scheduledValueAt(control.gainAutomation, atFrame, control.gainDecibels);
+    const next = clampGain(gainDecibels);
+    const bypassed = scheduledValueAt(control.bypassAutomation, atFrame, control.bypassed);
+    const time = frameTime(this.#context, atFrame);
+    scheduleRamp(
+      control.output.gain,
+      bypassed ? 1 : decibelsToGain(prior),
+      bypassed ? 1 : decibelsToGain(next),
+      time,
+      CHAIN_SWITCH_SECONDS,
+    );
+    recordScheduledValue(control.gainAutomation, atFrame, next);
+  }
+
+  previewEffectGain(effectId: EffectInstanceId, gainDecibels: number): void {
+    this.setEffectGain(effectId, gainDecibels);
+  }
+
+  setEffectGain(effectId: EffectInstanceId, gainDecibels: number): boolean {
+    const control = this.#active.controls.get(effectId);
+    if (control === undefined) return false;
+    control.gainDecibels = clampGain(gainDecibels);
+    ramp(
+      control.output.gain,
+      control.bypassed ? 1 : decibelsToGain(control.gainDecibels),
+      this.#context.currentTime,
+      CHAIN_SWITCH_SECONDS,
+    );
     return true;
   }
 
@@ -175,10 +230,11 @@ export class EffectChainNode {
     const control = this.#active.controls.get(effectId);
     if (control === undefined) return false;
     control.bypassed = bypassed;
-    const gains = wetDryGains(control.wetDry, control.wetDryLaw);
+    const gains = mixGains(control.mix);
     const now = this.#context.currentTime;
     ramp(control.dry.gain, bypassed ? 1 : gains.dry, now, CHAIN_SWITCH_SECONDS);
     ramp(control.wet.gain, bypassed ? 0 : gains.wet, now, CHAIN_SWITCH_SECONDS);
+    ramp(control.output.gain, bypassed ? 1 : decibelsToGain(control.gainDecibels), now, CHAIN_SWITCH_SECONDS);
     return true;
   }
 
@@ -231,8 +287,12 @@ export class EffectChainNode {
     for (const parameter of [this.#bypassDry.gain, this.#bypassWet.gain]) {
       parameter.cancelScheduledValues(time);
     }
+    this.#bypassAutomation = retainScheduledBefore(this.#bypassAutomation, fromFrame);
     for (const control of this.#active.controls.values()) {
-      for (const parameter of [control.dry.gain, control.wet.gain]) parameter.cancelScheduledValues(time);
+      for (const parameter of [control.dry.gain, control.wet.gain, control.output.gain]) parameter.cancelScheduledValues(time);
+      control.mixAutomation = retainScheduledBefore(control.mixAutomation, fromFrame);
+      control.gainAutomation = retainScheduledBefore(control.gainAutomation, fromFrame);
+      control.bypassAutomation = retainScheduledBefore(control.bypassAutomation, fromFrame);
       control.node.clearScheduledParameters?.(fromFrame);
     }
   }
@@ -272,24 +332,31 @@ export class EffectChainNode {
         const dry = this.#context.createGain();
         const wet = this.#context.createGain();
         const mix = this.#context.createGain();
-        const gains = wetDryGains(effect.wetDry, effect.wetDryLaw);
+        const output = this.#context.createGain();
+        const gains = mixGains(effect.mix);
         dry.gain.value = effect.bypassed ? 1 : gains.dry;
         wet.gain.value = effect.bypassed ? 0 : gains.wet;
+        output.gain.value = effect.bypassed ? 1 : decibelsToGain(effect.gainDecibels);
         tail.connect(node.input);
         tail.connect(dry);
         node.output.connect(wet);
         dry.connect(mix);
         wet.connect(mix);
-        ownedNodes.push(dry, wet, mix);
+        mix.connect(output);
+        ownedNodes.push(dry, wet, mix, output);
         controls.set(effect.id, {
           node,
           dry,
           wet,
-          wetDry: clamp01(effect.wetDry),
+          output,
+          mix: clamp01(effect.mix),
+          gainDecibels: clampGain(effect.gainDecibels),
           bypassed: effect.bypassed,
-          wetDryLaw: effect.wetDryLaw,
+          mixAutomation: [],
+          gainAutomation: [],
+          bypassAutomation: [],
         });
-        tail = mix;
+        tail = output;
       }
       tail.connect(exit);
       exit.connect(this.#bypassWet);
@@ -331,16 +398,48 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function wetDryGains(
-  wetDry: number,
-  law: "linear" | "equal-power",
-): { readonly dry: number; readonly wet: number } {
-  const value = clamp01(wetDry);
-  if (law === "linear") return { dry: 1 - value, wet: value };
+function mixGains(mix: number): { readonly dry: number; readonly wet: number } {
+  const value = clamp01(mix);
   return {
     dry: Math.cos((value * Math.PI) / 2),
     wet: Math.sin((value * Math.PI) / 2),
   };
+}
+
+function clampGain(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(24, Math.max(-24, value));
+}
+
+function decibelsToGain(value: number): number {
+  return 10 ** (clampGain(value) / 20);
+}
+
+function scheduledValueAt<T>(
+  values: readonly ScheduledValue<T>[],
+  atFrame: number,
+  fallback: T,
+): T {
+  return values.findLast((value) => value.atFrame <= atFrame)?.value ?? fallback;
+}
+
+function recordScheduledValue<T>(
+  values: ScheduledValue<T>[],
+  atFrame: number,
+  value: T,
+): void {
+  const existing = values.findIndex((candidate) => candidate.atFrame === atFrame);
+  if (existing >= 0) values.splice(existing, 1);
+  values.push({ atFrame, value });
+  values.sort((left, right) => left.atFrame - right.atFrame);
+}
+
+function retainScheduledBefore<T>(
+  values: readonly ScheduledValue<T>[],
+  fromFrame: number,
+): ScheduledValue<T>[] {
+  const prior = values.findLast((value) => value.atFrame < fromFrame);
+  return prior === undefined ? [] : [prior];
 }
 
 function ramp(parameter: AudioParam, value: number, now: number, seconds: number): void {

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { createGestureId, type EffectInstanceId, type PluginId } from "../../../contracts";
+import {
+  createGestureId,
+  EFFECT_GAIN_MAXIMUM_DECIBELS,
+  EFFECT_GAIN_MINIMUM_DECIBELS,
+  type EffectInstanceId,
+  type PluginId,
+} from "../../../contracts";
 import { Knob } from "../controls/Knob";
 import { automationShortcut } from "../controls/automation-shortcut";
 import { useAppStore, useDependencies, useIdFactory } from "../store/app-store-context";
@@ -312,9 +318,11 @@ export function EffectEditor(props: EffectEditorProps) {
   const replaceEffectInChain = useAppStore((state) => state.replaceEffectInChain);
   const reorderEffectInChain = useAppStore((state) => state.reorderEffectInChain);
   const setEffectBypassed = useAppStore((state) => state.setEffectBypassed);
-  const setEffectWetDry = useAppStore((state) => state.setEffectWetDry);
+  const setEffectMix = useAppStore((state) => state.setEffectMix);
+  const setEffectGain = useAppStore((state) => state.setEffectGain);
   const setEffectParameter = useAppStore((state) => state.setEffectParameter);
-  const previewEffectWetDry = useAppStore((state) => state.previewEffectWetDry);
+  const previewEffectMix = useAppStore((state) => state.previewEffectMix);
+  const previewEffectGain = useAppStore((state) => state.previewEffectGain);
   const previewEffectParameter = useAppStore((state) => state.previewEffectParameter);
   const setSendFocus = useAppStore((state) => state.setSendFocus);
   const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
@@ -596,26 +604,49 @@ export function EffectEditor(props: EffectEditorProps) {
                   ) : null}
                 </div>
                 <div className={styles.mix}>
-                  <span>Wet dry</span>
+                  <span>Effect output</span>
                   <Knob
-                    controlId={`effect-${effect.id}-wet-dry`}
-                    label={`${effectOwner} wet dry`}
+                    controlId={`effect-${effect.id}-mix`}
+                    label={`${effectOwner} Mix`}
                     caption="Mix"
                     min={0}
                     max={1}
                     step={0.01}
-                    value={effect.wetDry}
-                    defaultValue={1}
+                    value={effect.mix}
+                    defaultValue={manifest?.kind === "effect" ? manifest.defaultMix : 1}
                     precision={2}
-                    onInput={(value) => previewEffectWetDry(effect.id, value)}
+                    onInput={(value) => previewEffectMix(effect.id, value)}
                     onCommit={(value, gestureId) =>
-                      setEffectWetDry(effect.id, value, gestureId)
+                      setEffectMix(effect.id, value, gestureId)
                     }
                     onAutomate={() =>
                       openExternalAutomationTarget({
                         scope: "effect",
                         targetId: effect.id,
-                        parameterId: "wet-dry",
+                        parameterId: "mix",
+                      })
+                    }
+                  />
+                  <Knob
+                    controlId={`effect-${effect.id}-gain`}
+                    label={`${effectOwner} Gain`}
+                    caption="Gain"
+                    min={EFFECT_GAIN_MINIMUM_DECIBELS}
+                    max={EFFECT_GAIN_MAXIMUM_DECIBELS}
+                    step={0.1}
+                    value={effect.gainDecibels}
+                    defaultValue={0}
+                    unit="decibels"
+                    precision={1}
+                    onInput={(value) => previewEffectGain(effect.id, value)}
+                    onCommit={(value, gestureId) =>
+                      setEffectGain(effect.id, value, gestureId)
+                    }
+                    onAutomate={() =>
+                      openExternalAutomationTarget({
+                        scope: "effect",
+                        targetId: effect.id,
+                        parameterId: "gain",
                       })
                     }
                   />

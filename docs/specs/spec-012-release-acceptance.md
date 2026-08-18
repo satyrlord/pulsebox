@@ -72,11 +72,13 @@ The merged MVP is complete only when:
 23. **AC-023.** Module pedalboards work. The instrument rack is their only entry
     point.
 24. **AC-024.** Four modular send chains work. Each compact card uses a pinned
-    focus effect and that plugin's four declared compact controls.
+    focus effect and up to four declared compact controls from that plugin.
 25. **AC-025.** The master chain works.
-26. **AC-026.** All listed effects process audio.
+26. **AC-026.** All listed effects process audio. Each effect has one equal-power
+    Mix and one post-mix Gain. Mix and Gain are automatable. The UI has no
+    `Wet/Dry` label.
 27. **AC-027.** A–D defaults match the approved compact effect design and use circular
-    return Mix controls.
+    Return Level controls.
 28. **AC-028.** The reverb shimmer feature works.
 29. **AC-029.** The ordered named-Pattern Playlist supports add, choose, reorder,
     repeat, duplicate, delete, Undo, and Redo without a separate full timeline.
@@ -102,7 +104,8 @@ The merged MVP is complete only when:
     send-return stems before the master chain, plus a master mix that includes
     the master chain.
 38. **AC-038.** Projects reload and sound the same within the deterministic manifest,
-    schedule, and rendered-sample limits in section 24.4.
+    schedule, and rendered-sample limits in section 24.4. Format-2 projects
+    migrate to format 3 with the specified equal-power transform.
 39. **AC-039.** Theme switching from Settings does not interrupt audio or shift
     layout. Theme and contrast persist globally. They never travel in project
     files and have no selector in the application header.
@@ -202,8 +205,9 @@ The merged MVP is complete only when:
     locking.
 73. **AC-073.** Pause preserves position. Stop returns to the last explicit start marker,
     with the defined Pattern and Song defaults and no second-stop behavior.
-74. **AC-074.** The compact send-chain `Mix` control changes return level from silence to
-    unity without adding a dry copy or replacing per-effect wet/dry controls.
+74. **AC-074.** The compact send-chain `Return Level` control changes return
+    level from silence to unity. Each channel send uses the pre-fader tap.
+    A return adds no dry copy and does not replace an effect Mix or Gain.
 75. **AC-075.** Channel mute silences main and sends. Global solo passes only soloed
     channels and their sends. Shared returns contain only surviving soloed
     sources.

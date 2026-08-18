@@ -99,7 +99,8 @@ function createCatalogEffect(
     stateVersion: 1,
     state: { preset: pluginId },
     bypassed: false,
-    wetDry: 1,
+    mix: 1,
+    gainDecibels: 0,
   };
 }
 
@@ -314,7 +315,7 @@ describe("mixer commands", () => {
     expect(store.getState().project.masterLevel).toBe(0.5);
   });
 
-  it("stores all four send taps and restores a send edit through Undo", () => {
+  it("stores four pre-fader send amounts and restores an edit through Undo", () => {
     const { store, moduleId } = harness();
     expect(
       store.dispatch(
@@ -325,25 +326,31 @@ describe("mixer commands", () => {
         }),
       ).status,
     ).toBe("accepted");
-    expect(
-      store.dispatch(
-        store.createCommand("mixer-send-mode-set", {
-          moduleId,
-          sendBusId: "send-a" as never,
-          mode: "pre-fader",
-        }),
-      ).status,
-    ).toBe("accepted");
     expect(store.getState().project.modules[moduleId]?.sends["send-a" as never]).toEqual({
       amount: 0.65,
-      mode: "pre-fader",
     });
     store.undo();
     expect(store.getState().project.modules[moduleId]?.sends["send-a" as never]).toEqual({
-      amount: 0.65,
-      mode: "post-fader",
+      amount: 0,
     });
   });
+
+  it.each(["mix", "gain"])(
+    "rejects shared %s state through the plugin parameter command",
+    (parameterId) => {
+      const { store } = effectHarness();
+      const effectId = requiredEffectId(
+        store.getState().project.effects.sendChains["send-a" as never]?.slots[0],
+      );
+      const result = store.dispatch(store.createCommand("effects-instance-parameter-set", {
+        effectInstanceId: effectId,
+        parameterId,
+        value: 0.5,
+      }));
+      expect(result.status).toBe("rejected");
+      expect(store.getState().project.effects.instances[effectId]?.state).not.toHaveProperty(parameterId);
+    },
+  );
 
   it("removes module and chained-effect automation lanes with all Pattern references", () => {
     const { store, moduleId } = effectHarness();
@@ -366,7 +373,7 @@ describe("mixer commands", () => {
       patternId: verseId,
       scope: "effect",
       targetId: effectId,
-      parameterId: "wet-dry",
+      parameterId: "mix",
       steps: [{ tick: 0, value: 0.5 }],
     })).status).toBe("accepted");
 
@@ -423,7 +430,7 @@ describe("mixer commands", () => {
       store.getState().project.effects.moduleChains[targetModuleId]?.find((id) => id !== null),
     );
     store.dispatch(store.createCommand("piano-roll-automation-target-set", {
-      target: { scope: "effect", targetId: effectId, parameterId: "wet-dry" },
+      target: { scope: "effect", targetId: effectId, parameterId: "mix" },
     }));
     store.dispatch(store.createCommand("effects-chain-effect-remove", { effectInstanceId: effectId }));
     expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
@@ -431,7 +438,7 @@ describe("mixer commands", () => {
     store.undo();
     expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
     store.dispatch(store.createCommand("piano-roll-automation-target-set", {
-      target: { scope: "effect", targetId: effectId, parameterId: "wet-dry" },
+      target: { scope: "effect", targetId: effectId, parameterId: "mix" },
     }));
     store.redo();
     expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
@@ -552,7 +559,7 @@ describe("mixer commands", () => {
         patternId,
         scope: "effect",
         targetId: effectId,
-        parameterId: "wet-dry",
+        parameterId: "mix",
         steps: [{ tick: 0, value: 0.75 }],
       }),
     );
@@ -563,7 +570,7 @@ describe("mixer commands", () => {
     ).id;
     const genericLaneId = required(
       Object.values(store.getState().project.automationLanes).find(
-        (lane) => lane.targetId === effectId && lane.parameterId === "wet-dry",
+        (lane) => lane.targetId === effectId && lane.parameterId === "mix",
       ),
     ).id;
 
@@ -612,7 +619,7 @@ describe("mixer commands", () => {
         patternId,
         scope: "effect",
         targetId: effectId,
-        parameterId: "wet-dry",
+        parameterId: "mix",
         steps: [{ tick: 0, value: 0.75 }],
       }),
     );

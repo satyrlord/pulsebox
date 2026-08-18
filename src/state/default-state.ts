@@ -262,7 +262,15 @@ function createInitialEffectsState(
 }
 
 function createDefaultEffectInstance(id: EffectInstanceId, pluginId: PluginId): EffectInstanceState {
-  return Object.freeze({ id, pluginId, stateVersion: 1, state: Object.freeze({}), bypassed: false, wetDry: 1 });
+  return Object.freeze({
+    id,
+    pluginId,
+    stateVersion: 1,
+    state: Object.freeze({}),
+    bypassed: false,
+    mix: 1,
+    gainDecibels: 0,
+  });
 }
 
 function isSeedList(seed: ModuleSeed | readonly ModuleSeed[]): seed is readonly ModuleSeed[] {
@@ -302,7 +310,7 @@ export function createModule(
     pan: source?.pan ?? 0,
     sends: Object.freeze(Object.fromEntries(SEND_BUS_IDS.map((id) => {
       const send = source?.sends[id];
-      return [id, Object.freeze({ amount: send?.amount ?? 0, mode: send?.mode ?? "post-fader" })];
+      return [id, Object.freeze({ amount: send?.amount ?? 0 })];
     }))),
   });
 }

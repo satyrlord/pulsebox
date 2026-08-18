@@ -14,6 +14,7 @@ import {
   type ValidationIssue,
   type ValidationResult,
 } from "./validation";
+import { isEffectStageParameterId } from "./effects";
 
 export interface CompactControlDescriptor {
   readonly position: number;
@@ -182,7 +183,8 @@ export interface EffectPluginManifest extends BasePluginManifest {
   readonly latency: EffectLatencyDescriptor;
   readonly tail: EffectTailDescriptor;
   readonly bypassTransitionMilliseconds: number;
-  readonly wetDryLaw: "linear" | "equal-power";
+  /** Initial value for the shared per-effect equal-power Mix control. */
+  readonly defaultMix: number;
   readonly safetyClampParameterIds: readonly ParameterId[];
   readonly processorFactoryKey: string;
   readonly renderCapabilities: PluginRenderCapabilities;
@@ -770,6 +772,12 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
       });
     }
   } else {
+    if (manifest.parameters.some((parameter) => isEffectStageParameterId(parameter.id))) {
+      issues.push({
+        path: "parameters",
+        message: "Effect plugins must not redeclare the shared Mix or Gain parameter ID.",
+      });
+    }
     if (
       manifest.placements.some(
         (placement) =>
@@ -781,7 +789,10 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
       manifest.outputChannels.some((channels) => !isChannelCount(channels, false)) ||
       !isOneOf(manifest.latency.mode, ["zero", "fixed-frames"]) ||
       !isOneOf(manifest.tail.mode, ["none", "finite", "bounded-generated"]) ||
-      !isOneOf(manifest.wetDryLaw, ["linear", "equal-power"])
+      typeof manifest.defaultMix !== "number" ||
+      !Number.isFinite(manifest.defaultMix) ||
+      manifest.defaultMix < 0 ||
+      manifest.defaultMix > 1
     ) {
       issues.push({
         path: "effect",

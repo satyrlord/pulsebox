@@ -1,6 +1,8 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
+  EFFECT_GAIN_MAXIMUM_DECIBELS,
+  EFFECT_GAIN_MINIMUM_DECIBELS,
   type EffectInstanceId,
   type GestureId,
   type ModuleInstanceId,
@@ -892,7 +894,7 @@ function externalDescriptor(
     readonly minimum?: number;
     readonly maximum?: number;
     readonly step?: number;
-    readonly unit?: "none" | "percent";
+    readonly unit?: "none" | "percent" | "decibels";
   } = {},
 ): ParameterDescriptor {
   return {
@@ -1034,22 +1036,11 @@ function PianoRoll() {
     }
     if (target.scope === "send") {
       const targetModule = modules[target.targetId as ModuleInstanceId];
-      const match = /^send-([abcd])-(amount|mode)$/.exec(target.parameterId);
+      const match = /^send-([abcd])-amount$/.exec(target.parameterId);
       if (targetModule === undefined || match?.[1] === undefined) return undefined;
       const sendBusId = `send-${match[1]}` as SendBusId;
       const send = targetModule.sends[sendBusId];
       if (send === undefined) return undefined;
-      if (match[2] === "mode") {
-        return {
-          descriptor: {
-            ...externalDescriptor(target.parameterId, "Tap mode", "post-fader"),
-            valueType: "enum",
-            enumValues: ["post-fader", "pre-fader"],
-          },
-          ownerLabel: `${manifestFor(targetModule.pluginId)?.productName ?? "Module"} send ${match[1].toUpperCase()}`,
-          currentValue: send.mode,
-        };
-      }
       return {
         descriptor: externalDescriptor(target.parameterId, "Amount", 0, {
           minimum: 0,
@@ -1076,7 +1067,7 @@ function PianoRoll() {
       }
       if (target.parameterId !== "return-level") return undefined;
       return {
-        descriptor: externalDescriptor("return-level", "Return Mix", 1, {
+        descriptor: externalDescriptor("return-level", "Return Level", 1, {
           minimum: 0,
           maximum: 1,
           step: 0.01,
@@ -1114,16 +1105,28 @@ function PianoRoll() {
     if (effect === undefined) return undefined;
     const effectManifest = manifestFor(effect.pluginId);
     const ownerLabel = effectManifest?.productName ?? "Effect";
-    if (target.parameterId === "wet-dry") {
+    if (target.parameterId === "mix") {
       return {
-        descriptor: externalDescriptor("wet-dry", "Wet/dry", 1, {
+        descriptor: externalDescriptor("mix", "Mix", 1, {
           minimum: 0,
           maximum: 1,
           step: 0.01,
           unit: "percent",
         }),
         ownerLabel,
-        currentValue: effect.wetDry,
+        currentValue: effect.mix,
+      };
+    }
+    if (target.parameterId === "gain") {
+      return {
+        descriptor: externalDescriptor("gain", "Gain", 0, {
+          minimum: EFFECT_GAIN_MINIMUM_DECIBELS,
+          maximum: EFFECT_GAIN_MAXIMUM_DECIBELS,
+          step: 0.1,
+          unit: "decibels",
+        }),
+        ownerLabel,
+        currentValue: effect.gainDecibels,
       };
     }
     if (target.parameterId === "bypassed") {

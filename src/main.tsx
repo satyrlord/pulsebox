@@ -362,8 +362,11 @@ const app = mountPulseboxApp({
     previewSendReturnLevel: (sendBusId, returnLevel) => {
       audio.previewSendReturnLevel(sendBusId, returnLevel);
     },
-    previewEffectWetDry: (effectInstanceId, wetDry) => {
-      audio.previewEffectWetDry(effectInstanceId, wetDry);
+    previewEffectMix: (effectInstanceId, mix) => {
+      audio.previewEffectMix(effectInstanceId, mix);
+    },
+    previewEffectGain: (effectInstanceId, gainDecibels) => {
+      audio.previewEffectGain(effectInstanceId, gainDecibels);
     },
     previewEffectParameter: (effectInstanceId, parameterId, value) => {
       audio.previewEffectParameter(effectInstanceId, parameterId, value);
@@ -686,7 +689,6 @@ function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): Tr
       sends: Object.entries(module.sends).map(([busId, send]) => ({
         busId: busId as SendBusId,
         amount: send.amount,
-        mode: send.mode === "pre-fader" ? "pre" : "post",
       })),
     },
   };
@@ -713,8 +715,8 @@ function toAudioRouting(state: Readonly<PulseState>): TransportRoutingProjection
         : {
             limiterState: limiter.state,
             limiterEffectId: limiter.id,
-            limiterWetDry: limiter.wetDry,
-            limiterWetDryLaw: limiter.wetDryLaw,
+            limiterMix: limiter.mix,
+            limiterGainDecibels: limiter.gainDecibels,
           }),
     },
     automation: toAudioExternalAutomation(state),
@@ -763,9 +765,7 @@ function resolveEffectChain(
     const effect = state.project.effects.instances[effectId];
     if (effect === undefined) return [];
     const manifest = registry.get(effect.pluginId)?.manifest;
-    return manifest?.kind === "effect"
-      ? [{ ...effect, wetDryLaw: manifest.wetDryLaw }]
-      : [];
+    return manifest?.kind === "effect" ? [effect] : [];
   });
 }
 
@@ -820,7 +820,8 @@ function createEffectInstance(
     stateVersion: entry.manifest.stateSchemaVersion,
     state: Object.freeze(effectStateDefaultsFor(entry.manifest.defaultState)),
     bypassed: false,
-    wetDry: 1,
+    mix: entry.manifest.defaultMix,
+    gainDecibels: 0,
   });
 }
 

@@ -97,7 +97,7 @@ describe("effect worklet adapter", () => {
     const statuses: string[] = [];
     const port = await createEffectWorkletPort(stub as unknown as AudioContext, {
       pluginId: "distortion" as PluginId,
-      state: { drive: 1, model: "drive", tone: 18_000, mix: 1 },
+      state: { drive: 1, model: "drive", tone: 18_000 },
       onStatus: (status) => statuses.push(status.state),
     });
     const stableInput = port.input;

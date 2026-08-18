@@ -34,20 +34,11 @@ interface OpenSendSurface {
 function SendValueSurface(props: {
   readonly active: OpenSendSurface;
   readonly amount: number;
-  readonly mode: "pre-fader" | "post-fader";
   readonly onClose: () => void;
 }) {
   const setChannelSendAmount = useAppStore((state) => state.setChannelSendAmount);
   const previewChannelSendAmount = useAppStore((state) => state.previewChannelSendAmount);
-  const setChannelSendMode = useAppStore((state) => state.setChannelSendMode);
   const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
-  const tapAutomation = automationShortcut(() =>
-    openExternalAutomationTarget({
-      scope: "send",
-      targetId: props.active.moduleId,
-      parameterId: `${props.active.sendBusId}-mode`,
-    }),
-  );
   return (
     <section className={styles.sendSurface} data-component="send-value-surface" aria-label={`Send ${props.active.send} value`}>
       <div>
@@ -84,26 +75,6 @@ function SendValueSurface(props: {
           })
         }
       />
-      <label>
-        <span>Tap</span>
-        <select
-          aria-label={`Send ${props.active.send} tap mode`}
-          aria-keyshortcuts={tapAutomation.ariaKeyShortcuts}
-          value={props.mode}
-          onChange={(event) =>
-            setChannelSendMode(
-              props.active.moduleId,
-              props.active.sendBusId,
-              event.currentTarget.value as "pre-fader" | "post-fader",
-            )
-          }
-          onKeyDown={tapAutomation.onKeyDown}
-          onContextMenu={tapAutomation.onContextMenu}
-        >
-          <option value="post-fader">Post-fader</option>
-          <option value="pre-fader">Pre-fader</option>
-        </select>
-      </label>
       <button
         type="button"
         title={`Automate ${props.active.moduleName} send ${props.active.send}.`}
@@ -116,19 +87,6 @@ function SendValueSurface(props: {
         }
       >
         Automate
-      </button>
-      <button
-        type="button"
-        title={`Automate ${props.active.moduleName} send ${props.active.send} tap mode.`}
-        onClick={() =>
-          openExternalAutomationTarget({
-            scope: "send",
-            targetId: props.active.moduleId,
-            parameterId: `${props.active.sendBusId}-mode`,
-          })
-        }
-      >
-        Automate tap
       </button>
     </section>
   );
@@ -357,7 +315,7 @@ export function Mixer() {
                     key={send}
                     type="button"
                     data-active={active}
-                    aria-label={`${active ? "Edit active" : "Open"} send ${send} for ${name}. ${Math.round(state.amount * 100)} percent, ${state.mode}.`}
+                    aria-label={`${active ? "Edit active" : "Open"} send ${send} for ${name}. ${Math.round(state.amount * 100)} percent, pre-fader.`}
                     title={`Open send ${send} for ${name}.`}
                     onClick={() => setOpenSendSurface({ moduleId: module.id, moduleName: name, send, sendBusId })}
                   >
@@ -482,7 +440,6 @@ export function Mixer() {
           <SendValueSurface
             active={openSendSurface}
             amount={send.amount}
-            mode={send.mode}
             onClose={() => setOpenSendSurface(undefined)}
           />
         );

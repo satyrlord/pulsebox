@@ -219,8 +219,8 @@ Command plus A selects all events. Control or Command plus D duplicates them.
 
 1. Create one effect plugin folder.
 2. Add one registry entry.
-3. Declare channel layout, latency, tail, bypass, wet/dry, safety clamps,
-   automation, offline support, and UI manifests.
+3. Declare channel layout, latency, tail, click-safe bypass, equal-power Mix,
+   post-mix Gain, safety clamps, automation, offline support, and UI manifests.
 4. Update the schema and routing.
 5. Add rendered-audio tests.
 6. Update the documentation and acceptance evidence.

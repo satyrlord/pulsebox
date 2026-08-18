@@ -113,10 +113,7 @@ describe("mixer and effects surfaces", () => {
     fireEvent.keyUp(amount, { key: "End" });
     expect(harness.domain.getState().project.modules[firstModuleId(harness)]?.sends[SEND_A_ID]?.amount).toBe(1);
     expect(harness.domain.getState().history.canUndo).toBe(true);
-    fireEvent.change(screen.getByRole("combobox", { name: "Send A tap mode" }), {
-      target: { value: "pre-fader" },
-    });
-    expect(harness.domain.getState().project.modules[firstModuleId(harness)]?.sends[SEND_A_ID]?.mode).toBe("pre-fader");
+    expect(screen.queryByRole("combobox", { name: "Send A tap mode" })).toBeNull();
   });
 
   it("previews send and effect controls before one committed Undo entry", () => {
@@ -137,45 +134,41 @@ describe("mixer and effects surfaces", () => {
     expect(harness.domain.getState().history.canUndo).toBe(true);
     act(() => harness.store.getState().undo());
 
-    const returnMix = screen.getByRole("slider", { name: "Send A return Mix" });
-    fireEvent.keyDown(returnMix, { key: "Home" });
+    const returnLevel = screen.getByRole("slider", { name: "Send A Return Level" });
+    fireEvent.keyDown(returnLevel, { key: "Home" });
     expect(harness.audio.previewSendReturnLevel).toHaveBeenCalledWith(sendAId, 0);
     expect(harness.domain.getState().project.effects.sendChains[sendAId]?.returnLevel).toBe(1);
     expect(harness.domain.getState().history.canUndo).toBe(false);
-    fireEvent.keyUp(returnMix, { key: "Home" });
+    fireEvent.keyUp(returnLevel, { key: "Home" });
     expect(harness.domain.getState().project.effects.sendChains[sendAId]?.returnLevel).toBe(0);
     expect(harness.domain.getState().history.canUndo).toBe(true);
   });
 
-  it("keeps percent macro entry synchronized with commits, history, and external state", () => {
+  it("keeps per-effect Mix and Gain synchronized with commits and history", () => {
     const harness = createHarness();
     renderWithHarness(<EffectsBank />, harness);
     const sendA = harness.domain.getState().project.effects.sendChains[SEND_A_ID];
     const delayId = sendA?.slots[0];
     if (delayId === null || delayId === undefined) throw new Error("Expected the default delay.");
 
-    const feedback = screen.getByRole("slider", { name: "Send A Analog Echo Mix macro" });
-    const value = screen.getByRole("spinbutton", {
-      name: "Send A Analog Echo Mix macro value",
-    });
-    expect(feedback).toHaveAttribute("aria-valuemax", "100");
-    expect(feedback).toHaveAttribute("aria-valuenow", "35");
-    expect(feedback).toHaveAttribute("aria-valuetext", "35 percent");
-    expect(value).toHaveValue(35);
+    const firstEdit = screen.getAllByRole("button", { name: "Edit" }).at(0);
+    if (firstEdit === undefined) throw new Error("Expected the first send editor button.");
+    fireEvent.click(firstEdit);
+    const mix = screen.getByRole("slider", { name: "Analog Echo in Send A Mix" });
+    const gain = screen.getByRole("slider", { name: "Analog Echo in Send A Gain" });
+    expect(mix).toHaveAttribute("aria-valuenow", "0.35");
+    expect(gain).toHaveAttribute("aria-valuenow", "0");
 
-    fireEvent.change(value, { target: { value: "55" } });
-    fireEvent.blur(value);
-    expect(harness.domain.getState().project.effects.instances[delayId]?.state.mix).toBe(0.55);
-    expect(value).toHaveValue(55);
+    fireEvent.keyDown(mix, { key: "ArrowUp" });
+    fireEvent.keyUp(mix, { key: "ArrowUp" });
+    expect(harness.domain.getState().project.effects.instances[delayId]?.mix).toBe(0.36);
     act(() => harness.store.getState().undo());
-    expect(value).toHaveValue(35);
+    expect(harness.domain.getState().project.effects.instances[delayId]?.mix).toBe(0.35);
     act(() => harness.store.getState().redo());
-    expect(value).toHaveValue(55);
-
-    act(() => harness.store.getState().setEffectParameter(delayId, "mix", 0.5));
-    expect(value).toHaveValue(50);
-    fireEvent.doubleClick(feedback);
-    expect(harness.domain.getState().project.effects.instances[delayId]?.state.mix).toBe(0.35);
+    expect(harness.domain.getState().project.effects.instances[delayId]?.mix).toBe(0.36);
+    fireEvent.keyDown(gain, { key: "ArrowUp" });
+    fireEvent.keyUp(gain, { key: "ArrowUp" });
+    expect(harness.domain.getState().project.effects.instances[delayId]?.gainDecibels).toBe(0.1);
   });
 
   it("opens an external send target in the Piano Roll and writes its first lane step", () => {
@@ -222,9 +215,12 @@ describe("mixer and effects surfaces", () => {
     );
     const parameter = () => screen.getByRole("combobox", { name: "Piano Roll parameter" });
 
-    fireEvent.click(screen.getByRole("button", { name: /Open send A for Silver Serpent/i }));
-    fireEvent.contextMenu(screen.getByRole("combobox", { name: "Send A tap mode" }));
-    expect(parameter()).toHaveValue("send-a-mode");
+    const firstEdit = screen.getAllByRole("button", { name: "Edit" }).at(0);
+    if (firstEdit === undefined) throw new Error("Expected the first send editor button.");
+    fireEvent.click(firstEdit);
+    fireEvent.contextMenu(screen.getByRole("slider", { name: "Analog Echo in Send A Mix" }));
+    expect(parameter()).toHaveValue("mix");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
     fireEvent.keyDown(within(screen.getByRole("region", { name: "Master routing" })).getByRole("button", { name: "Bypass master effects" }), {
       key: "A",

@@ -143,7 +143,8 @@ export function createHarness(
     previewMasterLevel: vi.fn(),
     previewChannelSendAmount: vi.fn(),
     previewSendReturnLevel: vi.fn(),
-    previewEffectWetDry: vi.fn(),
+    previewEffectMix: vi.fn(),
+    previewEffectGain: vi.fn(),
     previewEffectParameter: vi.fn(),
     startAudition: vi.fn(() => Promise.resolve()),
     stopAudition: vi.fn(),
@@ -176,7 +177,8 @@ export function createHarness(
       stateVersion: manifest.stateSchemaVersion,
       state: parameterValues(manifest.defaultState),
       bypassed: false,
-      wetDry: 1,
+      mix: manifest.defaultMix,
+      gainDecibels: 0,
     };
   };
   const domain = new PulseStore(

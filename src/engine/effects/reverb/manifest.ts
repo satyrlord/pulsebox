@@ -5,7 +5,6 @@ const parameters = [
   numericParameter({ id: "pre-delay", name: "Pre-delay", minimum: 0, maximum: 200, defaultValue: 22, step: 1, unit: "milliseconds", precision: 0 }),
   numericParameter({ id: "decay", name: "Decay", minimum: 0.2, maximum: 12, defaultValue: 2.8, step: 0.1, unit: "seconds", precision: 1 }),
   numericParameter({ id: "damping", name: "Damping", minimum: 500, maximum: 18000, defaultValue: 6200, step: 1, unit: "hertz", precision: 0 }),
-  numericParameter({ id: "mix", name: "Mix", minimum: 0, maximum: 1, defaultValue: 0.3, step: 0.01, unit: "percent" }),
   numericParameter({ id: "shimmer", name: "Shimmer", minimum: 0, maximum: 1, defaultValue: 0, step: 0.01, unit: "percent" }),
 ];
-export const REVERB_MANIFEST = defineEffectManifest({ id: "reverb", name: "Plate Reverb", shortLabel: "PLAT", parameters, compact: ["pre-delay", "decay", "damping", "mix"], sections: [{ id: "plate", name: "Plate", parameters: ["mode", "pre-delay", "decay", "damping", "mix"] }, { id: "shimmer", name: "Shimmer", parameters: ["shimmer"] }], tailMilliseconds: 14000, cpuClass: "heavy", accent: ["#7A6AB5", "#3E365B", "#A99AE0", "#615393"] });
+export const REVERB_MANIFEST = defineEffectManifest({ id: "reverb", name: "Plate Reverb", shortLabel: "PLAT", parameters, compact: ["pre-delay", "decay", "damping"], sections: [{ id: "plate", name: "Plate", parameters: ["mode", "pre-delay", "decay", "damping"] }, { id: "shimmer", name: "Shimmer", parameters: ["shimmer"] }], tailMilliseconds: 14000, cpuClass: "heavy", defaultMix: 0.3, accent: ["#7A6AB5", "#3E365B", "#A99AE0", "#615393"] });

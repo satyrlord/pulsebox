@@ -92,7 +92,7 @@ interface EffectManifestDefinition {
   readonly latencyFrames?: number;
   readonly meters?: readonly { readonly id: string; readonly name: string }[];
   readonly accent: readonly [string, string, string, string];
-  readonly wetDryLaw?: EffectPluginManifest["wetDryLaw"];
+  readonly defaultMix: number;
 }
 
 export function defineEffectManifest(definition: EffectManifestDefinition): EffectPluginManifest {
@@ -141,7 +141,7 @@ export function defineEffectManifest(definition: EffectManifestDefinition): Effe
     latency: latencyDescriptor,
     tail: tailDescriptor,
     bypassTransitionMilliseconds: 8,
-    wetDryLaw: definition.wetDryLaw ?? "equal-power",
+    defaultMix: definition.defaultMix,
     safetyClampParameterIds: definition.parameters.filter((parameter) => parameter.valueType === "float").map((parameter) => parameter.id),
     processorFactoryKey: `${definition.id}-processor`,
     renderCapabilities: { live: true, offline: true },

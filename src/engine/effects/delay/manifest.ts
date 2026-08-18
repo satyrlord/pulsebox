@@ -8,6 +8,5 @@ const parameters = [
   numericParameter({ id: "feedback", name: "Feedback", minimum: 0, maximum: 0.92, defaultValue: 0.42, step: 0.01, unit: "percent" }),
   numericParameter({ id: "filter", name: "Feedback Filter", minimum: 300, maximum: 18000, defaultValue: 4800, step: 1, unit: "hertz", precision: 0 }),
   booleanParameter("ping-pong", "Ping-pong", true),
-  numericParameter({ id: "mix", name: "Mix", minimum: 0, maximum: 1, defaultValue: 0.35, step: 0.01, unit: "percent" }),
 ];
-export const DELAY_MANIFEST = defineEffectManifest({ id: "delay", name: "Analog Echo", shortLabel: "ECHO", parameters, compact: ["time", "feedback", "filter", "mix"], sections: [{ id: "timing", name: "Timing", parameters: ["tempo-sync", "time", "beat-time"] }, { id: "echo", name: "Echo", parameters: ["mode", "feedback", "filter", "ping-pong", "mix"] }], tailMilliseconds: 12000, cpuClass: "moderate", accent: ["#B66B46", "#5B3624", "#E99970", "#914F31"] });
+export const DELAY_MANIFEST = defineEffectManifest({ id: "delay", name: "Analog Echo", shortLabel: "ECHO", parameters, compact: ["time", "feedback", "filter"], sections: [{ id: "timing", name: "Timing", parameters: ["tempo-sync", "time", "beat-time"] }, { id: "echo", name: "Echo", parameters: ["mode", "feedback", "filter", "ping-pong"] }], tailMilliseconds: 12000, cpuClass: "moderate", defaultMix: 0.35, accent: ["#B66B46", "#5B3624", "#E99970", "#914F31"] });

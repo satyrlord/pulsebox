@@ -204,7 +204,7 @@ An effect plugin adds:
 - Latency.
 - Tail behavior.
 - Bypass behavior.
-- Wet and dry behavior.
+- Per-effect Mix and post-mix Gain behavior.
 - Processor factory.
 - Compact pedal manifest.
 - Detailed editor manifest.

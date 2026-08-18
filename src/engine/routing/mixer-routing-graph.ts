@@ -8,12 +8,9 @@ import {
   type RoutingEffectInstance,
 } from "./effect-chain-node";
 
-export type SendTapMode = "pre" | "post";
-
 export interface ChannelSendProjection {
   readonly busId: SendBusId;
   readonly amount: number;
-  readonly mode: SendTapMode;
 }
 
 export interface ChannelRoutingProjection {
@@ -40,8 +37,8 @@ export interface MasterRoutingProjection {
   readonly limiterBypassed: boolean;
   readonly limiterState?: Readonly<Record<string, unknown>>;
   readonly limiterEffectId?: EffectInstanceId;
-  readonly limiterWetDry?: number;
-  readonly limiterWetDryLaw?: "linear" | "equal-power";
+  readonly limiterMix?: number;
+  readonly limiterGainDecibels?: number;
 }
 
 export interface RoutingMeterFrame {
@@ -58,13 +55,19 @@ interface ChannelNodes {
   readonly fader: GainNode;
   readonly panner: StereoPannerNode;
   readonly effects: EffectChainNode;
-  readonly preSends: ReadonlyMap<SendBusId, GainNode>;
-  readonly postSends: ReadonlyMap<SendBusId, GainNode>;
+  readonly sends: ReadonlyMap<SendBusId, GainNode>;
   desiredLevel: number;
   desiredMuted: boolean;
   desiredSolo: boolean;
   readonly sendAmounts: Map<SendBusId, number>;
-  readonly sendModes: Map<SendBusId, SendTapMode>;
+  levelAutomation: ScheduledValue<number>[];
+  muteAutomation: ScheduledValue<boolean>[];
+  soloAutomation: ScheduledValue<boolean>[];
+}
+
+interface ScheduledValue<T> {
+  readonly atFrame: number;
+  readonly value: T;
 }
 
 interface SendNodes {
@@ -116,6 +119,8 @@ export class MixerRoutingGraph {
   readonly #limiterDrive: GainNode;
   readonly #limiterDry: GainNode;
   readonly #limiterWet: GainNode;
+  readonly #limiterMix: GainNode;
+  readonly #limiterOutputGain: GainNode;
   readonly #limiterBypass: GainNode;
   readonly #programOutput: GainNode;
   readonly #output: GainNode;
@@ -128,11 +133,12 @@ export class MixerRoutingGraph {
   #peakLatched = false;
   #limiterEffectId: EffectInstanceId | undefined;
   #limiterBypassed = false;
-  #limiterWetDry = 1;
-  #limiterWetDryLaw: "linear" | "equal-power" = "equal-power";
+  #limiterMixValue = 1;
+  #limiterOutputGainDecibels = 0;
   #limiterCeilingDecibels = -1;
-  #limiterGainDecibels = 0;
+  #limiterInputDecibels = 0;
   #limiterReleaseMilliseconds = 80;
+  readonly #limiterAutomation = new Map<string, ScheduledValue<ParameterValue>[]>();
   #transportTempo = 120;
 
   constructor(
@@ -154,6 +160,8 @@ export class MixerRoutingGraph {
     this.#limiterDrive = context.createGain();
     this.#limiterDry = context.createGain();
     this.#limiterWet = context.createGain();
+    this.#limiterMix = context.createGain();
+    this.#limiterOutputGain = context.createGain();
     this.#limiterBypass = context.createGain();
     this.#programOutput = context.createGain();
     this.#output = context.createGain();
@@ -165,12 +173,13 @@ export class MixerRoutingGraph {
     this.#masterGain.connect(this.#limiterDry);
     this.#programLimiter.connect(this.#limiterWet);
     this.#masterGain.connect(this.#limiterBypass);
+    this.#limiterDry.connect(this.#limiterMix);
+    this.#limiterWet.connect(this.#limiterMix);
+    this.#limiterMix.connect(this.#limiterOutputGain);
     if (this.#programCeiling === undefined) {
-      this.#limiterDry.connect(this.#programOutput);
-      this.#limiterWet.connect(this.#programOutput);
+      this.#limiterOutputGain.connect(this.#programOutput);
     } else {
-      this.#limiterDry.connect(this.#programCeiling.shaper);
-      this.#limiterWet.connect(this.#programCeiling.shaper);
+      this.#limiterOutputGain.connect(this.#programCeiling.shaper);
       this.#programCeiling.gain.connect(this.#programOutput);
     }
     this.#limiterBypass.connect(this.#programOutput);
@@ -215,7 +224,7 @@ export class MixerRoutingGraph {
     this.setChannelMix(moduleId, projection.level, projection.pan, projection.muted);
     for (const busId of SEND_BUS_IDS) {
       const send = projection.sends.find((candidate) => candidate.busId === busId);
-      this.setChannelSend(moduleId, busId, send?.amount ?? 0, send?.mode ?? "post");
+      this.setChannelSend(moduleId, busId, send?.amount ?? 0);
     }
   }
 
@@ -272,23 +281,18 @@ export class MixerRoutingGraph {
     ramp(parameter, field === "level" ? clamp01(value) : clamp(value, -1, 1), this.#context.currentTime, MIX_RAMP_SECONDS);
   }
 
-  setChannelSend(moduleId: ModuleInstanceId, busId: SendBusId, amount: number, mode: SendTapMode): void {
+  setChannelSend(moduleId: ModuleInstanceId, busId: SendBusId, amount: number): void {
     const channel = this.#channels.get(moduleId);
     if (channel === undefined) return;
     const value = clamp01(amount);
     channel.sendAmounts.set(busId, value);
-    channel.sendModes.set(busId, mode);
-    ramp(channel.preSends.get(busId)?.gain, mode === "pre" ? value : 0, this.#context.currentTime, MIX_RAMP_SECONDS);
-    ramp(channel.postSends.get(busId)?.gain, mode === "post" ? value : 0, this.#context.currentTime, MIX_RAMP_SECONDS);
+    ramp(channel.sends.get(busId)?.gain, value, this.#context.currentTime, MIX_RAMP_SECONDS);
   }
 
   previewChannelSendAmount(moduleId: ModuleInstanceId, busId: SendBusId, amount: number): void {
     const channel = this.#channels.get(moduleId);
     if (channel === undefined) return;
-    const value = clamp01(amount);
-    const mode = channel.sendModes.get(busId) ?? "post";
-    ramp(channel.preSends.get(busId)?.gain, mode === "pre" ? value : 0, this.#context.currentTime, MIX_RAMP_SECONDS);
-    ramp(channel.postSends.get(busId)?.gain, mode === "post" ? value : 0, this.#context.currentTime, MIX_RAMP_SECONDS);
+    ramp(channel.sends.get(busId)?.gain, clamp01(amount), this.#context.currentTime, MIX_RAMP_SECONDS);
   }
 
   async setSend(projection: SendRoutingProjection): Promise<void> {
@@ -327,18 +331,32 @@ export class MixerRoutingGraph {
     ramp(send.returnGain.gain, clamp01(returnLevel), this.#context.currentTime, MIX_RAMP_SECONDS);
   }
 
-  previewEffectWetDry(effectId: EffectInstanceId, wetDry: number): void {
-    this.setEffectWetDry(effectId, wetDry);
+  previewEffectMix(effectId: EffectInstanceId, mix: number): void {
+    this.setEffectMix(effectId, mix);
   }
 
-  setEffectWetDry(effectId: EffectInstanceId, wetDry: number): void {
+  setEffectMix(effectId: EffectInstanceId, mix: number): void {
     if (effectId === this.#limiterEffectId) {
-      this.#limiterWetDry = clamp01(wetDry);
+      this.#limiterMixValue = clamp01(mix);
       this.#applyLimiterMix();
       return;
     }
-    this.#masterEffects.previewEffectWetDry(effectId, wetDry);
-    for (const chain of this.#nonMasterEffectChains()) chain.previewEffectWetDry(effectId, wetDry);
+    this.#masterEffects.previewEffectMix(effectId, mix);
+    for (const chain of this.#nonMasterEffectChains()) chain.previewEffectMix(effectId, mix);
+  }
+
+  previewEffectGain(effectId: EffectInstanceId, gainDecibels: number): void {
+    this.setEffectGain(effectId, gainDecibels);
+  }
+
+  setEffectGain(effectId: EffectInstanceId, gainDecibels: number): void {
+    if (effectId === this.#limiterEffectId) {
+      this.#limiterOutputGainDecibels = clamp(gainDecibels, -24, 24);
+      this.#applyLimiterMix();
+      return;
+    }
+    this.#masterEffects.previewEffectGain(effectId, gainDecibels);
+    for (const chain of this.#nonMasterEffectChains()) chain.previewEffectGain(effectId, gainDecibels);
   }
 
   setEffectBypassed(effectId: EffectInstanceId, bypassed: boolean): void {
@@ -391,15 +409,16 @@ export class MixerRoutingGraph {
       this.#transportTempo,
     );
     this.#limiterEffectId = projection.limiterEffectId;
+    this.#limiterAutomation.clear();
     this.#limiterBypassed = projection.limiterBypassed;
-    this.#limiterWetDry = clamp01(projection.limiterWetDry ?? 1);
-    this.#limiterWetDryLaw = projection.limiterWetDryLaw ?? "equal-power";
+    this.#limiterMixValue = clamp01(projection.limiterMix ?? 1);
+    this.#limiterOutputGainDecibels = clamp(projection.limiterGainDecibels ?? 0, -24, 24);
     this.#applyLimiterMix();
     const ceiling = finiteNumber(projection.limiterState?.ceiling, -1);
-    const gain = finiteNumber(projection.limiterState?.gain, 0);
+    const input = finiteNumber(projection.limiterState?.input, 0);
     const release = finiteNumber(projection.limiterState?.release, 80);
     this.#limiterCeilingDecibels = clamp(ceiling, -12, 0);
-    this.#limiterGainDecibels = clamp(gain, 0, 24);
+    this.#limiterInputDecibels = clamp(input, 0, 24);
     this.#limiterReleaseMilliseconds = clamp(release, 5, 1_000);
     ramp(
       this.#programLimiter.threshold,
@@ -415,7 +434,7 @@ export class MixerRoutingGraph {
     );
     ramp(
       this.#limiterDrive.gain,
-      decibelGain(this.#limiterGainDecibels),
+      decibelGain(this.#limiterInputDecibels),
       this.#context.currentTime,
       MIX_RAMP_SECONDS,
     );
@@ -461,7 +480,10 @@ export class MixerRoutingGraph {
       cancel(channel.fader.gain);
       cancel(channel.panner.pan);
       cancel(channel.gate.gain);
-      for (const send of [...channel.preSends.values(), ...channel.postSends.values()]) cancel(send.gain);
+      for (const send of channel.sends.values()) cancel(send.gain);
+      channel.levelAutomation = retainScheduledBefore(channel.levelAutomation, fromFrame);
+      channel.muteAutomation = retainScheduledBefore(channel.muteAutomation, fromFrame);
+      channel.soloAutomation = retainScheduledBefore(channel.soloAutomation, fromFrame);
       channel.effects.clearAutomation(fromFrame);
     }
     for (const send of this.#sends.values()) {
@@ -476,7 +498,11 @@ export class MixerRoutingGraph {
     cancel(this.#programCeiling?.gain.gain);
     cancel(this.#limiterDry.gain);
     cancel(this.#limiterWet.gain);
+    cancel(this.#limiterOutputGain.gain);
     cancel(this.#limiterBypass.gain);
+    for (const [parameterId, values] of this.#limiterAutomation) {
+      this.#limiterAutomation.set(parameterId, retainScheduledBefore(values, fromFrame));
+    }
   }
 
   #scheduleAutomationChange(change: RoutingAutomationChange): void {
@@ -485,38 +511,28 @@ export class MixerRoutingGraph {
       const channel = this.#channels.get(change.targetId as ModuleInstanceId);
       if (channel === undefined) return;
       if (change.parameterId === "level" && typeof change.value === "number") {
-        channel.desiredLevel = clamp01(change.value);
-        setAtTime(channel.fader.gain, this.#channelAudible(channel) ? channel.desiredLevel : 0, time);
+        const level = clamp01(change.value);
+        recordScheduledValue(channel.levelAutomation, change.atFrame, level);
+        setAtTime(channel.fader.gain, this.#channelAudibleAt(channel, change.atFrame) ? level : 0, time);
       } else if (change.parameterId === "pan" && typeof change.value === "number") {
         setAtTime(channel.panner.pan, clamp(change.value, -1, 1), time);
       } else if (change.parameterId === "muted" && typeof change.value === "boolean") {
-        channel.desiredMuted = change.value;
-        this.#scheduleSoloMute(time);
+        recordScheduledValue(channel.muteAutomation, change.atFrame, change.value);
+        this.#scheduleSoloMute(time, change.atFrame);
       } else if (change.parameterId === "solo" && typeof change.value === "boolean") {
-        channel.desiredSolo = change.value;
-        this.#scheduleSoloMute(time);
+        recordScheduledValue(channel.soloAutomation, change.atFrame, change.value);
+        this.#scheduleSoloMute(time, change.atFrame);
       }
       return;
     }
     if (change.scope === "send") {
       const channel = this.#channels.get(change.targetId as ModuleInstanceId);
-      const match = /^send-([abcd])-(amount|mode)$/.exec(change.parameterId);
+      const match = /^send-([abcd])-amount$/.exec(change.parameterId);
       if (channel === undefined || match === null) return;
       const busId = `send-${match[1]}` as SendBusId;
-      let amount = channel.sendAmounts.get(busId) ?? 0;
-      let mode = channel.sendModes.get(busId) ?? "post";
-      if (match[2] === "amount" && typeof change.value === "number") {
-        amount = clamp01(change.value);
-        channel.sendAmounts.set(busId, amount);
-      } else if (
-        match[2] === "mode" &&
-        (change.value === "pre-fader" || change.value === "post-fader")
-      ) {
-        mode = change.value === "pre-fader" ? "pre" : "post";
-        channel.sendModes.set(busId, mode);
-      } else return;
-      setAtTime(channel.preSends.get(busId)?.gain, mode === "pre" ? amount : 0, time);
-      setAtTime(channel.postSends.get(busId)?.gain, mode === "post" ? amount : 0, time);
+      if (typeof change.value !== "number") return;
+      const amount = clamp01(change.value);
+      setAtTime(channel.sends.get(busId)?.gain, amount, time);
       return;
     }
     if (change.scope === "send-return") {
@@ -538,18 +554,22 @@ export class MixerRoutingGraph {
     }
     const effectId = change.targetId as EffectInstanceId;
     if (effectId === this.#limiterEffectId) {
-      if (change.parameterId === "wet-dry" && typeof change.value === "number") {
-        this.#scheduleLimiterMix(change.atFrame, change.value, this.#limiterBypassed);
+      if (change.parameterId === "mix" && typeof change.value === "number") {
+        this.#scheduleLimiterMix(change.atFrame, change.value);
+      } else if (change.parameterId === "gain" && typeof change.value === "number") {
+        this.#scheduleLimiterGain(change.atFrame, change.value);
       } else if (change.parameterId === "bypassed" && typeof change.value === "boolean") {
-        this.#scheduleLimiterMix(change.atFrame, this.#limiterWetDry, change.value);
+        this.#scheduleLimiterBypass(change.atFrame, change.value);
       } else {
         this.#scheduleLimiterParameter(change.atFrame, change.parameterId, change.value);
       }
       return;
     }
     const schedule = (chain: EffectChainNode) => {
-      if (change.parameterId === "wet-dry" && typeof change.value === "number") {
-        chain.scheduleEffectWetDry(change.atFrame, effectId, change.value);
+      if (change.parameterId === "mix" && typeof change.value === "number") {
+        chain.scheduleEffectMix(change.atFrame, effectId, change.value);
+      } else if (change.parameterId === "gain" && typeof change.value === "number") {
+        chain.scheduleEffectGain(change.atFrame, effectId, change.value);
       } else if (change.parameterId === "bypassed" && typeof change.value === "boolean") {
         chain.scheduleEffectBypass(change.atFrame, effectId, change.value);
       } else {
@@ -568,7 +588,7 @@ export class MixerRoutingGraph {
   }
 
   #applyLimiterMix(): void {
-    const gains = routingWetDryGains(this.#limiterWetDry, this.#limiterWetDryLaw);
+    const gains = routingMixGains(this.#limiterMixValue);
     const now = this.#context.currentTime;
     ramp(
       this.#limiterDry.gain,
@@ -585,6 +605,12 @@ export class MixerRoutingGraph {
     ramp(
       this.#limiterBypass.gain,
       this.#limiterBypassed ? 1 : 0,
+      now,
+      CHAIN_CONTROL_RAMP_SECONDS,
+    );
+    ramp(
+      this.#limiterOutputGain.gain,
+      this.#limiterBypassed ? 1 : decibelGain(this.#limiterOutputGainDecibels),
       now,
       CHAIN_CONTROL_RAMP_SECONDS,
     );
@@ -608,11 +634,11 @@ export class MixerRoutingGraph {
         now,
         EFFECT_PARAMETER_RAMP_SECONDS,
       );
-    } else if (parameterId === "gain") {
-      this.#limiterGainDecibels = clamp(value, 0, 24);
+    } else if (parameterId === "input") {
+      this.#limiterInputDecibels = clamp(value, 0, 24);
       ramp(
         this.#limiterDrive.gain,
-        decibelGain(this.#limiterGainDecibels),
+        decibelGain(this.#limiterInputDecibels),
         now,
         EFFECT_PARAMETER_RAMP_SECONDS,
       );
@@ -627,16 +653,72 @@ export class MixerRoutingGraph {
     }
   }
 
-  #scheduleLimiterMix(atFrame: number, wetDry: number, bypassed: boolean): void {
-    const priorGains = routingWetDryGains(this.#limiterWetDry, this.#limiterWetDryLaw);
-    const priorBypassed = this.#limiterBypassed;
-    this.#limiterWetDry = clamp01(wetDry);
-    this.#limiterBypassed = bypassed;
+  #scheduleLimiterMix(atFrame: number, mix: number): void {
+    const priorMix = scheduledNumberAt(
+      this.#limiterAutomation.get("mix"),
+      atFrame,
+      this.#limiterMixValue,
+    );
+    const bypassed = scheduledBooleanAt(
+      this.#limiterAutomation.get("bypassed"),
+      atFrame,
+      this.#limiterBypassed,
+    );
+    const priorGains = routingMixGains(priorMix);
+    const nextMix = clamp01(mix);
     const time = frameTime(this.#context, atFrame);
-    const gains = routingWetDryGains(this.#limiterWetDry, this.#limiterWetDryLaw);
-    scheduleRamp(this.#limiterDry.gain, priorBypassed ? 0 : priorGains.dry, bypassed ? 0 : gains.dry, time, CHAIN_CONTROL_RAMP_SECONDS);
-    scheduleRamp(this.#limiterWet.gain, priorBypassed ? 0 : priorGains.wet, bypassed ? 0 : gains.wet, time, CHAIN_CONTROL_RAMP_SECONDS);
+    const gains = routingMixGains(nextMix);
+    scheduleRamp(this.#limiterDry.gain, bypassed ? 0 : priorGains.dry, bypassed ? 0 : gains.dry, time, CHAIN_CONTROL_RAMP_SECONDS);
+    scheduleRamp(this.#limiterWet.gain, bypassed ? 0 : priorGains.wet, bypassed ? 0 : gains.wet, time, CHAIN_CONTROL_RAMP_SECONDS);
+    recordLimiterValue(this.#limiterAutomation, "mix", atFrame, nextMix);
+  }
+
+  #scheduleLimiterGain(atFrame: number, gainDecibels: number): void {
+    const prior = scheduledNumberAt(
+      this.#limiterAutomation.get("gain"),
+      atFrame,
+      this.#limiterOutputGainDecibels,
+    );
+    const next = clamp(gainDecibels, -24, 24);
+    const bypassed = scheduledBooleanAt(
+      this.#limiterAutomation.get("bypassed"),
+      atFrame,
+      this.#limiterBypassed,
+    );
+    const time = frameTime(this.#context, atFrame);
+    scheduleRamp(
+      this.#limiterOutputGain.gain,
+      bypassed ? 1 : decibelGain(prior),
+      bypassed ? 1 : decibelGain(next),
+      time,
+      CHAIN_CONTROL_RAMP_SECONDS,
+    );
+    recordLimiterValue(this.#limiterAutomation, "gain", atFrame, next);
+  }
+
+  #scheduleLimiterBypass(atFrame: number, bypassed: boolean): void {
+    const priorBypassed = scheduledBooleanAt(
+      this.#limiterAutomation.get("bypassed"),
+      atFrame,
+      this.#limiterBypassed,
+    );
+    const mix = scheduledNumberAt(
+      this.#limiterAutomation.get("mix"),
+      atFrame,
+      this.#limiterMixValue,
+    );
+    const gainDecibels = scheduledNumberAt(
+      this.#limiterAutomation.get("gain"),
+      atFrame,
+      this.#limiterOutputGainDecibels,
+    );
+    const gains = routingMixGains(mix);
+    const time = frameTime(this.#context, atFrame);
+    scheduleRamp(this.#limiterDry.gain, priorBypassed ? 0 : gains.dry, bypassed ? 0 : gains.dry, time, CHAIN_CONTROL_RAMP_SECONDS);
+    scheduleRamp(this.#limiterWet.gain, priorBypassed ? 0 : gains.wet, bypassed ? 0 : gains.wet, time, CHAIN_CONTROL_RAMP_SECONDS);
     scheduleRamp(this.#limiterBypass.gain, priorBypassed ? 1 : 0, bypassed ? 1 : 0, time, CHAIN_CONTROL_RAMP_SECONDS);
+    scheduleRamp(this.#limiterOutputGain.gain, priorBypassed ? 1 : decibelGain(gainDecibels), bypassed ? 1 : decibelGain(gainDecibels), time, CHAIN_CONTROL_RAMP_SECONDS);
+    recordLimiterValue(this.#limiterAutomation, "bypassed", atFrame, bypassed);
   }
 
   #scheduleLimiterParameter(
@@ -648,41 +730,56 @@ export class MixerRoutingGraph {
     const time = frameTime(this.#context, atFrame);
     if (parameterId === "ceiling") {
       const next = clamp(value, -12, 0);
+      const prior = scheduledNumberAt(
+        this.#limiterAutomation.get(parameterId),
+        atFrame,
+        this.#limiterCeilingDecibels,
+      );
       scheduleRamp(
         this.#programLimiter.threshold,
-        this.#limiterCeilingDecibels,
+        prior,
         next,
         time,
         EFFECT_PARAMETER_RAMP_SECONDS,
       );
       scheduleRamp(
         this.#programCeiling?.gain.gain,
-        decibelGain(this.#limiterCeilingDecibels),
+        decibelGain(prior),
         decibelGain(next),
         time,
         EFFECT_PARAMETER_RAMP_SECONDS,
       );
-      this.#limiterCeilingDecibels = next;
-    } else if (parameterId === "gain") {
+      recordLimiterValue(this.#limiterAutomation, parameterId, atFrame, next);
+    } else if (parameterId === "input") {
       const next = clamp(value, 0, 24);
+      const prior = scheduledNumberAt(
+        this.#limiterAutomation.get(parameterId),
+        atFrame,
+        this.#limiterInputDecibels,
+      );
       scheduleRamp(
         this.#limiterDrive.gain,
-        decibelGain(this.#limiterGainDecibels),
+        decibelGain(prior),
         decibelGain(next),
         time,
         EFFECT_PARAMETER_RAMP_SECONDS,
       );
-      this.#limiterGainDecibels = next;
+      recordLimiterValue(this.#limiterAutomation, parameterId, atFrame, next);
     } else if (parameterId === "release") {
       const next = clamp(value, 5, 1_000);
+      const prior = scheduledNumberAt(
+        this.#limiterAutomation.get(parameterId),
+        atFrame,
+        this.#limiterReleaseMilliseconds,
+      );
       scheduleRamp(
         this.#programLimiter.release,
-        this.#limiterReleaseMilliseconds / 1_000,
+        prior / 1_000,
         next / 1_000,
         time,
         EFFECT_PARAMETER_RAMP_SECONDS,
       );
-      this.#limiterReleaseMilliseconds = next;
+      recordLimiterValue(this.#limiterAutomation, parameterId, atFrame, next);
     }
   }
 
@@ -698,16 +795,21 @@ export class MixerRoutingGraph {
     }));
   }
 
-  #channelAudible(channel: ChannelNodes): boolean {
-    const anySolo = [...this.#channels.values()].some((candidate) => candidate.desiredSolo);
-    return !channel.desiredMuted && (!anySolo || channel.desiredSolo);
+  #channelAudibleAt(channel: ChannelNodes, atFrame: number): boolean {
+    const solo = scheduledValueAt(channel.soloAutomation, atFrame, channel.desiredSolo);
+    const muted = scheduledValueAt(channel.muteAutomation, atFrame, channel.desiredMuted);
+    const anySolo = [...this.#channels.values()].some((candidate) =>
+      scheduledValueAt(candidate.soloAutomation, atFrame, candidate.desiredSolo),
+    );
+    return !muted && (!anySolo || solo);
   }
 
-  #scheduleSoloMute(time: number): void {
+  #scheduleSoloMute(time: number, atFrame: number): void {
     for (const channel of this.#channels.values()) {
-      const audible = this.#channelAudible(channel);
+      const audible = this.#channelAudibleAt(channel, atFrame);
+      const level = scheduledValueAt(channel.levelAutomation, atFrame, channel.desiredLevel);
       setAtTime(channel.gate.gain, audible ? 1 : 0, time);
-      setAtTime(channel.fader.gain, audible ? channel.desiredLevel : 0, time);
+      setAtTime(channel.fader.gain, audible ? level : 0, time);
     }
   }
 
@@ -724,7 +826,7 @@ export class MixerRoutingGraph {
     channel.fader.disconnect();
     channel.panner.disconnect();
     channel.effects.dispose();
-    for (const node of [...channel.preSends.values(), ...channel.postSends.values()]) node.disconnect();
+    for (const node of channel.sends.values()) node.disconnect();
     this.#channels.delete(moduleId);
   }
 
@@ -815,6 +917,8 @@ export class MixerRoutingGraph {
       this.#limiterDrive,
       this.#limiterDry,
       this.#limiterWet,
+      this.#limiterMix,
+      this.#limiterOutputGain,
       this.#limiterBypass,
       this.#programOutput,
       this.#output,
@@ -845,19 +949,13 @@ export class MixerRoutingGraph {
     fader.connect(panner);
     panner.connect(this.#programInput);
 
-    const preSends = new Map<SendBusId, GainNode>();
-    const postSends = new Map<SendBusId, GainNode>();
+    const sends = new Map<SendBusId, GainNode>();
     for (const busId of SEND_BUS_IDS) {
-      const pre = this.#context.createGain();
-      const post = this.#context.createGain();
-      pre.gain.value = 0;
-      post.gain.value = 0;
-      gate.connect(pre);
-      panner.connect(post);
-      pre.connect(this.#ensureSend(busId).input);
-      post.connect(this.#ensureSend(busId).input);
-      preSends.set(busId, pre);
-      postSends.set(busId, post);
+      const send = this.#context.createGain();
+      send.gain.value = 0;
+      gate.connect(send);
+      send.connect(this.#ensureSend(busId).input);
+      sends.set(busId, send);
     }
     const channel = {
       input,
@@ -865,13 +963,14 @@ export class MixerRoutingGraph {
       fader,
       panner,
       effects,
-      preSends,
-      postSends,
+      sends,
       desiredLevel: 1,
       desiredMuted: false,
       desiredSolo: false,
       sendAmounts: new Map(),
-      sendModes: new Map(),
+      levelAutomation: [],
+      muteAutomation: [],
+      soloAutomation: [],
     };
     this.#channels.set(moduleId, channel);
     return channel;
@@ -988,12 +1087,8 @@ function clamp01(value: number): number {
   return clamp(value, 0, 1);
 }
 
-function routingWetDryGains(
-  wetDry: number,
-  law: "linear" | "equal-power",
-): { readonly dry: number; readonly wet: number } {
-  const value = clamp01(wetDry);
-  if (law === "linear") return { dry: 1 - value, wet: value };
+function routingMixGains(mix: number): { readonly dry: number; readonly wet: number } {
+  const value = clamp01(mix);
   return {
     dry: Math.cos((value * Math.PI) / 2),
     wet: Math.sin((value * Math.PI) / 2),
@@ -1006,4 +1101,60 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function scheduledValueAt<T>(
+  values: readonly ScheduledValue<T>[],
+  atFrame: number,
+  fallback: T,
+): T {
+  return values.findLast((value) => value.atFrame <= atFrame)?.value ?? fallback;
+}
+
+function recordScheduledValue<T>(
+  values: ScheduledValue<T>[],
+  atFrame: number,
+  value: T,
+): void {
+  const existing = values.findIndex((candidate) => candidate.atFrame === atFrame);
+  if (existing >= 0) values.splice(existing, 1);
+  values.push({ atFrame, value });
+  values.sort((left, right) => left.atFrame - right.atFrame);
+}
+
+function retainScheduledBefore<T>(
+  values: readonly ScheduledValue<T>[],
+  fromFrame: number,
+): ScheduledValue<T>[] {
+  const prior = values.findLast((value) => value.atFrame < fromFrame);
+  return prior === undefined ? [] : [prior];
+}
+
+function scheduledNumberAt(
+  values: readonly ScheduledValue<ParameterValue>[] | undefined,
+  atFrame: number,
+  fallback: number,
+): number {
+  const value = values?.findLast((candidate) => candidate.atFrame <= atFrame)?.value;
+  return typeof value === "number" ? value : fallback;
+}
+
+function scheduledBooleanAt(
+  values: readonly ScheduledValue<ParameterValue>[] | undefined,
+  atFrame: number,
+  fallback: boolean,
+): boolean {
+  const value = values?.findLast((candidate) => candidate.atFrame <= atFrame)?.value;
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function recordLimiterValue(
+  valuesByParameter: Map<string, ScheduledValue<ParameterValue>[]>,
+  parameterId: string,
+  atFrame: number,
+  value: ParameterValue,
+): void {
+  const values = valuesByParameter.get(parameterId) ?? [];
+  recordScheduledValue(values, atFrame, value);
+  valuesByParameter.set(parameterId, values);
 }

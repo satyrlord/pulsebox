@@ -109,7 +109,7 @@ describe("mixer routing graph", () => {
     graph.dispose();
   });
 
-  it("ramps pre-fader and post-fader sends on stable nodes", async () => {
+  it("ramps fixed pre-fader sends on stable nodes", async () => {
     const stub = context();
     const graph = new MixerRoutingGraph(stub.result, undefined, FIRST);
     await graph.setChannel(FIRST, {
@@ -117,7 +117,7 @@ describe("mixer routing graph", () => {
       pan: 0,
       muted: false,
       solo: false,
-      sends: [{ busId: SEND_A, amount: 0.7, mode: "pre" }],
+      sends: [{ busId: SEND_A, amount: 0.7 }],
       effects: [],
       effectsBypassed: false,
     });
@@ -127,7 +127,7 @@ describe("mixer routing graph", () => {
       ),
     ).toBe(true);
 
-    graph.setChannelSend(FIRST, SEND_A, 0.4, "post");
+    graph.setChannelSend(FIRST, SEND_A, 0.4);
     expect(
       stub.gains.some((gain) =>
         gain.gain.linearRampToValueAtTime.mock.calls.some(([value]) => value === 0.4),
@@ -181,8 +181,8 @@ describe("mixer routing graph", () => {
         pluginId: "delay" as PluginId,
         state: { time: 0.25 },
         bypassed: false,
-        wetDry: 0.6,
-        wetDryLaw: "equal-power",
+        mix: 0.6,
+        gainDecibels: 0,
       }],
     });
     expect(factory).toHaveBeenCalledTimes(1);
@@ -211,7 +211,8 @@ describe("mixer routing graph", () => {
       90,
     );
     expect(graph.getEffectMeter(effectId, "gain-reduction")).toBe(5);
-    graph.previewEffectWetDry(effectId, 0.25);
+    graph.previewEffectMix(effectId, 0.25);
+    graph.previewEffectGain(effectId, -6);
     const expectedWet = Math.sin(Math.PI / 8);
     const expectedDry = Math.cos(Math.PI / 8);
     expect(
@@ -256,10 +257,10 @@ describe("mixer routing graph", () => {
     const effect = (id: EffectInstanceId, pluginId: string) => ({
       id,
       pluginId: pluginId as PluginId,
-      state: { mix: 0.5 },
+      state: {},
       bypassed: false,
-      wetDry: 1,
-      wetDryLaw: "equal-power" as const,
+      mix: 0.5,
+      gainDecibels: 0,
     });
     await graph.setChannel(FIRST, {
       level: 0.8,
@@ -284,12 +285,13 @@ describe("mixer routing graph", () => {
     });
     expect(factory).toHaveBeenCalledTimes(3);
 
-    graph.setEffectParameter(sendEffectId, "mix", 0.25);
-    graph.setEffectWetDry(sendEffectId, 0.4);
+    graph.setEffectParameter(sendEffectId, "feedback", 0.25);
+    graph.setEffectMix(sendEffectId, 0.4);
+    graph.setEffectGain(sendEffectId, -3);
     graph.setEffectBypassed(sendEffectId, true);
     graph.setSendReturnLevel(SEND_A, 0.3);
     expect(factory).toHaveBeenCalledTimes(3);
-    expect(scheduleParameter).toHaveBeenCalledWith(0, "mix", 0.25);
+    expect(scheduleParameter).toHaveBeenCalledWith(0, "feedback", 0.25);
 
     await graph.setSendEffects(
       SEND_A,
@@ -324,7 +326,7 @@ describe("mixer routing graph", () => {
       stub.gains.filter((gain) =>
         gain.connect.mock.calls.some(([target]) => target === shaper),
       ),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(Math.max(...(shaper?.curve ?? [])) * (ceilingGain?.gain.value ?? 2))
       .toBeLessThanOrEqual(ceiling);
     graph.dispose();
@@ -340,9 +342,9 @@ describe("mixer routing graph", () => {
       effectsBypassed: false,
       limiterBypassed: false,
       limiterEffectId: limiterId,
-      limiterState: { ceiling: -1, gain: 0, release: 80 },
-      limiterWetDry: 1,
-      limiterWetDryLaw: "equal-power",
+      limiterState: { ceiling: -1, input: 0, release: 80 },
+      limiterMix: 1,
+      limiterGainDecibels: 0,
     });
     const allocations = stub.gains.length;
     const programLimiter = stub.compressors[0] as StubNode & {
@@ -356,9 +358,10 @@ describe("mixer routing graph", () => {
 
     graph.scheduleAutomation([
       { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "ceiling", value: -6 },
-      { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "gain", value: 12 },
+      { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "input", value: 12 },
       { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "release", value: 200 },
-      { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "wet-dry", value: 0.5 },
+      { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "mix", value: 0.5 },
+      { atFrame: 4_800, scope: "effect", targetId: limiterId, parameterId: "gain", value: -3 },
       { atFrame: 9_600, scope: "effect", targetId: limiterId, parameterId: "bypassed", value: true },
     ]);
 
@@ -398,6 +401,16 @@ describe("mixer routing graph", () => {
     expect(programLimiter.threshold.cancelScheduledValues).toHaveBeenCalledWith(0.1);
     expect(programLimiter.release.cancelScheduledValues).toHaveBeenCalledWith(0.1);
     expect(ceilingGain.gain.cancelScheduledValues).toHaveBeenCalledWith(0.1);
+    for (const gain of stub.gains) gain.gain.setValueAtTime.mockClear();
+    graph.scheduleAutomation([
+      { atFrame: 9_600, scope: "effect", targetId: limiterId, parameterId: "mix", value: 0.25 },
+      { atFrame: 9_600, scope: "effect", targetId: limiterId, parameterId: "gain", value: -6 },
+    ]);
+    const rescheduledStarts = stub.gains.flatMap((gain) => gain.gain.setValueAtTime.mock.calls)
+      .filter(([, time]) => time === 0.2)
+      .map(([value]) => value);
+    expect(rescheduledStarts.some((value) => Math.abs(value) < 1e-12)).toBe(true);
+    expect(rescheduledStarts.filter((value) => Math.abs(value - 1) < 1e-12).length).toBeGreaterThanOrEqual(2);
     graph.dispose();
   });
 

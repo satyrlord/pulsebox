@@ -1,5 +1,5 @@
 import { SEND_BUS_IDS, type EffectInstanceId, type ModuleInstanceId, type SendBusId } from "./ids";
-import type { ParameterValue, PluginId } from "./parameters";
+import type { ParameterId, ParameterValue, PluginId } from "./parameters";
 
 const DISTORTION_EFFECT_PLUGIN_ID = "distortion" as PluginId;
 
@@ -14,8 +14,10 @@ export interface EffectInstanceState {
   readonly state: Readonly<Record<string, ParameterValue>>;
   /** A bypass leaves the instance in its chain and keeps its automation target stable. */
   readonly bypassed: boolean;
-  /** The effect-local wet and dry balance, from dry at 0 through wet at 1. */
-  readonly wetDry: number;
+  /** The effect-local equal-power balance, from dry at 0 through wet at 1. */
+  readonly mix: number;
+  /** Gain after this effect's Mix stage. */
+  readonly gainDecibels: number;
 }
 
 /** A chain keeps its fixed slots so reordering never changes effect identity. */
@@ -23,7 +25,7 @@ export type EffectChainSlots = readonly (EffectInstanceId | null)[];
 
 export interface SendEffectChainState {
   readonly slots: EffectChainSlots;
-  /** Return level from silence through unity. This is not an effect wet/dry value. */
+  /** Return level from silence through unity. This is not an effect Mix value. */
   readonly returnLevel: number;
   /** Bypasses every effect in this return chain without changing its instances. */
   readonly bypassed: boolean;
@@ -34,6 +36,15 @@ export interface SendEffectChainState {
 export const MODULE_EFFECT_CHAIN_SLOT_COUNT = 8;
 export const SEND_EFFECT_CHAIN_SLOT_COUNT = 8;
 export const MASTER_EFFECT_CHAIN_SLOT_COUNT = 6;
+export const EFFECT_GAIN_MINIMUM_DECIBELS = -24;
+export const EFFECT_GAIN_MAXIMUM_DECIBELS = 24;
+const EFFECT_MIX_PARAMETER_ID = "mix" as ParameterId;
+const EFFECT_GAIN_PARAMETER_ID = "gain" as ParameterId;
+
+/** Shared stage controls use these IDs outside plugin-owned state. */
+export function isEffectStageParameterId(value: string): boolean {
+  return value === EFFECT_MIX_PARAMETER_ID || value === EFFECT_GAIN_PARAMETER_ID;
+}
 
 export const PROTECTED_LIMITER_EFFECT_PLUGIN_ID = "limiter" as PluginId;
 

@@ -66,7 +66,7 @@ The instrument rack is the only place that opens a module pedalboard.
 
 Each send button has a visible letter and an accessible name.
 The buttons remain in A, B / C, D reading order. A button opens the standard
-send-value surface for amount and pre-fader or post-fader mode. Zero amount is
+send-value surface for amount. The send tap is always pre-fader. Zero amount is
 inactive. A non-zero amount has a non-color active cue. Empty channel send
 buttons remain visible but disabled.
 
@@ -108,12 +108,12 @@ Voice output flow:
 3. Voice distortion.
 4. Voice pan and level.
 5. Module sum.
-6. Module pedalboard.
-7. Fixed channel gate.
-8. Main channel fader and pan.
-9. Module send taps from the gate or pan according to each send bus pre-fader or
-   post-fader setting.
-10. Master.
+6. Rack Volume or Level before the module pedalboard.
+7. Module pedalboard.
+8. Fixed channel gate.
+9. Pre-fader A-D send taps.
+10. Main channel fader and pan.
+11. Master.
 
 Voice-level send controls do not exist. The four send controls live only on the
 parent rack-slot mixer channel.
@@ -128,8 +128,8 @@ Approved hierarchy:
 - One master chain with at least six slots.
 
 Each compact A–D card summarizes one modular send-bus chain. It shows the
-primary effect, four macros, chain count, bypass state, activity, Edit control,
-and circular return Mix control.
+primary effect, up to four macros, chain count, bypass state, activity, Edit control,
+and circular Return Level control.
 
 ### 19.4.1 Automating a mixer, send, effect, or master parameter
 
@@ -155,8 +155,7 @@ from the module-scoped groups replaces and disarms the non-module parameter.
 
 ### 19.5 Solo and mute
 
-- Channel mute silences the module main path and all four sends, regardless of
-  the send tap's pre-fader or post-fader setting.
+- Channel mute silences the module main path and all four sends.
 - Voice mute silences one drum voice before the module sum.
 - Module solo participates in global mixer solo.
 - Voice solo is local to its drum module and does not place the parent mixer
@@ -175,12 +174,20 @@ surface. Module processing belongs to the rack pedalboard.
 
 ### 19.7 Output routing
 
-Every rack module uses one fixed main output path and four fixed A–D send buses.
-The main path runs from the module sum through its pedalboard, channel gate,
-fader, and pan to the master chain. A send tap uses the gate for pre-fader mode
-or the pan for post-fader mode. It then returns through its fixed send chain to
-the main mix. The project model may reserve future routing destinations, but the
-MVP does not provide fixed subgroups or an arbitrary routing graph.
+Every rack module uses one fixed main output path and four fixed A-D send buses.
+Rack Volume or Level controls the input before the pedalboard. The pedalboard
+contains up to eight serial effect stages. Each stage processes its input, uses
+an equal-power Mix to combine the stage input with its effect result, applies
+its post-mix Gain, and sends that result to the next stage. There is no
+chain-wide Mix or continuously summed chain-wide dry copy. A click-free chain
+bypass can switch to dry at unity.
+
+After the pedalboard, the channel gate feeds the fixed pre-fader A-D send taps.
+The dry channel then continues through its fader and pan to the master chain.
+Each send passes through its fixed send chain. Its return joins the main mix
+independently of the dry channel. The project model may reserve future routing
+destinations, but the MVP does not provide fixed subgroups or an arbitrary
+routing graph.
 
 ---
 
@@ -244,8 +251,8 @@ Each compact slot contains:
 
 - Bus letter.
 - Primary effect name.
-- Four macros from the pinned focus effect's declared compact controls.
-- Circular return Mix control.
+- Up to four macros from the pinned focus effect's declared compact controls.
+- Circular Return Level control.
 - Chain bypass.
 - Edit button placed in the established unused space.
 - Activity or status.
@@ -254,18 +261,18 @@ Each compact slot contains:
 - Chain-count indicator.
 
 The Add effect row appends a plugin to the selected send chain. The detailed
-editor manages ordering, replacement, per-plugin bypass, and per-plugin wet/dry
-mix.
+editor manages ordering, replacement, per-effect bypass, per-effect Mix, and
+per-effect Gain.
 
 The user pins one effect in the chain as the compact card focus. By default, the
-application pins the first effect. The four macros use the pinned plugin's
+application pins the first effect. The macros use the pinned plugin's
 declared compact controls. After the user removes the focused effect, focus
 moves to the next effect. If no next effect exists, focus moves to the previous
 effect. An empty chain uses the empty-card state.
 
-The circular control keeps the visible label `Mix` but acts as the send-chain
-return level from silence to unity. The source remains dry on its main path, and
-each plugin retains its own wet/dry control inside the chain.
+The circular control has the visible label `Return Level`. It sets the
+send-chain return level from silence to unity. The source remains dry on its
+main path. Return Level is not an effect Mix control.
 
 Edit opens the established 760 × 680 detailed editor without stopping playback.
 
@@ -274,7 +281,8 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - Pedals flow left to right.
 - Reorder by pointer drag and keyboard commands.
 - Bypass per pedal.
-- Wet and dry mix per pedal.
+- One equal-power Mix per effect.
+- One post-mix Gain per effect.
 - Compact view with two or three important controls.
 - Expanded editor.
 - No click or dropout while reordering.
@@ -285,16 +293,15 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 
 - Four buses A through D.
 - Independent amount per channel.
-- Pre-fader or post-fader per channel and bus.
-- Default post-fader.
+- Fixed pre-fader tap per channel and bus.
 - Each instrument strip exposes A–D as a 2 × 2 button grid in A, B / C, D
   reading order.
-- Activating a send button opens its amount and pre/post value surface. The
-  compact button shows disabled, zero, and non-zero states without color-only
-  meaning.
+- Activating a send button opens its amount surface. The compact button shows
+  disabled, zero, and non-zero states without color-only meaning.
 - Effect chains receive sends and return to master.
 - The master strip exposes no send or return control. Each chain's return level
-  is the circular `Mix` control on its compact A–D card in the Effects view.
+  is the circular `Return Level` control on its compact A-D card in the Effects
+  view.
 - Routing prevents feedback loops.
 - Send return level is automatable.
 
@@ -314,6 +321,20 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - Metering before and after the chain.
 
 ### 20.7 DSP requirements
+
+Every effect stage has this fixed order:
+
+`input -> effect DSP wet result -> equal-power Mix -> post-mix Gain -> next stage`
+
+Mix is a required automatable 0 through 1 parameter. It uses the equal-power
+dry coefficient `cos(mix * pi / 2)` and wet coefficient `sin(mix * pi / 2)`.
+Gain is a required automatable post-mix parameter from -24 dB through +24 dB.
+It defaults to 0 dB and uses a 0.1 dB step. The engine smooths both audible
+changes. Bypass is click-free and passes the stage input at unity. It is
+independent of Mix and Gain.
+
+The shared automation IDs are `mix` and `gain`. An effect plugin cannot use
+these IDs for plugin-owned parameters.
 
 Lo-fi:
 
@@ -348,9 +369,9 @@ Compressor:
 
 Limiter:
 
-- Compact controls are Ceiling, Gain, and Release.
+- Compact controls are Ceiling, Input, and Release.
 - Ceiling is the output level nothing passes.
-- Gain sets the level driven into the limiter.
+- Input sets the level driven into the limiter.
 - Visible gain reduction.
 - Deeper limiter controls live in its detailed editor.
 

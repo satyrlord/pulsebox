@@ -9,6 +9,8 @@ import {
   type ProjectRevision,
 } from "../../contracts/ids";
 import {
+  EFFECT_GAIN_MAXIMUM_DECIBELS,
+  EFFECT_GAIN_MINIMUM_DECIBELS,
   MASTER_EFFECT_CHAIN_SLOT_COUNT,
   MODULE_EFFECT_CHAIN_SLOT_COUNT,
   PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
@@ -50,7 +52,7 @@ import {
  */
 
 export const PROJECT_FORMAT = "pulsebox-project";
-export const PROJECT_FORMAT_VERSION = 2;
+export const PROJECT_FORMAT_VERSION = 3;
 
 /** Guards a hostile or corrupt file before any of it is trusted. */
 export const DOCUMENT_LIMITS = {
@@ -155,7 +157,6 @@ export interface AutomationLaneDocument {
 export interface MixerSendDocument {
   readonly busId: string;
   readonly amount: number;
-  readonly mode: "pre-fader" | "post-fader";
 }
 
 export interface MixerChannelDocument {
@@ -186,7 +187,8 @@ export interface EffectInstanceDocument {
   readonly stateVersion: number;
   readonly state: Readonly<Record<string, ParameterValue>>;
   readonly bypassed: boolean;
-  readonly wetDry: number;
+  readonly mix: number;
+  readonly gainDecibels: number;
 }
 
 export interface ModuleChainDocument {
@@ -282,6 +284,7 @@ const FORMAT_ONE_PATTERN_KEYS = new Set([
 const FORMAT_ONE_SONG_ENTRY_KEYS = new Set(["patternIndex", "repeats"]);
 const MIGRATION_KEYS = new Set(["scope", "id", "fromVersion", "toVersion", "implementation"]);
 const FORMAT_ONE_MIGRATION_ID = "project-format-1-to-2-pattern-bank";
+const FORMAT_TWO_MIGRATION_ID = "project-format-2-to-3-effect-stages";
 
 export type DocumentResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -370,7 +373,6 @@ export function serializeProject(
         sends: SEND_BUS_IDS.map((busId) => ({
           busId,
           amount: module.sends[busId]?.amount ?? 0,
-          mode: module.sends[busId]?.mode ?? "post-fader",
         })),
       };
     }),
@@ -417,7 +419,6 @@ export function serializeProject(
           sends: SEND_BUS_IDS.map((busId) => ({
             busId,
             amount: module?.sends[busId]?.amount ?? 0,
-            mode: module?.sends[busId]?.mode ?? "post-fader",
           })),
           moduleChainId: module?.id ?? null,
         };
@@ -434,7 +435,8 @@ export function serializeProject(
           stateVersion: instance.stateVersion,
           state: { ...instance.state },
           bypassed: instance.bypassed,
-          wetDry: instance.wetDry,
+          mix: instance.mix,
+          gainDecibels: instance.gainDecibels,
         })),
       moduleChains: Object.entries(project.effects.moduleChains)
         .map(([moduleId, slots]) => ({ moduleId, slots: [...slots] }))
@@ -624,7 +626,7 @@ const MIXER_CHANNEL_KEYS = new Set([
   "sends",
   "moduleChainId",
 ]);
-const MIXER_SEND_KEYS = new Set(["busId", "amount", "mode"]);
+const MIXER_SEND_KEYS = new Set(["busId", "amount"]);
 const MIXER_SEND_DEFINITION_KEYS = new Set(["busId"]);
 const MASTER_KEYS = new Set(["level"]);
 const EFFECTS_KEYS = new Set([
@@ -634,7 +636,7 @@ const EFFECTS_KEYS = new Set([
   "masterChain",
   "masterEffectsBypassed",
 ]);
-const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state", "bypassed", "wetDry"]);
+const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state", "bypassed", "mix", "gainDecibels"]);
 const MODULE_CHAIN_KEYS = new Set(["moduleId", "slots"]);
 const SEND_CHAIN_KEYS = new Set(["busId", "slots", "returnLevel", "bypassed", "pinnedEffectId"]);
 const MASTER_CHAIN_KEYS = new Set(["slots"]);
@@ -846,8 +848,13 @@ function validateAutomationLanes(
         const effect = typeof lane.targetId === "string" ? effectById.get(lane.targetId) : undefined;
         if (!isCanonicalUuid(lane.targetId) || effect === undefined) {
           collector.add(`${path}.targetId`, "Effect automation target must resolve to an effect instance.");
-        } else if (parameterId === "wet-dry") {
+        } else if (parameterId === "mix") {
           validateValue = unitAutomationValue;
+        } else if (parameterId === "gain") {
+          validateValue = (value) =>
+            finiteNumber(value, EFFECT_GAIN_MINIMUM_DECIBELS, EFFECT_GAIN_MAXIMUM_DECIBELS)
+              ? undefined
+              : "Automation value must be from -24 dB through 24 dB.";
         } else if (parameterId === "bypassed") {
           validateValue = booleanAutomationValue;
         } else {
@@ -941,11 +948,6 @@ function sendAutomationValueValidator(
   collector: IssueCollector,
 ): (value: ParameterValue) => string | undefined {
   if (/^send-[abcd]-amount$/u.test(parameterId)) return unitAutomationValue;
-  if (/^send-[abcd]-mode$/u.test(parameterId)) {
-    return (value) => value === "pre-fader" || value === "post-fader"
-      ? undefined
-      : "Automation value must be pre-fader or post-fader.";
-  }
   collector.add(path, "Send automation parameter is not supported.");
   return invalidAutomationValue;
 }
@@ -1320,8 +1322,6 @@ function validateSendDocuments(value: unknown, path: string, collector: IssueCol
     collector.exactKeys(send, MIXER_SEND_KEYS, sendPath);
     if (send.busId !== SEND_BUS_IDS[index]) collector.add(`${sendPath}.busId`, "Send buses must stay in A through D order.");
     if (!finiteNumber(send.amount, 0, 1)) collector.add(`${sendPath}.amount`, "Send amount must be from 0 through 1.");
-    if (send.mode !== "pre-fader" && send.mode !== "post-fader")
-      collector.add(`${sendPath}.mode`, "Send mode must be pre-fader or post-fader.");
   }
 }
 
@@ -1332,7 +1332,7 @@ function sameSendDocuments(left: unknown, right: unknown): boolean {
   return leftItems.every((send, index) => {
     const other = rightItems[index];
     return isPlainRecord(send) && isPlainRecord(other) &&
-      send.busId === other.busId && send.amount === other.amount && send.mode === other.mode;
+      send.busId === other.busId && send.amount === other.amount;
   });
 }
 
@@ -1459,7 +1459,8 @@ function parseEffects(
       if (effectDescriptor !== undefined)
         validateEffectState(instance.state, effectDescriptor, `${path}.state`, collector);
       if (typeof instance.bypassed !== "boolean") collector.add(`${path}.bypassed`, "Effect bypassed must be boolean.");
-      if (!finiteNumber(instance.wetDry, 0, 1)) collector.add(`${path}.wetDry`, "Effect wet and dry mix must be from 0 through 1.");
+      if (!finiteNumber(instance.mix, 0, 1)) collector.add(`${path}.mix`, "Effect Mix must be from 0 through 1.");
+      if (!finiteNumber(instance.gainDecibels, -24, 24)) collector.add(`${path}.gainDecibels`, "Effect Gain must be from -24 dB through 24 dB.");
       if (
         typeof instance.id === "string" &&
         typeof instance.pluginId === "string" &&
@@ -1472,7 +1473,8 @@ function parseEffects(
           stateVersion: instance.stateVersion,
           state: instance.state as Readonly<Record<string, ParameterValue>>,
           bypassed: instance.bypassed === true,
-          wetDry: typeof instance.wetDry === "number" ? instance.wetDry : 0,
+          mix: typeof instance.mix === "number" ? instance.mix : 0,
+          gainDecibels: typeof instance.gainDecibels === "number" ? instance.gainDecibels : 0,
         });
       }
     }
@@ -1816,10 +1818,23 @@ function formatOneMixerDocument(rack: readonly unknown[], legacyMixer: unknown):
   };
 }
 
-function formatOneEffectsDocument(value: unknown, projectId: string, rack: readonly unknown[]): EffectsDocument {
+interface FormatTwoEffectInstanceDocument {
+  readonly id: string;
+  readonly pluginId: string;
+  readonly stateVersion: number;
+  readonly state: Readonly<Record<string, ParameterValue>>;
+  readonly bypassed: boolean;
+  readonly wetDry: number;
+}
+
+interface FormatTwoEffectsDocument extends Omit<EffectsDocument, "instances"> {
+  readonly instances: readonly FormatTwoEffectInstanceDocument[];
+}
+
+function formatOneEffectsDocument(value: unknown, projectId: string, rack: readonly unknown[]): FormatTwoEffectsDocument {
   const old = isPlainRecord(value) ? value : {};
   const oldInstances = Array.isArray(old.instances) ? old.instances : [];
-  const instances: EffectInstanceDocument[] = oldInstances.flatMap((raw) => {
+  const instances: FormatTwoEffectInstanceDocument[] = oldInstances.flatMap((raw) => {
     if (!isPlainRecord(raw) || typeof raw.id !== "string" || typeof raw.pluginId !== "string" ||
       typeof raw.stateVersion !== "number" || !isPlainRecord(raw.state)) return [];
     return [{ id: raw.id, pluginId: raw.pluginId, stateVersion: raw.stateVersion, state: raw.state as Readonly<Record<string, ParameterValue>>, bypassed: false, wetDry: 1 }];
@@ -1886,7 +1901,7 @@ function formatOneEffectsDocument(value: unknown, projectId: string, rack: reado
 function formatOnePluginRequirements(
   value: unknown,
   rack: readonly unknown[],
-  effectInstances: readonly EffectInstanceDocument[],
+  effectInstances: readonly { readonly pluginId: string }[],
 ): readonly PluginRequirementDocument[] {
   const existing = Array.isArray(value) ? value : [];
   const effectIds = new Set(effectInstances.map((instance) => instance.pluginId));
@@ -1937,6 +1952,362 @@ function stableMigrationUuid(value: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+interface LegacyEffectMixState {
+  readonly dryWet: number;
+  readonly pluginMix: number;
+}
+
+function collapseLegacyEffectMix(pluginMix: number, dryWet: number): {
+  readonly mix: number;
+  readonly gainDecibels: number;
+} {
+  const innerAngle = (pluginMix * Math.PI) / 2;
+  const outerAngle = (dryWet * Math.PI) / 2;
+  const dryCoefficient = Math.cos(outerAngle) + Math.cos(innerAngle) * Math.sin(outerAngle);
+  const wetCoefficient = Math.sin(innerAngle) * Math.sin(outerAngle);
+  const gain = Math.hypot(dryCoefficient, wetCoefficient);
+  return {
+    mix: gain === 0 ? 0 : (Math.atan2(wetCoefficient, dryCoefficient) * 2) / Math.PI,
+    gainDecibels: gain === 0 ? -24 : Math.max(-24, Math.min(24, 20 * Math.log10(gain))),
+  };
+}
+
+function migrateFormatTwoDocument(
+  value: Readonly<Record<string, unknown>>,
+): DocumentResult<Readonly<Record<string, unknown>>> {
+  if (!isPlainRecord(value.effects) || !Array.isArray(value.effects.instances)) {
+    return failure("effects.instances", "Format 2 effect instances must be an array.");
+  }
+  if (!Array.isArray(value.migrations)) {
+    return failure("migrations", "Format 2 migrations must be an array.");
+  }
+  const legacyById = new Map<string, LegacyEffectMixState>();
+  const limiterIds = new Set<string>();
+  const collector = new IssueCollector();
+  const legacyInstances: readonly unknown[] = value.effects.instances;
+  const instances = legacyInstances.map((candidate, index) => {
+    if (!isPlainRecord(candidate) || !isPlainRecord(candidate.state)) return candidate;
+    const path = `effects.instances[${String(index)}]`;
+    const hasPluginMix = Object.hasOwn(candidate.state, "mix");
+    if (!finiteNumber(candidate.wetDry, 0, 1)) {
+      collector.add(`${path}.wetDry`, "Format 2 effect wetDry must be from 0 through 1.");
+    }
+    if (hasPluginMix && !finiteNumber(candidate.state.mix, 0, 1)) {
+      collector.add(`${path}.state.mix`, "Format 2 plugin Mix must be from 0 through 1.");
+    }
+    const pluginMix = finiteNumber(candidate.state.mix, 0, 1) ? candidate.state.mix : 1;
+    const dryWet = finiteNumber(candidate.wetDry, 0, 1) ? candidate.wetDry : 1;
+    if (typeof candidate.id === "string") legacyById.set(candidate.id, { dryWet, pluginMix });
+    const collapsed = collapseLegacyEffectMix(pluginMix, dryWet);
+    const state = { ...candidate.state };
+    delete state.mix;
+    const pluginId = typeof candidate.pluginId === "string" ? candidate.pluginId : "";
+    if (pluginId === PROTECTED_LIMITER_EFFECT_PLUGIN_ID && typeof candidate.id === "string") {
+      limiterIds.add(candidate.id);
+    }
+    if (pluginId === PROTECTED_LIMITER_EFFECT_PLUGIN_ID && typeof state.gain === "number") {
+      state.input = state.gain;
+      delete state.gain;
+    }
+    const rest = Object.fromEntries(
+      Object.entries(candidate).filter(([key]) => key !== "wetDry"),
+    );
+    return { ...rest, state, ...collapsed };
+  });
+  if (collector.issues.length > 0) {
+    return { ok: false, issues: collector.issues.slice(0, MAXIMUM_REPORTED_ISSUES) };
+  }
+  const migrateSends = (candidate: unknown): unknown => {
+    if (!isPlainRecord(candidate) || !Array.isArray(candidate.sends)) return candidate;
+    const sends: readonly unknown[] = candidate.sends;
+    return {
+      ...candidate,
+      sends: sends.map((send) => {
+        if (!isPlainRecord(send)) return send;
+        return Object.fromEntries(Object.entries(send).filter(([key]) => key !== "mode"));
+      }),
+    };
+  };
+  const rack = Array.isArray(value.rack) ? value.rack.map(migrateSends) : value.rack;
+  const mixer = isPlainRecord(value.mixer) && Array.isArray(value.mixer.channels)
+    ? { ...value.mixer, channels: value.mixer.channels.map(migrateSends) }
+    : value.mixer;
+  const automationResult = migrateFormatTwoEffectAutomation(
+    value.automation,
+    value.patterns,
+    value.rack,
+    legacyById,
+    limiterIds,
+    isPlainRecord(value.project) && typeof value.project.id === "string"
+      ? value.project.id
+      : "missing-project",
+  );
+  if (!automationResult.ok) return automationResult;
+  const migrations: readonly unknown[] = value.migrations;
+  return {
+    ok: true,
+    value: {
+      ...value,
+      formatVersion: 3,
+      rack,
+      mixer,
+      patterns: automationResult.value.patterns,
+      automation: automationResult.value.automation,
+      effects: { ...value.effects, instances },
+      migrations: [
+        ...migrations,
+        {
+          scope: "project",
+          id: FORMAT_TWO_MIGRATION_ID,
+          fromVersion: 2,
+          toVersion: 3,
+          implementation: "1.0.0",
+        },
+      ],
+    },
+  };
+}
+
+function migrateFormatTwoEffectAutomation(
+  rawAutomation: unknown,
+  rawPatterns: unknown,
+  rawRack: unknown,
+  legacyById: ReadonlyMap<string, LegacyEffectMixState>,
+  limiterIds: ReadonlySet<string>,
+  projectId: string,
+): DocumentResult<{ readonly automation: unknown; readonly patterns: unknown }> {
+  if (!Array.isArray(rawAutomation) || !Array.isArray(rawPatterns)) {
+    return { ok: true, value: { automation: rawAutomation, patterns: rawPatterns } };
+  }
+  const automationValues: readonly unknown[] = rawAutomation;
+  const patternValues: readonly unknown[] = rawPatterns;
+  const moduleIds = new Set(
+    Array.isArray(rawRack)
+      ? rawRack.flatMap((slot) =>
+          isPlainRecord(slot) && typeof slot.moduleId === "string" ? [slot.moduleId] : [],
+        )
+      : [],
+  );
+  const patternIds = new Set(
+    patternValues.flatMap((pattern) =>
+      isPlainRecord(pattern) && typeof pattern.id === "string" ? [pattern.id] : [],
+    ),
+  );
+  const validated = validateFormatTwoAutomationForMigration(
+    automationValues,
+    patternIds,
+    moduleIds,
+    new Set(legacyById.keys()),
+  );
+  if (!validated.ok) return validated;
+  const source = validated.value;
+  const groups = new Map<string, Readonly<Record<string, unknown>>[]>();
+  const retained: Readonly<Record<string, unknown>>[] = [];
+  const droppedLaneIds = new Set<string>();
+  for (const lane of source) {
+    if (
+      lane.scope === "effect" &&
+      typeof lane.targetId === "string" &&
+      typeof lane.patternId === "string" &&
+      (lane.parameterId === "mix" || lane.parameterId === "wet-dry")
+    ) {
+      const key = `${lane.patternId}:${lane.targetId}`;
+      groups.set(key, [...(groups.get(key) ?? []), lane]);
+      continue;
+    }
+    if (
+      lane.scope === "send" &&
+      typeof lane.parameterId === "string" &&
+      /^send-[abcd]-mode$/u.test(lane.parameterId)
+    ) {
+      if (typeof lane.id === "string") droppedLaneIds.add(lane.id);
+      continue;
+    }
+    if (
+      lane.scope === "effect" &&
+      typeof lane.targetId === "string" &&
+      limiterIds.has(lane.targetId) &&
+      lane.parameterId === "gain"
+    ) {
+      retained.push({ ...lane, parameterId: "input" });
+      continue;
+    }
+    retained.push(lane);
+  }
+  const addedLaneIdsByPattern = new Map<string, string[]>();
+  for (const [key, lanes] of groups) {
+    const separator = key.indexOf(":");
+    const patternId = key.slice(0, separator);
+    const targetId = key.slice(separator + 1);
+    const legacy = legacyById.get(targetId) ?? { pluginMix: 1, dryWet: 1 };
+    const innerLane = lanes.find((lane) => lane.parameterId === "mix");
+    const outerLane = lanes.find((lane) => lane.parameterId === "wet-dry");
+    const ticks = new Set<number>();
+    for (const lane of lanes) {
+      if (!Array.isArray(lane.steps)) continue;
+      for (const step of lane.steps) {
+        if (isPlainRecord(step) && typeof step.tick === "number") ticks.add(step.tick);
+      }
+    }
+    const orderedTicks = [...ticks].toSorted((left, right) => left - right);
+    const mixSteps = orderedTicks.map((tick) => {
+      const pluginMix = automationValueAt(innerLane, tick, legacy.pluginMix);
+      const dryWet = automationValueAt(outerLane, tick, legacy.dryWet);
+      return { tick, value: collapseLegacyEffectMix(pluginMix, dryWet).mix };
+    });
+    const gainSteps = orderedTicks.map((tick) => {
+      const pluginMix = automationValueAt(innerLane, tick, legacy.pluginMix);
+      const dryWet = automationValueAt(outerLane, tick, legacy.dryWet);
+      return { tick, value: collapseLegacyEffectMix(pluginMix, dryWet).gainDecibels };
+    });
+    const mixTemplate = outerLane ?? innerLane;
+    if (mixTemplate === undefined) continue;
+    retained.push({ ...mixTemplate, parameterId: "mix", steps: mixSteps });
+    const gainTemplate = innerLane !== undefined && innerLane !== mixTemplate ? innerLane : undefined;
+    if (gainTemplate !== undefined || gainSteps.some((step) => Math.abs(step.value) > 1e-9)) {
+      const gainId =
+        typeof gainTemplate?.id === "string"
+          ? gainTemplate.id
+          : stableMigrationUuid(`${projectId}:${patternId}:${targetId}:effect-gain`);
+      retained.push({ ...mixTemplate, ...gainTemplate, id: gainId, parameterId: "gain", steps: gainSteps });
+      if (gainTemplate === undefined) {
+        addedLaneIdsByPattern.set(patternId, [...(addedLaneIdsByPattern.get(patternId) ?? []), gainId]);
+      }
+    }
+  }
+  const patterns = patternValues.map((pattern) => {
+    if (!isPlainRecord(pattern) || typeof pattern.id !== "string") return pattern;
+    const added = addedLaneIdsByPattern.get(pattern.id) ?? [];
+    if (!Array.isArray(pattern.automationLaneIds)) return pattern;
+    if (added.length === 0 && droppedLaneIds.size === 0) return pattern;
+    const laneIds: readonly unknown[] = pattern.automationLaneIds;
+    const remaining = laneIds.filter(
+      (laneId) => typeof laneId !== "string" || !droppedLaneIds.has(laneId),
+    );
+    return { ...pattern, automationLaneIds: [...remaining, ...added] };
+  });
+  return { ok: true, value: { automation: retained, patterns } };
+}
+
+function validateFormatTwoAutomationForMigration(
+  values: readonly unknown[],
+  patternIds: ReadonlySet<string>,
+  moduleIds: ReadonlySet<string>,
+  effectIds: ReadonlySet<string>,
+): DocumentResult<readonly Readonly<Record<string, unknown>>[]> {
+  const collector = new IssueCollector();
+  const lanes: Readonly<Record<string, unknown>>[] = [];
+  const laneIds = new Set<string>();
+  for (const [index, candidate] of values.entries()) {
+    const path = `automation[${String(index)}]`;
+    if (!isPlainRecord(candidate)) {
+      collector.add(path, "Format 2 automation lane must be an object.");
+      continue;
+    }
+    lanes.push(candidate);
+    collector.exactKeys(candidate, AUTOMATION_LANE_KEYS, path);
+    if (!isCanonicalUuid(candidate.id) || laneIds.has(candidate.id)) {
+      collector.add(`${path}.id`, "Format 2 automation lane ID must be a unique canonical UUID.");
+    } else {
+      laneIds.add(candidate.id);
+    }
+    if (!isCanonicalUuid(candidate.patternId) || !patternIds.has(candidate.patternId)) {
+      collector.add(`${path}.patternId`, "Format 2 automation Pattern reference must resolve.");
+    }
+    if (candidate.stepTicks !== PATTERN_TICKS_PER_STEP) {
+      collector.add(`${path}.stepTicks`, "Format 2 automation step size must be 240 ticks.");
+    }
+    if (typeof candidate.parameterId !== "string" || candidate.parameterId.length === 0) {
+      collector.add(`${path}.parameterId`, "Format 2 automation parameter ID must not be empty.");
+    }
+    const scope = candidate.scope;
+    if (scope === "module" || scope === "mixer" || scope === "send") {
+      if (!isCanonicalUuid(candidate.targetId) || !moduleIds.has(candidate.targetId)) {
+        collector.add(`${path}.targetId`, "Format 2 module automation target must resolve.");
+      }
+    } else if (scope === "effect") {
+      if (!isCanonicalUuid(candidate.targetId) || !effectIds.has(candidate.targetId)) {
+        collector.add(`${path}.targetId`, "Format 2 effect automation target must resolve.");
+      }
+    } else if (scope === "send-return") {
+      if (!SEND_BUS_IDS.some((busId) => busId === candidate.targetId)) {
+        collector.add(`${path}.targetId`, "Format 2 send-return target must be send A through D.");
+      }
+    } else if (scope === "master") {
+      if (candidate.targetId !== "master") {
+        collector.add(`${path}.targetId`, "Format 2 master automation target must be master.");
+      }
+    } else {
+      collector.add(`${path}.scope`, "Format 2 automation scope is not supported.");
+    }
+    if (!Array.isArray(candidate.steps)) {
+      collector.add(`${path}.steps`, "Format 2 automation steps must be an array.");
+      continue;
+    }
+    const ticks = new Set<number>();
+    let greatestTick = -1;
+    for (const [stepIndex, step] of candidate.steps.entries()) {
+      const stepPath = `${path}.steps[${String(stepIndex)}]`;
+      if (!isPlainRecord(step)) {
+        collector.add(stepPath, "Format 2 automation step must be an object.");
+        continue;
+      }
+      collector.exactKeys(step, AUTOMATION_STEP_KEYS, stepPath);
+      const invalidTick =
+        typeof step.tick !== "number" ||
+        !Number.isSafeInteger(step.tick) ||
+        step.tick < 0 ||
+        step.tick % PATTERN_TICKS_PER_STEP !== 0 ||
+        ticks.has(step.tick) ||
+        step.tick <= greatestTick;
+      if (invalidTick) {
+        collector.add(`${stepPath}.tick`, "Format 2 automation ticks must be unique increasing 1/16 steps.");
+      } else if (typeof step.tick === "number") {
+        ticks.add(step.tick);
+        greatestTick = step.tick;
+      }
+      const scalar =
+        (typeof step.value === "number" && Number.isFinite(step.value)) ||
+        typeof step.value === "string" ||
+        typeof step.value === "boolean";
+      if (!scalar) {
+        collector.add(`${stepPath}.value`, "Format 2 automation value must be a finite JSON scalar.");
+      } else if (
+        candidate.scope === "effect" &&
+        (candidate.parameterId === "mix" || candidate.parameterId === "wet-dry") &&
+        !finiteNumber(step.value, 0, 1)
+      ) {
+        collector.add(`${stepPath}.value`, "Format 2 effect Mix value must be from 0 through 1.");
+      } else if (
+        candidate.scope === "send" &&
+        typeof candidate.parameterId === "string" &&
+        /^send-[abcd]-mode$/u.test(candidate.parameterId) &&
+        step.value !== "pre-fader" &&
+        step.value !== "post-fader"
+      ) {
+        collector.add(`${stepPath}.value`, "Format 2 send mode must be pre-fader or post-fader.");
+      }
+    }
+  }
+  if (collector.issues.length > 0) {
+    return { ok: false, issues: collector.issues.slice(0, MAXIMUM_REPORTED_ISSUES) };
+  }
+  return { ok: true, value: lanes };
+}
+
+function automationValueAt(
+  lane: Readonly<Record<string, unknown>> | undefined,
+  tick: number,
+  fallback: number,
+): number {
+  if (!Array.isArray(lane?.steps)) return fallback;
+  const steps = lane.steps.filter(isPlainRecord).filter(
+    (step) => typeof step.tick === "number" && typeof step.value === "number",
+  );
+  const prior = steps.filter((step) => Number(step.tick) <= tick).at(-1) ?? steps.at(-1);
+  return typeof prior?.value === "number" ? prior.value : fallback;
+}
+
 /**
  * Treats the document as untrusted. Rejects unknown root keys, executable
  * content, over-cap racks, unknown plugins, and out-of-range scalars before any
@@ -1954,6 +2325,11 @@ export function parseProjectDocument(
   }
   if (value.format === PROJECT_FORMAT && value.formatVersion === 1) {
     const migrated = migrateFormatOneDocument(value);
+    if (!migrated.ok) return migrated;
+    return parseProjectDocument(migrated.value, options);
+  }
+  if (value.format === PROJECT_FORMAT && value.formatVersion === 2) {
+    const migrated = migrateFormatTwoDocument(value);
     if (!migrated.ok) return migrated;
     return parseProjectDocument(migrated.value, options);
   }
@@ -2579,7 +2955,7 @@ export function documentToState(document: ProjectDocument, base: Readonly<PulseS
       pan: channel.pan,
       sends: Object.freeze(Object.fromEntries(channel.sends.map((send) => [
         send.busId,
-        Object.freeze({ amount: send.amount, mode: send.mode }),
+        Object.freeze({ amount: send.amount }),
       ]))) as RackModuleState["sends"],
     } as RackModuleState);
   }
@@ -2694,7 +3070,8 @@ function effectsStateFromDocument(document: EffectsDocument): EffectsState {
       stateVersion: instance.stateVersion,
       state: Object.freeze({ ...instance.state }),
       bypassed: instance.bypassed,
-      wetDry: instance.wetDry,
+      mix: instance.mix,
+      gainDecibels: instance.gainDecibels,
     });
   }
   return Object.freeze({

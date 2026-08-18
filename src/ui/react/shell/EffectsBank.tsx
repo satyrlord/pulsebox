@@ -235,8 +235,8 @@ export function EffectsBank() {
                 <div className={styles.effectControls}>
                   <Knob
                     controlId={`send-return-${send}`}
-                    label={`Send ${send} return Mix`}
-                    caption="Mix"
+                    label={`Send ${send} Return Level`}
+                    caption="Return Level"
                     value={chain.returnLevel}
                     min={0}
                     max={1}

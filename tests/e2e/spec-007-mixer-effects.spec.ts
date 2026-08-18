@@ -343,7 +343,7 @@ test("shows the unsupported-size state one pixel below either editing boundary",
   }
 });
 
-test("edits send amount and pre/post mode, then restores both with undo and redo", async ({
+test("edits a fixed pre-fader send amount, then restores it with undo and redo", async ({
   page,
 }) => {
   const studio = await openStudio(page, "Mixer");
@@ -358,24 +358,19 @@ test("edits send amount and pre/post mode, then restores both with undo and redo
   await amount.press("ArrowRight");
   const changedAmount = Number(await amount.getAttribute("aria-valuenow"));
   expect(changedAmount).toBeGreaterThan(0);
-  await editor.getByRole("combobox", { name: "Send A tap mode" }).selectOption("pre-fader");
+  await expect(editor.getByRole("combobox", { name: "Send A tap mode" })).toHaveCount(0);
   await expect(send).toHaveAttribute("data-active", "true");
 
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   const redo = page.getByRole("button", { name: "Redo", exact: true });
   await expect(undo).toBeEnabled();
   await undo.click();
-  await expect(editor.getByRole("combobox", { name: "Send A tap mode" })).toHaveValue("post-fader");
-  await expect(amount).toHaveAttribute("aria-valuenow", String(changedAmount));
-  await expect(send).toHaveAttribute("data-active", "true");
-  await undo.click();
   await expect(amount).toHaveAttribute("aria-valuenow", "0");
   await expect(send).toHaveAttribute("data-active", "false");
   await redo.click();
-  await redo.click();
   await expect(send).toHaveAttribute("data-active", "true");
 
-  await waitForAutosaveValue(page, '"mode":"pre-fader"');
+  await waitForAutosaveValue(page, `"amount":${String(changedAmount)}`);
   await page.reload();
   const reloadedStudio = await openStudio(page, "Mixer");
   const reloadedSend = loadedStrip(reloadedStudio).getByRole("button", { name: /send A/iu });
@@ -383,14 +378,14 @@ test("edits send amount and pre/post mode, then restores both with undo and redo
   await reloadedSend.click();
   await expect(page.locator('[data-component="send-value-surface"]')).toBeVisible();
   const reloadedEditor = page.locator('[data-component="send-value-surface"]');
-  await expect(reloadedEditor.getByRole("combobox", { name: "Send A tap mode" })).toHaveValue("pre-fader");
+  await expect(reloadedEditor.getByRole("combobox", { name: "Send A tap mode" })).toHaveCount(0);
   await expect(reloadedEditor.getByRole("slider", { name: "Amount", exact: true })).toHaveAttribute(
     "aria-valuenow",
     String(changedAmount),
   );
 });
 
-test("opens one send-chain editor, supports add, wet/dry, bypass, focus, and keyboard reorder", async ({
+test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and keyboard reorder", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1536, height: 1024 });
@@ -403,11 +398,11 @@ test("opens one send-chain editor, supports add, wet/dry, bypass, focus, and key
   await expect(cards.nth(3)).toContainText(/Drive/i);
 
   const card = cards.nth(0);
-  const returnMix = card.getByRole("slider", { name: "Send A return Mix" });
-  const returnBefore = Number(await returnMix.getAttribute("aria-valuenow"));
-  await returnMix.focus();
-  await returnMix.press("ArrowLeft");
-  expect(Number(await returnMix.getAttribute("aria-valuenow"))).toBeLessThan(returnBefore);
+  const returnLevel = card.getByRole("slider", { name: "Send A Return Level" });
+  const returnBefore = Number(await returnLevel.getAttribute("aria-valuenow"));
+  await returnLevel.focus();
+  await returnLevel.press("ArrowLeft");
+  expect(Number(await returnLevel.getAttribute("aria-valuenow"))).toBeLessThan(returnBefore);
   const chainBypass = card.getByRole("button", { name: /Chain bypass/iu });
   if ((await chainBypass.getAttribute("aria-pressed")) === "true") await chainBypass.click();
   await chainBypass.click();
@@ -437,12 +432,17 @@ test("opens one send-chain editor, supports add, wet/dry, bypass, focus, and key
     added.getByRole("button", { name: "Bypassed Chorus in Send A", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  const wetDry = added.getByRole("slider", { name: "Chorus in Send A wet dry" });
-  const wetDryBefore = Number(await wetDry.getAttribute("aria-valuenow"));
-  await wetDry.focus();
-  await wetDry.press("ArrowLeft");
-  const wetDryAfter = Number(await wetDry.getAttribute("aria-valuenow"));
-  expect(wetDryAfter).toBeLessThan(wetDryBefore);
+  const mix = added.getByRole("slider", { name: "Chorus in Send A Mix" });
+  const mixBefore = Number(await mix.getAttribute("aria-valuenow"));
+  await mix.focus();
+  await mix.press("ArrowLeft");
+  const mixAfter = Number(await mix.getAttribute("aria-valuenow"));
+  expect(mixAfter).toBeLessThan(mixBefore);
+  const gain = added.getByRole("slider", { name: "Chorus in Send A Gain" });
+  await gain.focus();
+  await gain.press("ArrowDown");
+  const gainAfter = Number(await gain.getAttribute("aria-valuenow"));
+  expect(gainAfter).toBeLessThan(0);
 
   const detailSliderNames = await detail.getByRole("slider").evaluateAll((controls) =>
     controls.map((control) => control.getAttribute("aria-label")),
@@ -484,7 +484,8 @@ test("opens one send-chain editor, supports add, wet/dry, bypass, focus, and key
   await expect(edit).toBeFocused();
   await expect(card).toContainText(/Chorus/i);
 
-  await waitForAutosaveValue(page, `"wetDry":${String(wetDryAfter)}`);
+  await waitForAutosaveValue(page, `"mix":${String(mixAfter)}`);
+  await waitForAutosaveValue(page, `"gainDecibels":${String(gainAfter)}`);
   await page.reload();
   const reloadedEffects = await openStudio(page, "Effects");
   const reloadedEdit = reloadedEffects.locator('[data-component="effect-slot"]').first().getByRole("button", { name: "Edit", exact: true });
@@ -495,9 +496,13 @@ test("opens one send-chain editor, supports add, wet/dry, bypass, focus, and key
       has: page.locator("strong").filter({ hasText: /^Chorus$/u }),
     }),
   ).toBeVisible();
-  await expect(reloadedDetail.getByRole("slider", { name: "Chorus in Send A wet dry" })).toHaveAttribute(
+  await expect(reloadedDetail.getByRole("slider", { name: "Chorus in Send A Mix" })).toHaveAttribute(
     "aria-valuenow",
-    String(wetDryAfter),
+    String(mixAfter),
+  );
+  await expect(reloadedDetail.getByRole("slider", { name: "Chorus in Send A Gain" })).toHaveAttribute(
+    "aria-valuenow",
+    String(gainAfter),
   );
 });
 
@@ -550,18 +555,17 @@ test("routes mixer controls and all four send returns through live output", asyn
         const amount = sendSurface.getByRole("slider", { name: "Amount", exact: true });
         await amount.focus();
         await amount.press("End");
-        await sendSurface.getByRole("combobox", { name: `Send ${send} tap mode` }).selectOption("pre-fader");
         await sendSurface.getByRole("button", { name: "Close send value" }).click();
 
         const effects = await openStudio(page, "Effects");
         const card = effects.locator('[data-component="effect-slot"]').nth(index);
-        const returnMix = card.getByRole("slider", { name: `Send ${send} return Mix` });
-        await returnMix.focus();
-        await returnMix.press("Home");
+        const returnLevel = card.getByRole("slider", { name: `Send ${send} Return Level` });
+        await returnLevel.focus();
+        await returnLevel.press("Home");
         assertSilent(await holdAudition(page, "Silver Serpent", false));
-        await returnMix.press("End");
+        await returnLevel.press("End");
         assertSignal(await holdAudition(page));
-        await returnMix.press("Home");
+        await returnLevel.press("Home");
       }
 
       const mixer = await openStudio(page, "Mixer");
@@ -601,7 +605,7 @@ test("routes every catalog worklet through a module pedalboard at both rates", a
     ["Distortion", "Drive", "End"],
     ["Compressor", "Threshold", "Home"],
     ["Analog Echo", "Feedback", "End"],
-    ["Plate Reverb", "Mix", "End"],
+    ["Plate Reverb", "Decay", "End"],
     ["Chorus", "Depth", "End"],
     ["Phaser", "Depth", "End"],
     ["Parametric EQ", "Mid Gain", "End"],
@@ -626,8 +630,8 @@ test("routes every catalog worklet through a module pedalboard at both rates", a
         await add.selectOption({ label: effectName });
         const row = editor.locator("ol > li").filter({ hasText: effectName }).first();
         await expect(row).toBeVisible();
-        const wetDry = row.getByRole("slider", { name: new RegExp(`${effectName}.*wet dry`, "i") });
-        await wetDry.press("End");
+        const mix = row.getByRole("slider", { name: new RegExp(`${effectName}.* Mix$`, "i") });
+        await mix.press("End");
         const parameter = row.getByRole("slider", { name: new RegExp(`${parameterName}$`) });
         await parameter.press(key);
         await page.keyboard.press("Escape");

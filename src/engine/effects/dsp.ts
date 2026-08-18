@@ -60,11 +60,6 @@ export function enumState<T extends string>(
   return typeof value === "string" && values.includes(value as T) ? (value as T) : fallback;
 }
 
-export function equalPowerMix(dry: number, wet: number, mix: number): number {
-  const bounded = clamp(mix, 0, 1);
-  return dry * Math.cos((bounded * Math.PI) / 2) + wet * Math.sin((bounded * Math.PI) / 2);
-}
-
 export function decibelsToGain(decibels: number): number {
   return 10 ** (decibels / 20);
 }

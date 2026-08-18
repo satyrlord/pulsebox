@@ -1,7 +1,8 @@
 # Pulsebox project and pack format
 
 **Status:** Normative Phase 0 contract  
-**Project format:** 1  
+**Project format:** 3
+
 **Pack format:** 1
 
 This document defines the durable project, asset-pack, browser-storage, import,
@@ -176,7 +177,7 @@ compressed bytes is invalid. The importer enforces declared limits before
 inflation and actual limits while streaming inflation. Crossing a limit stops
 that import immediately.
 
-## 5. Project manifest version 2
+## 5. Project manifest version 3
 
 ### 5.1 Root record
 
@@ -185,7 +186,7 @@ absent. Unknown root keys are invalid.
 
 ```text
 format              "pulsebox-project"
-formatVersion       2
+formatVersion       3
 project             ProjectMetadata
 plugins             PluginRequirement[]
 rack                RackSlot[8]
@@ -273,13 +274,13 @@ canonical JSON. Known plugin state is validated against that plugin's registered
 schema, including parameter IDs, types, ranges, references, and allowed keys.
 Instrument and effect parameters use the same registered descriptor checks.
 
-Every instrument and effect instance is required in format 2. The manifest has
+Every instrument and effect instance is required in format 3. The manifest has
 no optional-plugin mode. Missing, unknown, or incompatible referenced plugins
 reject the project in full.
 
 ### 5.4 Required MVP plugin registry
 
-Format 2 assigns API version 1, plugin version `1.0.0`, and state version 1 to
+Format 3 assigns API version 1, plugin version `1.0.0`, and state version 1 to
 the following built-in instrument IDs:
 
 - `bass-mono`
@@ -318,7 +319,7 @@ record with:
 - a reference to its module effect chain.
 
 The eight-slot array is an MVP file-format limit. Slot-count-agnostic code may
-support later migrations, but a format-2 importer rejects a ninth slot and
+support later migrations, but a format-3 importer rejects a ninth slot and
 reports every over-cap slot before applying any state.
 
 The root `patterns` array contains 1 through 32 project-wide `Pattern` records.
@@ -368,7 +369,7 @@ Playlist order is array order, not identity. Every reference must resolve to a
 Pattern in the same project. At least one placement is required. Pattern names
 and duration are read from the referenced Pattern and are not duplicated in the
 placement. There are no Section, Scene, lane, arrangement-clip, tempo-event,
-time-signature-event, or Song-automation records in format version 2. Musical
+time-signature-event, or Song-automation records in format version 3. Musical
 structure is fixed at 4/4 for the MVP.
 
 An `AutomationLane` contains:
@@ -388,9 +389,10 @@ parameter descriptors validate every automation value.
 
 `MixerState` contains exactly eight channel records in fixed slot order, four
 send definitions in bus order, and one master record. Channel records reference
-fixed slot IDs. They contain finite parameter values, four send amounts and
-pre/post modes, mute, solo, and stable module-chain references. Transient
-meter frames and L/R or M/S meter mode are absent.
+fixed slot IDs. They contain finite parameter values, four send amounts, mute,
+solo, and stable module-chain references. Every send uses the fixed pre-fader
+tap. Send mode is absent. Transient meter frames and L/R or M/S meter mode are
+absent.
 
 `EffectsState` contains:
 
@@ -400,14 +402,18 @@ meter frames and L/R or M/S meter mode are absent.
 - one `masterEffectsBypassed` boolean.
 - the pinned compact-focus instance for each send chain or `null`.
 
-Every effect slot is `null` or contains a stable effect instance. Routing is
-fixed to one main path and sends A through D. An effect can appear only in a
-chain allowed by its manifest. The master chain must end with the protected
-limiter, whose only placement is `master-chain`. Cycles, feedback edges, unknown
-destinations, a missing protected final limiter, or more slots than the owning
-chain contract permits are structural errors. `masterEffectsBypassed` bypasses
-the user master effects before the protected limiter. It never bypasses master
-gain or the limiter and is independent of the limiter instance's own bypass.
+Every effect slot is `null` or contains a stable effect instance. An effect
+instance has `bypassed`, `mix`, and `gainDecibels` fields after its plugin state.
+`mix` is finite from 0 through 1. `gainDecibels` is finite from -24 through 24.
+The plugin state must not contain a `mix` or `gain` field. These IDs belong to
+the shared stage automation. Routing is fixed to one main path and sends A
+through D. An effect can appear only in a chain allowed by its manifest. The
+master chain must end with the protected limiter, whose only placement is
+`master-chain`. Cycles, feedback edges, unknown destinations, a missing
+protected final limiter, or more slots than the owning chain contract permits
+are structural errors. `masterEffectsBypassed` bypasses the user master effects
+before the protected limiter. It never bypasses master gain or the limiter and
+is independent of the limiter instance's own bypass.
 
 ### 5.8 Extensions
 
@@ -685,6 +691,31 @@ reader validates the full format-2 result before it opens, imports, or restores
 the project. It appends the `project-format-1-to-2-pattern-bank` migration
 record. The same fixture must pass direct import, stored-project open, and
 autosave recovery tests.
+
+The format-3 reader migrates every format-2 document before current-schema
+validation. For every effect instance, it reads the old generic `wetDry` value
+as `b` and the old plugin-state `mix` value as `a`. If plugin-state `mix` is
+absent, `a` is 1. It then writes:
+
+```text
+dryCoefficient = cos(b * pi / 2) + cos(a * pi / 2) * sin(b * pi / 2)
+wetCoefficient = sin(a * pi / 2) * sin(b * pi / 2)
+mix = atan2(wetCoefficient, dryCoefficient) * 2 / pi
+gainDecibels = 20 * log10(hypot(dryCoefficient, wetCoefficient))
+```
+
+The migration removes `wetDry` and the old plugin-state `mix`. It renames
+limiter plugin-state `gain` to `input` and renames limiter `gain` automation
+lanes to `input`. It removes every send mode and fixes all sends to the
+pre-fader tap. It drops every send-mode automation lane and removes those lanes
+from each Pattern's lane list. It appends the
+`project-format-2-to-3-effect-stages` migration record. Unit fixtures shall
+verify exact coefficients, serialized fields, limiter rename, fixed pre-fader
+sends, dropped send-mode lanes, and direct import, stored-project open, and
+autosave recovery.
+
+The migration rejects an invalid present legacy value. It does not replace that
+value with a default or discard malformed automation data.
 
 ## 9. Import validation and atomicity
 

@@ -134,7 +134,8 @@ export interface AudioControlPort {
     amount: number,
   ) => void;
   readonly previewSendReturnLevel?: (sendBusId: SendBusId, returnLevel: number) => void;
-  readonly previewEffectWetDry?: (effectInstanceId: EffectInstanceId, wetDry: number) => void;
+  readonly previewEffectMix?: (effectInstanceId: EffectInstanceId, mix: number) => void;
+  readonly previewEffectGain?: (effectInstanceId: EffectInstanceId, gainDecibels: number) => void;
   readonly previewEffectParameter?: (
     effectInstanceId: EffectInstanceId,
     parameterId: string,
@@ -357,7 +358,8 @@ export interface AppState {
     amount: number,
   ) => void;
   readonly previewSendReturnLevel: (sendBusId: SendBusId, returnLevel: number) => void;
-  readonly previewEffectWetDry: (effectInstanceId: EffectInstanceId, wetDry: number) => void;
+  readonly previewEffectMix: (effectInstanceId: EffectInstanceId, mix: number) => void;
+  readonly previewEffectGain: (effectInstanceId: EffectInstanceId, gainDecibels: number) => void;
   readonly previewEffectParameter: (
     effectInstanceId: EffectInstanceId,
     parameterId: string,
@@ -403,11 +405,6 @@ export interface AppState {
     amount: number,
     gestureId?: GestureId,
   ) => void;
-  readonly setChannelSendMode: (
-    moduleId: ModuleInstanceId,
-    sendBusId: SendBusId,
-    mode: "pre-fader" | "post-fader",
-  ) => void;
   readonly addEffectToChain: (chain: EffectChainTarget, effectPluginId: PluginId) => void;
   readonly removeEffectFromChain: (effectInstanceId: EffectInstanceId) => void;
   readonly replaceEffectInChain: (
@@ -419,9 +416,14 @@ export interface AppState {
     afterEffectId?: EffectInstanceId,
   ) => void;
   readonly setEffectBypassed: (effectInstanceId: EffectInstanceId, bypassed: boolean) => void;
-  readonly setEffectWetDry: (
+  readonly setEffectMix: (
     effectInstanceId: EffectInstanceId,
-    wetDry: number,
+    mix: number,
+    gestureId?: GestureId,
+  ) => void;
+  readonly setEffectGain: (
+    effectInstanceId: EffectInstanceId,
+    gainDecibels: number,
     gestureId?: GestureId,
   ) => void;
   readonly setEffectParameter: (
@@ -843,8 +845,12 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       audio.previewSendReturnLevel?.(sendBusId, returnLevel);
     },
 
-    previewEffectWetDry: (effectInstanceId, wetDry) => {
-      audio.previewEffectWetDry?.(effectInstanceId, wetDry);
+    previewEffectMix: (effectInstanceId, mix) => {
+      audio.previewEffectMix?.(effectInstanceId, mix);
+    },
+
+    previewEffectGain: (effectInstanceId, gainDecibels) => {
+      audio.previewEffectGain?.(effectInstanceId, gainDecibels);
     },
 
     previewEffectParameter: (effectInstanceId, parameterId, value) => {
@@ -1039,10 +1045,6 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       );
     },
 
-    setChannelSendMode: (moduleId, sendBusId, mode) => {
-      store.dispatch(store.createCommand("mixer-send-mode-set", { moduleId, sendBusId, mode }));
-    },
-
     addEffectToChain: (chain, effectPluginId) => {
       store.dispatch(store.createCommand("effects-chain-effect-add", { chain, effectPluginId }));
     },
@@ -1073,11 +1075,21 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       store.dispatch(store.createCommand("effects-instance-bypass-set", { effectInstanceId, bypassed }));
     },
 
-    setEffectWetDry: (effectInstanceId, wetDry, gestureId) => {
+    setEffectMix: (effectInstanceId, mix, gestureId) => {
       store.dispatch(
         store.createCommand(
-          "effects-instance-wet-dry-set",
-          { effectInstanceId, wetDry },
+          "effects-instance-mix-set",
+          { effectInstanceId, mix },
+          gestureId === undefined ? {} : { gestureId },
+        ),
+      );
+    },
+
+    setEffectGain: (effectInstanceId, gainDecibels, gestureId) => {
+      store.dispatch(
+        store.createCommand(
+          "effects-instance-gain-set",
+          { effectInstanceId, gainDecibels },
           gestureId === undefined ? {} : { gestureId },
         ),
       );

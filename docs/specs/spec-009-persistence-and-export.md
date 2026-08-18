@@ -118,6 +118,10 @@ with `manifest.json` at the root and imported assets under `assets/`.
 It also defines the pack-reference contract, plugin compatibility rules,
 resource bounds, and archive safety rules.
 
+Format 3 serializes each effect instance with `mix` and `gainDecibels`. It does
+not serialize `wetDry`, plugin-state `mix`, or a send mode. Format-2 migration
+uses the exact equal-power coefficient transform in `PROJECT-FORMAT.md`.
+
 ### 23.3 Save and recovery
 
 - Autosave after committed edits with debounce.
@@ -130,8 +134,9 @@ resource bounds, and archive safety rules.
 - Tell the user which data recovery restored. Use a non-blocking panel and ARIA
   live announcement.
 - Keep a bounded recovery history.
-- The format-1 to format-2 project migration runs before current-schema
-  validation. Import, stored-project open, and autosave recovery use it.
+- The format-1 to format-2 and format-2 to format-3 project migrations run
+  before current-schema validation. Import, stored-project open, and autosave
+  recovery use them.
 
 After the first explicit Save or sample-pack installation gesture, request
 persistent origin storage once. Show whether the browser granted the request.

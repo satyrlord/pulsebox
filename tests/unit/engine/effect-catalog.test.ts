@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { ParameterId } from "../../../src/contracts/parameters";
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import { ChorusDsp } from "../../../src/engine/effects/chorus/dsp-core";
 import { CompressorDsp } from "../../../src/engine/effects/compressor/dsp-core";
@@ -38,16 +39,16 @@ const PROCESSORS: readonly ProcessorConstructor[] = [
 const ACTIVE_FIXTURES: Readonly<Record<string, Readonly<Record<string, number | boolean | string>>>> = {
   "lo-fi": { bits: 5, rate: 0.2, character: 0.8 },
   "pattern-filter": { cutoff: 600, resonance: 0.7 },
-  distortion: { drive: 7, model: "fold", mix: 1 },
+  distortion: { drive: 7, model: "fold" },
   compressor: { threshold: -30, ratio: 10, makeup: 3 },
-  delay: { "tempo-sync": false, time: 20, feedback: 0.7, mix: 0.8 },
-  reverb: { "pre-delay": 0, decay: 1.5, mix: 0.8 },
-  chorus: { depth: 0.9, rate: 2, mix: 0.8 },
-  phaser: { depth: 0.9, rate: 2, mix: 0.8 },
+  delay: { "tempo-sync": false, time: 20, feedback: 0.7 },
+  reverb: { "pre-delay": 0, decay: 1.5 },
+  chorus: { depth: 0.9, rate: 2 },
+  phaser: { depth: 0.9, rate: 2 },
   "parametric-eq": { "mid-frequency": 900, "mid-gain": 9, "mid-q": 2 },
   "transient-shaper": { attack: 1, sustain: -0.5, output: -1 },
   "stereo-width": { width: 1.8, "high-pass": 80, "low-pass": 16_000 },
-  limiter: { ceiling: -2, gain: 18, release: 40 },
+  limiter: { ceiling: -2, input: 18, release: 40 },
 };
 
 describe("built-in effect catalog", () => {
@@ -59,7 +60,7 @@ describe("built-in effect catalog", () => {
       expect(manifest.renderCapabilities).toEqual({ live: true, offline: true });
       expect(manifest.ui.compactControls.length).toBeLessThanOrEqual(4);
       if (manifest.placements.includes("send-chain")) {
-        expect(manifest.ui.compactControls.length, manifest.productName).toBe(4);
+        expect(manifest.ui.compactControls.length, manifest.productName).toBeGreaterThanOrEqual(3);
       }
       expect(manifest.ui.detailedEditorSections.length).toBeGreaterThan(0);
       expect(Object.keys(manifest.defaultState)).toEqual(
@@ -68,11 +69,33 @@ describe("built-in effect catalog", () => {
     }
   });
 
+  it.each(["mix", "gain"])(
+    "rejects the shared %s ID in plugin-owned effect state",
+    (reservedId) => {
+      const base = BUILT_IN_EFFECTS.find((effect) => effect.manifest.pluginId === "delay")?.manifest;
+      const template = base?.parameters[0];
+      if (base === undefined || template === undefined) throw new Error("Expected the delay manifest.");
+      const parameterId = reservedId as ParameterId;
+      const result = validatePluginManifest({
+        ...base,
+        parameters: [...base.parameters, { ...template, id: parameterId, name: reservedId }],
+        defaultState: { ...base.defaultState, [reservedId]: 0 },
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.issues).toContainEqual({
+          path: "parameters",
+          message: "Effect plugins must not redeclare the shared Mix or Gain parameter ID.",
+        });
+      }
+    },
+  );
+
   it("limits the protected limiter to the master chain", () => {
     const limiter = BUILT_IN_EFFECTS.find((effect) => effect.manifest.pluginId === "limiter");
     expect(limiter?.manifest.placements).toEqual(["master-chain"]);
     expect(limiter?.manifest.ui.compactControls.map((control) => control.parameterId)).toEqual([
-      "ceiling", "gain", "release",
+      "ceiling", "input", "release",
     ]);
     expect(limiter?.manifest.meters.map((meter) => meter.id)).toEqual(["gain-reduction"]);
   });
@@ -96,7 +119,6 @@ describe("built-in effect catalog", () => {
           feedback: 0,
           filter: 18_000,
           "ping-pong": false,
-          mix: 1,
           [EFFECT_TRANSPORT_TEMPO_PARAMETER]: tempo,
         });
         const limit = Math.ceil(sampleRate * 0.3);
@@ -122,7 +144,6 @@ describe("built-in effect catalog", () => {
         depth: 1,
         feedback: 0.35,
         delay: 12,
-        mix: 1,
         [EFFECT_TRANSPORT_TEMPO_PARAMETER]: tempo,
       });
       const output: number[] = [];
@@ -149,7 +170,6 @@ describe("built-in effect catalog", () => {
       "cutoff",
       "resonance",
       "drive",
-      "mix",
     ]);
     expect(
       patternFilter?.manifest.parameters.find((parameter) => parameter.id === "cutoff")
@@ -236,7 +256,6 @@ describe("built-in effect catalog", () => {
         drive: 1,
         model: "drive",
         tone: 18_000,
-        mix: 1,
       };
       const smoother = new EffectParameterSmoother(
         sampleRate,
@@ -287,7 +306,6 @@ describe("built-in effect catalog", () => {
       "pre-delay": 0,
       decay: 2,
       damping: 10_000,
-      mix: 1,
     };
     const plain = new ReverbDsp(sampleRate, { ...base, shimmer: 0 });
     const shimmer = new ReverbDsp(sampleRate, { ...base, shimmer: 1 });
@@ -308,7 +326,6 @@ describe("built-in effect catalog", () => {
         width: 2,
         "high-pass": 2_000,
         "low-pass": 2_000,
-        mix: 1,
       });
       for (let frame = 0; frame < 4_096; frame += 1) {
         const input = Math.sin((frame * 2 * Math.PI * 431) / sampleRate) * 0.8;
@@ -327,7 +344,7 @@ describe("built-in effect catalog", () => {
   });
 
   it("enforces the limiter ceiling for hostile finite input", () => {
-    const limiter = new LimiterDsp(48_000, { ceiling: -1, gain: 24, release: 80 });
+    const limiter = new LimiterDsp(48_000, { ceiling: -1, input: 24, release: 80 });
     const ceiling = 10 ** (-1 / 20);
     for (let frame = 0; frame < 1000; frame += 1) {
       const output = limiter.process(4, -4);

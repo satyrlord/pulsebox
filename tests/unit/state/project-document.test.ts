@@ -870,13 +870,20 @@ describe("format 2 documents", () => {
     const parsed = parseProjectJson(JSON.stringify(legacy), PARSE);
     if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
 
-    expect(parsed.value.formatVersion).toBe(2);
+    expect(parsed.value.formatVersion).toBe(3);
     expect(parsed.value.migrations).toEqual([
       {
         scope: "project",
         id: "project-format-1-to-2-pattern-bank",
         fromVersion: 1,
         toVersion: 2,
+        implementation: "1.0.0",
+      },
+      {
+        scope: "project",
+        id: "project-format-2-to-3-effect-stages",
+        fromVersion: 2,
+        toVersion: 3,
         implementation: "1.0.0",
       },
     ]);
@@ -898,13 +905,13 @@ describe("format 2 documents", () => {
       document: legacy as unknown as ProjectDocument,
     };
     const opened = parseStoredProject(stored, PARSE);
-    expect(opened.ok && opened.value.document.formatVersion).toBe(2);
+    expect(opened.ok && opened.value.document.formatVersion).toBe(3);
 
     const repository = createMemoryProjectRepository();
     await repository.saveAutosave(stored);
     const base = createDefaultState(browserIdFactory, SEED);
     const restored = await restoreAutosave(base, { repository, parseOptions: PARSE });
-    expect(restored.document?.formatVersion).toBe(2);
+    expect(restored.document?.formatVersion).toBe(3);
     expect(restored.state.project.patterns[0]?.id).toBe(parsed.value.patterns[0]?.id);
   });
 

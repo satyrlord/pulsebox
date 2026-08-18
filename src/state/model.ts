@@ -114,7 +114,6 @@ export interface RackModuleState {
 
 export interface MixerSendState {
   readonly amount: number;
-  readonly mode: "pre-fader" | "post-fader";
 }
 
 export interface SongPlacement {

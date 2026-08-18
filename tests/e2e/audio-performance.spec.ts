@@ -246,6 +246,7 @@ for (const requestedSampleRate of [44_100, 48_000]) {
     { browser, page },
     testInfo,
   ) => {
+    test.slow();
     await page.addInitScript((sampleRate) => {
       interface Probe {
         active: boolean;

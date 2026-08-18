@@ -128,7 +128,7 @@ function readyProcessor(): TestProcessor {
 }
 
 function configuration() {
-  return { pluginId: "distortion", state: { drive: 1, model: "drive", tone: 18_000, mix: 1 } };
+  return { pluginId: "distortion", state: { drive: 1, model: "drive", tone: 18_000 } };
 }
 
 function changes(start: number, count: number) {

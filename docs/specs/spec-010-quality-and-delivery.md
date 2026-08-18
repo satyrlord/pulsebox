@@ -191,6 +191,7 @@ Visual regression:
 | -------- | ----------------- | -------------- |
 | Direct per-voice Distortion | `tests/unit/engine/drumline-dsp.test.ts`, `tests/unit/engine/drum-machines-dsp.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/audio-performance.spec.ts` | Zero is dry. A non-zero value affects only the selected voice and changes safely while it sounds. |
 | Rack-only pedalboard access | `tests/component/mixer-effects.test.tsx` and `tests/e2e/spec-007-mixer-effects.spec.ts` | Rack Effects opens the module pedalboard. Mixer channels expose no module-chain editor. |
+| Effect stages and sends | `tests/unit/engine/effect-chain-node.test.ts`, `tests/unit/engine/mixer-routing-graph.test.ts`, `tests/unit/state/project-document.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | Every effect has one Mix and one Gain. No `Wet/Dry` label appears. The saved document uses `mix` and `gainDecibels`. Effect order is DSP, Mix, then Gain. Sends use only the pre-fader tap. |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

@@ -178,9 +178,9 @@ describe("external automation audio scheduling", () => {
     const graph = new MixerRoutingGraph(stub.context, factory, MODULE);
     await graph.setChannel(MODULE, {
       level: 0.8, pan: 0, muted: false, solo: false,
-      sends: [{ busId: SEND_A, amount: 0.2, mode: "post" }],
+      sends: [{ busId: SEND_A, amount: 0.2 }],
       effectsBypassed: false,
-      effects: [{ id: EFFECT, pluginId: "delay" as PluginId, state: {}, bypassed: false, wetDry: 1, wetDryLaw: "equal-power" }],
+      effects: [{ id: EFFECT, pluginId: "delay" as PluginId, state: {}, bypassed: false, mix: 1, gainDecibels: 0 }],
     });
     await graph.setSend({ busId: SEND_A, returnLevel: 0.7, effects: [], effectsBypassed: false });
     await graph.setMaster({ level: 0.9, effects: [], effectsBypassed: false, limiterBypassed: false });
@@ -190,11 +190,11 @@ describe("external automation audio scheduling", () => {
       { atFrame: 4_800, scope: "mixer", targetId: MODULE, parameterId: "pan", value: -0.25 },
       { atFrame: 4_800, scope: "mixer", targetId: MODULE, parameterId: "solo", value: true },
       { atFrame: 4_800, scope: "send", targetId: MODULE, parameterId: "send-a-amount", value: 0.6 },
-      { atFrame: 4_800, scope: "send", targetId: MODULE, parameterId: "send-a-mode", value: "pre-fader" },
       { atFrame: 4_800, scope: "send-return", targetId: SEND_A, parameterId: "return-level", value: 0.4 },
       { atFrame: 4_800, scope: "send-return", targetId: SEND_A, parameterId: "chain-bypassed", value: true },
       { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "feedback", value: 0.3 },
-      { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "wet-dry", value: 0.5 },
+      { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "mix", value: 0.5 },
+      { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "gain", value: -3 },
       { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "bypassed", value: false },
       { atFrame: 4_800, scope: "master", targetId: "master", parameterId: "level", value: 0.75 },
       { atFrame: 4_800, scope: "master", targetId: "master", parameterId: "effects-bypassed", value: true },

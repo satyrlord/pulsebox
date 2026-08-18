@@ -45,7 +45,6 @@ export interface TransportModuleMix {
   readonly sends?: readonly {
     readonly busId: SendBusId;
     readonly amount: number;
-    readonly mode: "pre" | "post";
   }[];
 }
 
@@ -707,8 +706,12 @@ export class TransportRuntime {
           );
           return;
         }
-        if (effectId !== undefined && typeof delta.payload.wetDry === "number") {
-          this.#routing?.setEffectWetDry(effectId, delta.payload.wetDry);
+        if (effectId !== undefined && typeof delta.payload.mix === "number") {
+          this.#routing?.setEffectMix(effectId, delta.payload.mix);
+          return;
+        }
+        if (effectId !== undefined && typeof delta.payload.gainDecibels === "number") {
+          this.#routing?.setEffectGain(effectId, delta.payload.gainDecibels);
           return;
         }
         if (effectId !== undefined && typeof delta.payload.bypassed === "boolean") {
@@ -1838,10 +1841,16 @@ export class TransportRuntime {
     this.#routing?.previewSendReturnLevel(busId, returnLevel);
   }
 
-  /** Transient effect wet/dry value while its control is moving. */
-  previewEffectWetDry(effectId: EffectInstanceId, wetDry: number): void {
-    if (this.#context === undefined || !Number.isFinite(wetDry)) return;
-    this.#routing?.previewEffectWetDry(effectId, wetDry);
+  /** Transient effect Mix value while its control is moving. */
+  previewEffectMix(effectId: EffectInstanceId, mix: number): void {
+    if (this.#context === undefined || !Number.isFinite(mix)) return;
+    this.#routing?.previewEffectMix(effectId, mix);
+  }
+
+  /** Transient post-mix effect Gain while its control is moving. */
+  previewEffectGain(effectId: EffectInstanceId, gainDecibels: number): void {
+    if (this.#context === undefined || !Number.isFinite(gainDecibels)) return;
+    this.#routing?.previewEffectGain(effectId, gainDecibels);
   }
 
   /** Transient numeric effect parameter while its control is moving. */
@@ -1871,7 +1880,7 @@ export class TransportRuntime {
     if (routing === undefined) return;
     routing.setChannelMix(module.id, module.mix.level, module.mix.pan, module.mix.muted);
     for (const send of module.mix.sends ?? []) {
-      routing.setChannelSend(module.id, send.busId, send.amount, send.mode);
+      routing.setChannelSend(module.id, send.busId, send.amount);
     }
   }
 

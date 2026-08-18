@@ -220,10 +220,6 @@ export type PulseCommand =
       { readonly moduleId: ModuleInstanceId; readonly sendBusId: SendBusId; readonly amount: number }
     >
   | CommandEnvelope<
-      "mixer-send-mode-set",
-      { readonly moduleId: ModuleInstanceId; readonly sendBusId: SendBusId; readonly mode: "pre-fader" | "post-fader" }
-    >
-  | CommandEnvelope<
       "effects-chain-effect-add",
       {
         readonly chain: { readonly scope: "module"; readonly targetId: ModuleInstanceId } | { readonly scope: "send"; readonly targetId: SendBusId } | { readonly scope: "master" };
@@ -245,8 +241,12 @@ export type PulseCommand =
       { readonly effectInstanceId: EffectInstanceId; readonly bypassed: boolean }
     >
   | CommandEnvelope<
-      "effects-instance-wet-dry-set",
-      { readonly effectInstanceId: EffectInstanceId; readonly wetDry: number }
+      "effects-instance-mix-set",
+      { readonly effectInstanceId: EffectInstanceId; readonly mix: number }
+    >
+  | CommandEnvelope<
+      "effects-instance-gain-set",
+      { readonly effectInstanceId: EffectInstanceId; readonly gainDecibels: number }
     >
   | CommandEnvelope<
       "effects-instance-parameter-set",
