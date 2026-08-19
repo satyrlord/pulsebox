@@ -196,6 +196,8 @@ Control groups do not wrap to a second line. The groups are Sound, Voice when
 the module has voice controls, and Output. Each group has one disclosure
 control. A user can collapse or expand groups independently when the row does
 not fit. Keep Output at the right edge. Sound and Voice use the flexible lane.
+The Output group contains one icon-only `Bypass All` toggle for the module
+pedalboard. It is disabled when the pedalboard is empty.
 
 Group disclosure is transient component state. It does not enter project data,
 local storage, portable files, or Undo history. A collapsed group hides its
@@ -261,6 +263,7 @@ Each instrument has:
 - Per-module output level.
 - Mute and solo.
 - Rack-only pedalboard access.
+- One group bypass for all Rack FX in that pedalboard.
 - Metering.
 - Original visualization.
 - Full keyboard accessibility.

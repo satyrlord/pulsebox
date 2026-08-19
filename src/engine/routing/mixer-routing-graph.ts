@@ -238,6 +238,10 @@ export class MixerRoutingGraph {
     chain.setRuntimeParameter(EFFECT_TRANSPORT_TEMPO_PARAMETER, this.#transportTempo);
   }
 
+  setChannelEffectsBypassed(moduleId: ModuleInstanceId, bypassed: boolean): void {
+    this.#channels.get(moduleId)?.effects.setBypassed(bypassed);
+  }
+
   setChannelMix(
     moduleId: ModuleInstanceId,
     level: number,

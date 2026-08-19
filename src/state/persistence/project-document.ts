@@ -194,6 +194,8 @@ export interface EffectInstanceDocument {
 export interface ModuleChainDocument {
   readonly moduleId: string;
   readonly slots: readonly (string | null)[];
+  /** Absent only in early format-3 documents. */
+  readonly bypassed?: boolean;
 }
 
 export interface SendChainDocument {
@@ -212,6 +214,8 @@ export interface EffectsDocument {
   readonly instances: readonly EffectInstanceDocument[];
   readonly moduleChains: readonly ModuleChainDocument[];
   readonly sendChains: readonly SendChainDocument[];
+  /** Absent only in early format-3 documents. */
+  readonly sendEffectsBypassed?: boolean;
   readonly masterChain: MasterChainDocument;
   readonly masterEffectsBypassed: boolean;
 }
@@ -439,7 +443,11 @@ export function serializeProject(
           gainDecibels: instance.gainDecibels,
         })),
       moduleChains: Object.entries(project.effects.moduleChains)
-        .map(([moduleId, slots]) => ({ moduleId, slots: [...slots] }))
+        .map(([moduleId, chain]) => ({
+          moduleId,
+          slots: [...chain.slots],
+          bypassed: chain.bypassed,
+        }))
         .toSorted((left, right) => left.moduleId.localeCompare(right.moduleId)),
       sendChains: SEND_BUS_IDS.map((busId) => {
         const chain = project.effects.sendChains[busId];
@@ -454,6 +462,7 @@ export function serializeProject(
           pinnedEffectId: chain.pinnedEffectId,
         };
       }),
+      sendEffectsBypassed: project.effects.sendEffectsBypassed,
       masterChain: { slots: [...project.effects.masterChain] },
       masterEffectsBypassed: project.effects.masterEffectsBypassed,
     },
@@ -633,11 +642,12 @@ const EFFECTS_KEYS = new Set([
   "instances",
   "moduleChains",
   "sendChains",
+  "sendEffectsBypassed",
   "masterChain",
   "masterEffectsBypassed",
 ]);
 const EFFECT_INSTANCE_KEYS = new Set(["id", "pluginId", "stateVersion", "state", "bypassed", "mix", "gainDecibels"]);
-const MODULE_CHAIN_KEYS = new Set(["moduleId", "slots"]);
+const MODULE_CHAIN_KEYS = new Set(["moduleId", "slots", "bypassed"]);
 const SEND_CHAIN_KEYS = new Set(["busId", "slots", "returnLevel", "bypassed", "pinnedEffectId"]);
 const MASTER_CHAIN_KEYS = new Set(["slots"]);
 
@@ -1509,7 +1519,16 @@ function parseEffects(
       collector.add(`${path}.moduleId`, "Module chain must uniquely resolve to an occupied module.");
     else moduleChainIds.add(chain.moduleId);
     validateEffectSlots(chain.slots, MODULE_EFFECT_CHAIN_SLOT_COUNT, `${path}.slots`, "module-pedalboard", registerReference, collector);
-    if (typeof chain.moduleId === "string" && Array.isArray(chain.slots)) moduleChains.push({ moduleId: chain.moduleId, slots: chain.slots as readonly (string | null)[] });
+    if (chain.bypassed !== undefined && typeof chain.bypassed !== "boolean") {
+      collector.add(`${path}.bypassed`, "Module chain bypassed must be boolean.");
+    }
+    if (typeof chain.moduleId === "string" && Array.isArray(chain.slots)) {
+      moduleChains.push({
+        moduleId: chain.moduleId,
+        slots: chain.slots as readonly (string | null)[],
+        bypassed: chain.bypassed === true,
+      });
+    }
   }
   for (const moduleId of occupiedModules.keys()) if (!moduleChainIds.has(moduleId)) collector.add("effects.moduleChains", `Missing module chain for ${moduleId}.`);
 
@@ -1546,6 +1565,15 @@ function parseEffects(
       if (limiter?.pluginId !== PROTECTED_LIMITER_EFFECT_PLUGIN_ID) collector.add("effects.masterChain.slots", "The final master slot must be the protected limiter.");
     }
   }
+  if (
+    value.sendEffectsBypassed !== undefined &&
+    typeof value.sendEffectsBypassed !== "boolean"
+  ) {
+    collector.add(
+      "effects.sendEffectsBypassed",
+      "All send effects bypassed must be boolean.",
+    );
+  }
   if (typeof value.masterEffectsBypassed !== "boolean") collector.add("effects.masterEffectsBypassed", "Master effects bypassed must be boolean.");
 
   for (const instance of instances) {
@@ -1560,7 +1588,14 @@ function parseEffects(
     }
   }
   return {
-    document: { instances, moduleChains, sendChains, masterChain, masterEffectsBypassed: value.masterEffectsBypassed === true },
+    document: {
+      instances,
+      moduleChains,
+      sendChains,
+      sendEffectsBypassed: value.sendEffectsBypassed === true,
+      masterChain,
+      masterEffectsBypassed: value.masterEffectsBypassed === true,
+    },
     referencedPluginIds: new Set(instances.map((instance) => instance.pluginId)),
   };
 }
@@ -1578,7 +1613,14 @@ function validateEffectSlots(
 }
 
 function emptyEffectsDocument(): EffectsDocument {
-  return { instances: [], moduleChains: [], sendChains: [], masterChain: { slots: [] }, masterEffectsBypassed: false };
+  return {
+    instances: [],
+    moduleChains: [],
+    sendChains: [],
+    sendEffectsBypassed: false,
+    masterChain: { slots: [] },
+    masterEffectsBypassed: false,
+  };
 }
 
 function validateEffectState(
@@ -3078,7 +3120,12 @@ function effectsStateFromDocument(document: EffectsDocument): EffectsState {
     instances: Object.freeze(instances),
     moduleChains: Object.freeze(Object.fromEntries(document.moduleChains.map((chain) => [
       chain.moduleId as ModuleInstanceId,
-      Object.freeze(chain.slots.map((id) => id === null ? null : id as EffectInstanceId)),
+      Object.freeze({
+        slots: Object.freeze(
+          chain.slots.map((id) => id === null ? null : id as EffectInstanceId),
+        ),
+        bypassed: chain.bypassed === true,
+      }),
     ]))),
     sendChains: Object.freeze(Object.fromEntries(document.sendChains.map((chain) => [
       chain.busId,
@@ -3089,6 +3136,7 @@ function effectsStateFromDocument(document: EffectsDocument): EffectsState {
         pinnedEffectId: chain.pinnedEffectId === null ? null : chain.pinnedEffectId as EffectInstanceId,
       }),
     ]))) as EffectsState["sendChains"],
+    sendEffectsBypassed: document.sendEffectsBypassed === true,
     masterChain: Object.freeze(document.masterChain.slots.map((id) => id === null ? null : id as EffectInstanceId)),
     masterEffectsBypassed: document.masterEffectsBypassed,
   });

@@ -22,6 +22,7 @@ import {
   SEND_EFFECT_CHAIN_SLOT_COUNT,
   type EffectInstanceState,
   type EffectsState,
+  type ModuleEffectChainState,
 } from "../contracts/effects";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
 import type {
@@ -226,9 +227,12 @@ function createInitialEffectsState(
   modules: readonly RackModuleState[],
   createEffectInstance: DefaultEffectInstanceFactory | undefined,
 ): EffectsState {
-  const moduleChains: Record<ModuleInstanceId, readonly null[]> = {};
+  const moduleChains: Record<ModuleInstanceId, ModuleEffectChainState> = {};
   for (const module of modules) {
-    moduleChains[module.id] = Object.freeze(Array.from({ length: MODULE_EFFECT_CHAIN_SLOT_COUNT }, () => null));
+    moduleChains[module.id] = Object.freeze({
+      slots: Object.freeze(Array.from({ length: MODULE_EFFECT_CHAIN_SLOT_COUNT }, () => null)),
+      bypassed: false,
+    });
   }
   const instances: Record<string, EffectInstanceState> = {};
   const sendChains = Object.fromEntries(SEND_BUS_IDS.map((sendBusId) => {
@@ -252,6 +256,7 @@ function createInitialEffectsState(
     instances: Object.freeze(instances),
     moduleChains: Object.freeze(moduleChains),
     sendChains: Object.freeze(sendChains),
+    sendEffectsBypassed: false,
     masterChain: Object.freeze([
       ...masterIds.slice(0, -1),
       ...Array.from({ length: MASTER_EFFECT_CHAIN_SLOT_COUNT - masterIds.length }, () => null),

@@ -35,8 +35,9 @@ The specification 007 mixer and effects slice is also runnable. It includes
 eight fixed instrument strips, four send chains, module pedalboards, the master
 chain, and the complete effect catalog, including the protected master-chain
 limiter. The fixed main path and A–D channel sends are implemented. Project
-state retains routing, effect instances, pinned send focus, and master-effects
-bypass.
+state retains routing, effect instances, pinned send focus, Rack FX group
+bypass, Send FX group bypass, and master-effects bypass. The Rack Output group
+and Mixer use icon-only controls for their group bypasses.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications

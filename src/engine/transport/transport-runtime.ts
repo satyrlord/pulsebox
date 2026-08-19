@@ -53,6 +53,7 @@ export interface TransportModule {
   readonly pluginId: PluginId;
   readonly parameters: Readonly<Record<string, ParameterValue>>;
   readonly effects?: readonly RoutingEffectInstance[];
+  readonly effectsBypassed?: boolean;
   /** One event part per project Pattern slot. */
   readonly parts: readonly PatternPartView[];
   readonly mix: TransportModuleMix;
@@ -686,6 +687,15 @@ export class TransportRuntime {
         this.#setRevision(delta.projectRevision);
         const audioScope = delta.payload.audioScope;
         if (audioScope === "none") return;
+        if (audioScope === "send-all") {
+          const routing = this.#routing;
+          const projection = this.#routingProjection;
+          if (routing === undefined || projection === undefined) return;
+          for (const send of projection.sends) {
+            routing.setSendEffectsBypassed(send.busId, send.effectsBypassed);
+          }
+          return;
+        }
         if (audioScope === "module") {
           if (moduleProjection === undefined) {
             throw new Error("A module effect update requires its bounded module projection.");
@@ -756,10 +766,17 @@ export class TransportRuntime {
         }
 
         if (audioScope === "module" && moduleProjection !== undefined) {
+          if (typeof delta.payload.bypassed === "boolean") {
+            this.#routing?.setChannelEffectsBypassed(
+              moduleProjection.id,
+              delta.payload.bypassed,
+            );
+            return;
+          }
           await this.#routing?.setChannelEffects(
             moduleProjection.id,
             moduleProjection.effects ?? [],
-            false,
+            moduleProjection.effectsBypassed ?? false,
           );
           return;
         }
@@ -1871,7 +1888,7 @@ export class TransportRuntime {
       solo: module.mix.solo,
       sends: module.mix.sends ?? [],
       effects: module.effects ?? [],
-      effectsBypassed: false,
+      effectsBypassed: module.effectsBypassed ?? false,
     });
   }
 

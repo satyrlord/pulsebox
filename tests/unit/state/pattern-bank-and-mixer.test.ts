@@ -360,7 +360,7 @@ describe("mixer commands", () => {
       effectPluginId: "module-effect" as PluginId,
     })).status).toBe("accepted");
     const effectId = requiredEffectId(
-      store.getState().project.effects.moduleChains[moduleId]?.find((id) => id !== null),
+      store.getState().project.effects.moduleChains[moduleId]?.slots.find((id) => id !== null),
     );
     expect(store.dispatch(store.createCommand("automation-lane-steps-set", {
       patternId: verseId,
@@ -427,7 +427,7 @@ describe("mixer commands", () => {
       effectPluginId: "module-effect" as PluginId,
     })).status).toBe("accepted");
     const effectId = requiredEffectId(
-      store.getState().project.effects.moduleChains[targetModuleId]?.find((id) => id !== null),
+      store.getState().project.effects.moduleChains[targetModuleId]?.slots.find((id) => id !== null),
     );
     store.dispatch(store.createCommand("piano-roll-automation-target-set", {
       target: { scope: "effect", targetId: effectId, parameterId: "mix" },
@@ -457,6 +457,55 @@ describe("mixer commands", () => {
     expect(store.getState().project.effects.masterEffectsBypassed).toBe(true);
     expect(store.undo().status).toBe("accepted");
     expect(store.getState().project.effects.masterEffectsBypassed).toBe(false);
+  });
+
+  it("toggles Rack FX and all Send FX as independent group overrides", () => {
+    const { store, moduleId } = effectHarness();
+    expect(
+      store.dispatch(
+        store.createCommand("effects-chain-effect-add", {
+          chain: { scope: "module", targetId: moduleId },
+          effectPluginId: "module-effect" as PluginId,
+        }),
+      ).status,
+    ).toBe("accepted");
+    const rackEffectId = requiredEffectId(
+      store.getState().project.effects.moduleChains[moduleId]?.slots[0],
+    );
+    store.dispatch(
+      store.createCommand("effects-instance-bypass-set", {
+        effectInstanceId: rackEffectId,
+        bypassed: true,
+      }),
+    );
+    const sendA = required(SEND_BUS_IDS[0]);
+    store.dispatch(
+      store.createCommand("effects-send-chain-bypass-set", {
+        sendBusId: sendA,
+        bypassed: true,
+      }),
+    );
+
+    expect(
+      store.dispatch(
+        store.createCommand("effects-module-chain-bypass-toggle", { moduleId }),
+      ).status,
+    ).toBe("accepted");
+    expect(store.getState().project.effects.moduleChains[moduleId]?.bypassed).toBe(true);
+    expect(store.getState().project.effects.instances[rackEffectId]?.bypassed).toBe(true);
+    expect(store.undo().status).toBe("accepted");
+    expect(store.getState().project.effects.moduleChains[moduleId]?.bypassed).toBe(false);
+    expect(store.redo().status).toBe("accepted");
+    expect(store.getState().project.effects.moduleChains[moduleId]?.bypassed).toBe(true);
+
+    expect(
+      store.dispatch(store.createCommand("effects-send-all-bypass-toggle", {})).status,
+    ).toBe("accepted");
+    expect(store.getState().project.effects.sendEffectsBypassed).toBe(true);
+    expect(store.getState().project.effects.sendChains[sendA]?.bypassed).toBe(true);
+    expect(store.undo().status).toBe("accepted");
+    expect(store.getState().project.effects.sendEffectsBypassed).toBe(false);
+    expect(store.getState().project.effects.sendChains[sendA]?.bypassed).toBe(true);
   });
 
   it("appends a send effect and reorders it by stable effect ID", () => {

@@ -13,6 +13,9 @@ export function toTransportDelta(
     if (delta.payload.audioUnchanged === true) {
       return { ...delta, payload: { ...delta.payload, audioScope: "none" } };
     }
+    if (typeof delta.payload.sendEffectsBypassed === "boolean") {
+      return { ...delta, payload: { ...delta.payload, audioScope: "send-all" } };
+    }
     const chain = readEffectChain(delta.payload.chain);
     if (chain?.scope === "module") {
       return {
@@ -25,12 +28,21 @@ export function toTransportDelta(
       };
     }
     if (chain?.scope === "send") {
+      const send = state.project.effects.sendChains[chain.targetId];
       return {
         ...delta,
         payload: {
           ...delta.payload,
           audioScope: "send",
           sendBusId: chain.targetId,
+          ...(typeof delta.payload.bypassed === "boolean" &&
+            typeof delta.payload.effectId !== "string" &&
+            send !== undefined
+            ? {
+                bypassed:
+                  state.project.effects.sendEffectsBypassed || send.bypassed,
+              }
+            : {}),
         },
       };
     }

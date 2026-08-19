@@ -405,12 +405,52 @@
 
 /* Three peer views, so three equal tabs seated in their own recess. The
    selected tab rises out of it and lights its lower edge. */
-.studioTabs {
+.studioHeader {
   flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+}
+
+.studioTabs {
+  flex: 1;
+  min-inline-size: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 3px;
+}
+
+.studioBypassAll {
+  flex: 0 0 30px;
+  align-self: center;
+  inline-size: 30px;
+  block-size: 30px;
+  margin-inline-end: 3px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: linear-gradient(180deg, var(--metal-skirt-a), var(--metal-skirt-b));
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 0 0 1px var(--edge-hairline),
+    0 1px 2px var(--edge-shadow);
+}
+
+.studioBypassAll svg {
+  inline-size: 18px;
+  block-size: 18px;
+}
+
+.studioBypassAll[data-bypassed="true"] {
+  color: var(--pulse-color-on-accent, #07110b);
+  background: var(--accent-lamp);
+  box-shadow:
+    inset 0 0 0 2px var(--pulse-color-on-accent, #07110b),
+    0 0 0 1px var(--pulse-color-border-strong, #aab4bc),
+    0 1px 2px var(--edge-shadow);
 }
 
 .studioTabs button {

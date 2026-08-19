@@ -261,6 +261,11 @@ export type PulseCommand =
       { readonly sendBusId: SendBusId; readonly bypassed: boolean }
     >
   | CommandEnvelope<
+      "effects-module-chain-bypass-toggle",
+      { readonly moduleId: ModuleInstanceId }
+    >
+  | CommandEnvelope<"effects-send-all-bypass-toggle", Record<string, never>>
+  | CommandEnvelope<
       "effects-send-focus-set",
       { readonly sendBusId: SendBusId; readonly effectInstanceId: EffectInstanceId | null }
     >

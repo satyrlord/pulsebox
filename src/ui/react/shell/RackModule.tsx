@@ -8,6 +8,7 @@ import type {
 } from "../../../contracts";
 import type { RackModuleState } from "../../../state/public";
 import { AuditionButton } from "../controls/AuditionButton";
+import { BypassAllIcon } from "../controls/BypassAllIcon";
 import { Knob } from "../controls/Knob";
 import { LevelMeter } from "../controls/LevelMeter";
 import { PopupMenu, type PopupMenuItem } from "../controls/PopupMenu";
@@ -139,6 +140,9 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
   const commitParameter = useAppStore((state) => state.commitParameter);
   const previewParameter = useAppStore((state) => state.previewParameter);
   const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
+  const toggleModuleEffectsBypass = useAppStore(
+    (state) => state.toggleModuleEffectsBypass,
+  );
   const moduleChain = useAppStore((state) =>
     module === undefined ? undefined : state.project.project.effects.moduleChains[module.id],
   );
@@ -175,6 +179,7 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
   }
 
   const selected = module.id === selectedModuleId;
+  const hasModuleEffects = moduleChain?.slots.some((effectId) => effectId !== null) ?? false;
   const voices = manifest.kind === "instrument" ? manifest.voices : [];
   const selectedVoiceId = selectedVoice ?? voices[0]?.id;
   const compact = manifest.ui.compactControls
@@ -493,6 +498,24 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
           <ModuleLevelMeter moduleId={module.id} productName={manifest.productName} />
           <button
             type="button"
+            className={`${styles.action} ${styles.bypassAll}`}
+            aria-label={`Bypass all Rack FX for ${manifest.productName}`}
+            aria-pressed={moduleChain?.bypassed ?? false}
+            data-bypassed={moduleChain?.bypassed ?? false}
+            disabled={!hasModuleEffects}
+            title={
+              hasModuleEffects
+                ? moduleChain?.bypassed === true
+                  ? `Enable all Rack FX for ${manifest.productName}.`
+                  : `Bypass all Rack FX for ${manifest.productName}.`
+                : `${manifest.productName} has no Rack FX to bypass.`
+            }
+            onClick={() => toggleModuleEffectsBypass(module.id)}
+          >
+            <BypassAllIcon />
+          </button>
+          <button
+            type="button"
             className={styles.action}
             disabled={moduleChain === undefined}
             onClick={() => setEffectsOpen(true)}
@@ -538,7 +561,7 @@ export const RackModule = memo(function RackModule(props: RackModuleProps) {
         <EffectEditor
           chain={{ scope: "module", targetId: module.id }}
           title={`${manifest.productName} pedalboard`}
-          slots={moduleChain}
+          slots={moduleChain.slots}
           onClose={() => setEffectsOpen(false)}
         />
       ) : null}

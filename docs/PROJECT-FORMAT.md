@@ -399,6 +399,8 @@ absent.
 - one ordered module chain per occupied module.
 - four ordered send chains.
 - one ordered master chain.
+- one `bypassed` boolean for each module chain.
+- one `sendEffectsBypassed` boolean for all four send chains.
 - one `masterEffectsBypassed` boolean.
 - the pinned compact-focus instance for each send chain or `null`.
 
@@ -411,9 +413,17 @@ through D. An effect can appear only in a chain allowed by its manifest. The
 master chain must end with the protected limiter, whose only placement is
 `master-chain`. Cycles, feedback edges, unknown destinations, a missing
 protected final limiter, or more slots than the owning chain contract permits
-are structural errors. `masterEffectsBypassed` bypasses the user master effects
+are structural errors. A module-chain `bypassed` value switches around the
+complete pedalboard. `sendEffectsBypassed` switches around all four send chains.
+Both group values preserve the bypass state of each effect or send chain.
+`masterEffectsBypassed` bypasses the user master effects
 before the protected limiter. It never bypasses master gain or the limiter and
 is independent of the limiter instance's own bypass.
+
+Early format-3 documents can omit the module-chain `bypassed` values and
+`sendEffectsBypassed`. The reader resolves each absent value to `false`. New
+documents always write both fields. This compatible addition keeps format
+version 3 and protects existing local autosaves.
 
 ### 5.8 Extensions
 

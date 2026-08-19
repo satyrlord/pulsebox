@@ -128,4 +128,65 @@ describe("audio delta projection", () => {
         .kind,
     ).toBe("project-replace");
   });
+
+  it("projects the group bypass overrides without rebuilding unrelated audio", () => {
+    if (firstModule === undefined) throw new Error("Expected default content.");
+    const sendBusId = "send-a" as SendBusId;
+    const bypassedState = {
+      ...state,
+      project: {
+        ...state.project,
+        effects: { ...state.project.effects, sendEffectsBypassed: true },
+      },
+    };
+
+    expect(
+      toTransportDelta(
+        delta(bypassedState, "module-effects-set", { sendEffectsBypassed: true }),
+        bypassedState,
+      ).payload,
+    ).toEqual(expect.objectContaining({ audioScope: "send-all" }));
+    expect(
+      toTransportDelta(
+        delta(bypassedState, "module-effects-set", {
+          bypassed: false,
+          chain: { scope: "send", targetId: sendBusId },
+        }),
+        bypassedState,
+      ).payload,
+    ).toEqual(
+      expect.objectContaining({ audioScope: "send", sendBusId, bypassed: true }),
+    );
+    expect(
+      toTransportDelta(
+        delta(state, "module-effects-set", {
+          bypassed: true,
+          chain: { scope: "module", targetId: firstModule },
+        }),
+        state,
+      ).payload,
+    ).toEqual(
+      expect.objectContaining({
+        audioScope: "module",
+        moduleId: firstModule,
+        bypassed: true,
+      }),
+    );
+    expect(
+      toTransportDelta(
+        delta(bypassedState, "module-effects-set", {
+          effectId: "20000000-0000-4000-8000-000000000001",
+          bypassed: false,
+          chain: { scope: "send", targetId: sendBusId },
+        }),
+        bypassedState,
+      ).payload,
+    ).toEqual(
+      expect.objectContaining({
+        audioScope: "send",
+        sendBusId,
+        bypassed: false,
+      }),
+    );
+  });
 });

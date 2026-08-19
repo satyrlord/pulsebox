@@ -23,6 +23,12 @@ export interface EffectInstanceState {
 /** A chain keeps its fixed slots so reordering never changes effect identity. */
 export type EffectChainSlots = readonly (EffectInstanceId | null)[];
 
+export interface ModuleEffectChainState {
+  readonly slots: EffectChainSlots;
+  /** Bypasses the complete pedalboard without changing any pedal bypass state. */
+  readonly bypassed: boolean;
+}
+
 export interface SendEffectChainState {
   readonly slots: EffectChainSlots;
   /** Return level from silence through unity. This is not an effect Mix value. */
@@ -70,9 +76,11 @@ export const DEFAULT_MASTER_EFFECT_PLUGIN_IDS = Object.freeze([
 export interface EffectsState {
   readonly instances: Readonly<Record<EffectInstanceId, EffectInstanceState>>;
   /** Eight fixed pedalboard slots exist for every loaded module. */
-  readonly moduleChains: Readonly<Record<ModuleInstanceId, EffectChainSlots>>;
+  readonly moduleChains: Readonly<Record<ModuleInstanceId, ModuleEffectChainState>>;
   /** The four fixed send paths each have an independently focused return chain. */
   readonly sendChains: Readonly<Record<SendBusId, SendEffectChainState>>;
+  /** Bypasses all four send chains without changing their individual bypass states. */
+  readonly sendEffectsBypassed: boolean;
   /** The final non-null slot is the protected limiter. */
   readonly masterChain: EffectChainSlots;
   /** Bypasses user master effects but never master gain or the final limiter. */

@@ -53,6 +53,7 @@ The established visible mixer contains:
 - Module short label.
 - Selection state.
 - A clear indicator when any send is active.
+- One icon-only `Bypass All` toggle for all Send FX in the Mixer view header.
 
 A fader or pan move is audible while the gesture is in progress. The engine
 ramps the live channel value during the drag. One command commits the final
@@ -127,6 +128,18 @@ Approved hierarchy:
 - Four send-bus chains.
 - One master chain with at least six slots.
 
+Each loaded rack faceplate exposes one icon-only `Bypass All` toggle in its
+Output group. It bypasses that module's complete pedalboard. The Mixer view
+header exposes one icon-only `Bypass All` toggle that bypasses all four send
+chains. The controls preserve every per-effect and per-send-chain bypass state.
+Turning a group override off restores those states.
+
+Each group override is project-owned, undoable in one step, and playback-safe.
+It uses the same click-safe chain switch as the individual chain bypass. It is
+a command, not an automation parameter, and creates no automation lane. Each
+icon-only button has an accessible label, a plain tooltip, `aria-pressed`, and
+a non-color pressed-state boundary.
+
 Each compact A–D card summarizes one modular send-bus chain. It shows the
 primary effect, up to four macros, chain count, bypass state, activity, Edit control,
 and circular Return Level control.
@@ -181,6 +194,9 @@ an equal-power Mix to combine the stage input with its effect result, applies
 its post-mix Gain, and sends that result to the next stage. There is no
 chain-wide Mix or continuously summed chain-wide dry copy. A click-free chain
 bypass can switch to dry at unity.
+
+The module `Bypass All` override switches around the complete pedalboard at
+unity. It does not change the bypass state of any pedal.
 
 After the pedalboard, the channel gate feeds the fixed pre-fader A-D send taps.
 The dry channel then continues through its fader and pan to the master chain.
@@ -288,6 +304,8 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
 - No click or dropout while reordering.
 - Stable effect IDs.
 - Automation follows the effect instance when moved.
+- The Output-group `Bypass All` toggle bypasses the complete pedalboard and
+  preserves every pedal bypass state.
 
 ### 20.5 Send buses
 
@@ -304,6 +322,8 @@ Edit opens the established 760 × 680 detailed editor without stopping playback.
   view.
 - Routing prevents feedback loops.
 - Send return level is automatable.
+- The Mixer `Bypass All` toggle bypasses all four send chains and preserves
+  each chain's own bypass state.
 
 ### 20.6 Master chain
 

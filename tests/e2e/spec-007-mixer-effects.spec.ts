@@ -723,6 +723,53 @@ test("keeps the pedalboard in the instrument rack", async ({ page }) => {
   await expect(page.getByText("This pedalboard processes only this instrument before its mixer channel.")).toBeVisible();
 });
 
+test("bypasses all Rack FX and Send FX with icon-only group controls", async ({ page }) => {
+  const studio = await openStudio(page, "Mixer");
+  const rackModule = page
+    .locator('[data-component="rack-module"][data-label="Silver Serpent"]')
+    .first();
+  const rackBypass = rackModule.getByRole("button", {
+    name: "Bypass all Rack FX for Silver Serpent",
+  });
+  await expect(rackBypass).toBeDisabled();
+  await expect(rackBypass.locator('[data-component="bypass-all-icon"]')).toHaveCount(1);
+  await expect(rackBypass).toHaveText("");
+
+  await rackModule.getByRole("button", { name: "Effects", exact: true }).click();
+  const editor = page.locator('[data-component="effect-editor"]');
+  await editor
+    .getByRole("combobox", { name: "Add an effect to Silver Serpent pedalboard" })
+    .selectOption({ label: "Chorus" });
+  await page.keyboard.press("Escape");
+  await expect(rackBypass).toBeEnabled();
+  await rackBypass.click();
+  await expect(rackBypass).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(rackBypass).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(rackBypass).toHaveAttribute("aria-pressed", "true");
+
+  const sendBypass = studio.getByRole("button", { name: "Bypass all Send FX" });
+  await expect(sendBypass.locator('[data-component="bypass-all-icon"]')).toHaveCount(1);
+  await expect(sendBypass).toHaveText("");
+  await sendBypass.click();
+  await expect(sendBypass).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(sendBypass).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(sendBypass).toHaveAttribute("aria-pressed", "true");
+
+  await waitForAutosaveValue(page, '"sendEffectsBypassed":true');
+  await page.reload();
+  const reloadedStudio = await openStudio(page, "Mixer");
+  await expect(
+    reloadedStudio.getByRole("button", { name: "Bypass all Send FX" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Bypass all Rack FX for Silver Serpent" }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
 test("keeps the protected limiter and makes master-effects bypass undoable and persistent", async ({
   page,
 }) => {

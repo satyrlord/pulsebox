@@ -438,6 +438,8 @@ export interface AppState {
     gestureId?: GestureId,
   ) => void;
   readonly setSendChainBypassed: (sendBusId: SendBusId, bypassed: boolean) => void;
+  readonly toggleModuleEffectsBypass: (moduleId: ModuleInstanceId) => void;
+  readonly toggleAllSendEffectsBypass: () => void;
   readonly setSendFocus: (sendBusId: SendBusId, effectInstanceId: EffectInstanceId | null) => void;
   readonly toggleMasterEffectsBypass: () => void;
   readonly openExternalAutomationTarget: (target: ExternalAutomationTarget) => void;
@@ -1117,6 +1119,14 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
 
     setSendChainBypassed: (sendBusId, bypassed) => {
       store.dispatch(store.createCommand("effects-send-chain-bypass-set", { sendBusId, bypassed }));
+    },
+
+    toggleModuleEffectsBypass: (moduleId) => {
+      store.dispatch(store.createCommand("effects-module-chain-bypass-toggle", { moduleId }));
+    },
+
+    toggleAllSendEffectsBypass: () => {
+      store.dispatch(store.createCommand("effects-send-all-bypass-toggle", {}));
     },
 
     setSendFocus: (sendBusId, effectInstanceId) => {

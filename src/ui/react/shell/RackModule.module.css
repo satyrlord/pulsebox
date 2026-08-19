@@ -302,6 +302,28 @@
   filter: none;
 }
 
+.bypassAll {
+  inline-size: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.bypassAll svg {
+  inline-size: 17px;
+  block-size: 17px;
+}
+
+.bypassAll[data-bypassed="true"] {
+  color: var(--pulse-color-on-accent, #07110b);
+  background: var(--k);
+  box-shadow:
+    inset 0 0 0 2px var(--pulse-color-on-accent, #07110b),
+    0 0 0 1px var(--edge-hairline),
+    0 1px 2px #00000080;
+  filter: none;
+}
+
 .voiceSelector,
 .enumControl {
   position: relative;

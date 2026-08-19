@@ -651,11 +651,13 @@ function patternIndexFor(state: Readonly<PulseState>, patternId: string): number
 }
 
 function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): TransportModule {
+  const effectChain = state.project.effects.moduleChains[module.id];
   return {
     id: module.id,
     pluginId: module.pluginId,
     parameters: module.parameters,
-    effects: resolveEffectChain(state, state.project.effects.moduleChains[module.id] ?? []),
+    effects: resolveEffectChain(state, effectChain?.slots ?? []),
+    effectsBypassed: effectChain?.bypassed ?? false,
     parts: state.project.patterns.map((pattern) => {
       const part = pattern.parts[module.id];
       return part === undefined
@@ -699,7 +701,7 @@ function toAudioRouting(state: Readonly<PulseState>): TransportRoutingProjection
     busId: busId as SendBusId,
     returnLevel: chain.returnLevel,
     effects: resolveEffectChain(state, chain.slots),
-    effectsBypassed: chain.bypassed,
+    effectsBypassed: state.project.effects.sendEffectsBypassed || chain.bypassed,
   }));
   const masterEffects = resolveEffectChain(state, state.project.effects.masterChain);
   const limiter = masterEffects.at(-1);

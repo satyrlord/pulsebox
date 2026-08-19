@@ -109,6 +109,22 @@ describe("mixer routing graph", () => {
     graph.dispose();
   });
 
+  it("switches a complete module effect chain without rebuilding it", () => {
+    const stub = context();
+    const graph = new MixerRoutingGraph(stub.result, undefined, FIRST);
+    const gainCount = stub.gains.length;
+
+    graph.setChannelEffectsBypassed(FIRST, true);
+
+    expect(stub.gains).toHaveLength(gainCount);
+    expect(
+      stub.gains.some((gain) =>
+        gain.gain.linearRampToValueAtTime.mock.calls.some(([value]) => value === 1),
+      ),
+    ).toBe(true);
+    graph.dispose();
+  });
+
   it("ramps fixed pre-fader sends on stable nodes", async () => {
     const stub = context();
     const graph = new MixerRoutingGraph(stub.result, undefined, FIRST);

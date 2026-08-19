@@ -126,6 +126,8 @@ describe("mixer and effects project document", () => {
       "send-d",
     ]);
     expect(written.effects.sendChains).toHaveLength(4);
+    expect(written.effects.moduleChains.every((chain) => chain.bypassed === false)).toBe(true);
+    expect(written.effects.sendEffectsBypassed).toBe(false);
     expect(written.effects.masterChain.slots).toHaveLength(6);
     expect(written.effects.instances.every((effect) => "mix" in effect && "gainDecibels" in effect)).toBe(true);
     expect(written.effects.instances.every((effect) => !("wetDry" in effect))).toBe(true);
@@ -136,7 +138,49 @@ describe("mixer and effects project document", () => {
     const restored = documentToState(parsed.value, createDefaultState(ids(), undefined, () => TIMESTAMP));
     expect(restored.project.masterLevel).toBe(written.mixer.master.level);
     expect(restored.project.effects.masterChain).toHaveLength(6);
+    expect(Object.values(restored.project.effects.moduleChains).every((chain) => !chain.bypassed)).toBe(true);
+    expect(restored.project.effects.sendEffectsBypassed).toBe(false);
     expect(restored.project.effects.masterEffectsBypassed).toBe(false);
+  });
+
+  it("reads and writes the group bypass overrides without changing local bypass state", () => {
+    const written = structuredClone(document());
+    const moduleChain = written.effects.moduleChains[0];
+    const sendChain = written.effects.sendChains[0];
+    if (moduleChain === undefined || sendChain === undefined) {
+      throw new Error("Expected effect-chain fixtures.");
+    }
+    (moduleChain as { bypassed: boolean }).bypassed = true;
+    (written.effects as { sendEffectsBypassed: boolean }).sendEffectsBypassed = true;
+    (sendChain as { bypassed: boolean }).bypassed = true;
+
+    const parsed = parseProjectDocument(written, PARSE_OPTIONS);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    const restored = documentToState(
+      parsed.value,
+      createDefaultState(ids(), undefined, () => TIMESTAMP),
+    );
+    const restoredModuleId = restored.project.rackSlots.find(
+      (slot) => slot.moduleId !== undefined,
+    )?.moduleId;
+    if (restoredModuleId === undefined) throw new Error("Expected a restored module.");
+    expect(restored.project.effects.moduleChains[restoredModuleId]?.bypassed).toBe(true);
+    expect(restored.project.effects.sendEffectsBypassed).toBe(true);
+    expect(restored.project.effects.sendChains["send-a" as never]?.bypassed).toBe(true);
+
+    const earlyFormatThree = structuredClone(document());
+    for (const chain of earlyFormatThree.effects.moduleChains) {
+      delete (chain as { bypassed?: boolean }).bypassed;
+    }
+    delete (earlyFormatThree.effects as { sendEffectsBypassed?: boolean }).sendEffectsBypassed;
+    const legacyParsed = parseProjectDocument(earlyFormatThree, PARSE_OPTIONS);
+    if (!legacyParsed.ok) throw new Error(JSON.stringify(legacyParsed.issues));
+    const legacyState = documentToState(
+      legacyParsed.value,
+      createDefaultState(ids(), undefined, () => TIMESTAMP),
+    );
+    expect(Object.values(legacyState.project.effects.moduleChains).every((chain) => !chain.bypassed)).toBe(true);
+    expect(legacyState.project.effects.sendEffectsBypassed).toBe(false);
   });
 
   it("round-trips every external automation scope", () => {

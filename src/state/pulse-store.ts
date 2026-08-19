@@ -9,6 +9,7 @@ import type {
   EffectChainSlots,
   EffectInstanceState,
   EffectsState,
+  ModuleEffectChainState,
 } from "../contracts/effects";
 import {
   EFFECT_GAIN_MAXIMUM_DECIBELS,
@@ -569,6 +570,10 @@ export class PulseStore {
         return this.#setSendReturnLevel(command.payload.sendBusId, command.payload.returnLevel);
       case "effects-send-chain-bypass-set":
         return this.#setSendChainBypass(command.payload.sendBusId, command.payload.bypassed);
+      case "effects-module-chain-bypass-toggle":
+        return this.#toggleModuleChainBypass(command.payload.moduleId);
+      case "effects-send-all-bypass-toggle":
+        return this.#toggleAllSendEffectsBypass();
       case "effects-send-focus-set":
         return this.#setSendFocus(command.payload.sendBusId, command.payload.effectInstanceId);
       case "effects-master-bypass-toggle":
@@ -1491,6 +1496,49 @@ export class PulseStore {
     );
   }
 
+  #toggleModuleChainBypass(moduleId: ModuleInstanceId) {
+    const chain = this.#state.project.effects.moduleChains[moduleId];
+    if (chain === undefined) {
+      return {
+        error: rejected(
+          "payload.moduleId",
+          "Module effect chain does not exist.",
+          "Choose a loaded rack module.",
+        ),
+      };
+    }
+    const nextChain = { ...chain, bypassed: !chain.bypassed };
+    const effects = {
+      ...this.#state.project.effects,
+      moduleChains: {
+        ...this.#state.project.effects.moduleChains,
+        [moduleId]: nextChain,
+      },
+    };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [moduleId],
+      {
+        bypassed: nextChain.bypassed,
+        chain: { scope: "module", targetId: moduleId },
+      },
+    );
+  }
+
+  #toggleAllSendEffectsBypass() {
+    const effects = {
+      ...this.#state.project.effects,
+      sendEffectsBypassed: !this.#state.project.effects.sendEffectsBypassed,
+    };
+    return this.#projectTransition(
+      { ...this.#state.project, effects },
+      "module-effects-set",
+      [...SEND_BUS_IDS],
+      { sendEffectsBypassed: effects.sendEffectsBypassed },
+    );
+  }
+
   #toggleMasterEffectsBypass() {
     const effects = { ...this.#state.project.effects, masterEffectsBypassed: !this.#state.project.effects.masterEffectsBypassed };
     return this.#projectTransition(
@@ -1646,7 +1694,7 @@ export class PulseStore {
       Object.entries(this.#state.project.modules).filter(([id]) => id !== moduleId),
     ) as Readonly<Record<ModuleInstanceId, RackModuleState>>;
     const removedEffectIds = new Set(
-      (this.#state.project.effects.moduleChains[moduleId] ?? []).filter(
+      (this.#state.project.effects.moduleChains[moduleId]?.slots ?? []).filter(
         (effectId): effectId is EffectInstanceId => effectId !== null,
       ),
     );
@@ -1818,11 +1866,16 @@ export class PulseStore {
   ): EffectsState {
     const instances: Record<EffectInstanceId, EffectInstanceState> = { ...effects.instances };
     const sourceChain = effects.moduleChains[sourceModuleId];
-    const moduleChains: Record<ModuleInstanceId, EffectChainSlots> = { ...effects.moduleChains };
+    const moduleChains: Record<ModuleInstanceId, ModuleEffectChainState> = {
+      ...effects.moduleChains,
+    };
     if (sourceChain === undefined) {
-      moduleChains[targetModuleId] = Array.from({ length: 8 }, () => null);
+      moduleChains[targetModuleId] = {
+        slots: Array.from({ length: 8 }, () => null),
+        bypassed: false,
+      };
     } else {
-      const clonedSlots = sourceChain.map((sourceEffectId) => {
+      const clonedSlots = sourceChain.slots.map((sourceEffectId) => {
         if (sourceEffectId === null) return null;
         const sourceEffect = effects.instances[sourceEffectId];
         if (sourceEffect === undefined) return null;
@@ -1830,7 +1883,7 @@ export class PulseStore {
         instances[cloneId] = { ...sourceEffect, id: cloneId, state: { ...sourceEffect.state } };
         return cloneId;
       });
-      moduleChains[targetModuleId] = clonedSlots;
+      moduleChains[targetModuleId] = { slots: clonedSlots, bypassed: sourceChain.bypassed };
     }
     return {
       ...effects,
@@ -2951,15 +3004,20 @@ function sameProjectContent(left: ProjectState, right: ProjectState): boolean {
 
 function withModuleEffectChain(effects: EffectsState, moduleId: ModuleInstanceId): EffectsState {
   const moduleChains = effects.moduleChains[moduleId] === undefined
-    ? { ...effects.moduleChains, [moduleId]: Array.from({ length: 8 }, () => null) }
+    ? {
+        ...effects.moduleChains,
+        [moduleId]: { slots: Array.from({ length: 8 }, () => null), bypassed: false },
+      }
     : effects.moduleChains;
   return pruneUnreferencedEffects({ ...effects, moduleChains });
 }
 
 function withoutModuleEffectChain(effects: EffectsState, moduleId: ModuleInstanceId): EffectsState {
-  const moduleChains = Object.entries(effects.moduleChains).reduce<Record<ModuleInstanceId, EffectChainSlots>>(
-    (next, [rawModuleId, slots]) => {
-      if (rawModuleId !== moduleId) next[rawModuleId as ModuleInstanceId] = slots;
+  const moduleChains = Object.entries(effects.moduleChains).reduce<
+    Record<ModuleInstanceId, ModuleEffectChainState>
+  >(
+    (next, [rawModuleId, chain]) => {
+      if (rawModuleId !== moduleId) next[rawModuleId as ModuleInstanceId] = chain;
       return next;
     },
     {},
@@ -2969,8 +3027,8 @@ function withoutModuleEffectChain(effects: EffectsState, moduleId: ModuleInstanc
 
 function pruneUnreferencedEffects(effects: EffectsState): EffectsState {
   const referenced = new Set<EffectInstanceId>();
-  for (const slots of Object.values(effects.moduleChains)) {
-    for (const effectId of slots) if (effectId !== null) referenced.add(effectId);
+  for (const chain of Object.values(effects.moduleChains)) {
+    for (const effectId of chain.slots) if (effectId !== null) referenced.add(effectId);
   }
   for (const chain of Object.values(effects.sendChains)) {
     for (const effectId of chain.slots) if (effectId !== null) referenced.add(effectId);
@@ -3039,8 +3097,10 @@ interface LocatedEffectInstance extends LocatedEffectChain {
 
 function locateEffectChain(effects: EffectsState, chain: EffectChainTarget): LocatedEffectChain | undefined {
   if (chain.scope === "module") {
-    const slots = effects.moduleChains[chain.targetId];
-    return slots === undefined ? undefined : { chain, slots, isMaster: false };
+    const moduleChain = effects.moduleChains[chain.targetId];
+    return moduleChain === undefined
+      ? undefined
+      : { chain, slots: moduleChain.slots, isMaster: false };
   }
   if (chain.scope === "send") {
     const send = effects.sendChains[chain.targetId];
@@ -3050,11 +3110,11 @@ function locateEffectChain(effects: EffectsState, chain: EffectChainTarget): Loc
 }
 
 function locateEffectInstance(effects: EffectsState, effectId: EffectInstanceId): LocatedEffectInstance | undefined {
-  for (const [rawModuleId, slots] of Object.entries(effects.moduleChains)) {
-    if (!slots.includes(effectId)) continue;
+  for (const [rawModuleId, moduleChain] of Object.entries(effects.moduleChains)) {
+    if (!moduleChain.slots.includes(effectId)) continue;
     return {
       chain: { scope: "module", targetId: rawModuleId as ModuleInstanceId },
-      slots,
+      slots: moduleChain.slots,
       isMaster: false,
       isProtectedLimiter: false,
     };
@@ -3089,7 +3149,15 @@ function effectAudioPayload(
 
 function replaceEffectChain(effects: EffectsState, chain: EffectChainTarget, slots: EffectChainSlots): EffectsState {
   if (chain.scope === "module") {
-    return { ...effects, moduleChains: { ...effects.moduleChains, [chain.targetId]: slots } };
+    const current = effects.moduleChains[chain.targetId];
+    if (current === undefined) return effects;
+    return {
+      ...effects,
+      moduleChains: {
+        ...effects.moduleChains,
+        [chain.targetId]: { ...current, slots },
+      },
+    };
   }
   if (chain.scope === "send") {
     const current = effects.sendChains[chain.targetId];

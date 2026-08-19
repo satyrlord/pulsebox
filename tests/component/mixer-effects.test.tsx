@@ -1,13 +1,14 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { RACK_SLOT_IDS, SEND_BUS_IDS } from "../../src/contracts";
+import { RACK_SLOT_IDS, SEND_BUS_IDS, type PluginId } from "../../src/contracts";
 import { DRUMLINE_SIX_MANIFEST } from "../../src/engine/public";
 import { EffectsBank } from "../../src/ui/react/shell/EffectsBank";
 import { EditorWorkspace } from "../../src/ui/react/shell/EditorWorkspace";
 import { MasterPanel } from "../../src/ui/react/shell/MasterPanel";
 import { Mixer } from "../../src/ui/react/shell/Mixer";
 import { Rack } from "../../src/ui/react/shell/Rack";
+import { StudioPanel } from "../../src/ui/react/shell/StudioPanel";
 import { firstModuleId, createHarness, renderWithHarness } from "./helpers";
 
 const SEND_A_ID = SEND_BUS_IDS[0];
@@ -80,6 +81,52 @@ describe("mixer and effects surfaces", () => {
     expect(harness.domain.getState().project.modules[moduleId]?.parameters["kick-distortion"]).toBe(
       0,
     );
+  });
+
+  it("uses an icon-only Output control to bypass all Rack FX with one Undo", () => {
+    const harness = createHarness();
+    const moduleId = firstModuleId(harness);
+    harness.domain.dispatch(
+      harness.domain.createCommand("effects-chain-effect-add", {
+        chain: { scope: "module", targetId: moduleId },
+        effectPluginId: "chorus" as PluginId,
+      }),
+    );
+    renderWithHarness(<Rack />, harness);
+
+    const bypass = screen.getByRole("button", {
+      name: "Bypass all Rack FX for Silver Serpent",
+    });
+    expect(bypass).toHaveAttribute("aria-pressed", "false");
+    expect(bypass).toHaveTextContent("");
+    expect(bypass.querySelector('[data-component="bypass-all-icon"]')).not.toBeNull();
+    fireEvent.click(bypass);
+    expect(bypass).toHaveAttribute("aria-pressed", "true");
+    expect(harness.domain.getState().project.effects.moduleChains[moduleId]?.bypassed).toBe(
+      true,
+    );
+    act(() => harness.store.getState().undo());
+    expect(bypass).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("uses one icon-only Mixer control to bypass all Send FX", () => {
+    const harness = createHarness();
+    renderWithHarness(<StudioPanel />, harness);
+
+    const bypass = screen.getByRole("button", { name: "Bypass all Send FX" });
+    expect(bypass).toHaveAttribute("aria-pressed", "false");
+    expect(bypass).toHaveTextContent("");
+    expect(bypass.querySelector('[data-component="bypass-all-icon"]')).not.toBeNull();
+    fireEvent.click(bypass);
+    expect(bypass).toHaveAttribute("aria-pressed", "true");
+    expect(harness.domain.getState().project.effects.sendEffectsBypassed).toBe(true);
+    expect(
+      Object.values(harness.domain.getState().project.effects.sendChains).every(
+        (chain) => !chain.bypassed,
+      ),
+    ).toBe(true);
+    act(() => harness.store.getState().undo());
+    expect(bypass).toHaveAttribute("aria-pressed", "false");
   });
 
   it("keeps eight fixed channel strips and opens a send amount and tap surface", () => {

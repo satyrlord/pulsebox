@@ -50,6 +50,7 @@ At 1536 × 1024:
 - Each rack faceplate puts its control groups in one horizontal row.
 - A user can collapse each control group when the row does not fit.
 - The Output group stays at the right edge of each loaded faceplate.
+- The Output group contains one icon-only `Bypass All` toggle for its Rack FX.
 - A compact studio column sits on the right and provides mutually exclusive
   Mixer, Effects, and Master tabs.
 - Mixer is the default studio view. Effects and Master replace it inside the
@@ -102,6 +103,8 @@ For the studio mixer:
   Effects and Master views.
 - Arrange four A–D send buttons in a visible 2 × 2 grid inside each instrument
   strip. Keep empty-channel send buttons visible but disabled.
+- Show one icon-only `Bypass All` toggle for all Send FX in the Mixer view
+  header. Keep it outside the master strip.
 - A vertical fader.
 - A loudness meter.
 - Pan, mute, and solo.
@@ -133,7 +136,8 @@ At every supported width:
 - Pulsebox selects Mixer by default.
 - Mixer presents all eight instrument strips and one master strip. Disabled
   empty strips show a two-digit slot number. Each instrument strip keeps its
-  2 × 2 A–D send grid visible. The master strip carries no A–D grid.
+  2 × 2 A–D send grid visible. The master strip carries no A–D grid. The Mixer
+  header contains the icon-only `Bypass All` toggle for all Send FX.
 - Effects replaces the Mixer view and presents the four modular send-chain
   summaries. Show a detailed-chain entry point only when its editor exists.
 - Master opens master routing, master-chain, and output metering.

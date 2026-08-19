@@ -635,3 +635,10 @@ contains the normative requirements. This table is the traceability record.
   and limiter `gain` automation lanes to `input`, and it drops send-mode
   automation lanes. Sections 19.7 and 20.7 of
   [mixer and effects](spec-007-mixer-and-effects.md) own the behavior.
+- **D101.** Each rack module has one icon-only `Bypass All` toggle in its
+  Output group. It switches around that module's complete pedalboard. The
+  Mixer header has one icon-only `Bypass All` toggle that switches around all
+  four send chains. Both group overrides preserve the individual effect and
+  chain bypass states. Each override is project-owned, undoable in one step,
+  playback-safe, and excluded from automation. Early format-3 documents can
+  omit these override fields and resolve them to `false`.

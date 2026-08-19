@@ -971,6 +971,13 @@ Master-effects bypass shall switch around every user master effect as one
 click-safe graph operation, then pass through master gain and the protected
 limiter. It shall not change the limiter instance's detailed bypass state.
 
+The module Rack FX override shall switch around one complete pedalboard as one
+click-safe graph operation. The Send FX override shall switch around all four
+send chains in one project command. Each override shall preserve the bypass
+state of its effects and chains. A direct toggle off shall restore those states
+without rebuilding an unrelated graph branch. History replay keeps the
+snapshot behavior from section 7.4.
+
 The header meters shall observe the post-master signal through
 a non-audible analysis branch. L/R mode displays channel magnitudes. M/S mode
 derives `M = (L + R) / 2` and `S = (L - R) / 2` for analysis only. Switching
