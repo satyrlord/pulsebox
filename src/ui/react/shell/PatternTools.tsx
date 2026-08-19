@@ -243,10 +243,11 @@ export function PatternTools() {
           }}
         >
           <optgroup label="Generators">
-            <option value="euclidean">Euclidean rhythm</option>
-            <option value="randomize">Randomize</option>
-            <option value="humanize">Humanize timing and velocity</option>
-            <option value="variation">Pattern variation</option>
+            {(["euclidean", "randomize", "humanize", "variation"] as const).map((kind) => (
+              <option key={kind} value={kind}>
+                {TOOL_LABELS[kind]}
+              </option>
+            ))}
           </optgroup>
           <optgroup label="Transforms">
             {(["reverse", "invert", "transpose", "double", "half", "shift", "legato", "stretch"] as const).map(

@@ -1,10 +1,6 @@
 import { useState } from "react";
 
-import {
-  SEND_BUS_IDS,
-  type ModuleInstanceId,
-  type SendBusId,
-} from "../../../contracts";
+import { type ModuleInstanceId, type SendBusId } from "../../../contracts";
 import { DEFAULT_MASTER_LEVEL, DEFAULT_MODULE_LEVEL } from "../../../state/public";
 import { Fader } from "../controls/Fader";
 import { Knob } from "../controls/Knob";
@@ -14,20 +10,13 @@ import { automationShortcut } from "../controls/automation-shortcut";
 import { masterMeterDisplayLevel } from "../store/app-store";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
+import { SENDS, sendIdFor, type SendLetter } from "./sends";
 import styles from "./Mixer.module.css";
-
-const SENDS = ["A", "B", "C", "D"] as const;
-
-function sendIdFor(index: number): SendBusId {
-  const id = SEND_BUS_IDS[index];
-  if (id === undefined) throw new Error("A fixed send bus is missing.");
-  return id;
-}
 
 interface OpenSendSurface {
   readonly moduleId: ModuleInstanceId;
   readonly moduleName: string;
-  readonly send: (typeof SENDS)[number];
+  readonly send: SendLetter;
   readonly sendBusId: SendBusId;
 }
 

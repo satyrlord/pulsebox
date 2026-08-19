@@ -245,5 +245,4 @@ export class DigitalDrumVoice {
   }
 
   readonly getPan = (): number => this.#parameters.pan;
-
 }

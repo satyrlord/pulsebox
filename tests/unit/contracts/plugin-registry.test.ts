@@ -29,6 +29,13 @@ describe("plugin registry", () => {
     ).toThrow(PluginRegistryValidationError);
   });
 
+  it.each([undefined, null])("rejects a missing engine factory before activation", (factory) => {
+    const manifest = createInstrumentManifest();
+    expect(() => createPluginRegistry([{ manifest, factory: factory as never }])).toThrow(
+      PluginRegistryValidationError,
+    );
+  });
+
   it("does not freeze entries when registry validation fails", () => {
     const manifest = {
       ...createInstrumentManifest(),

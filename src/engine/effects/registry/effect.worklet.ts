@@ -4,6 +4,8 @@ import type { StateRevision } from "../../../contracts/ids";
 import type { ParameterValue } from "../../../contracts/parameters";
 import {
   ENGINE_PROTOCOL_VERSION,
+  isEngineParameterId,
+  isEngineParameterValue,
   isRealtimeSafeControllerEnvelope,
   type AcknowledgementPayload,
   type ControllerToProcessorKind,
@@ -220,7 +222,7 @@ class PulseboxEffectProcessor extends AudioWorkletProcessor {
     this.#meterFrames += outLeft.length;
     if (this.#meterFrames >= Math.max(1, Math.floor(sampleRate / 30))) {
       this.#meterFrames = 0;
-      const reduction = (this.#processor as (EffectFrameProcessor & { readonly gainReductionDecibels?: number }) | undefined)?.gainReductionDecibels;
+      const reduction = this.#processor?.gainReductionDecibels;
       if (typeof reduction === "number" && Number.isFinite(reduction)) this.#post("meter-frame", { values: { "gain-reduction": Math.max(0, reduction) } });
     }
     return true;
@@ -250,7 +252,7 @@ function decodeConfiguration(value: unknown): EffectConfiguration | undefined {
   if (!isPlainRecord(value) || typeof value.pluginId !== "string" || !isPlainRecord(value.state)) return undefined;
   const state: MutableState = {};
   for (const [parameterId, entry] of Object.entries(value.state)) {
-    if ((typeof entry !== "number" || !Number.isFinite(entry)) && typeof entry !== "string" && typeof entry !== "boolean") return undefined;
+    if (!isEngineParameterId(parameterId) || !isEngineParameterValue(entry)) return undefined;
     state[parameterId] = entry;
   }
   return { pluginId: value.pluginId, state };
@@ -258,8 +260,7 @@ function decodeConfiguration(value: unknown): EffectConfiguration | undefined {
 
 function isScheduledChange(value: unknown): value is { readonly audioFrame: number; readonly parameterId: string; readonly value: ParameterValue } {
   if (!isPlainRecord(value) || !Number.isSafeInteger(value.audioFrame) || (value.audioFrame as number) < 0) return false;
-  if (typeof value.parameterId !== "string" || value.parameterId.length === 0 || value.parameterId.length > 64) return false;
-  return (typeof value.value === "number" && Number.isFinite(value.value)) || typeof value.value === "string" || typeof value.value === "boolean";
+  return isEngineParameterId(value.parameterId) && isEngineParameterValue(value.value);
 }
 
 registerProcessor("pulsebox-effect", PulseboxEffectProcessor);

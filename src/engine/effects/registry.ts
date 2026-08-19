@@ -1,5 +1,4 @@
 import type { EffectPluginManifest } from "../../contracts/plugins";
-import type { PluginId } from "../../contracts/parameters";
 import { CHORUS_MANIFEST } from "./chorus/manifest";
 import { COMPRESSOR_MANIFEST } from "./compressor/manifest";
 import { DELAY_MANIFEST } from "./delay/manifest";
@@ -35,8 +34,10 @@ export const BUILT_IN_EFFECTS: readonly BuiltInEffect[] = Object.freeze([
   builtInEffect(STEREO_WIDTH_MANIFEST), builtInEffect(LIMITER_MANIFEST),
 ]);
 
-const EFFECT_BY_ID = new Map(BUILT_IN_EFFECTS.map((effect) => [effect.manifest.pluginId, effect]));
+const EFFECT_BY_ID = new Map<string, BuiltInEffect>(
+  BUILT_IN_EFFECTS.map((effect) => [effect.manifest.pluginId, effect]),
+);
 
-export function registeredEffect(pluginId: PluginId | string): BuiltInEffect | undefined {
-  return EFFECT_BY_ID.get(pluginId as PluginId);
+export function registeredEffect(pluginId: string): BuiltInEffect | undefined {
+  return EFFECT_BY_ID.get(pluginId);
 }

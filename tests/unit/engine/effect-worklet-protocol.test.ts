@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TEST_UUID } from "../contracts/fixtures";
+import { ENGINE_PROTOCOL_LIMITS } from "../../../src/contracts/worklet-protocol";
 
 interface TestProcessor {
   readonly port: FakeProcessorPort;
@@ -87,6 +88,72 @@ describe("effect worklet protocol", () => {
     const oversized = readyProcessor();
     oversized.port.receive(envelope(1, "parameter-batch", { changes: changes(0, 129) }));
     expect(oversized.port.sent[2]).toMatchObject({
+      kind: "fault",
+      payload: { code: "malformed-controller-message" },
+    });
+  });
+
+  it("rejects protocol-limit violations in effect state and scheduled changes", () => {
+    const atLimit = new Processor();
+    atLimit.port.receive(envelope(0, "hello", {
+      ...configuration(),
+      state: {
+        ...configuration().state,
+        ["p".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength)]: "v".repeat(
+          ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength,
+        ),
+      },
+    }));
+    expect(atLimit.port.sent[0]).toMatchObject({ kind: "ready" });
+
+    const invalidState = new Processor();
+    invalidState.port.receive(envelope(0, "hello", {
+      ...configuration(),
+      state: {
+        ...configuration().state,
+        ["p".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength + 1)]: 1,
+      },
+    }));
+    expect(invalidState.port.sent[0]).toMatchObject({
+      kind: "fault",
+      payload: { code: "unknown-effect-plugin" },
+    });
+
+    const invalidValueState = new Processor();
+    invalidValueState.port.receive(envelope(0, "hello", {
+      ...configuration(),
+      state: {
+        ...configuration().state,
+        model: "v".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength + 1),
+      },
+    }));
+    expect(invalidValueState.port.sent[0]).toMatchObject({
+      kind: "fault",
+      payload: { code: "unknown-effect-plugin" },
+    });
+
+    const longId = readyProcessor();
+    longId.port.receive(envelope(1, "parameter-batch", {
+      changes: [{
+        audioFrame: 0,
+        parameterId: "p".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength + 1),
+        value: 1,
+      }],
+    }));
+    expect(longId.port.sent[2]).toMatchObject({
+      kind: "fault",
+      payload: { code: "malformed-controller-message" },
+    });
+
+    const longValue = readyProcessor();
+    longValue.port.receive(envelope(1, "parameter-batch", {
+      changes: [{
+        audioFrame: 0,
+        parameterId: "model",
+        value: "v".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength + 1),
+      }],
+    }));
+    expect(longValue.port.sent[2]).toMatchObject({
       kind: "fault",
       payload: { code: "malformed-controller-message" },
     });

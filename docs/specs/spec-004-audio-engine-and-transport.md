@@ -82,15 +82,14 @@ Behavior:
 - The user can configure the count-in and metronome for live recording.
 - The header metronome toggle is the single control that enables or disables the
   metronome. It uses `aria-pressed`. Store its state as a global UI preference,
-  not as project data. It creates no undo entry. It never changes project state,
+  not as project state. It creates no undo entry. It never changes project state,
   automation, or export. Count-in length and metronome sound stay with the live
   recording settings in
   [pattern editing](spec-006-pattern-editing.md) section 16.4.
 - The MVP has no control that marks a project. The project selector orders
   stored projects by modified time alone. A post-MVP Favourite feature will let
-  the user mark projects. It is a separate feature from the removed Pin control
-  and it will define its own behavior, ordering, and interface. The project
-  format reserves the `favorite` field for it.
+  the user mark projects. Decision `D84` records its scope. The project format
+  reserves the `favorite` field for it.
 
 The `L/R`/`M/S` control changes analysis only. It never changes live audio,
 project state, automation, undo history, or export. Meter mode is a transient
@@ -191,11 +190,12 @@ A live step edit replaces the affected module's queued horizon. A quantized
 Pattern launch replaces queued events that cross its selected boundary.
 
 A timing rebuild preserves expanded onsets by their actual frame and stable
-occurrence identity. It does not use only the source step. Thus, Micro-timing,
+occurrence identity. It does not use only the source step. Micro-timing,
 Flam, and Roll events cannot be lost or repeated at the rebuild boundary.
 If controller work makes a pulled replacement onset expire, the engine keeps
 the cleared old-timing occurrence when its frame is still in the future.
 The engine applies the same rule to a pulled automation step.
+
 The controller tracks the bounded queue sent to each processor. Timing rebuilds
 derive kept and fallback occurrences from this queue record. Each scheduler
 pass removes consumed records. Future records cannot exceed the matching

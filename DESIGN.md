@@ -394,7 +394,7 @@ Inset wells: Well Black fill, thin border, recess shadow, monospace with 0.06em
 tracking, right-aligned, with a fixed minimum width so digits do not reflow as
 the value changes.
 
-### Overlay notice
+### Undo notice
 
 The Undo notice: fixed to the lower right, Overlay Slate fill, Border Strong
 edge, panel drop shadow, 8px/12px padding. It never blocks input, and it always

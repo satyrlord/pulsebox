@@ -203,9 +203,10 @@ Use the deterministic fixtures and detailed procedures in `ARCHITECTURE.md`,
 `PROJECT-FORMAT.md`, and `THEMING.md`. The following release thresholds are
 normative:
 
-- A same-build project save, reload, and offline render at the same sample rate
-  produces the same canonical manifest and event schedule. For deterministic
-  rendered samples, maximum absolute sample error is at most `1e-6`.
+- A same-build project save, reload, and offline render produce the same
+  canonical manifest and event schedule at the same sample rate. For
+  deterministic rendered samples, maximum absolute sample error is at most
+  `1e-6`.
 - Across 44.1 kHz and 48 kHz fixtures, scheduled event time differs by at most
   1 millisecond. Oscillator pitch differs by at most 1 cent after conversion to
   seconds and hertz.
@@ -225,53 +226,12 @@ normative:
   every supported viewport, in the `rack` theme and high-contrast mode.
 - The first-sound procedure in section 21.8 passes all five runs in Chrome on
   the recorded release host.
-- AC-077 uses one deterministic startup check run by the single owner. Start a fresh persistent
-  Chrome profile at `http://127.0.0.1:4173` and load the application. Verify each
-  condition below:
-  - The project selector reads `Current project: Neon Basement`.
-  - Six rack modules are loaded.
-  - The Play control is visible with title `Play. Space.`.
-  - The selected Pattern has a stable UUID.
-  - The `Silver Serpent events in Verse` group is visible.
-  - The stored-project list reads `No stored projects yet.`.
-  The check uses no user study or assistance. The procedure is in
+- AC-077 runs the deterministic startup check in
   `tests/e2e/first-sound-release.spec.ts`.
 
 ### 24.5 Suggested file structure
 
-```text
-src/
-  main.ts
-  app/
-  state/
-  engine/
-    worklets/
-    transport/
-    routing/
-    modules/
-    effects/
-  components/
-    transport/
-    library/
-    rack/
-    mixer/
-    effects/
-    editor/
-    song/
-    controls/
-  persistence/
-  themes/
-  styles/
-  utilities/
-tests/
-  unit/
-  component/
-  e2e/
-  visual/
-docs/
-  instruments/
-research/  # non-shipping named source notes; excluded from production packages and public docs
-```
+The repository map in `AGENTS.md` and `ARCHITECTURE.md` owns the layer layout.
 
 Keep audio processors, state logic, UI components, persistence, and theme tokens
 in separate modules. Do not create one enormous component, engine file, or

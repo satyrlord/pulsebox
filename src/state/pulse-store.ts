@@ -40,6 +40,7 @@ import {
   type VoiceId,
 } from "../contracts/ids";
 import type { PluginId } from "../contracts/parameters";
+import type { EffectPlacement } from "../contracts/plugins";
 import type { PatternEventEdit, PulseCommand } from "./commands";
 import {
   createEmptyPatternPart,
@@ -48,6 +49,7 @@ import {
   MAXIMUM_PATTERN_SEED,
   MINIMUM_PATTERN_COUNT,
   PATTERN_STEP_COUNT,
+  patternSeedFromId,
   type ModuleSeed,
 } from "./default-state";
 import {
@@ -123,7 +125,7 @@ export type PulseEngineDelta = EngineDelta<
 >;
 
 /** The composition boundary supplies all effect instances from the effect registry. */
-export type ChainEffectPlacement = "module-pedalboard" | "send-chain" | "master-chain";
+export type ChainEffectPlacement = EffectPlacement;
 
 export type EffectInstanceFactory = (
   id: EffectInstanceId,
@@ -785,7 +787,7 @@ export class PulseStore {
       durationBars: 1,
       scale: "Chromatic",
       humanize: 0,
-      seed: seedFromPatternId(id),
+      seed: patternSeedFromId(id),
       parts: {},
       automationLaneIds: [],
       createdAt: timestamp,
@@ -1612,10 +1614,6 @@ export class PulseStore {
         error: rejected("payload.moduleId", "Module does not exist.", "Duplicate a loaded module."),
       };
     const slot = this.#state.project.rackSlots.find((candidate) => candidate.id === slotId);
-    if (slot?.moduleId !== undefined)
-      return {
-        error: rejected("payload.slotId", "Rack slot is occupied.", "Choose an empty slot."),
-      };
     if (slot === undefined)
       return {
         error: rejected(
@@ -1623,6 +1621,10 @@ export class PulseStore {
           "Rack slot does not exist.",
           "Choose slot-01 through slot-08.",
         ),
+      };
+    if (slot.moduleId !== undefined)
+      return {
+        error: rejected("payload.slotId", "Rack slot is occupied.", "Choose an empty slot."),
       };
     const seed = this.#moduleSeedFor(source.pluginId);
     if (seed === undefined) {
@@ -1708,7 +1710,7 @@ export class PulseStore {
         .map((lane) => lane.id),
     );
     const automationLanes = Object.fromEntries(
-      Object.entries(this.#state.project.automationLanes).filter(([id]) => !removedLaneIds.has(id as never)),
+      Object.entries(this.#state.project.automationLanes).filter(([id]) => !removedLaneIds.has(id as AutomationLaneId)),
     );
     const patterns = removeAutomationLaneReferences(
       this.#state.project.patterns.map((pattern) => {
@@ -2549,11 +2551,6 @@ function cloneAutomationLane(
     targetId,
     steps: lane.steps.map((step) => ({ ...step })),
   };
-}
-
-function seedFromPatternId(patternId: PatternId): number {
-  const parsed = Number.parseInt(patternId.replaceAll("-", "").slice(0, 8), 16);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function isNumberNoteKey(value: string): boolean {

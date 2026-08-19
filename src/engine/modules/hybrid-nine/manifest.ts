@@ -87,7 +87,7 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    smoothing: smoothing,
+    smoothing,
     defaultFor: (voiceId) => DEFAULT_HYBRID_PARAMETERS.voices[voiceId].blend,
   },
   {
@@ -131,7 +131,7 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    smoothing: smoothing,
+    smoothing,
     defaultFor: (voiceId) => DEFAULT_HYBRID_PARAMETERS.voices[voiceId].level,
   },
   {
@@ -142,7 +142,7 @@ const VOICE_FIELDS: readonly VoiceField[] = [
     step: 0.01,
     unit: "ratio",
     precision: 2,
-    smoothing: smoothing,
+    smoothing,
     defaultFor: (voiceId) => DEFAULT_HYBRID_PARAMETERS.voices[voiceId].pan,
   },
 ];

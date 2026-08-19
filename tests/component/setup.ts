@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 
 const SUPPORTED_WIDTH = 1_440;
 const SUPPORTED_HEIGHT = 900;
@@ -83,4 +83,6 @@ setSupportedViewport();
 afterEach(() => {
   cleanup();
   setSupportedViewport();
+  // A failed fake-timer test must not leak a faked clock into later tests.
+  vi.useRealTimers();
 });

@@ -51,9 +51,7 @@ channel layouts. Reject files with more than two channels. Enforce hard limits
 of 32 MiB per source file and 512 MiB of total stored imported assets per
 project. Enforce the decoded frame, duration, archive, manifest, and expansion
 limits in `PROJECT-FORMAT.md` before project state changes. A compressed source
-that expands beyond a decoded limit causes rejection.
-
-This rule applies even
+that expands beyond a decoded limit causes rejection. This rule applies even
 when its source file is smaller than 32 MiB.
 
 ### 23.1 Browser storage
@@ -151,10 +149,8 @@ Export remains available.
 
 `QuotaExceededError` never causes silent pruning of current project assets.
 Pulsebox can prune only recovery snapshots outside the protected current and
-last known-good pair.
-
-It prunes the oldest snapshot first
-and reports the action.
+last known-good pair. It prunes the oldest snapshot first and reports the
+action.
 
 Ordinary Save preserves each sample manifest entry's current `embedded` or
 `pack-reference` storage mode without prompting. Portable Export asks whether

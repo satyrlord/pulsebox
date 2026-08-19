@@ -62,7 +62,6 @@ export type DefaultEffectInstanceFactory = (
   pluginId: PluginId,
 ) => EffectInstanceState | undefined;
 
-/** The supplied project contains five Patterns. Projects can hold 1 through 32. */
 export const DEFAULT_PATTERN_COUNT = 5;
 export const MINIMUM_PATTERN_COUNT = 1;
 export const MAXIMUM_PATTERN_COUNT = 32;
@@ -81,7 +80,7 @@ export const MAXIMUM_PATTERN_SEED = 0xffff_ffff;
  * repeatable variation without a second random source. Tests that inject a
  * deterministic ID factory get deterministic seeds for free.
  */
-function patternSeedFromId(id: string): number {
+export function patternSeedFromId(id: string): number {
   const hex = id.replaceAll("-", "").slice(0, 8);
   const parsed = Number.parseInt(hex, 16);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;

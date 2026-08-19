@@ -80,7 +80,7 @@ export interface PatternPartView {
  * frame with the previous note's release must win, or the release silences the
  * new note.
  */
-function scheduledEventPriority(event: ScheduledVoiceEvent): number {
+export function scheduledEventPriority(event: ScheduledVoiceEvent): number {
   return event.type === "note-off" ? 0 : event.type === "reset" ? 1 : 2;
 }
 

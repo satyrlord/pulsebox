@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { waitForAutosaveValue } from "./autosave-wait";
 
 const SUPPORTED_VIEWPORTS = [
   { width: 1536, height: 1024 },
@@ -244,27 +245,6 @@ async function openStudio(page: Page, name: "Mixer" | "Effects" | "Master") {
   return studio;
 }
 
-async function waitForAutosaveValue(page: Page, value: string) {
-  await expect.poll(async () =>
-    page.evaluate(async (expected) => {
-      const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open("pulsebox-v1", 1);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error("The project database could not open."));
-      });
-      const transaction = database.transaction("autosave", "readonly");
-      const record = await new Promise<unknown>((resolve, reject) => {
-        const request = transaction.objectStore("autosave").get("current");
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error("The autosave record could not load."));
-      });
-      database.close();
-      const serialized = JSON.stringify(record);
-      return typeof serialized === "string" && serialized.includes(expected);
-    }, value),
-  ).toBe(true);
-}
-
 function loadedStrip(studio: Locator) {
   return studio.locator('[data-component="channel-strip"]:not([data-empty="true"])').first();
 }
@@ -338,8 +318,16 @@ test("shows the unsupported-size state one pixel below either editing boundary",
     { width: 1280, height: 719 },
   ]) {
     await page.setViewportSize(viewport);
-    await expect(page.locator('[data-component="unsupported-size"]')).toBeVisible();
+    const notice = page.locator('[data-component="unsupported-size"]');
+    await expect(notice).toBeVisible();
+    await expect(notice.getByRole("status")).toContainText("Autosave remains active");
+    await expect(notice.getByLabel("Read-only project summary")).toContainText(
+      "Neon Basement",
+    );
+    await expect(notice.getByRole("button")).toHaveText(["Save", "Export"]);
     await expect(page.locator('[data-component="studio-panel"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Play", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("slider")).toHaveCount(0);
   }
 });
 

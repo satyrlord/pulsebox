@@ -363,7 +363,7 @@ function nextRuntimeId(prefix: string): string {
 }
 
 function validChange(change: ScheduledEffectParameterChange): boolean {
-  return Number.isSafeInteger(change.audioFrame) && change.audioFrame >= 0 && change.parameterId.length > 0 && change.parameterId.length <= 64 && ((typeof change.value === "number" && Number.isFinite(change.value)) || typeof change.value === "boolean" || (typeof change.value === "string" && change.value.length <= 256));
+  return Number.isSafeInteger(change.audioFrame) && change.audioFrame >= 0 && change.parameterId.length > 0 && change.parameterId.length <= ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength && ((typeof change.value === "number" && Number.isFinite(change.value)) || typeof change.value === "boolean" || (typeof change.value === "string" && change.value.length <= ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength));
 }
 
 function changeKey(change: ScheduledEffectParameterChange): string {

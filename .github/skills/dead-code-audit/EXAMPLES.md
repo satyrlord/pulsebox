@@ -8,7 +8,7 @@ URL import and the processor registration string.
 ## Plugin
 
 A plugin can be live only through its registry and manifest. Before you remove
-its adapter, runtime, processor, or assets, trace both.
+its adapter, processor, or assets, trace both.
 
 ## Migration
 

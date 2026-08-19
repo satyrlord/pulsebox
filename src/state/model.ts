@@ -145,7 +145,7 @@ export type AutomationTargetId = ModuleInstanceId | SendBusId | EffectInstanceId
 /** A non-module lane that is armed from its owning mixer or effects control. */
 export interface ExternalAutomationTarget {
   readonly scope: Exclude<AutomationScope, "module">;
-  readonly targetId: Exclude<AutomationTargetId, ModuleInstanceId> | ModuleInstanceId;
+  readonly targetId: AutomationTargetId;
   readonly parameterId: string;
 }
 

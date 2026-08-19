@@ -681,6 +681,38 @@ describe("PulseApp under StrictMode", () => {
     expect(harness.domain.getState().history.canUndo).toBe(false);
   });
 
+  it("does not apply transport shortcuts while a text field owns the key event", async () => {
+    const harness = createHarness();
+    renderWithHarness(<PulseApp themeService={memoryThemeService()} />, harness);
+    const tempo = screen.getByLabelText<HTMLInputElement>("Tempo");
+
+    fireEvent.keyDown(tempo, { code: "Space", key: " " });
+    expect(harness.audio.play).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await waitFor(() => {
+      expect(harness.domain.getState().transport.status).toBe("playing");
+    });
+
+    fireEvent.keyDown(tempo, { code: "Escape", key: "Escape" });
+    expect(harness.audio.stop).not.toHaveBeenCalled();
+    expect(harness.domain.getState().transport.status).toBe("playing");
+
+    act(() => {
+      makeHistory(harness, 2);
+    });
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+    expect(fireEvent.keyDown(tempo, { key: "z", ctrlKey: true })).toBe(true);
+    expect(harness.domain.getState().history.canUndo).toBe(true);
+
+    act(() => {
+      harness.domain.undo();
+    });
+    expect(harness.domain.getState().history.canRedo).toBe(true);
+    expect(fireEvent.keyDown(tempo, { key: "y", ctrlKey: true })).toBe(true);
+    expect(harness.domain.getState().history.canRedo).toBe(true);
+  });
+
   it("finalizes an armed live key on blur at the Song-local second loop", () => {
     const harness = createHarness();
     const moduleId = firstModuleId(harness);

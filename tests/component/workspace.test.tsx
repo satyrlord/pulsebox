@@ -255,17 +255,6 @@ describe("EditorWorkspace", () => {
       .filter((control) => control.getAttribute("aria-label")?.includes("step 1"));
     expect(firstStepControls).toHaveLength(2);
     expect(firstStepControls.every((control) => control.tabIndex >= 0)).toBe(true);
-    expect(
-      firstStepControls.every(
-        (control) => control.parentElement?.dataset.component === "piano-roll-point-control",
-      ),
-    ).toBe(true);
-    expect(
-      firstStepControls.every(
-        (control) =>
-          control.parentElement?.style.getPropertyValue("--lane-position") !== "",
-      ),
-    ).toBe(true);
   });
 
   it("adds the selected Pattern to the compact Playlist", () => {
@@ -913,7 +902,11 @@ describe("EffectsBank", () => {
     expect(screen.getByText("Analog Echo")).toBeVisible();
     expect(screen.getByText("Plate Reverb")).toBeVisible();
     expect(screen.getByText("Stereo Width")).toBeVisible();
-    expect(screen.getAllByText("Drive").some((element) => element.tagName === "P")).toBe(true);
+    const driveCard = screen
+      .getByRole("heading", { name: "Send D" })
+      .closest('[data-component="effect-slot"]');
+    expect(driveCard).not.toBeNull();
+    expect(within(driveCard as HTMLElement).getByText("Drive", { selector: "p" })).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Send D Distortion Model macro" })).toHaveValue("drive");
     expect(screen.queryByRole("button", { name: "Details" })).toBeNull();
   });

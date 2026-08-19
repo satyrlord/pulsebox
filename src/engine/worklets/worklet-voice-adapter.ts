@@ -17,6 +17,7 @@ import { isPlainRecord } from "../../contracts/validation";
 import {
   SCHEDULED_EVENT_QUEUE_CAPACITY,
   SCHEDULED_PARAMETER_QUEUE_CAPACITY,
+  scheduledEventPriority,
   type ScheduledParameterChange,
   type ScheduledVoiceEvent,
 } from "../transport/scheduled-event";
@@ -278,7 +279,7 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
             ? `${this.#sessionId}:${this.#eventId.toString()}`
             : `${event.occurrenceId}:${event.type}`,
         audioFrame: event.atFrame,
-        priority: eventPriority(event),
+        priority: scheduledEventPriority(event),
         data: voiceEventData(event),
       });
       this.#eventId += 1;
@@ -737,10 +738,6 @@ export class WorkletVoiceAdapter implements VoiceAdapterPort {
     this.#destination = undefined;
     this.#state = "disposed";
   }
-}
-
-function eventPriority(event: ScheduledVoiceEvent): number {
-  return event.type === "note-off" ? 0 : event.type === "reset" ? 1 : 2;
 }
 
 function voiceEventData(event: ScheduledVoiceEvent): Readonly<Record<string, unknown>> {

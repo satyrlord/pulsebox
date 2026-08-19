@@ -1,15 +1,8 @@
 import { useEffect } from "react";
 
 import { createGestureId, type GestureId, type ModuleInstanceId } from "../../../contracts";
-import { semitoneOffsetForLiveKeyEvent } from "./live-key-map";
+import { isTextEntryTarget, semitoneOffsetForLiveKeyEvent } from "./live-key-map";
 import { useAppContext } from "../store/app-store-context";
-
-function isTextEntry(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-}
 
 export interface KeyboardShortcutOptions {
   /** Collapses or expands the lower editor, matching the workspace-bar button. */
@@ -66,6 +59,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutOptions): void {
 
     const onKeyDown = (event: KeyboardEvent) => {
       const state = store.getState();
+      const textEntry = isTextEntryTarget(event.target);
 
       if ((event.ctrlKey || event.metaKey) && !event.altKey) {
         const key = event.key.toLowerCase();
@@ -75,6 +69,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutOptions): void {
           return;
         }
         if (key === "z" || key === "y") {
+          if (event.defaultPrevented || textEntry) return;
           event.preventDefault();
           const redo = key === "y" || event.shiftKey;
           if (redo) state.redo();
@@ -96,7 +91,9 @@ export function useKeyboardShortcuts(options: KeyboardShortcutOptions): void {
         return;
       }
 
-      if (isTextEntry(event.target)) return;
+      // Component-owned editors handle their own key events. Text-entry
+      // fields must keep Space, Escape, and the live-key map for editing.
+      if (event.defaultPrevented || textEntry) return;
 
       const semitoneOffset = semitoneOffsetForLiveKeyEvent(event, state.liveKeyMap);
       if (

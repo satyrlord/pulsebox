@@ -2,7 +2,6 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    restoreMocks: true,
     projects: [
       {
         // Engine, state, contracts, and the architecture policy stay DOM-free,

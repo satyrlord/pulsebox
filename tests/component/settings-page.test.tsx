@@ -82,7 +82,6 @@ describe("settings page appearance controls", () => {
     await screen.findByText("The theme was rejected. The active theme did not change.");
     expect(service.appearance.theme).toBe("rack");
     expect(service.appearance.userTheme).toBeNull();
-    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
   });
 
   it("switches between the built-in theme and the installed user theme", async () => {

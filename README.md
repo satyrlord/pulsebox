@@ -200,8 +200,8 @@ Command plus A selects all events. Control or Command plus D duplicates them.
   quantize-strength value remain planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.
-- Files under `design/` are normally non-normative prototypes, not production
-  evidence. Behavioral and release evidence comes from the owning
+- Files under `docs/design/` are normally non-normative prototypes, not
+  production evidence. Behavioral and release evidence comes from the owning
   specifications and production checks.
 - Named historical research remains isolated under non-shipping `research/`.
 

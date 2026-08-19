@@ -57,7 +57,7 @@ At 1536 × 1024:
   same column rather than appearing beside or below it.
 - Each instrument channel in the Mixer view includes four A–D send buttons in
   a visible 2 × 2 grid.
-- Send-chain content appears only in the Effects view. Pulsebox never renders a
+- Send-chain content appears only in the Effects tab. Pulsebox never renders a
   second or persistent duplicate effects bank beside the mixer.
 - The lower editor shows the Pattern inspector, one module-aware Piano Roll,
   Pattern timing controls, and the compact named-Pattern Playlist.
@@ -122,7 +122,7 @@ in the MVP.
 
 ### 8.5 Studio tabs
 
-The studio region provides:
+The studio column provides:
 
 - Mixer.
 - Effects.
@@ -134,10 +134,7 @@ takes a wider tab than the others at any supported width.
 At every supported width:
 
 - Pulsebox selects Mixer by default.
-- Mixer presents all eight instrument strips and one master strip. Disabled
-  empty strips show a two-digit slot number. Each instrument strip keeps its
-  2 × 2 A–D send grid visible. The master strip carries no A–D grid. The Mixer
-  header contains the icon-only `Bypass All` toggle for all Send FX.
+- Mixer presents the strips and controls that section 8.4 specifies.
 - Effects replaces the Mixer view and presents the four modular send-chain
   summaries. Show a detailed-chain entry point only when its editor exists.
 - Master opens master routing, master-chain, and output metering.

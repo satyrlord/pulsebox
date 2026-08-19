@@ -45,6 +45,32 @@ describe("worklet protocol envelope validation", () => {
     ).toBe(false);
   });
 
+  it("enforces parameter ID and string-value bounds on both validation paths", () => {
+    const valid = envelope("parameter-batch", {
+      changes: [{
+        parameterId: "p".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength),
+        value: "v".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength),
+      }],
+    });
+    expect(validateEngineMessageEnvelope(valid).ok).toBe(true);
+    expect(isRealtimeSafeControllerEnvelope(valid)).toBe(true);
+
+    const emptyId = envelope("parameter-batch", { changes: [{ parameterId: "", value: 1 }] });
+    const longId = envelope("parameter-batch", {
+      changes: [{ parameterId: "p".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength + 1), value: 1 }],
+    });
+    const longValue = envelope("parameter-batch", {
+      changes: [{
+        parameterId: "cutoff",
+        value: "v".repeat(ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength + 1),
+      }],
+    });
+    for (const invalid of [emptyId, longId, longValue]) {
+      expect(validateEngineMessageEnvelope(invalid).ok).toBe(false);
+      expect(isRealtimeSafeControllerEnvelope(invalid)).toBe(false);
+    }
+  });
+
   it("accepts an absent project revision and checks its shape only when present", () => {
     // The envelope contract makes projectRevision optional. Kinds that need
     // it, such as hello, enforce presence at the receiver instead.
@@ -161,7 +187,7 @@ describe("worklet protocol envelope validation", () => {
     const payload: ParameterBatchPayload = {
       changes: Array.from(
         { length: ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch },
-        () => ({}),
+        () => ({ parameterId: "cutoff", value: 900 }),
       ),
     };
     expect(
@@ -174,7 +200,7 @@ describe("worklet protocol envelope validation", () => {
             {
               length: ENGINE_PROTOCOL_LIMITS.maximumParameterChangesPerBatch + 1,
             },
-            () => ({}),
+            () => ({ parameterId: "cutoff", value: 900 }),
           ),
         }),
       ).ok,

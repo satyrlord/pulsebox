@@ -96,7 +96,7 @@ export function createAutosave(options: AutosaveOptions): AutosaveController {
   const write = (snapshot: AutosaveSnapshot, force = false): Promise<void> => {
     queue = queue
       .then(() => {
-        if ((!force && disposed) || (!force && snapshot.sequence !== latestSequence)) return;
+        if (!force && (disposed || snapshot.sequence !== latestSequence)) return;
         return options.repository.saveAutosave(snapshot.stored);
       })
       .catch((error: unknown) => {

@@ -229,8 +229,8 @@ The merged MVP is complete only when:
     different origin.
 79. **AC-079.** The Piano Roll header shows a horizontal Swing slider bound to the
     one global project Swing value. It also shows a Pattern-owned horizontal
-    Humanize slider and a Parameter selector. The selector defaults to Velocity
-    in place of `Vel 100`. It is the only control that chooses an edited lane.
+    Humanize slider and a Parameter selector. The selector defaults to
+    Velocity. It is the only control that chooses an edited lane.
     It is scoped to the selected module.
 
     The selector offers the selected module's supported note properties and

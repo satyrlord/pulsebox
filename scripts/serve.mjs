@@ -12,7 +12,6 @@ const mimeTypes = new Map([
   [".js", "text/javascript; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
   [".svg", "image/svg+xml"],
-  [".wasm", "application/wasm"],
 ]);
 
 /** @param {string} relativePath @returns {string} */

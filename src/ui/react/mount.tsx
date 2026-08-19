@@ -14,7 +14,13 @@ import {
   validateLiveKeyMap,
   type LiveKeyMap,
 } from "./hooks/live-key-map";
-import { connectDomainStore, createAppStore, type AppStoreDependencies } from "./store/app-store";
+import {
+  connectDomainStore,
+  createAppStore,
+  type AppStoreDependencies,
+  type AudioRuntimeStateView,
+  type AudioStatus,
+} from "./store/app-store";
 import { AppStoreProvider } from "./store/app-store-context";
 
 export interface PulseboxAppHandle {
@@ -22,13 +28,8 @@ export interface PulseboxAppHandle {
   readonly markAudioUnavailable: () => void;
   /** Shows the non-blocking project notice with its ARIA live announcement. */
   readonly reportProjectNotice: (message: string) => void;
-  readonly reportAudioStatus: (
-    status: "faulted" | "recovered" | "recovering",
-    message?: string,
-  ) => void;
-  readonly reportAudioRuntimeState: (
-    state: "locked" | "active" | "suspended" | "unavailable",
-  ) => void;
+  readonly reportAudioStatus: (status: AudioStatus, message?: string) => void;
+  readonly reportAudioRuntimeState: (state: AudioRuntimeStateView) => void;
   readonly reportMeter: (moduleId: ModuleInstanceId, level: number) => void;
   readonly themeService: PulseThemeService;
 }

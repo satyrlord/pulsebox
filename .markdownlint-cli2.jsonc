@@ -9,7 +9,7 @@
   // section names, the `**Creative North Star: "..."**` line, the repeated
   // `### Named Rules` subheadings, and the `### Do:` / `### Don't:` headings.
   // Parsing tools match those strings character-for-character, so the file
-  // cannot satisfy these five rules and stay valid.
+  // cannot satisfy these four rules and stay valid.
   "overrides": [
     {
       "filter": ["DESIGN.md"],

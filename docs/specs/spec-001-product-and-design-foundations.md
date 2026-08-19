@@ -13,14 +13,14 @@ language, themes, and the MVP scope boundary.
 
 ## 1. Product goal
 
-Build **Pulsebox**, a production-quality, desktop-first modular groove
+Build **Pulsebox**, a desktop-first modular groove
 workstation for the browser.
 
 Pulsebox requirements:
 
 - Fully client-side.
 - Runnable at the canonical local origin `http://127.0.0.1:4173`.
-- A serious music-production application with working controls.
+- A music-production application with working controls.
 - Built around a dense rack, an eight-channel studio mixer, a four-bus effects
   area, pattern editing, piano-roll editing, and song arrangement.
 - A new user can start the supplied loop within one minute.
@@ -147,10 +147,6 @@ must be newly created for Pulsebox.
 10. **Accessibility is part of the component contract.** It is not a late
     retrofit.
 
-Deep effect editors use the 760 × 680 editor format.
-Playback continues underneath. When the user closes the editor, it restores
-focus.
-
 Pulsebox uses no destructive confirmation dialogs. It applies destructive edits
 immediately. It preserves complete recovery data while the bounded history entry
 remains. It shows a non-blocking notification with an operable Undo action and
@@ -203,9 +199,8 @@ Each instrument also declares one original SVG icon in its manifest. The icon
 is a maker's mark for the instrument: an acid smiley for `ACID`, a marching
 snare for `SNAP`, a thundercloud for `BOOM`, meshed gears for `MESH`, a ghost
 for `BITS`, and mosaic tiles for `PERC`. The module browser thumbnail renders
-it beside the short label and full name. On a loaded rack faceplate, the icon
-badge is the only identity mark. Icons are original drawings and follow the
-section 2.3 originality rules.
+it beside the short label and full name. Icons are original drawings and follow
+the section 2.3 originality rules.
 
 Use each accent for:
 

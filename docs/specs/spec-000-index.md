@@ -29,7 +29,7 @@ references only.
    acceptance numbers stable. These identifiers provide cross-file
    traceability. An unqualified numbered-section reference resolves through the
    section ownership in the build-order table below.
-6. Files under `design/` are prototypes and visual evidence. They are not
+6. Files under `docs/design/` are prototypes and visual evidence. They are not
    normative unless a product specification or direct product-owner decision
    makes them so.
 

@@ -30,8 +30,7 @@ input, generators, and transforms.
 - Launch quantization.
 
 The Playlist always lets the user build a Song beside the inspector. It uses the
-same named Patterns and does not introduce Section or Scene entities. The
-inspector has no Pattern/Song tabs.
+same named Patterns. The inspector has no Pattern/Song tabs.
 
 ### 16.1 One pattern editing surface
 
@@ -124,7 +123,7 @@ Shared header:
 - Horizontal Swing slider. It edits the one global project Swing value, so its
   position is the same on every Pattern.
 - Horizontal Humanize slider. The selected Pattern owns its value.
-- Both timing sliders default to 0 percent. Their travel is tapered: the first
+- Both timing sliders default to 0 percent and use a tapered travel: the first
   30 percent of the value takes 60 percent of the track. The mouse wheel steps
   the value by two percent, or by one percent with Shift held. Each slider
   reports the true percent to assistive technology.
@@ -298,10 +297,9 @@ the rest of the Pattern without a module change.
   files exclude it, and it creates no undo entry.
 
 The same rule applies to the lower lane. The active lane may show lanes from
-non-selected modules as recessed ghost content. These ghosts obey the same
-output-only constraints. This preserves the single-editing-surface rule in
-section 16.1. A ghost is a reference view of data. Select its owning module to
-edit that data.
+non-selected modules as ghost content. This preserves the single-editing-surface
+rule in section 16.1. A ghost is a reference view of data. Select its owning
+module to edit that data.
 
 Keyboard behavior:
 

@@ -60,9 +60,9 @@ Gradients are not theme tokens and are not used for ordinary surfaces.
 
 ## 3. Token architecture
 
-The application theme host defines every token. Shadow-DOM components
-consume inherited tokens and may map them to private component properties. They
-must not redeclare different product values.
+The application theme host defines every token. Components consume inherited
+tokens and may map them to private component properties. They must not
+redeclare different product values.
 
 There are three token classes:
 
@@ -297,8 +297,8 @@ also have a text, shape, boundary, or icon cue that uses overlay colors.
   because the overlay rule cannot outrank an inline property.
 - Components use semantic tokens. They do not use literal theme palette colors
   except for the required `rack` fallback beside `var()`.
-- Reusable Shadow-DOM controls inherit public tokens. Private component tokens
-  may alias public tokens but may not create a hidden, theme-specific palette.
+- Reusable controls inherit public tokens. Private component tokens may alias
+  public tokens but may not create a hidden, theme-specific palette.
 - Canvas renderers receive a resolved semantic palette from the UI theme
   service. They must invalidate cached colors on a theme-change event without
   replacing the canvas or restarting animation unnecessarily.
@@ -467,8 +467,8 @@ Appearance is one global local-storage preference. The UI layer owns the key
 canonical user-theme object is installed. The entire stored value is limited to
 16,384 UTF-8 bytes. No other layer reads or writes this key.
 
-When the Settings page is implemented, it exposes theme selection, high-contrast
-selection, user-theme import, and user-theme deletion.
+The Settings page exposes theme selection, high-contrast selection, user-theme
+import, and user-theme deletion.
 The application header has no appearance selector. This placement rule does not
 change the preference envelope or theme-service ownership.
 

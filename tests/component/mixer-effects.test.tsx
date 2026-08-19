@@ -13,6 +13,15 @@ import { firstModuleId, createHarness, renderWithHarness } from "./helpers";
 
 const SEND_A_ID = SEND_BUS_IDS[0];
 
+/** The Edit control of the named send card, not the first card in DOM order. */
+function sendEditorButton(send: "A" | "B" | "C" | "D"): HTMLElement {
+  const card = screen
+    .getByRole("heading", { name: `Send ${send}` })
+    .closest('[data-component="effect-slot"]');
+  if (card === null) throw new Error(`Expected the Send ${send} effect card.`);
+  return within(card as HTMLElement).getByRole("button", { name: "Edit" });
+}
+
 describe("mixer and effects surfaces", () => {
   it("keeps rack and mixer selection aligned", () => {
     const harness = createHarness();
@@ -198,9 +207,7 @@ describe("mixer and effects surfaces", () => {
     const delayId = sendA?.slots[0];
     if (delayId === null || delayId === undefined) throw new Error("Expected the default delay.");
 
-    const firstEdit = screen.getAllByRole("button", { name: "Edit" }).at(0);
-    if (firstEdit === undefined) throw new Error("Expected the first send editor button.");
-    fireEvent.click(firstEdit);
+    fireEvent.click(sendEditorButton("A"));
     const mix = screen.getByRole("slider", { name: "Analog Echo in Send A Mix" });
     const gain = screen.getByRole("slider", { name: "Analog Echo in Send A Gain" });
     expect(mix).toHaveAttribute("aria-valuenow", "0.35");
@@ -262,9 +269,7 @@ describe("mixer and effects surfaces", () => {
     );
     const parameter = () => screen.getByRole("combobox", { name: "Piano Roll parameter" });
 
-    const firstEdit = screen.getAllByRole("button", { name: "Edit" }).at(0);
-    if (firstEdit === undefined) throw new Error("Expected the first send editor button.");
-    fireEvent.click(firstEdit);
+    fireEvent.click(sendEditorButton("A"));
     fireEvent.contextMenu(screen.getByRole("slider", { name: "Analog Echo in Send A Mix" }));
     expect(parameter()).toHaveValue("mix");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -280,8 +285,7 @@ describe("mixer and effects surfaces", () => {
     );
     expect(parameter()).toHaveValue("model");
 
-    const edit = screen.getAllByRole("button", { name: "Edit" })[0];
-    if (edit === undefined) throw new Error("Expected the Send A editor control.");
+    const edit = sendEditorButton("A");
     fireEvent.click(edit);
     fireEvent.contextMenu(
       screen.getByRole("combobox", { name: "Analog Echo in Send A Mode" }),
@@ -299,8 +303,7 @@ describe("mixer and effects surfaces", () => {
     renderWithHarness(<EffectsBank />, harness);
 
     expect(document.querySelectorAll('[data-component="effect-slot"]')).toHaveLength(4);
-    const edit = screen.getAllByRole("button", { name: "Edit" })[0];
-    if (edit === undefined) throw new Error("Expected a Send A edit button.");
+    const edit = sendEditorButton("A");
     edit.focus();
     fireEvent.click(edit);
     expect(screen.getByRole("dialog", { name: "Send A effect editor" })).toBeVisible();
@@ -429,9 +432,7 @@ describe("mixer and effects surfaces", () => {
       </>,
       harness,
     );
-    const edit = screen.getAllByRole("button", { name: "Edit" })[0];
-    if (edit === undefined) throw new Error("Expected the Send A editor control.");
-    fireEvent.click(edit);
+    fireEvent.click(sendEditorButton("A"));
     fireEvent.change(screen.getByRole("combobox", { name: "Add an effect to Send A" }), {
       target: { value: "pattern-filter" },
     });

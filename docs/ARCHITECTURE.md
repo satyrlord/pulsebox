@@ -777,6 +777,8 @@ Every queue and payload shall have a declared bound.
 - The controller and processor shall reject cyclic, non-finite, or oversized
   ordinary payloads without serializing data on the audio thread.
 - A `parameter-batch` shall contain at most 128 changes.
+- A parameter ID shall contain 1 through 64 characters.
+- A string parameter value shall contain at most 256 characters.
 - An `event-batch` shall contain at most 256 events and shall not schedule
   beyond the 500-millisecond lookahead horizon.
 - One processor shall retain at most 2,048 scheduled musical endpoints. The

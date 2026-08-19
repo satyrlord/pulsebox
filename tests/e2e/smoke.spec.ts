@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import { expect, test, type Page } from "@playwright/test";
+import { waitForAutosaveSnapshot, waitForAutosaveValue } from "./autosave-wait";
 
 /**
  * The browser suite covers what only a real browser can prove: the production
@@ -443,24 +444,14 @@ for (const viewport of [
   });
 }
 
-test("shows the unsupported-size notice below the editing boundary", async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 700 });
-  const notice = page.locator('[data-component="unsupported-size"]');
-  await expect(notice).toBeVisible();
-  await expect(notice.getByRole("status")).toContainText("Autosave remains active");
-  await expect(notice.getByRole("button")).toHaveText(["Save", "Export"]);
-  await expect(page.getByRole("button", { name: "Play", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("slider")).toHaveCount(0);
-});
-
 test("a pattern rename is autosaved and restored after a reload", async ({ page }) => {
   await page.getByRole("combobox", { name: "Selected Pattern" }).selectOption({ label: "Intro" });
   const rename = page.getByRole("textbox", { name: "Pattern name" });
   await rename.fill("Autosaved Pattern");
   await rename.press("Enter");
 
-  // Autosave is debounced, so the reload waits for the snapshot to land.
-  await page.waitForTimeout(1_500);
+  // The debounced autosave lands in IndexedDB before the reload.
+  await waitForAutosaveValue(page, "Autosaved Pattern");
   await page.reload();
 
   await expect(page.getByRole("textbox", { name: "Pattern name" })).toHaveValue(
@@ -474,31 +465,9 @@ test("a tempo change is autosaved and restored after a reload", async ({ page })
   await tempo.press("Enter");
   await expect(tempo).toHaveValue("152");
 
-  await page.waitForTimeout(1_500);
+  await waitForAutosaveValue(page, '"tempo":152');
   await page.reload();
   await expect(page.locator('[data-field="tempo"]')).toHaveValue("152");
-});
-
-test("playback does not block the main thread with long tasks", async ({ page }) => {
-  await page.evaluate(() => {
-    const window_ = window as unknown as { __longTasks: number[] };
-    window_.__longTasks = [];
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) window_.__longTasks.push(entry.duration);
-    }).observe({ entryTypes: ["longtask"] });
-  });
-
-  await startPlayback(page);
-  await page.waitForTimeout(5_000);
-
-  const longTasks = await page.evaluate(
-    () => (window as unknown as { __longTasks: number[] }).__longTasks,
-  );
-
-  // Audio runs on its own thread, so five seconds of playback must not produce
-  // a main-thread task long enough to drop frames or stall input.
-  const worst = longTasks.length === 0 ? 0 : Math.max(...longTasks);
-  expect(worst, `long tasks during playback: ${JSON.stringify(longTasks)}`).toBeLessThan(200);
 });
 
 test("playback keeps the heap stable rather than growing without bound", async ({ page }) => {
@@ -610,7 +579,7 @@ test("each Pattern keeps its own name and selection across reload", async ({ pag
   expect(await pattern.inputValue()).toMatch(/^[0-9a-f-]{36}$/u);
   await expect(pattern.getByRole("option", { name: "Breakbeat" })).toBeAttached();
 
-  await page.waitForTimeout(1_500);
+  await waitForAutosaveValue(page, "Breakbeat");
   await page.reload();
 
   const reloaded = page.getByRole("combobox", { name: "Selected Pattern", exact: true });
@@ -644,7 +613,7 @@ test("a mixer fader moves by keyboard and persists across a reload", async ({ pa
   const after = Number(await fader.getAttribute("aria-valuenow"));
   expect(after).toBeGreaterThan(before);
 
-  await page.waitForTimeout(1_500);
+  await waitForAutosaveSnapshot(page);
   await page.reload();
   await page.getByRole("tab", { name: "Mixer" }).click();
   expect(

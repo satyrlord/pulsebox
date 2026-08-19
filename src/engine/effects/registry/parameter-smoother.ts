@@ -2,18 +2,7 @@ import type {
   ParameterValue,
   SmoothingDescriptor,
 } from "../../../contracts/parameters";
-import { CHORUS_MANIFEST } from "../chorus/manifest";
-import { COMPRESSOR_MANIFEST } from "../compressor/manifest";
-import { DELAY_MANIFEST } from "../delay/manifest";
-import { DISTORTION_MANIFEST } from "../distortion/manifest";
-import { LIMITER_MANIFEST } from "../limiter/manifest";
-import { LO_FI_MANIFEST } from "../lo-fi/manifest";
-import { PARAMETRIC_EQ_MANIFEST } from "../parametric-eq/manifest";
-import { PATTERN_FILTER_MANIFEST } from "../pattern-filter/manifest";
-import { PHASER_MANIFEST } from "../phaser/manifest";
-import { REVERB_MANIFEST } from "../reverb/manifest";
-import { STEREO_WIDTH_MANIFEST } from "../stereo-width/manifest";
-import { TRANSIENT_SHAPER_MANIFEST } from "../transient-shaper/manifest";
+import { BUILT_IN_EFFECTS } from "../registry";
 
 type MutableState = Record<string, ParameterValue>;
 
@@ -27,20 +16,7 @@ interface ParameterRampSlot {
   endValue: number;
 }
 
-const EFFECT_MANIFESTS = [
-  LO_FI_MANIFEST,
-  PATTERN_FILTER_MANIFEST,
-  DISTORTION_MANIFEST,
-  COMPRESSOR_MANIFEST,
-  DELAY_MANIFEST,
-  REVERB_MANIFEST,
-  CHORUS_MANIFEST,
-  PHASER_MANIFEST,
-  PARAMETRIC_EQ_MANIFEST,
-  TRANSIENT_SHAPER_MANIFEST,
-  STEREO_WIDTH_MANIFEST,
-  LIMITER_MANIFEST,
-] as const;
+const EFFECT_MANIFESTS = BUILT_IN_EFFECTS.map((effect) => effect.manifest);
 
 const SMOOTHING_BY_PLUGIN = new Map(
   EFFECT_MANIFESTS.map((manifest) => [

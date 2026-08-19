@@ -1,4 +1,5 @@
 import { isCanonicalUuid, validateStateRevision, type StateRevision } from "./ids";
+import type { ParameterValue } from "./parameters";
 import {
   isPlainRecord,
   validationFailure,
@@ -17,6 +18,8 @@ export const ENGINE_PROTOCOL_LIMITS = Object.freeze({
   maximumParameterChangesPerBatch: 128,
   maximumEventsPerBatch: 256,
   maximumMeterFramesPerSecond: 30,
+  maximumParameterIdLength: 64,
+  maximumParameterValueStringLength: 256,
   maximumSampleChunkBytes: 1024 * 1024,
   maximumSampleChunksInFlight: 4,
 });
@@ -137,6 +140,25 @@ export function isProcessorToControllerKind(value: unknown): value is ProcessorT
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Validates the bounded parameter key shared by controller and processor paths. */
+export function isEngineParameterId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= ENGINE_PROTOCOL_LIMITS.maximumParameterIdLength
+  );
+}
+
+/** Validates the scalar parameter values that can cross the engine protocol. */
+export function isEngineParameterValue(value: unknown): value is ParameterValue {
+  return (
+    (typeof value === "number" && Number.isFinite(value)) ||
+    typeof value === "boolean" ||
+    (typeof value === "string" &&
+      value.length <= ENGINE_PROTOCOL_LIMITS.maximumParameterValueStringLength)
+  );
 }
 
 function ordinaryPayloadByteLength(value: unknown): number | undefined {
@@ -300,6 +322,20 @@ function validateParameterBatch(
       path: "payload.changes",
       message: "Parameter batch exceeds 128 changes.",
     });
+  }
+  for (const [index, change] of candidate.changes.entries()) {
+    if (!isPlainRecord(change) || !isEngineParameterId(change.parameterId)) {
+      issues.push({
+        path: `payload.changes[${index.toString()}].parameterId`,
+        message: "Parameter change ID must contain 1 through 64 characters.",
+      });
+    }
+    if (!isPlainRecord(change) || !isEngineParameterValue(change.value)) {
+      issues.push({
+        path: `payload.changes[${index.toString()}].value`,
+        message: "Parameter change value must be finite, boolean, or a string of at most 256 characters.",
+      });
+    }
   }
 }
 
@@ -590,15 +626,11 @@ export function isRealtimeSafeControllerEnvelope(
       return false;
     }
     for (const change of payload.changes) {
-      if (!isPlainRecord(change) || typeof change.parameterId !== "string") return false;
-      const parameterValue = change.value;
       if (
-        typeof parameterValue !== "string" &&
-        typeof parameterValue !== "boolean" &&
-        (typeof parameterValue !== "number" || !Number.isFinite(parameterValue))
-      ) {
-        return false;
-      }
+        !isPlainRecord(change) ||
+        !isEngineParameterId(change.parameterId) ||
+        !isEngineParameterValue(change.value)
+      ) return false;
     }
   } else if (value.kind === "event-batch") {
     if (

@@ -9,6 +9,8 @@ export interface StereoFrame {
 export interface EffectFrameProcessor {
   process(left: number, right: number, output?: StereoFrame): StereoFrame;
   reset(): void;
+  /** Peak-gain reduction in decibels while the processor is active. */
+  readonly gainReductionDecibels?: number;
 }
 
 export type EffectState = Readonly<Record<string, ParameterValue>>;

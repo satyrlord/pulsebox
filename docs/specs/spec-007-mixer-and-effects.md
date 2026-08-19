@@ -248,7 +248,7 @@ Effect variants or modes provide the compact default identities:
 - Distortion in Drive mode.
 - Stereo width as its own effect.
 
-The reverb detailed editor retains the previously designed shimmer capability.
+The reverb detailed editor has the shimmer capability.
 
 ### 20.3 Compact A–D Effects view
 
@@ -256,12 +256,8 @@ The Effects studio tab contains four compact A–D cards. Each card summarizes o
 send-bus effect chain. The Effects view replaces the Mixer view inside the same
 compact studio column. The application never shows it beside or below the mixer.
 
-Default primary effects:
-
-- A: Analog echo.
-- B: Plate reverb.
-- C: Stereo width.
-- D: Drive.
+Default primary effects follow
+[rack and instruments](spec-005-rack-and-instruments.md) section 9.1.
 
 Each compact slot contains:
 
@@ -291,6 +287,7 @@ send-chain return level from silence to unity. The source remains dry on its
 main path. Return Level is not an effect Mix control.
 
 Edit opens the established 760 × 680 detailed editor without stopping playback.
+Closing the editor restores focus to its opener.
 
 ### 20.4 Pedalboard
 

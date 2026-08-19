@@ -1,19 +1,12 @@
 import { useState, type CSSProperties } from "react";
 
-import { SEND_BUS_IDS, type EffectInstanceId } from "../../../contracts";
+import { type EffectInstanceId } from "../../../contracts";
 import { Knob } from "../controls/Knob";
 import { automationShortcut } from "../controls/automation-shortcut";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { EffectEditor } from "./EffectEditor";
+import { SENDS, sendIdFor } from "./sends";
 import styles from "./Shell.module.css";
-
-const SENDS = ["A", "B", "C", "D"] as const;
-
-function sendIdFor(index: number) {
-  const id = SEND_BUS_IDS[index];
-  if (id === undefined) throw new Error("A fixed send bus is missing.");
-  return id;
-}
 
 function CompactMacro(props: {
   readonly effectId: EffectInstanceId;

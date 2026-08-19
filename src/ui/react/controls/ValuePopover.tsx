@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 export interface ValuePopoverProps {
   readonly id?: string | undefined;
   /** Full accessible name for the entry field. */
@@ -69,4 +71,3 @@ export function ValuePopover(props: ValuePopoverProps) {
     />
   );
 }
-import { useEffect, useRef, useState } from "react";

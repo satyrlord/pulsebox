@@ -2475,7 +2475,7 @@ export function parseProjectDocument(
             pluginId: pluginId.value,
             kind,
             pluginVersion: typeof requirement.pluginVersion === "string" ? requirement.pluginVersion : "",
-            apiVersion: requirement.apiVersion === 1 ? 1 : 1,
+            apiVersion: 1,
             stateSchemaVersion: typeof requirement.stateSchemaVersion === "number" ? requirement.stateSchemaVersion : 0,
           });
         }
