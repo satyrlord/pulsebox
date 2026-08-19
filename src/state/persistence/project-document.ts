@@ -32,6 +32,7 @@ import {
   MAXIMUM_PATTERN_COUNT,
   MINIMUM_PATTERN_COUNT,
 } from "../default-state";
+import { isNumericNoteKey } from "../edit-policy";
 import {
   PATTERN_TICKS_PER_STEP,
   PATTERN_SCALES,
@@ -711,12 +712,6 @@ function validUuidList(value: unknown, path: string, collector: IssueCollector):
   return true;
 }
 
-function isNumberNoteKey(value: string): boolean {
-  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) return false;
-  const note = Number(value);
-  return Number.isSafeInteger(note) && note >= 0 && note <= 127;
-}
-
 function validVoiceCycleLengths(
   value: unknown,
   path: string,
@@ -728,7 +723,7 @@ function validVoiceCycleLengths(
     return false;
   }
   for (const [voiceKey, length] of Object.entries(value)) {
-    if (voiceIds === undefined || voiceIds.length === 0 || (!voiceIds.includes(voiceKey) && !isNumberNoteKey(voiceKey))) {
+    if (voiceIds === undefined || voiceIds.length === 0 || (!voiceIds.includes(voiceKey) && !isNumericNoteKey(voiceKey))) {
       collector.add(`${path}.${voiceKey}`, "Voice cycle key must resolve to a drum voice or numeric note.");
     }
     if (

@@ -176,8 +176,8 @@ Michroma, and Share Tech Mono. Rules for bundled typefaces:
 - Every font stack ends in a generic system fallback, so missing glyphs and a
   failed asset resolve to a system face.
 - A change to this typeface set is a product-contract change. It requires an
-  update to this document, the typography tests, and the naming and
-  originality audit.
+  update to this document and the typography tests. It also requires a new
+  naming and originality audit.
 
 ### 3.4 Module-scoped accent tokens
 

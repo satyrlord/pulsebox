@@ -171,13 +171,12 @@ describe("architecture source policy", () => {
     ]);
   });
 
-  it("keeps owning contracts and the required naming audit allowed", () => {
+  it("keeps owning contracts allowed", () => {
     expect(
       findRunNarrativeViolations([
         "AGENTS.md",
         "README.md",
         "docs/ARCHITECTURE.md",
-        "docs/audits/naming-originality-audit.md",
         "docs/instruments/silver-serpent.md",
         "docs/specs/spec-010-quality-and-delivery.md",
       ]),

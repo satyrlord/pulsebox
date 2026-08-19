@@ -133,6 +133,7 @@ describe("product toolchain contract", () => {
     expect(launcher).toMatch(/(?:port|PORT)\s*=\s*4173/);
     expect(launcher).toMatch(/\.listen\s*\(\s*(?:port|PORT)\s*,\s*(?:host|HOST)/);
     expect(launcher).toMatch(/EADDRINUSE/);
+    expect(launcher).toMatch(/\[\s*["']\.woff2["']\s*,\s*["']font\/woff2["']\s*\]/);
     expect(launcher).not.toMatch(/(?:port|PORT)\s*(?:\+\+|\+=|=\s*(?:port|PORT)\s*\+)/);
   });
 

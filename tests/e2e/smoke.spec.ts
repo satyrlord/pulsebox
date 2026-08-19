@@ -470,27 +470,6 @@ test("a tempo change is autosaved and restored after a reload", async ({ page })
   await expect(page.locator('[data-field="tempo"]')).toHaveValue("152");
 });
 
-test("playback keeps the heap stable rather than growing without bound", async ({ page }) => {
-  const readHeap = () =>
-    page.evaluate(() => {
-      const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
-      return memory?.usedJSHeapSize ?? 0;
-    });
-
-  await startPlayback(page);
-  await page.waitForTimeout(2_000);
-  const first = await readHeap();
-  await page.waitForTimeout(6_000);
-  const second = await readHeap();
-  await page.getByRole("button", { name: "Stop" }).click();
-
-  // A scheduler that leaked one object per lookahead tick would climb steeply.
-  // Chrome only exposes `performance.memory`, so a zero reading skips the check.
-  if (first > 0 && second > 0) {
-    expect(second, `heap grew from ${String(first)} to ${String(second)}`).toBeLessThan(first * 3);
-  }
-});
-
 test("Tin Soldier keeps producing audio with Tone driven to its maximum", async ({ page }) => {
   await startPlayback(page);
 

@@ -79,8 +79,6 @@ Current owners:
   per-instrument voice limits, steal priority, release, choke, and retrigger.
 - [docs/user-sample-policy.md](docs/user-sample-policy.md): accepted samples,
   ownership, privacy, and user-facing failure behavior.
-- [docs/audits/naming-originality-audit.md](docs/audits/naming-originality-audit.md):
-  current naming, dependency, and originality evidence.
 
 ## Commands
 
@@ -177,10 +175,8 @@ Command plus A selects all events. Control or Command plus D duplicates them.
   later roadmap phases.
 - The Pattern bank holds five named Patterns and selects Verse by default. The
   lower editor creates, selects, moves, resizes, duplicates, and deletes notes.
-  It also paints fixed drum triggers and edits event velocity. Swing and
-  Humanize controls remain in the shared header.
-- Record arms and disarms only. Live recording and its count-in settings belong
-  to the specification 006 phase.
+  It paints drum triggers and edits advanced event properties. It also supports
+  keyboard recording with a count-in. Swing and Humanize remain in the header.
 - Silver Serpent and Tin Soldier implement their Phase 1 sound and compact-rack
   foundation. Expanded per-module editors remain planned for all six
   instruments: manifests declare editor sections, but no UI reads them yet.
@@ -193,10 +189,7 @@ Command plus A selects all events. Control or Command plus D duplicates them.
   direct Distortion control. Generated sample layers use click-safe playback
   boundaries where the drum module uses them. User
   choke-group assignment and per-voice metering remain planned.
-  Per-step probability, micro-timing, flam, and roll wait for the specification
-  006 editing surface.
-- The default project stores sixteen-step Patterns. The specification 005
-  named-Pattern bar lengths, the time-signature field, and a stored
+- Patterns have named durations in bars. The time-signature field and a stored
   quantize-strength value remain planned.
 - Browser tests prove AudioWorklet activation. Final release still requires the
   specified rendered-audio, startup, and physical listening procedures.

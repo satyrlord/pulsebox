@@ -42,6 +42,7 @@ import {
 import type { PluginId } from "../contracts/parameters";
 import type { EffectPlacement } from "../contracts/plugins";
 import type { PatternEventEdit, PulseCommand } from "./commands";
+import { isNumericNoteKey } from "./edit-policy";
 import {
   createEmptyPatternPart,
   createModule,
@@ -993,7 +994,7 @@ export class PulseStore {
     if (seed !== undefined && (seed.voiceIds === undefined || seed.voiceIds.length === 0)) {
       return { error: rejected("payload.moduleId", "This module has no drum voices.", "Choose a drum module.") };
     }
-    if (seed?.voiceIds !== undefined && !seed.voiceIds.includes(voiceKey as VoiceId) && !isNumberNoteKey(voiceKey)) {
+    if (seed?.voiceIds !== undefined && !seed.voiceIds.includes(voiceKey as VoiceId) && !isNumericNoteKey(voiceKey)) {
       return { error: rejected("payload.voiceKey", "Voice cycle key does not belong to this module.", "Choose a module voice or numeric note.") };
     }
     if (length !== undefined && (!Number.isSafeInteger(length) || length < 1 || length > 64)) {
@@ -2553,14 +2554,8 @@ function cloneAutomationLane(
   };
 }
 
-function isNumberNoteKey(value: string): boolean {
-  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) return false;
-  const note = Number(value);
-  return Number.isSafeInteger(note) && note >= 0 && note <= 127;
-}
-
 function isVoiceCycleLengthKey(value: string): value is VoiceCycleLengthKey {
-  return isNumberNoteKey(value) || /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value);
+  return isNumericNoteKey(value) || /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value);
 }
 
 function insertAfter<Item>(

@@ -30,12 +30,10 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 }
 
 /**
- * jsdom implements no canvas rendering context. Its `getContext` prints a "Not
- * implemented" notice and returns null, so the level meter takes its
- * null-context exit and installs none of the animation loop, theme observer, or
- * visibility listener that these tests check. The stub carries only the members
- * the meter draws with. A call to any other member must fail loudly here rather
- * than pass as a silent no-op.
+ * jsdom implements no canvas rendering context. The stub lets the level meter
+ * install its animation loop, theme observer, and visibility listener. It
+ * carries only the members the meter draws with. Other calls fail instead of
+ * passing as silent no-ops.
  */
 function createContext2dStub(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const stub = {

@@ -1007,6 +1007,7 @@ test("saved Distortion reaches the production worklet and changes while sounding
 test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ browser }, testInfo) => {
   test.setTimeout(120_000);
   const captures: CrossRateCapture[] = [];
+  const comparisonWindowSeconds = 1.5;
 
   for (const requestedSampleRate of [44_100, 48_000]) {
     const context = await browser.newContext();
@@ -1170,7 +1171,53 @@ test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ br
       const renderStartedAt = Date.now();
       await page.getByRole("button", { name: /^play$/i }).click();
       await expect(page.locator(".audio-status")).toHaveText("Audio active");
-      await page.waitForTimeout(2_000);
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              ({ sampleRate, windowSeconds }) => {
+                const state = window as unknown as {
+                  __crossRateProbe: {
+                    nodes: {
+                      meterLevels: number[];
+                      onsets: CrossRateOnsetEvidence[];
+                      processorName: string;
+                    }[];
+                  };
+                };
+                const nodes = state.__crossRateProbe.nodes.filter(
+                  (node) => node.processorName !== "pulsebox-effect",
+                );
+                if (
+                  nodes.length !== 6 ||
+                  nodes.some(
+                    (node) =>
+                      node.onsets.length === 0 ||
+                      !node.meterLevels.some((level) => level > 0),
+                  )
+                ) {
+                  return false;
+                }
+                const onsets = nodes.flatMap((node) => node.onsets);
+                const stepZeroFrames = onsets
+                  .filter((onset) => onset.sourceStep === 0)
+                  .map((onset) => onset.audioFrame);
+                if (stepZeroFrames.length !== 3 || new Set(stepZeroFrames).size !== 1) {
+                  return false;
+                }
+                const startFrame = stepZeroFrames[0];
+                if (startFrame === undefined) return false;
+                const latestFrame = Math.max(...onsets.map((onset) => onset.audioFrame));
+                return latestFrame - startFrame >= sampleRate * windowSeconds;
+              },
+              { sampleRate: requestedSampleRate, windowSeconds: comparisonWindowSeconds },
+            ),
+          {
+            message: "Expected a complete cross-rate audio evidence window.",
+            timeout: 10_000,
+          },
+        )
+        .toBe(true);
       const renderLengthMilliseconds = Date.now() - renderStartedAt;
       const capture = await page.evaluate(() => {
         const state = window as unknown as {
@@ -1257,7 +1304,6 @@ test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ br
   expect(lowerRateNodes).toHaveLength(6);
   expect(higherRateNodes).toHaveLength(6);
 
-  const comparisonWindowSeconds = 1.5;
   const lowerStart = at44k?.startFrame ?? 0;
   const higherStart = at48k?.startFrame ?? 0;
   const lowerWindowFrames = Math.floor(44_100 * comparisonWindowSeconds);

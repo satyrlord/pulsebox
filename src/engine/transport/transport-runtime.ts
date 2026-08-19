@@ -839,9 +839,9 @@ export class TransportRuntime {
       case "song-set": {
         this.#setRevision(delta.projectRevision);
         const entries = delta.payload.entries;
-        // Stable-ID Playlist payloads are projected by the composition root.
-        // Keep the current engine view when this legacy numeric payload is
-        // absent, rather than replacing a valid chain with an empty one.
+        // Stable-ID Playlist payloads are projected into numeric engine entries
+        // by the composition root. Keep the current view when entries are
+        // absent instead of replacing a valid chain with an empty one.
         if (!Array.isArray(entries)) return;
         const base = this.#pendingArrangement ?? this.#arrangement;
         this.setArrangement({

@@ -12,6 +12,13 @@ export function clampUnitInterval(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+/** True when a voice-cycle key is a canonical note number from 0 through 127. */
+export function isNumericNoteKey(value: string): boolean {
+  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) return false;
+  const note = Number(value);
+  return Number.isSafeInteger(note) && note >= 0 && note <= 127;
+}
+
 /**
  * Section 14: a module swap keeps sequence data and reports the events the
  * swap target cannot map. Undefined playable notes means every note maps, as

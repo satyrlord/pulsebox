@@ -29,3 +29,5 @@ jobs:
       - run: npx playwright install --with-deps chrome
 
       - run: npm run test:e2e
+
+      - run: npm run dead-code

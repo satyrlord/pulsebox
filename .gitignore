@@ -38,8 +38,12 @@ Thumbs.db
 
 # Generated one-off outputs
 logs/
+
+# Tool workspaces
 .claude/
 .codex/
 .agents/
 .impeccable/
+
+# Non-shipping research
 research/

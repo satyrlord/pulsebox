@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest";
  *
  * The patterns are conservative word-boundary matches, so an accidental
  * substring inside a hex color or an identifier cannot fail the check. The
- * periodic manual audit in `docs/audits/naming-originality-audit.md` remains
- * the complete review. This test keeps its most mechanical part continuous.
+ * production audit also reviews assets and visual work. This test keeps its
+ * mechanical text scan continuous.
  */
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -78,8 +78,12 @@ function readScannedUnits(): readonly TextUnit[] {
 describe("naming and originality boundary", () => {
   const units = readScannedUnits();
 
-  it("scans a non-empty shipping tree", () => {
-    expect(units.length).toBeGreaterThan(50);
+  it("scans each required shipping root", () => {
+    const paths = new Set(units.map((unit) => unit.path));
+    for (const directory of SCANNED_DIRECTORIES) {
+      expect(units.some((unit) => unit.path.startsWith(`${directory}/`))).toBe(true);
+    }
+    for (const file of SCANNED_ROOT_FILES) expect(paths.has(file)).toBe(true);
   });
 
   it("contains no manufacturer name in shipping text or file names", () => {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { clampUnitInterval, countUnmappedEvents } from "../../../src/state/edit-policy";
+import {
+  clampUnitInterval,
+  countUnmappedEvents,
+  isNumericNoteKey,
+} from "../../../src/state/edit-policy";
 import type { PatternPartState } from "../../../src/state/model";
 
 function event(id: string, note: number) {
@@ -28,6 +32,16 @@ describe("clampUnitInterval", () => {
     expect(clampUnitInterval(0.4)).toBe(0.4);
     expect(clampUnitInterval(1)).toBe(1);
     expect(clampUnitInterval(1.5)).toBe(1);
+  });
+});
+
+describe("isNumericNoteKey", () => {
+  it("accepts only canonical note numbers from 0 through 127", () => {
+    expect(isNumericNoteKey("0")).toBe(true);
+    expect(isNumericNoteKey("127")).toBe(true);
+    expect(isNumericNoteKey("128")).toBe(false);
+    expect(isNumericNoteKey("01")).toBe(false);
+    expect(isNumericNoteKey("kick")).toBe(false);
   });
 });
 

@@ -266,8 +266,7 @@ Deliver:
 - Informational performance notes covering browser, sample rate, buffer setting
   where exposed, active module and effect load, observed glitches, and known
   hotspots. No fixed CPU threshold is an acceptance gate.
-- Repository-wide case-insensitive naming and dependency audit report under
-  `docs/audits/`.
+- Repository-wide case-insensitive naming and dependency audit.
 
 README includes:
 
@@ -295,6 +294,9 @@ Commands:
 - `npm run test:e2e`
 - `npm run lint`
 - `npm run typecheck`
+- `npm run dead-code`
+- `npm run lint:md`
+- `npm run ci`
 
 ### 24.8 Build phases
 
@@ -333,17 +335,15 @@ phase. Such a slice does not complete its parent phase or a skipped phase.
 User-facing status must name the exact implemented slice and its missing
 parent-phase scope.
 
-The current runnable foundation contains Phase 1 and narrow slices for Tin
-Soldier, named Pattern storage, basic channel mixing, and the per-voice
-Distortion control. The runnable `spec-007` slice adds fixed mixer strips, A–D
-channel sends, module pedalboards, and four send chains. It also adds the master
-chain and the built-in effect catalog with its protected master-chain limiter.
-It contains Playlist transport, appearance Settings, and browser project
-persistence. These slices verify shared contracts and integration points. They
-do not complete the Phase 4 parent scope or Phases 5 through 7, or their
-acceptance criteria. Remaining gaps include the full Phase 4 acceptance set and
-the later Pattern/Song, persistence/export, accessibility, and release-evidence
-gates.
+The current runnable foundation contains Phase 1 and narrow slices from later
+phases. These slices include six instruments and the eight-slot rack. They also
+include Pattern editing, live keyboard recording, generators, transforms, and
+advanced event properties. The `spec-007` slice includes fixed mixer strips,
+A–D sends, module pedalboards, send chains, the master chain, and the built-in
+effect catalog. Playlist transport, appearance Settings, and browser project
+persistence are also present. These slices do not complete their parent phases
+or acceptance criteria. Remaining work includes advanced instrument editors,
+assets and packs, export, accessibility acceptance, and final release evidence.
 
 ### 24.9 Close-out
 

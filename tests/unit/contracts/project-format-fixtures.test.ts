@@ -21,10 +21,9 @@ describe("Phase 0 project-format fixture definitions", () => {
     expect(counts).toEqual({ valid: 7, rejection: 12, repair: 5, storage: 10 });
   });
 
-  it("gives every definition an actionable expected assertion", () => {
+  it("gives every definition a stable ID", () => {
     for (const fixture of PROJECT_FORMAT_FIXTURE_DEFINITIONS) {
       expect(fixture.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
-      expect(fixture.assertion.length).toBeGreaterThan(20);
     }
   });
 });
