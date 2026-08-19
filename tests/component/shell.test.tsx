@@ -86,6 +86,44 @@ describe("TransportBar", () => {
     expect(harness.domain.getState().transport.status).toBe("stopped");
   });
 
+  it("keeps Stop authoritative while Play waits for audio activation", async () => {
+    const harness = createHarness();
+    let finishActivation = (): void => undefined;
+    const activation = new Promise<void>((resolve) => {
+      finishActivation = resolve;
+    });
+    harness.audio.play.mockReturnValueOnce(activation);
+    renderWithHarness(<TransportBar />, harness);
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await waitFor(() => expect(harness.audio.play).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    expect(harness.domain.getState().transport.status).toBe("stopped");
+
+    act(() => finishActivation());
+    await waitFor(() => expect(harness.audio.stop).toHaveBeenCalledTimes(2));
+    expect(harness.domain.getState().transport.status).toBe("stopped");
+  });
+
+  it("keeps Pause authoritative while Play waits for audio activation", async () => {
+    const harness = createHarness();
+    let finishActivation = (): void => undefined;
+    const activation = new Promise<void>((resolve) => {
+      finishActivation = resolve;
+    });
+    harness.audio.play.mockReturnValueOnce(activation);
+    renderWithHarness(<TransportBar />, harness);
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await waitFor(() => expect(harness.audio.play).toHaveBeenCalledOnce());
+    act(() => harness.store.getState().pause());
+    expect(harness.domain.getState().transport.status).toBe("paused");
+
+    act(() => finishActivation());
+    await waitFor(() => expect(harness.audio.pause).toHaveBeenCalledTimes(2));
+    expect(harness.domain.getState().transport.status).toBe("paused");
+  });
+
   it("commits a tempo only when it is inside the supported range", () => {
     const harness = createHarness();
     renderWithHarness(<TransportBar />, harness);

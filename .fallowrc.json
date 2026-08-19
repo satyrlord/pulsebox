@@ -1,0 +1,6 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "dynamicallyLoaded": [
+    "src/engine/effects/*/dsp-core.ts"
+  ]
+}

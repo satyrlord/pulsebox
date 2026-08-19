@@ -480,6 +480,8 @@
 .studioPane {
   flex: 1;
   min-block-size: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -487,6 +489,32 @@
 .masterPanel {
   gap: 6px;
   padding: 8px;
+}
+
+.effectsBank {
+  --effects-return-width: calc(
+    var(--pulse-space-10, 40px) + var(--pulse-space-3, 12px) + var(--pulse-border-strong, 2px)
+  );
+  --effects-actions-width: calc(
+    var(--pulse-space-10, 40px) + var(--pulse-space-10, 40px) +
+      var(--pulse-space-10, 40px) + var(--pulse-space-1, 4px)
+  );
+  --effects-macro-min-width: calc(
+    var(--pulse-space-10, 40px) + var(--pulse-space-1, 4px)
+  );
+  --effects-macro-min-height: calc(
+    var(--pulse-space-10, 40px) + var(--pulse-space-3, 12px)
+  );
+  --effects-compact-control: calc(
+    var(--pulse-control-compact, 24px) + var(--pulse-space-1, 4px)
+  );
+  flex: 1;
+  block-size: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 /* A send row and a master card are both raised plates on the chassis. The lit
@@ -554,22 +582,121 @@
   text-shadow: 0 1px 0 var(--text-engraved-lo);
 }
 
-.effectSummary { min-inline-size: 0; display: grid; gap: 6px; }
-.effectHeading, .effectControls { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.effectHeading output { font-family: var(--pulse-font-mono, ui-monospace, monospace); font-size: var(--pulse-type-10, 10px); color: var(--pulse-color-text-muted, #919ba3); }
-.effectMacros { min-block-size: 30px; display: flex; align-items: start; gap: 4px; overflow: hidden; }
-.effectMacros :global([data-component="knob"]) { min-inline-size: 30px; gap: 0; }
-.effectMacros :global([data-component="knob"] [role="slider"]), .effectMacros :global([data-component="knob"] svg) { inline-size: 26px; block-size: 26px; }
-.effectMacros :global([data-component="knob"] > span) { max-inline-size: 30px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--pulse-type-10, 10px); }
-.compactSelect { min-inline-size: 42px; display: grid; gap: 1px; font-size: var(--pulse-type-10, 10px); text-align: center; }
-.compactSelect span { max-inline-size: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.compactSelect select { inline-size: 42px; min-block-size: 26px; padding-inline: 1px; font-size: var(--pulse-type-10, 10px); }
-.emptyMacros { align-self: center; font-size: var(--pulse-type-10, 10px); color: var(--pulse-color-text-muted, #919ba3); }
-.effectControls { justify-content: start; }
-.effectControls :global([data-component="knob"]) { min-inline-size: 34px; gap: 0; }
-.effectControls :global([data-component="knob"] [role="slider"]), .effectControls :global([data-component="knob"] svg) { inline-size: 28px; block-size: 28px; }
-.effectControls :global([data-component="knob"] > span) { font-size: var(--pulse-type-10, 10px); }
-.effectControls button, .masterChainActions button { min-block-size: 24px; font-size: var(--pulse-type-10, 10px); }
+.effectSummary {
+  min-inline-size: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.effectHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.effectHeading output {
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.effectBody {
+  min-inline-size: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--effects-return-width) var(--effects-actions-width);
+  align-items: start;
+  gap: var(--pulse-space-1, 4px);
+}
+
+.effectMacros {
+  min-inline-size: 0;
+  min-block-size: var(--effects-macro-min-height);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--effects-macro-min-width), 1fr));
+  align-items: start;
+  gap: var(--pulse-space-1, 4px);
+}
+
+.effectMacros :global([data-component="knob"]) {
+  min-inline-size: 0;
+  inline-size: 100%;
+  gap: 0;
+}
+
+.effectMacros :global([data-component="knob"] [role="slider"]),
+.effectMacros :global([data-component="knob"] svg) {
+  inline-size: var(--effects-compact-control);
+  block-size: var(--effects-compact-control);
+}
+
+.effectMacros :global([data-component="knob"] > span) {
+  max-inline-size: 100%;
+  overflow: hidden;
+  white-space: normal;
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.compactSelect {
+  min-inline-size: 0;
+  display: grid;
+  gap: var(--pulse-focus-gap, 1px);
+  font-size: var(--pulse-type-10, 10px);
+  text-align: center;
+}
+
+.compactSelect span {
+  min-block-size: var(--pulse-target-min, 24px);
+  overflow: hidden;
+  line-height: var(--pulse-line-tight, 1.2);
+  white-space: normal;
+}
+
+.compactSelect select {
+  inline-size: 100%;
+  min-block-size: var(--effects-compact-control);
+  padding-inline: var(--pulse-focus-gap, 1px);
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.emptyMacros {
+  grid-column: 1 / -1;
+  align-self: center;
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.effectReturn :global([data-component="knob"]) {
+  min-inline-size: var(--effects-return-width);
+  gap: var(--pulse-space-0, 0);
+}
+
+.effectReturn :global([data-component="knob"] [role="slider"]),
+.effectReturn :global([data-component="knob"] svg) {
+  inline-size: var(--effects-compact-control);
+  block-size: var(--effects-compact-control);
+}
+
+.effectReturn :global([data-component="knob"] > span) {
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.effectActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pulse-space-1, 4px);
+}
+
+.effectActions button,
+.masterChainActions button {
+  min-block-size: var(--pulse-target-min, 24px);
+  padding-inline: var(--pulse-space-1, 4px);
+  font-size: var(--pulse-type-10, 10px);
+}
+
+.effectActions button:last-child {
+  grid-column: 1 / -1;
+}
 .masterChainActions { display: flex; flex-wrap: wrap; gap: 6px; }
 .masterOutputActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .masterChainMeters {

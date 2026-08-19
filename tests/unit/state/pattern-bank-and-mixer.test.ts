@@ -115,7 +115,12 @@ function effectHarness() {
       pluginId === BASS_MONO_MANIFEST.pluginId ? BASS_MONO_MANIFEST.parameters : undefined,
     ),
     () => TIMESTAMP,
-    () => true,
+    (effect, parameter, value) =>
+      effect.pluginId === ("chorus" as PluginId) &&
+      parameter === "rate" &&
+      typeof value === "number" &&
+      value >= 0 &&
+      value <= 1,
     createCatalogEffect,
   );
   return { store, moduleId: required(store.getState().ui.selectedModuleId) };
@@ -160,6 +165,50 @@ describe("project-owned Pattern bank", () => {
       roll: 0,
     });
     expect(project.patterns.filter((pattern) => pattern.id !== verse.id).every((pattern) => pattern.parts[moduleId] === undefined)).toBe(true);
+  });
+
+  it("enforces the Pattern-name limit in UTF-8 bytes for each naming command", () => {
+    const { store } = harness();
+    const verseId = patternId(store, "Verse");
+    const trailingHighSurrogate = String.fromCharCode(0xd800);
+    const aboveLimit = "🎹".repeat(65);
+
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-rename", {
+          patternId: verseId,
+          name: trailingHighSurrogate,
+        }),
+      ).status,
+    ).toBe("rejected");
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-add", {
+          name: trailingHighSurrogate,
+          afterPatternId: verseId,
+        }),
+      ).status,
+    ).toBe("rejected");
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-rename", { patternId: verseId, name: aboveLimit }),
+      ).status,
+    ).toBe("rejected");
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-add", { name: aboveLimit, afterPatternId: verseId }),
+      ).status,
+    ).toBe("rejected");
+
+    const boundaryName = "🎹".repeat(64);
+    expect(
+      store.dispatch(
+        store.createCommand("pattern-rename", { patternId: verseId, name: boundaryName }),
+      ).status,
+    ).toBe("accepted");
+    expect(
+      store.dispatch(store.createCommand("pattern-duplicate", { patternId: verseId })).status,
+    ).toBe("rejected");
   });
 
   it("adds, duplicates, reorders, and deletes by stable Pattern ID", () => {
@@ -442,6 +491,76 @@ describe("mixer commands", () => {
     }));
     store.redo();
     expect(store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+  });
+
+  it("rejects unsupported and malformed external automation targets when arming", () => {
+    const { store, moduleId } = effectHarness();
+    expect(store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "mixer", targetId: moduleId, parameterId: "unknown" },
+    }))).toMatchObject({
+      status: "rejected",
+      error: { message: "Automation parameter is not supported." },
+    });
+    expect(store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "invalid" as never, targetId: moduleId, parameterId: "level" },
+    }))).toMatchObject({
+      status: "rejected",
+      error: { message: "Automation scope is invalid." },
+    });
+
+    expect(store.dispatch(store.createCommand("effects-chain-effect-add", {
+      chain: { scope: "module", targetId: moduleId },
+      effectPluginId: "chorus" as PluginId,
+    })).status).toBe("accepted");
+    const effectId = requiredEffectId(
+      store.getState().project.effects.moduleChains[moduleId]?.slots.find((id) => id !== null),
+    );
+    expect(store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "effect", targetId: effectId, parameterId: "rate" },
+    }))).toMatchObject({ status: "accepted", changed: true });
+    expect(store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+      target: { scope: "effect", targetId: effectId, parameterId: "unknown" },
+    }))).toMatchObject({
+      status: "rejected",
+      error: { message: "Automation parameter is not supported." },
+    });
+  });
+
+  it("clears plugin automation targets after replacement and keeps shared targets", () => {
+    const prepareTarget = (parameterId: string) => {
+      const { store, moduleId } = effectHarness();
+      expect(store.dispatch(store.createCommand("effects-chain-effect-add", {
+        chain: { scope: "module", targetId: moduleId },
+        effectPluginId: "chorus" as PluginId,
+      })).status).toBe("accepted");
+      const effectId = requiredEffectId(
+        store.getState().project.effects.moduleChains[moduleId]?.slots.find((id) => id !== null),
+      );
+      expect(store.dispatch(store.createCommand("piano-roll-automation-target-set", {
+        target: { scope: "effect", targetId: effectId, parameterId },
+      })).status).toBe("accepted");
+      return { store, effectId };
+    };
+
+    const pluginTarget = prepareTarget("rate");
+    expect(pluginTarget.store.dispatch(pluginTarget.store.createCommand(
+      "effects-chain-effect-replace",
+      { effectInstanceId: pluginTarget.effectId, effectPluginId: "compressor" as PluginId },
+    )).status).toBe("accepted");
+    expect(pluginTarget.store.getState().ui.pianoRollAutomationTarget).toBeUndefined();
+
+    for (const parameterId of ["mix", "gain", "bypassed"]) {
+      const sharedTarget = prepareTarget(parameterId);
+      expect(sharedTarget.store.dispatch(sharedTarget.store.createCommand(
+        "effects-chain-effect-replace",
+        { effectInstanceId: sharedTarget.effectId, effectPluginId: "compressor" as PluginId },
+      )).status).toBe("accepted");
+      expect(sharedTarget.store.getState().ui.pianoRollAutomationTarget).toEqual({
+        scope: "effect",
+        targetId: sharedTarget.effectId,
+        parameterId,
+      });
+    }
   });
 
   it("keeps default return chains, the protected limiter, and master bypass in project state", () => {

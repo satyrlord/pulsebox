@@ -306,6 +306,39 @@ describe("project document", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("rejects a user-visible name above 256 UTF-8 bytes", () => {
+    const written = document();
+    const result = parseProjectDocument(
+      {
+        ...written,
+        project: { ...written.project, name: "🎹".repeat(65) },
+      },
+      PARSE,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toContainEqual({
+      path: "project.name",
+      message: "Name must contain 1 through 256 UTF-8 bytes.",
+    });
+  });
+
+  it("rejects a trailing high surrogate in a project name", () => {
+    const written = document();
+    const patterns = written.patterns.map((pattern, index) =>
+      index === 0 ? { ...pattern, name: String.fromCharCode(0xd800) } : pattern,
+    );
+    const result = parseProjectDocument({ ...written, patterns }, PARSE);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toContainEqual({
+      path: "$.patterns[0].name",
+      message: "String contains a forbidden control or surrogate character.",
+    });
+  });
+
   it("accepts simultaneous trigger voices and rejects duplicate voice triggers", () => {
     const written = document(DRUM_SEED);
     const { patternIndex, partIndex } = firstEventPart(written);
@@ -820,6 +853,70 @@ describe("legacy saved data", () => {
 });
 
 describe("format 2 documents", () => {
+  it("scans hostile format-1 input before the migration pipeline", () => {
+    const legacy = {
+      ...formatOneDocument(),
+      project: {
+        ...(formatOneDocument().project as Readonly<Record<string, unknown>>),
+        tempo: -0,
+      },
+    };
+
+    expect(parseProjectDocument(legacy, PARSE)).toEqual({
+      ok: false,
+      issues: [
+        {
+          path: "$.project.tempo",
+          message: "Numbers must be finite and must not be negative zero.",
+        },
+      ],
+    });
+  });
+
+  it("rejects malformed format-1 migration containers without throwing", () => {
+    const legacy = formatOneDocument();
+    const malformedRack = parseProjectDocument({ ...legacy, rack: null }, PARSE);
+    const effects = legacy.effects as Readonly<Record<string, unknown>>;
+    const malformedChain = parseProjectDocument(
+      {
+        ...legacy,
+        effects: { ...effects, moduleChains: [null] },
+      },
+      PARSE,
+    );
+
+    expect(malformedRack).toEqual({
+      ok: false,
+      issues: [{ path: "rack", message: "Format 1 rack data must be an array." }],
+    });
+    expect(malformedChain).toEqual({
+      ok: false,
+      issues: [
+        {
+          path: "effects.moduleChains[0].slots",
+          message: "A format-1 effect chain must have a slot array.",
+        },
+      ],
+    });
+
+    const invalidEffectContainers = [
+      [{ ...legacy, effects: null }, "effects"],
+      [{ ...legacy, effects: { ...effects, moduleChains: null } }, "effects.moduleChains"],
+      [{ ...legacy, effects: { ...effects, sendChains: {} } }, "effects.sendChains"],
+      [{ ...legacy, effects: { ...effects, masterChain: null } }, "effects.masterChain"],
+      [
+        { ...legacy, effects: { ...effects, masterChain: { slots: null } } },
+        "effects.masterChain.slots",
+      ],
+    ] as const;
+    for (const [candidate, path] of invalidEffectContainers) {
+      const result = parseProjectDocument(candidate, PARSE);
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.issues.some((issue) => issue.path === path)).toBe(true);
+    }
+  });
+
   it("round-trips the full bank, mixer, and song through JSON", () => {
     const base = createDefaultState(browserIdFactory, SEED);
     const activePattern = required(base.project.patterns[2]);

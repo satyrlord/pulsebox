@@ -147,6 +147,34 @@ describe("EditorWorkspace", () => {
     expect(Object.values(harness.domain.getState().project.automationLanes)).toHaveLength(0);
   });
 
+  it("uses the state-owned catalog for external automation labels, ranges, and values", () => {
+    const harness = createHarness();
+    renderWithHarness(<EditorWorkspace />, harness);
+    const moduleId = firstModuleId(harness);
+
+    act(() => {
+      harness.store.getState().openExternalAutomationTarget({
+        scope: "mixer",
+        targetId: moduleId,
+        parameterId: "pan",
+      });
+    });
+
+    const selector = screen.getByRole("combobox", { name: "Piano Roll parameter" });
+    expect(
+      within(selector).getByRole<HTMLOptionElement>("option", { name: "Pan" }).selected,
+    ).toBe(true);
+    expect(screen.getByRole("group", { name: "Silver Serpent mixer: Pan lane" })).toBeVisible();
+    const firstStep = screen.getByRole("slider", { name: "Pan, step 1" });
+    expect(firstStep).toHaveValue("0");
+
+    act(() => {
+      harness.store.getState().setChannelPan(moduleId, 0.65);
+    });
+    expect(screen.getByRole("slider", { name: "Pan, step 1" })).toHaveValue("0.65");
+    expect(Object.values(harness.domain.getState().project.automationLanes)).toHaveLength(0);
+  });
+
   function drumHarness() {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);

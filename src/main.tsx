@@ -1,13 +1,17 @@
 import {
   type EffectInstanceId,
   type EffectInstanceState,
-  type ModuleInstanceId,
   type PluginId,
   type ProjectRevision,
-  type SendBusId,
 } from "./contracts";
 import { browserIdFactory } from "./composition/browser-id-factory";
 import { toTransportDelta } from "./composition/audio-delta-projection";
+import { AudioProjectionCoordinator } from "./composition/audio-projection-coordinator";
+import {
+  applyFullAudioProjection,
+  createAudioStateProjector,
+  patternIndexFor,
+} from "./composition/audio-state-projection";
 import {
   BUILT_IN_MODULES,
   BUILT_IN_EFFECTS,
@@ -16,10 +20,6 @@ import {
   playableNotesFor,
   createPluginRegistry,
   createEffectWorkletPort,
-  type RoutingEffectInstance,
-  type TransportModule,
-  type TransportRoutingProjection,
-  type TransportExternalAutomationProjection,
   type VoiceAdapterFactory,
 } from "./engine/public";
 import {
@@ -39,9 +39,7 @@ import {
   serializePortableProject,
   type ModuleSeed,
   type ChainEffectPlacement,
-  type PulseEngineDelta,
   type PulseState,
-  type RackModuleState,
 } from "./state/public";
 import {
   createDefaultProjectState,
@@ -93,6 +91,9 @@ const registry = createPluginRegistry<RuntimePlugin>([
     factory: { effectProcessorFactoryKey: processorFactoryKey },
   })),
 ]);
+const audioStateProjector = createAudioStateProjector(
+  (pluginId) => registry.get(pluginId)?.manifest,
+);
 // One transport owns the clock, the lookahead loop, and every voice. Registering
 // an instrument means adding a registry entry, not touching the transport.
 let audio: TransportRuntime;
@@ -136,27 +137,17 @@ function createAudioRuntime(): TransportRuntime {
   return runtime;
 }
 audio = createAudioRuntime();
-let audioProjectionQueue = Promise.resolve();
-let suppressAudioProjection = false;
 
-/**
- * Serializes a full projection behind every projection already queued. A
- * direct `audioProjectionQueue = replaceAudioProjection(...)` would race the
- * pending chain: two concurrent syncs both pass the adapter-existence check
- * and one module ends up with two live adapters. The state is read when the
- * projection runs, so the replacement always projects the newest state.
- */
+/** Serializes a full state projection in the active runtime generation. */
 function queueFullAudioProjection(): void {
-  audioProjectionQueue = audioProjectionQueue
-    .catch(() => undefined)
-    .then(() => replaceAudioProjection(store.getState()));
+  audioProjectionCoordinator.queueFullProjection();
 }
 
 const store = new PulseStore(
   createDefaultProjectState(browserIdFactory, createEffectInstance),
   browserIdFactory,
   (pluginId) => registry.get(pluginId)?.factory.moduleSeed,
-  (delta) => queueAudioDelta(delta),
+  (delta) => audioProjectionCoordinator.queueDelta(delta),
   // One validation policy: the descriptor check that guards project import
   // also guards live commands.
   createParameterValidator(
@@ -168,6 +159,19 @@ const store = new PulseStore(
   ),
   createEffectInstance,
 );
+const audioProjectionCoordinator = new AudioProjectionCoordinator({
+  runtime: audio,
+  getState: () => store.getState(),
+  projector: audioStateProjector,
+  toTransportDelta,
+  onProjectionFailure: () => {
+    appReference.current?.markAudioUnavailable();
+    if (store.getState().transport.status === "playing") {
+      audio.stop();
+      store.dispatch(store.createCommand("transport-stop", {}));
+    }
+  },
+});
 
 const host = document.querySelector<HTMLElement>("#app");
 if (host === null) throw new Error("Pulsebox requires a #app mount point.");
@@ -345,7 +349,7 @@ const app = mountPulseboxApp({
         moduleId,
         {
           ...part,
-          voiceCycleLengths: voiceCycleLengthsByNote(
+          voiceCycleLengths: audioStateProjector.voiceCycleLengths(
             module.pluginId,
             part.voiceCycleLengths,
           ),
@@ -514,60 +518,13 @@ window.addEventListener("pagehide", (event) => {
   audio.dispose();
 });
 
-function queueAudioDelta(delta: PulseEngineDelta): void {
-  if (suppressAudioProjection) return;
-  const acceptedState = store.getState();
-  const transportDelta = toTransportDelta(delta, acceptedState);
-  const moduleId =
-    typeof transportDelta.payload.moduleId === "string"
-      ? (transportDelta.payload.moduleId as ModuleInstanceId)
-      : undefined;
-  const module = moduleId === undefined ? undefined : acceptedState.project.modules[moduleId];
-  const moduleProjection =
-    module === undefined ? undefined : toAudioModule(acceptedState, module);
-  const fullProjection =
-    transportDelta.kind === "project-replace" ? toAudioModules(acceptedState) : undefined;
-  const fullRouting =
-    transportDelta.kind === "project-replace" ? toAudioRouting(acceptedState) : undefined;
-
-  audioProjectionQueue = audioProjectionQueue
-    .then(async () => {
-      // A full replacement owns every ordered engine view. Keep these updates
-      // in the same queue as its revision so another delta cannot pass them.
-      if (transportDelta.kind === "project-replace") {
-        audio.setArrangement(toAudioArrangement(acceptedState));
-        audio.setPatternTiming(toPatternTiming(acceptedState));
-        audio.setSwing(acceptedState.project.swing);
-        audio.setMasterLevel(acceptedState.project.masterLevel);
-        if (fullRouting !== undefined) audio.setRoutingProjection(fullRouting);
-      }
-      if (
-        transportDelta.kind === "pattern-events-set" ||
-        transportDelta.kind === "module-effects-set" ||
-        transportDelta.kind === "mixer-set"
-      ) {
-        audio.setRoutingProjection(toAudioRouting(acceptedState));
-      }
-      await audio.project(transportDelta, moduleProjection, fullProjection);
-    })
-    .catch(() => replaceAudioProjection(store.getState()));
-}
-
 async function prepareImportedProject(
   candidate: PulseState,
 ): Promise<{ readonly activate: () => void; readonly dispose: () => void }> {
   const candidateAudio = createAudioRuntime();
   let activated = false;
   try {
-    candidateAudio.setArrangement(toAudioArrangement(candidate));
-    candidateAudio.setPatternTiming(toPatternTiming(candidate));
-    candidateAudio.setSwing(candidate.project.swing);
-    candidateAudio.setMasterLevel(candidate.project.masterLevel);
-    candidateAudio.setRoutingProjection(toAudioRouting(candidate));
-    await candidateAudio.replaceFromCurrentState(
-      toAudioModules(candidate),
-      candidate.project.revision,
-    );
+    await applyFullAudioProjection(candidateAudio, audioStateProjector.project(candidate));
     await candidateAudio.activate();
   } catch (error) {
     candidateAudio.dispose();
@@ -576,220 +533,29 @@ async function prepareImportedProject(
 
   return {
     activate: () => {
-      suppressAudioProjection = true;
-      try {
+      audioProjectionCoordinator.suppressWhile(() => {
         if (store.getState().transport.status !== "stopped") {
           store.dispatch(store.createCommand("transport-stop", {}));
         }
         const loaded = store.loadProject(candidate.project);
         if (loaded.status !== "accepted") throw new Error(loaded.error.message);
-      } finally {
-        suppressAudioProjection = false;
-      }
+      });
+      const acceptedState = store.getState();
       const previousAudio = audio;
       audio = candidateAudio;
+      void audioProjectionCoordinator.replaceRuntime(candidateAudio, () => {
+        previousAudio.dispose();
+      });
+      // PulseStore owns the accepted revision. Project it before later deltas
+      // so the prepared runtime does not keep the imported document revision.
+      audioProjectionCoordinator.queueFullProjection(acceptedState);
       appReference.current?.reportAudioRuntimeState(audio.state);
-      audioProjectionQueue = Promise.resolve();
-      previousAudio.dispose();
       activated = true;
     },
     dispose: () => {
       if (!activated) candidateAudio.dispose();
     },
   };
-}
-
-async function replaceAudioProjection(state: Readonly<PulseState>): Promise<void> {
-  try {
-    audio.setArrangement(toAudioArrangement(state));
-    audio.setPatternTiming(toPatternTiming(state));
-    audio.setSwing(state.project.swing);
-    audio.setMasterLevel(state.project.masterLevel);
-    audio.setRoutingProjection(toAudioRouting(state));
-    await audio.replaceFromCurrentState(toAudioModules(state), state.project.revision);
-  } catch {
-    app.markAudioUnavailable();
-    if (store.getState().transport.status === "playing") {
-      audio.stop();
-      store.dispatch(store.createCommand("transport-stop", {}));
-    }
-  }
-}
-
-function toAudioModules(state: Readonly<PulseState>): readonly TransportModule[] {
-  return Object.values(state.project.modules).map((module) => toAudioModule(state, module));
-}
-
-function toPatternTiming(state: Readonly<PulseState>) {
-  return state.project.patterns.map((pattern) => ({
-    humanize: pattern.humanize,
-    seed: pattern.seed,
-  }));
-}
-
-/**
- * The engine receives an ordered scheduling view only. Project state keeps the
- * durable Pattern IDs, so a reorder or delete cannot redirect a module part or
- * Playlist placement. This view is rebuilt from those IDs at each projection.
- */
-function toAudioArrangement(state: Readonly<PulseState>) {
-  const patternIndex = patternIndexFor(state, state.project.activePatternId) ?? 0;
-  const songEntries = state.project.song.placements.flatMap((placement) => {
-    const index = patternIndexFor(state, placement.patternId);
-    return index === undefined ? [] : [{ patternIndex: index, repeats: placement.repeatCount }];
-  });
-  return {
-    activePatternIndex: patternIndex,
-    songEnabled: state.project.song.enabled,
-    songEntries,
-  };
-}
-
-function patternIndexFor(state: Readonly<PulseState>, patternId: string): number | undefined {
-  const index = state.project.patterns.findIndex((pattern) => pattern.id === patternId);
-  return index < 0 ? undefined : index;
-}
-
-function toAudioModule(state: Readonly<PulseState>, module: RackModuleState): TransportModule {
-  const effectChain = state.project.effects.moduleChains[module.id];
-  return {
-    id: module.id,
-    pluginId: module.pluginId,
-    parameters: module.parameters,
-    effects: resolveEffectChain(state, effectChain?.slots ?? []),
-    effectsBypassed: effectChain?.bypassed ?? false,
-    parts: state.project.patterns.map((pattern) => {
-      const part = pattern.parts[module.id];
-      return part === undefined
-        ? { length: 16, durationSteps: pattern.durationBars * 16, events: [] }
-        : {
-            ...part,
-            voiceCycleLengths: voiceCycleLengthsByNote(module.pluginId, part.voiceCycleLengths),
-            durationSteps: pattern.durationBars * 16,
-            automationSteps: part.automationLaneIds
-              .flatMap((laneId) => {
-                const lane = state.project.automationLanes[laneId];
-                if (lane === undefined) return [];
-                return lane.steps.map((step) => ({
-                  parameterId: lane.parameterId,
-                  positionTicks: step.tick,
-                  value: step.value,
-                }));
-              })
-              .sort(
-                (left, right) =>
-                  left.positionTicks - right.positionTicks ||
-                  left.parameterId.localeCompare(right.parameterId),
-              ),
-          };
-    }),
-    mix: {
-      level: module.level,
-      pan: module.pan,
-      muted: module.muted,
-      solo: module.solo,
-      sends: Object.entries(module.sends).map(([busId, send]) => ({
-        busId: busId as SendBusId,
-        amount: send.amount,
-      })),
-    },
-  };
-}
-
-function toAudioRouting(state: Readonly<PulseState>): TransportRoutingProjection {
-  const sendChains = Object.entries(state.project.effects.sendChains).map(([busId, chain]) => ({
-    busId: busId as SendBusId,
-    returnLevel: chain.returnLevel,
-    effects: resolveEffectChain(state, chain.slots),
-    effectsBypassed: state.project.effects.sendEffectsBypassed || chain.bypassed,
-  }));
-  const masterEffects = resolveEffectChain(state, state.project.effects.masterChain);
-  const limiter = masterEffects.at(-1);
-  return {
-    sends: sendChains,
-    master: {
-      level: state.project.masterLevel,
-      effects: limiter === undefined ? [] : masterEffects.slice(0, -1),
-      effectsBypassed: state.project.effects.masterEffectsBypassed,
-      limiterBypassed: limiter?.bypassed ?? false,
-      ...(limiter === undefined
-        ? {}
-        : {
-            limiterState: limiter.state,
-            limiterEffectId: limiter.id,
-            limiterMix: limiter.mix,
-            limiterGainDecibels: limiter.gainDecibels,
-          }),
-    },
-    automation: toAudioExternalAutomation(state),
-  };
-}
-
-function toAudioExternalAutomation(
-  state: Readonly<PulseState>,
-): TransportExternalAutomationProjection {
-  const targets: Record<string, TransportExternalAutomationProjection["targets"][string]> = {};
-  const parts = state.project.patterns.map((pattern) => {
-    const automationSteps = pattern.automationLaneIds.flatMap((laneId) => {
-      const lane = state.project.automationLanes[laneId];
-      if (lane === undefined || lane.scope === "module") return [];
-      targets[lane.id] = {
-        scope: lane.scope,
-        targetId: lane.targetId,
-        parameterId: lane.parameterId,
-      };
-      return lane.steps.map((step) => ({
-        parameterId: lane.id,
-        positionTicks: step.tick,
-        value: step.value,
-      }));
-    });
-    return {
-      length: 16,
-      durationSteps: pattern.durationBars * 16,
-      events: [],
-      automationSteps: automationSteps.sort(
-        (left, right) =>
-          left.positionTicks - right.positionTicks ||
-          left.parameterId.localeCompare(right.parameterId),
-      ),
-    };
-  });
-  return { parts, targets };
-}
-
-function resolveEffectChain(
-  state: Readonly<PulseState>,
-  slots: readonly (EffectInstanceId | null)[],
-): readonly RoutingEffectInstance[] {
-  return slots.flatMap((effectId) => {
-    if (effectId === null) return [];
-    const effect = state.project.effects.instances[effectId];
-    if (effect === undefined) return [];
-    const manifest = registry.get(effect.pluginId)?.manifest;
-    return manifest?.kind === "effect" ? [effect] : [];
-  });
-}
-
-/** The state contract lets a drum part use its stable voice ID. The scheduler
- * sees notes only, so the composition boundary resolves that ID to its current
- * manifest note before it crosses into the engine projection. */
-function voiceCycleLengthsByNote(
-  pluginId: PluginId,
-  cycleLengths: Readonly<Record<string, number>>,
-): Readonly<Record<string, number>> {
-  const manifest = registry.get(pluginId)?.manifest;
-  const notesByVoiceId =
-    manifest?.kind === "instrument"
-      ? new Map(manifest.voices.flatMap((voice) => (voice.note === undefined ? [] : [[voice.id, voice.note]])))
-      : new Map<string, number>();
-  return Object.fromEntries(
-    Object.entries(cycleLengths).flatMap(([key, length]) => {
-      const numericNote = Number(key);
-      const note = Number.isInteger(numericNote) ? numericNote : notesByVoiceId.get(key);
-      return note === undefined ? [] : [[String(note), length]];
-    }),
-  );
 }
 
 function requireInstrumentRuntime(pluginId: PluginId): Required<RuntimePlugin> {

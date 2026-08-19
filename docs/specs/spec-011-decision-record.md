@@ -642,3 +642,8 @@ contains the normative requirements. This table is the traceability record.
   chain bypass states. Each override is project-owned, undoable in one step,
   playback-safe, and excluded from automation. Early format-3 documents can
   omit these override fields and resolve them to `false`.
+- **D102.** Each compact send card shows complete visible parameter captions.
+  It uses the card width for controls and actions before it adds height. The
+  Effects view has its own visible vertical scrollbar, so all four send cards
+  remain reachable at each supported viewport. Section 20.3 of
+  [mixer and effects](spec-007-mixer-and-effects.md) owns this behavior.

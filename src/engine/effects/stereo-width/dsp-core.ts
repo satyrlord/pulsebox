@@ -6,3 +6,7 @@ export class StereoWidthDsp implements EffectFrameProcessor {
   reset(): void { this.#highpass.reset(); this.#lowpass.reset(); }
   process(left: number, right: number, output?: StereoFrame): StereoFrame { const l = finite(left), r = finite(right), mid = (l + r) * 0.5, side = (l - r) * 0.5; const hp = numberState(this.#state, "high-pass", 120, 20, 2000), lp = numberState(this.#state, "low-pass", 14000, 2000, 20000); const filteredSide = this.#lowpass.process(this.#highpass.process(side, hp, this.#sampleRate), lp, this.#sampleRate); const width = numberState(this.#state, "width", 1, 0, 2); const wetLeft = mid + filteredSide * width, wetRight = mid - filteredSide * width; return writeStereoFrame(output, finite(wetLeft), finite(wetRight)); }
 }
+
+export function createEffectProcessor(sampleRate: number, state: EffectState): EffectFrameProcessor {
+  return new StereoWidthDsp(sampleRate, state);
+}

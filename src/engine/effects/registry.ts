@@ -15,23 +15,26 @@ import { TRANSIENT_SHAPER_MANIFEST } from "./transient-shaper/manifest";
 export interface BuiltInEffect {
   readonly manifest: EffectPluginManifest;
   readonly processorFactoryKey: string;
+  /** Worklet-only module key. It is not part of the manifest or project data. */
+  readonly workletModuleKey: string;
 }
 
-function builtInEffect(manifest: EffectPluginManifest): BuiltInEffect {
+function builtInEffect(manifest: EffectPluginManifest, workletModuleKey: string): BuiltInEffect {
   return Object.freeze({
     manifest,
     processorFactoryKey: manifest.processorFactoryKey,
+    workletModuleKey,
   });
 }
 
 /** The single engine registration point for built-in effects. */
 export const BUILT_IN_EFFECTS: readonly BuiltInEffect[] = Object.freeze([
-  builtInEffect(LO_FI_MANIFEST), builtInEffect(PATTERN_FILTER_MANIFEST),
-  builtInEffect(DISTORTION_MANIFEST), builtInEffect(COMPRESSOR_MANIFEST),
-  builtInEffect(DELAY_MANIFEST), builtInEffect(REVERB_MANIFEST),
-  builtInEffect(CHORUS_MANIFEST), builtInEffect(PHASER_MANIFEST),
-  builtInEffect(PARAMETRIC_EQ_MANIFEST), builtInEffect(TRANSIENT_SHAPER_MANIFEST),
-  builtInEffect(STEREO_WIDTH_MANIFEST), builtInEffect(LIMITER_MANIFEST),
+  builtInEffect(LO_FI_MANIFEST, "lo-fi"), builtInEffect(PATTERN_FILTER_MANIFEST, "pattern-filter"),
+  builtInEffect(DISTORTION_MANIFEST, "distortion"), builtInEffect(COMPRESSOR_MANIFEST, "compressor"),
+  builtInEffect(DELAY_MANIFEST, "delay"), builtInEffect(REVERB_MANIFEST, "reverb"),
+  builtInEffect(CHORUS_MANIFEST, "chorus"), builtInEffect(PHASER_MANIFEST, "phaser"),
+  builtInEffect(PARAMETRIC_EQ_MANIFEST, "parametric-eq"), builtInEffect(TRANSIENT_SHAPER_MANIFEST, "transient-shaper"),
+  builtInEffect(STEREO_WIDTH_MANIFEST, "stereo-width"), builtInEffect(LIMITER_MANIFEST, "limiter"),
 ]);
 
 const EFFECT_BY_ID = new Map<string, BuiltInEffect>(

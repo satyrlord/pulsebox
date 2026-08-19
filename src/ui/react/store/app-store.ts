@@ -23,8 +23,7 @@ import {
   type PatternEventEdit,
   type PatternEvent,
   type AutomationStepState,
-  type AutomationScope,
-  type AutomationTargetId,
+  type ExternalAutomationTarget,
   type PatternPartState,
   type PatternScale,
   type ProjectSaveResult,
@@ -166,12 +165,6 @@ export type EffectChainTarget =
   | { readonly scope: "module"; readonly targetId: ModuleInstanceId }
   | { readonly scope: "send"; readonly targetId: SendBusId }
   | { readonly scope: "master" };
-export interface ExternalAutomationTarget {
-  readonly scope: Exclude<AutomationScope, "module">;
-  readonly targetId: AutomationTargetId;
-  readonly parameterId: string;
-}
-
 export interface SavedProjectSummary {
   readonly id: string;
   readonly name: string;
@@ -547,6 +540,16 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   let recordCaptureAfterTicks: number | undefined;
   /** Blocks a second Play while the first is still activating the engine. */
   let playInFlight = false;
+  let playGeneration = 0;
+  let settleCancelledPlay: (() => void | Promise<void>) | undefined;
+
+  const cancelPendingPlay = (settle: () => void | Promise<void>): void => {
+    if (!playInFlight) return;
+    playGeneration += 1;
+    settleCancelledPlay = settle;
+  };
+  const cancelledPlaySettlement = (): (() => void | Promise<void>) | undefined =>
+    settleCancelledPlay;
 
   const notice = (message: string): UndoNotice => {
     noticeSequence += 1;
@@ -597,23 +600,36 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       if (get().audioUnavailable || playInFlight) return;
       if (get().project.transport.status === "playing") return;
       playInFlight = true;
+      const generation = ++playGeneration;
+      settleCancelledPlay = undefined;
       const tempo = get().project.project.tempo;
       try {
         await audio.play(tempo);
+        if (generation !== playGeneration) {
+          await cancelledPlaySettlement()?.();
+          return;
+        }
         store.dispatch(store.createCommand("transport-play", {}));
       } catch {
-        set({ audioUnavailable: true });
+        if (generation === playGeneration) set({ audioUnavailable: true });
       } finally {
         playInFlight = false;
+        settleCancelledPlay = undefined;
       }
     },
 
     pause: () => {
+      cancelPendingPlay(() => {
+        audio.pause();
+      });
       const positionTicks = audio.pause();
       store.dispatch(store.createCommand("transport-pause", { positionTicks }));
     },
 
     stop: () => {
+      cancelPendingPlay(() => {
+        audio.stop();
+      });
       audio.stop();
       store.dispatch(store.createCommand("transport-stop", {}));
     },
@@ -671,6 +687,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
       const powered = get().audioRuntimeState === "active";
       try {
         if (powered) {
+          cancelPendingPlay(async () => {
+            await audio.setPower?.(false);
+          });
           if (get().project.transport.status === "playing") {
             audio.stop();
             store.dispatch(store.createCommand("transport-stop", {}));
@@ -1003,6 +1022,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     markAudioUnavailable: () => {
+      cancelPendingPlay(() => {
+        audio.stop();
+      });
       set({ audioUnavailable: true });
     },
 
@@ -1452,6 +1474,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     openProject: async (id) => {
       const projects = dependencies.projects;
       if (projects === undefined) return;
+      cancelPendingPlay(() => {
+        audio.stop();
+      });
       try {
         await projects.open(id);
         // The swap report described a module of the replaced project.
@@ -1464,6 +1489,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     importProject: async (bytes) => {
       const projects = dependencies.projects;
       if (projects === undefined) return;
+      cancelPendingPlay(() => {
+        audio.stop();
+      });
       const result = await projects.importPortable(bytes);
       if (result.ok) await get().refreshSavedProjects();
       set({
@@ -1484,6 +1512,9 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     createProjectFromTemplate: async (id) => {
       const template = dependencies.templates?.find((one) => one.id === id);
       if (template === undefined) return;
+      cancelPendingPlay(() => {
+        audio.stop();
+      });
       set({ saveStatus: "saving" });
       // A rejected transaction must not strand `saveStatus` at "saving":
       // `connectDomainStore` never marks a later edit dirty in that state, so

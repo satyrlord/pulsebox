@@ -174,19 +174,42 @@ export function EffectsBank() {
                   <output aria-label={`${occupied} effects in send ${send}`}>{`${occupied}/8`}</output>
                   <output aria-label={`Send ${send} status`}>{active ? "Active" : "Idle"}</output>
                 </div>
-                <div className={styles.effectMacros} aria-label={`Send ${send} macros`}>
-                  {macros.length === 0 ? <span className={styles.emptyMacros}>No compact controls</span> : null}
-                  {macros.map((macro) => {
-                    const descriptor = manifest?.parameters.find((item) => item.id === macro.parameterId);
-                    const value = focus?.state[macro.parameterId] ?? descriptor?.defaultValue;
-                    if (descriptor === undefined || focus === undefined) return null;
-                    if (
-                      descriptor.valueType === "enum" &&
-                      typeof value === "string" &&
-                      descriptor.enumValues !== undefined
-                    ) {
+                <div className={styles.effectBody}>
+                  <div
+                    className={styles.effectMacros}
+                    data-component="effect-macros"
+                    aria-label={`Send ${send} macros`}
+                  >
+                    {macros.length === 0 ? (
+                      <span className={styles.emptyMacros}>No compact controls</span>
+                    ) : null}
+                    {macros.map((macro) => {
+                      const descriptor = manifest?.parameters.find(
+                        (item) => item.id === macro.parameterId,
+                      );
+                      const value = focus?.state[macro.parameterId] ?? descriptor?.defaultValue;
+                      if (descriptor === undefined || focus === undefined) return null;
+                      if (
+                        descriptor.valueType === "enum" &&
+                        typeof value === "string" &&
+                        descriptor.enumValues !== undefined
+                      ) {
+                        return (
+                          <CompactEnumMacro
+                            key={macro.parameterId}
+                            effectId={focus.id}
+                            owner={`Send ${send}`}
+                            effectName={manifest?.productName ?? focus.pluginId}
+                            parameterId={macro.parameterId}
+                            label={descriptor.shortLabel ?? descriptor.name}
+                            value={value}
+                            values={descriptor.enumValues}
+                          />
+                        );
+                      }
+                      if (typeof value !== "number") return null;
                       return (
-                        <CompactEnumMacro
+                        <CompactMacro
                           key={macro.parameterId}
                           effectId={focus.id}
                           owner={`Send ${send}`}
@@ -194,81 +217,80 @@ export function EffectsBank() {
                           parameterId={macro.parameterId}
                           label={descriptor.shortLabel ?? descriptor.name}
                           value={value}
-                          values={descriptor.enumValues}
+                          minimum={descriptor.minimum ?? 0}
+                          maximum={descriptor.maximum ?? 1}
+                          step={descriptor.step ?? 0.01}
+                          resetValue={
+                            typeof descriptor.resetValue === "number"
+                              ? descriptor.resetValue
+                              : value
+                          }
+                          normalizedPercent={
+                            descriptor.unit === "percent" &&
+                            descriptor.minimum === 0 &&
+                            descriptor.maximum === 1
+                          }
                         />
                       );
-                    }
-                    if (typeof value !== "number") return null;
-                    return (
-                        <CompactMacro
-                          key={macro.parameterId}
-                          effectId={focus.id}
-                          owner={`Send ${send}`}
-                          effectName={manifest?.productName ?? focus.pluginId}
-                        parameterId={macro.parameterId}
-                        label={descriptor.shortLabel ?? descriptor.name}
-                        value={value}
-                        minimum={descriptor.minimum ?? 0}
-                        maximum={descriptor.maximum ?? 1}
-                        step={descriptor.step ?? 0.01}
-                        resetValue={
-                          typeof descriptor.resetValue === "number"
-                            ? descriptor.resetValue
-                            : value
-                        }
-                        normalizedPercent={
-                          descriptor.unit === "percent" &&
-                          descriptor.minimum === 0 &&
-                          descriptor.maximum === 1
-                        }
-                      />
-                    );
-                  })}
-                </div>
-                <div className={styles.effectControls}>
-                  <Knob
-                    controlId={`send-return-${send}`}
-                    label={`Send ${send} Return Level`}
-                    caption="Return Level"
-                    value={chain.returnLevel}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    defaultValue={1}
-                    precision={2}
-                    onInput={(value) => previewSendReturnLevel(id, value)}
-                    onCommit={(value, gestureId) => setSendReturnLevel(id, value, gestureId)}
-                    onAutomate={() =>
-                      openExternalAutomationTarget({
-                        scope: "send-return",
-                        targetId: id,
-                        parameterId: "return-level",
-                      })
-                    }
-                  />
-                  <button
-                    type="button"
-                    aria-pressed={chain.bypassed}
-                    onClick={() => setSendChainBypassed(id, !chain.bypassed)}
-                  >
-                    {chain.bypassed ? "Chain bypassed" : "Chain bypass"}
-                  </button>
-                  <button
-                    type="button"
-                    title={`Automate send ${send} chain bypass.`}
-                    onClick={() =>
-                      openExternalAutomationTarget({
-                        scope: "send-return",
-                        targetId: id,
-                        parameterId: "chain-bypassed",
-                      })
-                    }
-                  >
-                    Automate bypass
-                  </button>
-                  <button type="button" onClick={() => setEditorSend(index)}>
-                    Edit
-                  </button>
+                    })}
+                  </div>
+                  <div className={styles.effectReturn}>
+                    <Knob
+                      controlId={`send-return-${send}`}
+                      label={`Send ${send} Return Level`}
+                      caption="Return Level"
+                      value={chain.returnLevel}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={1}
+                      precision={2}
+                      onInput={(value) => previewSendReturnLevel(id, value)}
+                      onCommit={(value, gestureId) => setSendReturnLevel(id, value, gestureId)}
+                      onAutomate={() =>
+                        openExternalAutomationTarget({
+                          scope: "send-return",
+                          targetId: id,
+                          parameterId: "return-level",
+                        })
+                      }
+                    />
+                  </div>
+                  <div className={styles.effectActions} data-component="effect-actions">
+                    <button
+                      type="button"
+                      aria-label={
+                        chain.bypassed
+                          ? `Send ${send} chain bypassed`
+                          : `Bypass Send ${send} chain`
+                      }
+                      aria-pressed={chain.bypassed}
+                      onClick={() => setSendChainBypassed(id, !chain.bypassed)}
+                    >
+                      {chain.bypassed ? "Bypassed" : "Bypass"}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Automate send ${send} bypass`}
+                      title={`Automate send ${send} chain bypass.`}
+                      onClick={() =>
+                        openExternalAutomationTarget({
+                          scope: "send-return",
+                          targetId: id,
+                          parameterId: "chain-bypassed",
+                        })
+                      }
+                    >
+                      Automate
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Edit Send ${send} effects`}
+                      onClick={() => setEditorSend(index)}
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </div>
               </div>
             </article>

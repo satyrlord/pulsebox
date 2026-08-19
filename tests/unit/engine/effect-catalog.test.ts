@@ -3,38 +3,30 @@ import { describe, expect, it } from "vitest";
 import type { ParameterId } from "../../../src/contracts/parameters";
 import { validatePluginManifest } from "../../../src/contracts/plugins";
 import { ChorusDsp } from "../../../src/engine/effects/chorus/dsp-core";
-import { CompressorDsp } from "../../../src/engine/effects/compressor/dsp-core";
 import { DelayDsp } from "../../../src/engine/effects/delay/dsp-core";
 import { DistortionDsp, distortSample } from "../../../src/engine/effects/distortion/dsp-core";
 import {
   EFFECT_TRANSPORT_TEMPO_PARAMETER,
   type EffectFrameProcessor,
-  type EffectState,
 } from "../../../src/engine/effects/dsp";
 import { LimiterDsp } from "../../../src/engine/effects/limiter/dsp-core";
-import { LoFiDsp } from "../../../src/engine/effects/lo-fi/dsp-core";
-import { ParametricEqDsp } from "../../../src/engine/effects/parametric-eq/dsp-core";
-import { PatternFilterDsp } from "../../../src/engine/effects/pattern-filter/dsp-core";
 import { PhaserDsp } from "../../../src/engine/effects/phaser/dsp-core";
 import { ReverbDsp } from "../../../src/engine/effects/reverb/dsp-core";
 import { BUILT_IN_EFFECTS } from "../../../src/engine/effects/registry";
+import {
+  EFFECT_PROCESSOR_FACTORIES,
+  createRegisteredEffectProcessor,
+} from "../../../src/engine/effects/registry/effect-processors.worklet";
 import {
   EffectParameterSmoother,
   effectParameterSmoothing,
 } from "../../../src/engine/effects/registry/parameter-smoother";
 import { StereoWidthDsp } from "../../../src/engine/effects/stereo-width/dsp-core";
-import { TransientShaperDsp } from "../../../src/engine/effects/transient-shaper/dsp-core";
 
 const EXPECTED_IDS = [
   "lo-fi", "pattern-filter", "distortion", "compressor", "delay", "reverb",
   "chorus", "phaser", "parametric-eq", "transient-shaper", "stereo-width", "limiter",
 ] as const;
-
-type ProcessorConstructor = new (sampleRate: number, state: EffectState) => EffectFrameProcessor;
-const PROCESSORS: readonly ProcessorConstructor[] = [
-  LoFiDsp, PatternFilterDsp, DistortionDsp, CompressorDsp, DelayDsp, ReverbDsp,
-  ChorusDsp, PhaserDsp, ParametricEqDsp, TransientShaperDsp, StereoWidthDsp, LimiterDsp,
-];
 
 const ACTIVE_FIXTURES: Readonly<Record<string, Readonly<Record<string, number | boolean | string>>>> = {
   "lo-fi": { bits: 5, rate: 0.2, character: 0.8 },
@@ -67,6 +59,17 @@ describe("built-in effect catalog", () => {
         manifest.parameters.map((parameter) => parameter.id),
       );
     }
+  });
+
+  it("maps every registered effect module key to one eager worklet processor factory", () => {
+    const expectedPaths = BUILT_IN_EFFECTS.map(
+      (effect) => `../${effect.workletModuleKey}/dsp-core.ts`,
+    ).sort();
+    expect(Object.keys(EFFECT_PROCESSOR_FACTORIES).sort()).toEqual(expectedPaths);
+    expect(
+      new Set(BUILT_IN_EFFECTS.map((effect) => effect.workletModuleKey)).size,
+    ).toBe(BUILT_IN_EFFECTS.length);
+    expect(createRegisteredEffectProcessor("unknown", 48_000, {})).toBeUndefined();
   });
 
   it.each(["mix", "gain"])(
@@ -178,15 +181,10 @@ describe("built-in effect catalog", () => {
   });
 
   it.each([44_100, 48_000])("keeps every DSP core finite and frame-count independent at %i Hz", (sampleRate) => {
-    for (let index = 0; index < PROCESSORS.length; index += 1) {
-      const Constructor = PROCESSORS[index];
-      const manifest = BUILT_IN_EFFECTS[index]?.manifest;
-      expect(Constructor).toBeDefined();
-      expect(manifest).toBeDefined();
-      if (Constructor === undefined || manifest === undefined) throw new Error("Effect catalog order is incomplete.");
+    for (const { manifest } of BUILT_IN_EFFECTS) {
       const state: Record<string, string | number | boolean> = {};
       for (const parameter of manifest.parameters) state[parameter.id] = parameter.defaultValue;
-      const processor = new Constructor(sampleRate, state);
+      const processor = registeredProcessor(manifest.pluginId, sampleRate, state);
       for (let frame = 0; frame < 503; frame += 1) {
         const source = Math.sin((frame * 2 * Math.PI * 431) / sampleRate) * 0.72;
         const output = processor.process(source, -source * 0.4);
@@ -198,15 +196,10 @@ describe("built-in effect catalog", () => {
   });
 
   it("writes every DSP result into caller-owned worklet storage", () => {
-    for (let index = 0; index < PROCESSORS.length; index += 1) {
-      const Constructor = PROCESSORS[index];
-      const manifest = BUILT_IN_EFFECTS[index]?.manifest;
-      if (Constructor === undefined || manifest === undefined) {
-        throw new Error("Effect catalog order is incomplete.");
-      }
+    for (const { manifest } of BUILT_IN_EFFECTS) {
       const state: Record<string, string | number | boolean> = {};
       for (const parameter of manifest.parameters) state[parameter.id] = parameter.defaultValue;
-      const processor = new Constructor(48_000, state);
+      const processor = registeredProcessor(manifest.pluginId, 48_000, state);
       const output = { left: Number.NaN, right: Number.NaN };
       expect(processor.process(0.25, -0.5, output)).toBe(output);
       expect(Number.isFinite(output.left)).toBe(true);
@@ -277,16 +270,11 @@ describe("built-in effect catalog", () => {
   it.each([44_100, 48_000])(
     "changes deterministic audio through every catalog effect at %i Hz",
     (sampleRate) => {
-      for (let index = 0; index < PROCESSORS.length; index += 1) {
-        const Constructor = PROCESSORS[index];
-        const manifest = BUILT_IN_EFFECTS[index]?.manifest;
-        if (Constructor === undefined || manifest === undefined) {
-          throw new Error("Effect catalog order is incomplete.");
-        }
+      for (const { manifest } of BUILT_IN_EFFECTS) {
         const state: Record<string, string | number | boolean> = {};
         for (const parameter of manifest.parameters) state[parameter.id] = parameter.defaultValue;
         Object.assign(state, ACTIVE_FIXTURES[manifest.pluginId]);
-        const processor = new Constructor(sampleRate, state);
+        const processor = registeredProcessor(manifest.pluginId, sampleRate, state);
         let difference = 0;
         for (let frame = 0; frame < 4096; frame += 1) {
           const impulse = frame % 997 === 0 ? 0.9 : 0;
@@ -354,3 +342,13 @@ describe("built-in effect catalog", () => {
     expect(limiter.gainReductionDecibels).toBeGreaterThan(0);
   });
 });
+
+function registeredProcessor(
+  pluginId: string,
+  sampleRate: number,
+  state: Readonly<Record<string, string | number | boolean>>,
+): EffectFrameProcessor {
+  const processor = createRegisteredEffectProcessor(pluginId, sampleRate, state);
+  if (processor === undefined) throw new Error(`The registered ${pluginId} effect has no processor factory.`);
+  return processor;
+}

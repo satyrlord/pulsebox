@@ -383,7 +383,9 @@ An `AutomationLane` contains:
 
 Two steps in one lane may not occupy the same tick. Automation contains only
 discrete held steps. Lines, curves, and dense freehand points are invalid. Known
-parameter descriptors validate every automation value.
+parameter descriptors validate every automation value. For the fixed mixer,
+send, send-return, and master scopes, the parameter ID must belong to that
+scope's descriptor catalog.
 
 ### 5.7 Mixer and effects
 
@@ -685,6 +687,11 @@ Project and plugin migrations are pure, deterministic data transforms. They:
 - append a migration record containing from-version, to-version, migration ID,
   and fixed implementation version.
 - produce a complete repair and migration report.
+
+The implementation shall keep each project-format migration separate from the
+current-schema parser. One public project-document facade shall scan hostile
+input, apply migrations in order, and then run current-schema validation. No
+caller may invoke a migration to bypass that facade.
 
 Format 1 has no predecessor. Unversioned JSON is invalid. A reader rejects a
 project `formatVersion` newer than it supports.

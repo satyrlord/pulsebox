@@ -27,6 +27,10 @@ export default defineConfig({
               name: "vendor",
               test: /node_modules[\\/]/,
             },
+            {
+              name: "state",
+              test: /src[\\/]state[\\/]/,
+            },
           ],
         },
       },

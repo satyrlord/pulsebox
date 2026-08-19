@@ -15,21 +15,9 @@ import {
 } from "../../../contracts/worklet-protocol";
 import { isPlainRecord } from "../../../contracts/validation";
 import type { EffectFrameProcessor, StereoFrame } from "../dsp";
-import { ChorusDsp } from "../chorus/dsp-core";
-import { CompressorDsp } from "../compressor/dsp-core";
-import { DelayDsp } from "../delay/dsp-core";
-import { DistortionDsp } from "../distortion/dsp-core";
-import { LimiterDsp } from "../limiter/dsp-core";
-import { LoFiDsp } from "../lo-fi/dsp-core";
-import { ParametricEqDsp } from "../parametric-eq/dsp-core";
-import { PatternFilterDsp } from "../pattern-filter/dsp-core";
-import { PhaserDsp } from "../phaser/dsp-core";
-import { ReverbDsp } from "../reverb/dsp-core";
-import { registeredEffect } from "../registry";
-import { StereoWidthDsp } from "../stereo-width/dsp-core";
-import { TransientShaperDsp } from "../transient-shaper/dsp-core";
 import { EffectParameterQueue } from "./parameter-queue";
 import { EffectParameterSmoother, effectParameterSmoothing } from "./parameter-smoother";
+import { createRegisteredEffectProcessor } from "./effect-processors.worklet";
 
 type MutableState = Record<string, ParameterValue>;
 interface EffectConfiguration { readonly pluginId: string; readonly state: MutableState; }
@@ -155,7 +143,11 @@ class PulseboxEffectProcessor extends AudioWorkletProcessor {
   }
 
   #replace(configuration: EffectConfiguration): boolean {
-    const processor = createProcessor(configuration.pluginId, configuration.state);
+    const processor = createRegisteredEffectProcessor(
+      configuration.pluginId,
+      sampleRate,
+      configuration.state,
+    );
     if (processor === undefined) return false;
     this.#processor = processor;
     this.#smoother = new EffectParameterSmoother(sampleRate, configuration.state, effectParameterSmoothing(configuration.pluginId));
@@ -227,25 +219,6 @@ class PulseboxEffectProcessor extends AudioWorkletProcessor {
     }
     return true;
   };
-}
-
-function createProcessor(pluginId: string, state: MutableState): EffectFrameProcessor | undefined {
-  const key = registeredEffect(pluginId)?.processorFactoryKey;
-  switch (key) {
-    case "lo-fi-processor": return new LoFiDsp(sampleRate, state);
-    case "pattern-filter-processor": return new PatternFilterDsp(sampleRate, state);
-    case "distortion-processor": return new DistortionDsp(sampleRate, state);
-    case "compressor-processor": return new CompressorDsp(sampleRate, state);
-    case "delay-processor": return new DelayDsp(sampleRate, state);
-    case "reverb-processor": return new ReverbDsp(sampleRate, state);
-    case "chorus-processor": return new ChorusDsp(sampleRate, state);
-    case "phaser-processor": return new PhaserDsp(sampleRate, state);
-    case "parametric-eq-processor": return new ParametricEqDsp(sampleRate, state);
-    case "transient-shaper-processor": return new TransientShaperDsp(sampleRate, state);
-    case "stereo-width-processor": return new StereoWidthDsp(sampleRate, state);
-    case "limiter-processor": return new LimiterDsp(sampleRate, state);
-    default: return undefined;
-  }
 }
 
 function decodeConfiguration(value: unknown): EffectConfiguration | undefined {

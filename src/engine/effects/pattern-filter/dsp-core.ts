@@ -14,3 +14,7 @@ export class PatternFilterDsp implements EffectFrameProcessor {
     return writeStereoFrame(output, finite(this.#left.low), finite(this.#right.low));
   }
 }
+
+export function createEffectProcessor(sampleRate: number, state: EffectState): EffectFrameProcessor {
+  return new PatternFilterDsp(sampleRate, state);
+}

@@ -551,8 +551,6 @@ export class MixerRoutingGraph {
     if (change.scope === "master") {
       if (change.parameterId === "level" && typeof change.value === "number") {
         setAtTime(this.#masterGain.gain, clamp01(change.value), time);
-      } else if (change.parameterId === "effects-bypassed" && typeof change.value === "boolean") {
-        this.#masterEffects.scheduleBypass(change.atFrame, change.value);
       }
       return;
     }

@@ -111,6 +111,11 @@ layer. It shall contain no product rules, audio algorithms, project mutations,
 or UI rendering. In the repository it is `src/main.tsx` plus the wiring-only
 `src/composition/` directory.
 
+Pure state-to-engine projections and their serial coordinator belong to the
+composition boundary. The coordinator shall own one projection queue and one
+runtime generation. Queued work from an old generation shall not call, stop,
+dispose, or report failure against a replacement runtime.
+
 A small `contracts` area may hold data-only TypeScript types shared between
 layers. It shall contain no mutable singleton, browser handle, storage call, DOM
 code, audio node, or product-specific algorithm.
@@ -302,6 +307,11 @@ entry. Shared engine, state, persistence, mixer, automation, and UI code shall
 dispatch through typed contracts. They shall not branch on a product-specific
 plugin ID.
 
+The main-thread effect registry shall contain metadata and worklet module keys,
+not executable DSP imports. The effect worklet shall derive its processor
+factories from those keys. It shall not maintain a second effect list or a
+product-specific processor switch.
+
 Before audio activation, registry startup shall fail if two entries claim the
 same plugin ID, and if any manifest fails validation. Manifest validation
 rejects a duplicate parameter ID, duplicate meter ID, or duplicate compact
@@ -415,6 +425,11 @@ metadata. A project file shall not supply executable formatters. Structural
 operations, meter frames, audio power, hover, focus, and
 global UI preferences shall not be parameters or automation targets.
 
+The state layer shall own one descriptor catalog for fixed mixer, send,
+send-return, shared effect-stage, and master automation targets. Live commands,
+project import, and the UI shall use that catalog. Plugin-owned parameter
+descriptors shall enter through an injected registry lookup.
+
 ### 6.4 Instrument specialization
 
 An instrument manifest shall add:
@@ -522,6 +537,10 @@ apply one complete transition or no transition. Validation errors shall name the
 invalid field and recovery action. Engine work shall begin only after the state
 transition is accepted.
 
+The store may delegate feature validation and candidate construction to pure
+state-owned command handlers. Only the store shall assign active state, assign
+revisions, write history, notify subscribers, or publish an engine delta.
+
 The MVP musical structure is fixed at 4/4 and its Pattern grid is fixed at 1/16.
 Playlist placement, reorder, repeat-count, duplicate, and delete operations are
 undoable structural commands. There are no time-signature events, Song
@@ -533,6 +552,11 @@ The composition boundary shall translate accepted state changes into a minimal
 typed `EngineDelta`. It shall not send whole project objects for ordinary edits.
 Every delta shall carry the accepted complete state revision token and stable
 target IDs.
+
+An imported project replacement shall invalidate queued work for the old audio
+runtime before it changes active state. The replacement runtime shall receive
+the revision that the store accepts. The old runtime shall remain isolated until
+its queued work settles and the composition boundary disposes it.
 
 If the engine rejects a delta because of a fault or stale engine revision,
 project state shall remain authoritative. The controller shall report the
@@ -1021,6 +1045,11 @@ equality, not timestamps or numeric counters alone. Cross-tab notices may warn a
 stale tab but shall not create a lock or conflict copy. Epoch rollover and
 same-project-ID import resolution are owned by `PROJECT-FORMAT.md`.
 
+The state layer shall expose one public project-document facade. Separate leaf
+modules may own schema types, serialization, JSON safety, migrations, current
+schema validation, and state mapping. The facade shall keep the required
+validation order and remain the only untrusted project entry.
+
 ## 13. Test seams
 
 Browser globals shall be wrapped at the owning layer boundary. Tests shall be
@@ -1050,6 +1079,8 @@ Plugin contract tests shall run every registered manifest through one shared
 suite. The suite shall verify IDs, defaults, ranges, smoothing, state migration,
 serialization, lifecycle, and disposal. It shall also verify message bounds,
 channel behavior, live/offline parity, and declared latency and tail rules.
+For each registered effect, the suite shall find exactly one worklet processor
+factory. It shall also reject a processor factory without a registry entry.
 
 Architecture tests shall fail on prohibited cross-layer imports, direct UI audio
 access, state-held browser objects, and unregistered plugin branches. They shall

@@ -15,6 +15,9 @@ export interface EffectFrameProcessor {
 
 export type EffectState = Readonly<Record<string, ParameterValue>>;
 
+/** The standard eager AudioWorklet factory export for each effect DSP core. */
+export type EffectProcessorFactory = (sampleRate: number, state: EffectState) => EffectFrameProcessor;
+
 /** Runtime-only transport tempo. Effect manifests and project documents omit this value. */
 export const EFFECT_TRANSPORT_TEMPO_PARAMETER = "__transport-tempo";
 

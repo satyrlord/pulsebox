@@ -4,7 +4,6 @@ import { PROTECTED_LIMITER_EFFECT_PLUGIN_ID } from "../../../contracts";
 import { DEFAULT_MASTER_LEVEL } from "../../../state/public";
 import { Fader } from "../controls/Fader";
 import { LevelMeter } from "../controls/LevelMeter";
-import { automationShortcut } from "../controls/automation-shortcut";
 import { masterMeterDisplayLevel } from "../store/app-store";
 import { useAppStore } from "../store/app-store-context";
 import { EffectEditor } from "./EffectEditor";
@@ -37,13 +36,6 @@ export function MasterPanel() {
   const toggleMasterEffectsBypass = useAppStore((state) => state.toggleMasterEffectsBypass);
   const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
   const resetMasterPeak = useAppStore((state) => state.resetMasterPeak);
-  const masterBypassAutomation = automationShortcut(() =>
-    openExternalAutomationTarget({
-      scope: "master",
-      targetId: "master",
-      parameterId: "effects-bypassed",
-    }),
-  );
   const limiterId = [...masterChain]
     .reverse()
     .find((id) => id !== null && instances[id]?.pluginId === PROTECTED_LIMITER_EFFECT_PLUGIN_ID) ?? undefined;
@@ -103,28 +95,12 @@ export function MasterPanel() {
           <button
             type="button"
             aria-pressed={masterEffectsBypassed}
-            aria-keyshortcuts={masterBypassAutomation.ariaKeyShortcuts}
             onClick={toggleMasterEffectsBypass}
-            onKeyDown={masterBypassAutomation.onKeyDown}
-            onContextMenu={masterBypassAutomation.onContextMenu}
           >
             {masterEffectsBypassed ? "Master effects bypassed" : "Bypass master effects"}
           </button>
           <button type="button" onClick={() => setEditorOpen(true)}>
             Edit chain
-          </button>
-          <button
-            type="button"
-            title="Automate master effects bypass."
-            onClick={() =>
-              openExternalAutomationTarget({
-                scope: "master",
-                targetId: "master",
-                parameterId: "effects-bypassed",
-              })
-            }
-          >
-            Automate
           </button>
         </div>
       </article>

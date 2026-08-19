@@ -157,9 +157,10 @@ parameter and opens its lane as the Piano Roll's active lane in the active
 Pattern. Editing then follows the single-surface rule. The user draws and edits
 the lane only in the Piano Roll.
 
-Arming alone writes no project data and creates no undo entry. The first
-committed edit or recorded pass creates the lane record. This behavior matches
-a module parameter.
+Arming alone writes no project data and creates no undo entry. Arming
+rejects a parameter that its surface does not support. The first committed
+edit or recorded pass creates the lane record. This behavior matches a module
+parameter.
 
 While the user arms a non-module parameter, the Parameter selector shows it as the
 active lane. The selector also shows its owning surface name. Thus, the user can
@@ -271,6 +272,13 @@ Each compact slot contains:
 - Accent.
 - Selection state.
 - Chain-count indicator.
+
+Each card shows the complete visible caption for every compact parameter. It
+does not shorten a caption with an ellipsis. The controls and actions use the
+available card width before the card adds height. The Effects view owns a
+vertical scroll port with a visible scrollbar. The user can reach all four
+cards at each supported viewport without page scrolling or horizontal studio
+scrolling.
 
 The Add effect row appends a plugin to the selected send chain. The detailed
 editor manages ordering, replacement, per-effect bypass, per-effect Mix, and

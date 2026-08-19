@@ -7,3 +7,7 @@ export class PhaserDsp implements EffectFrameProcessor {
   #run(input: number, stages: readonly Allpass[], frequency: number): number { const tangent = Math.tan(Math.PI * Math.min(frequency, this.#sampleRate * 0.45) / this.#sampleRate); const coefficient = (1 - tangent) / (1 + tangent); let value = input; let index = 0; while (index < stages.length) { value = stages[index]?.process(value, coefficient) ?? value; index += 1; } return value; }
   process(left: number, right: number, output?: StereoFrame): StereoFrame { const rate = booleanState(this.#state, "tempo-sync", false) ? numberState(this.#state, EFFECT_TRANSPORT_TEMPO_PARAMETER, 120, 40, 240) / 240 : numberState(this.#state, "rate", 0.35, 0.02, 8), depth = numberState(this.#state, "depth", 0.65, 0, 1), feedback = numberState(this.#state, "feedback", 0.25, -0.85, 0.85); this.#phase = (this.#phase + rate / this.#sampleRate) % 1; const leftFrequency = 250 + (0.5 + 0.5 * Math.sin(2 * Math.PI * this.#phase)) * depth * 3500, rightFrequency = 250 + (0.5 + 0.5 * Math.sin(2 * Math.PI * (this.#phase + 0.25))) * depth * 3500; this.#feedbackLeft = this.#run(finite(left) + this.#feedbackLeft * feedback, this.#left, leftFrequency); this.#feedbackRight = this.#run(finite(right) + this.#feedbackRight * feedback, this.#right, rightFrequency); return writeStereoFrame(output, finite(this.#feedbackLeft), finite(this.#feedbackRight)); }
 }
+
+export function createEffectProcessor(sampleRate: number, state: EffectState): EffectFrameProcessor {
+  return new PhaserDsp(sampleRate, state);
+}

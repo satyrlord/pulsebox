@@ -1,23 +1,19 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
-  EFFECT_GAIN_MAXIMUM_DECIBELS,
-  EFFECT_GAIN_MINIMUM_DECIBELS,
-  type EffectInstanceId,
   type GestureId,
   type ModuleInstanceId,
   type NoteEventId,
   type ParameterDescriptor,
-  type ParameterId,
   type ParameterValue,
   type PatternId,
-  type SendBusId,
   type SongPlacementId,
 } from "../../../contracts";
 import {
   PATTERN_SCALES,
   PATTERN_TICKS_PER_BAR,
   PATTERN_TICKS_PER_STEP,
+  resolveExternalAutomationTarget,
   type PatternEvent,
   type PatternPartState,
   type PatternScale,
@@ -829,6 +825,7 @@ function AutomationStepControl(props: {
   }
   return (
     <input
+      key={initial}
       className={styles.velocityControl}
       type="range"
       min={descriptor.minimum ?? 0}
@@ -879,45 +876,10 @@ function notePropertyUpdate(
   }
 }
 
-interface ExternalAutomationView {
-  readonly descriptor: ParameterDescriptor;
-  readonly ownerLabel: string;
-  readonly currentValue: ParameterValue;
-}
-
-function externalDescriptor(
-  id: string,
-  name: string,
-  defaultValue: ParameterValue,
-  options: {
-    readonly valueType?: "float" | "boolean";
-    readonly minimum?: number;
-    readonly maximum?: number;
-    readonly step?: number;
-    readonly unit?: "none" | "percent" | "decibels";
-  } = {},
-): ParameterDescriptor {
-  return {
-    id: id as ParameterId,
-    name,
-    valueType: options.valueType ?? "float",
-    ...(options.minimum === undefined ? {} : { minimum: options.minimum }),
-    ...(options.maximum === undefined ? {} : { maximum: options.maximum }),
-    ...(options.step === undefined ? {} : { step: options.step }),
-    defaultValue,
-    unit: options.unit ?? "none",
-    displayPrecision: options.step !== undefined && options.step < 0.1 ? 2 : 0,
-    resetValue: defaultValue,
-    smoothing: { curve: "linear", durationMilliseconds: 10 },
-    workletRate: "message",
-    automation: "step",
-    modulation: "none",
-  };
-}
-
 function PianoRoll() {
   const { auditionNoteFor, manifestFor } = useDependencies();
-  const modules = useAppStore((state) => state.project.project.modules);
+  const project = useAppStore((state) => state.project.project);
+  const modules = project.modules;
   const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
   const activePatternId = useAppStore((state) => state.project.project.activePatternId);
   const patterns = useAppStore((state) => state.project.project.patterns);
@@ -934,9 +896,7 @@ function PianoRoll() {
   const pianoRollParameter = useAppStore((state) => state.project.ui.pianoRollParameter);
   const setPianoRollParameter = useAppStore((state) => state.setPianoRollParameter);
   const editPatternEvents = useAppStore((state) => state.editPatternEvents);
-  const automationLanes = useAppStore((state) => state.project.project.automationLanes);
-  const effects = useAppStore((state) => state.project.project.effects);
-  const masterLevel = useAppStore((state) => state.project.project.masterLevel);
+  const automationLanes = project.automationLanes;
   const externalAutomationTarget = useAppStore(
     (state) => state.project.ui.pianoRollAutomationTarget,
   );
@@ -990,162 +950,13 @@ function PianoRoll() {
     ? ["velocity", "accent", "slide", "probability", "microTimingTicks", "flam", "roll"]
     : ["velocity", "accent", "probability", "microTimingTicks", "flam", "roll"];
   const automatableParameters = manifest?.parameters.filter((parameter) => parameter.automation === "step") ?? [];
-  const externalAutomation: ExternalAutomationView | undefined = (() => {
-    const target = externalAutomationTarget;
-    if (target === undefined) return undefined;
-    if (target.scope === "mixer") {
-      const targetModule = modules[target.targetId as ModuleInstanceId];
-      if (targetModule === undefined) return undefined;
-      const ownerLabel = `${manifestFor(targetModule.pluginId)?.productName ?? "Module"} mixer`;
-      if (target.parameterId === "level") {
-        return {
-          descriptor: externalDescriptor("level", "Level", 0.8, {
-            minimum: 0,
-            maximum: 1,
-            step: 0.01,
-            unit: "percent",
-          }),
-          ownerLabel,
-          currentValue: targetModule.level,
-        };
-      }
-      if (target.parameterId === "pan") {
-        return {
-          descriptor: externalDescriptor("pan", "Pan", 0, {
-            minimum: -1,
-            maximum: 1,
-            step: 0.01,
-          }),
-          ownerLabel,
-          currentValue: targetModule.pan,
-        };
-      }
-      if (target.parameterId === "muted" || target.parameterId === "solo") {
-        return {
-          descriptor: externalDescriptor(
-            target.parameterId,
-            target.parameterId === "muted" ? "Mute" : "Solo",
-            false,
-            { valueType: "boolean" },
-          ),
-          ownerLabel,
-          currentValue: target.parameterId === "muted" ? targetModule.muted : targetModule.solo,
-        };
-      }
-      return undefined;
-    }
-    if (target.scope === "send") {
-      const targetModule = modules[target.targetId as ModuleInstanceId];
-      const match = /^send-([abcd])-amount$/.exec(target.parameterId);
-      if (targetModule === undefined || match?.[1] === undefined) return undefined;
-      const sendBusId = `send-${match[1]}` as SendBusId;
-      const send = targetModule.sends[sendBusId];
-      if (send === undefined) return undefined;
-      return {
-        descriptor: externalDescriptor(target.parameterId, "Amount", 0, {
-          minimum: 0,
-          maximum: 1,
-          step: 0.01,
-          unit: "percent",
-        }),
-        ownerLabel: `${manifestFor(targetModule.pluginId)?.productName ?? "Module"} send ${match[1].toUpperCase()}`,
-        currentValue: send.amount,
-      };
-    }
-    if (target.scope === "send-return") {
-      const sendBusId = target.targetId as SendBusId;
-      const send = effects.sendChains[sendBusId];
-      if (send === undefined) return undefined;
-      if (target.parameterId === "chain-bypassed") {
-        return {
-          descriptor: externalDescriptor("chain-bypassed", "Chain bypass", false, {
-            valueType: "boolean",
-          }),
-          ownerLabel: `Send ${sendBusId.at(-1)?.toUpperCase() ?? ""}`,
-          currentValue: send.bypassed,
-        };
-      }
-      if (target.parameterId !== "return-level") return undefined;
-      return {
-        descriptor: externalDescriptor("return-level", "Return Level", 1, {
-          minimum: 0,
-          maximum: 1,
-          step: 0.01,
-          unit: "percent",
-        }),
-        ownerLabel: `Send ${sendBusId.at(-1)?.toUpperCase() ?? ""}`,
-        currentValue: send.returnLevel,
-      };
-    }
-    if (target.scope === "master") {
-      if (target.parameterId === "level") {
-        return {
-          descriptor: externalDescriptor("level", "Level", 0.8, {
-            minimum: 0,
-            maximum: 1,
-            step: 0.01,
-            unit: "percent",
-          }),
-          ownerLabel: "Master",
-          currentValue: masterLevel,
-        };
-      }
-      if (target.parameterId === "effects-bypassed") {
-        return {
-          descriptor: externalDescriptor("effects-bypassed", "Effects bypass", false, {
-            valueType: "boolean",
-          }),
-          ownerLabel: "Master",
-          currentValue: effects.masterEffectsBypassed,
-        };
-      }
-      return undefined;
-    }
-    const effect = effects.instances[target.targetId as EffectInstanceId];
-    if (effect === undefined) return undefined;
-    const effectManifest = manifestFor(effect.pluginId);
-    const ownerLabel = effectManifest?.productName ?? "Effect";
-    if (target.parameterId === "mix") {
-      return {
-        descriptor: externalDescriptor("mix", "Mix", 1, {
-          minimum: 0,
-          maximum: 1,
-          step: 0.01,
-          unit: "percent",
-        }),
-        ownerLabel,
-        currentValue: effect.mix,
-      };
-    }
-    if (target.parameterId === "gain") {
-      return {
-        descriptor: externalDescriptor("gain", "Gain", 0, {
-          minimum: EFFECT_GAIN_MINIMUM_DECIBELS,
-          maximum: EFFECT_GAIN_MAXIMUM_DECIBELS,
-          step: 0.1,
-          unit: "decibels",
-        }),
-        ownerLabel,
-        currentValue: effect.gainDecibels,
-      };
-    }
-    if (target.parameterId === "bypassed") {
-      return {
-        descriptor: externalDescriptor("bypassed", "Bypass", false, { valueType: "boolean" }),
-        ownerLabel,
-        currentValue: effect.bypassed,
-      };
-    }
-    const descriptor = effectManifest?.parameters.find(
-      (candidate) => candidate.id === target.parameterId && candidate.automation === "step",
-    );
-    if (descriptor === undefined) return undefined;
-    return {
-      descriptor,
-      ownerLabel,
-      currentValue: effect.state[descriptor.id] ?? descriptor.defaultValue,
-    };
-  })();
+  const externalAutomation = resolveExternalAutomationTarget(project, externalAutomationTarget, {
+    effectParametersFor: (pluginId) => {
+      const effectManifest = manifestFor(pluginId);
+      return effectManifest?.kind === "effect" ? effectManifest.parameters : undefined;
+    },
+    pluginNameFor: (pluginId) => manifestFor(pluginId)?.productName,
+  });
 
   const followedPageIndex = Math.floor(
     (((positionTicks % (cycleSteps * STEP_TICKS)) + cycleSteps * STEP_TICKS) %

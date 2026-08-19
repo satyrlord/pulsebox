@@ -73,9 +73,11 @@ The merged MVP is complete only when:
     point. Each Output group has one icon-only `Bypass All` toggle. It bypasses
     the complete pedalboard without changing any pedal bypass state.
 24. **AC-024.** Four modular send chains work. Each compact card uses a pinned
-    focus effect and up to four declared compact controls from that plugin. The
-    Mixer has one icon-only `Bypass All` toggle for all Send FX. It preserves
-    each send chain's own bypass state.
+    focus effect and up to four declared compact controls from that plugin.
+    Each visible parameter caption is complete. The Effects view provides its
+    own visible vertical scrollbar when its cards exceed the available height.
+    The Mixer has one icon-only `Bypass All` toggle for all Send FX. It
+    preserves each send chain's own bypass state.
 25. **AC-025.** The master chain works.
 26. **AC-026.** All listed effects process audio. Each effect has one equal-power
     Mix and one post-mix Gain. Mix and Gain are automatable. The UI has no

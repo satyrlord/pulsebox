@@ -1,4 +1,5 @@
 export * from "./commands";
+export * from "./automation-targets";
 export * from "./default-state";
 export * from "./edit-policy";
 export * from "./model";

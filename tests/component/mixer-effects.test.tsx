@@ -19,7 +19,9 @@ function sendEditorButton(send: "A" | "B" | "C" | "D"): HTMLElement {
     .getByRole("heading", { name: `Send ${send}` })
     .closest('[data-component="effect-slot"]');
   if (card === null) throw new Error(`Expected the Send ${send} effect card.`);
-  return within(card as HTMLElement).getByRole("button", { name: "Edit" });
+  return within(card as HTMLElement).getByRole("button", {
+    name: `Edit Send ${send} effects`,
+  });
 }
 
 describe("mixer and effects surfaces", () => {
@@ -274,11 +276,12 @@ describe("mixer and effects surfaces", () => {
     expect(parameter()).toHaveValue("mix");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
-    fireEvent.keyDown(within(screen.getByRole("region", { name: "Master routing" })).getByRole("button", { name: "Bypass master effects" }), {
-      key: "A",
-      shiftKey: true,
-    });
-    expect(parameter()).toHaveValue("effects-bypassed");
+    fireEvent.contextMenu(
+      within(screen.getByRole("region", { name: "Master routing" })).getByRole("slider", {
+        name: "Master level",
+      }),
+    );
+    expect(parameter()).toHaveValue("level");
 
     fireEvent.contextMenu(
       screen.getByRole("combobox", { name: "Send D Distortion Model macro" }),
@@ -303,6 +306,14 @@ describe("mixer and effects surfaces", () => {
     renderWithHarness(<EffectsBank />, harness);
 
     expect(document.querySelectorAll('[data-component="effect-slot"]')).toHaveLength(4);
+    for (const send of ["A", "B", "C", "D"] as const) {
+      expect(
+        screen.getByRole("button", { name: `Bypass Send ${send} chain` }),
+      ).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: `Edit Send ${send} effects` }),
+      ).toBeVisible();
+    }
     const edit = sendEditorButton("A");
     edit.focus();
     fireEvent.click(edit);
@@ -461,6 +472,8 @@ describe("mixer and effects surfaces", () => {
     renderWithHarness(<MasterPanel />, harness);
     const bypass = screen.getByRole("button", { name: "Bypass master effects" });
 
+    expect(bypass).not.toHaveAttribute("aria-keyshortcuts");
+    expect(screen.queryByTitle("Automate master effects bypass.")).toBeNull();
     fireEvent.click(bypass);
     expect(harness.domain.getState().project.effects.masterEffectsBypassed).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Reset peak" }));

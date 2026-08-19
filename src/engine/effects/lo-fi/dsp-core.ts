@@ -36,3 +36,7 @@ export class LoFiDsp implements EffectFrameProcessor {
     );
   }
 }
+
+export function createEffectProcessor(sampleRate: number, state: EffectState): EffectFrameProcessor {
+  return new LoFiDsp(sampleRate, state);
+}

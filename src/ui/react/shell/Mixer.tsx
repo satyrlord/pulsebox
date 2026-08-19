@@ -6,7 +6,6 @@ import { Fader } from "../controls/Fader";
 import { Knob } from "../controls/Knob";
 import { LevelMeter } from "../controls/LevelMeter";
 import { Toggle } from "../controls/Toggle";
-import { automationShortcut } from "../controls/automation-shortcut";
 import { masterMeterDisplayLevel } from "../store/app-store";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { decibelsToGain, gainToDecibels, MINIMUM_FADER_DB } from "./fader-decibels";
@@ -129,13 +128,6 @@ export function Mixer() {
   const previewMasterLevel = useAppStore((state) => state.previewMasterLevel);
   const selectModule = useAppStore((state) => state.selectModule);
   const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
-  const masterBypassAutomation = automationShortcut(() =>
-    openExternalAutomationTarget({
-      scope: "master",
-      targetId: "master",
-      parameterId: "effects-bypassed",
-    }),
-  );
   const visible = rackSlots.slice(0, visibleSlotCount);
   const loaded = visible.flatMap((slot) => {
     const module = slot.moduleId === undefined ? undefined : modules[slot.moduleId];
@@ -414,10 +406,7 @@ export function Mixer() {
           aria-pressed={masterEffectsBypassed}
           data-bypassed={masterEffectsBypassed}
           title="Bypass all user master effects. The master gain and protected limiter stay active."
-          aria-keyshortcuts={masterBypassAutomation.ariaKeyShortcuts}
           onClick={toggleMasterEffectsBypass}
-          onKeyDown={masterBypassAutomation.onKeyDown}
-          onContextMenu={masterBypassAutomation.onContextMenu}
         >
           {masterEffectsBypassed ? "FX OFF" : "FX ON"}
         </button>

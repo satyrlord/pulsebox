@@ -13,3 +13,7 @@ export class DistortionDsp implements EffectFrameProcessor {
   reset(): void { this.#left.reset(); this.#right.reset(); }
   process(left: number, right: number, output?: StereoFrame): StereoFrame { const drive = numberState(this.#state, "drive", 3.2, 1, 12); const model = enumState(this.#state, "model", "drive" as const, ["drive", "fold", "asymmetric"] as const); const tone = numberState(this.#state, "tone", 7200, 200, 18000); const dl = this.#left.process(distortSample(left, drive, model), tone, this.#sampleRate); const dr = this.#right.process(distortSample(right, drive, model), tone, this.#sampleRate); return writeStereoFrame(output, finite(dl), finite(dr)); }
 }
+
+export function createEffectProcessor(sampleRate: number, state: EffectState): EffectFrameProcessor {
+  return new DistortionDsp(sampleRate, state);
+}

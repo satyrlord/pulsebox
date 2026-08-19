@@ -391,13 +391,13 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   await returnLevel.focus();
   await returnLevel.press("ArrowLeft");
   expect(Number(await returnLevel.getAttribute("aria-valuenow"))).toBeLessThan(returnBefore);
-  const chainBypass = card.getByRole("button", { name: /Chain bypass/iu });
+  const chainBypass = card.getByRole("button", { name: /Send A chain/iu });
   if ((await chainBypass.getAttribute("aria-pressed")) === "true") await chainBypass.click();
   await chainBypass.click();
   await expect(chainBypass).toHaveAttribute("aria-pressed", "true");
   await chainBypass.click();
 
-  const edit = card.getByRole("button", { name: "Edit", exact: true });
+  const edit = card.getByRole("button", { name: "Edit Send A effects", exact: true });
   await edit.click();
   const detail = page.locator('[data-component="effect-editor"]');
   await expect(detail).toBeVisible();
@@ -476,7 +476,7 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   await waitForAutosaveValue(page, `"gainDecibels":${String(gainAfter)}`);
   await page.reload();
   const reloadedEffects = await openStudio(page, "Effects");
-  const reloadedEdit = reloadedEffects.locator('[data-component="effect-slot"]').first().getByRole("button", { name: "Edit", exact: true });
+  const reloadedEdit = reloadedEffects.locator('[data-component="effect-slot"]').first().getByRole("button", { name: "Edit Send A effects", exact: true });
   await reloadedEdit.click();
   const reloadedDetail = page.locator('[data-component="effect-editor"]');
   await expect(
@@ -492,6 +492,76 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
     "aria-valuenow",
     String(gainAfter),
   );
+});
+
+test("keeps every compact send card reachable and every parameter caption readable", async ({
+  page,
+}) => {
+  const expectedCaptions = [
+    ["Time", "Feedback", "Feedback Filter"],
+    ["Pre-delay", "Decay", "Damping"],
+    ["Width", "Side High-pass", "Side Low-pass"],
+    ["Model", "Drive", "Tone"],
+  ] as const;
+
+  for (const viewport of SUPPORTED_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    const studio = await openStudio(page, "Effects");
+    const bank = studio.locator('[data-component="effects-bank"]');
+    const cards = bank.locator('[data-component="effect-slot"]');
+    await expect(cards).toHaveCount(4);
+
+    const overflow = await bank.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        clientHeight: element.clientHeight,
+        borderBoxWidth: element.getBoundingClientRect().width,
+        overflowY: style.overflowY,
+        scrollHeight: element.scrollHeight,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      };
+    });
+    expect(overflow.overflowY).toBe("scroll");
+    expect(overflow.borderBoxWidth - overflow.clientWidth).toBeGreaterThanOrEqual(8);
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+    if (viewport.width === 1280) {
+      expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight);
+    }
+
+    for (const [index, captions] of expectedCaptions.entries()) {
+      const card = cards.nth(index);
+      const captionGeometry = await card
+        .locator(
+          '[data-component="effect-macros"] > [data-component="knob"] > span, [data-component="effect-macros"] > label > span',
+        )
+        .evaluateAll((elements) =>
+          elements.map((element) => ({
+            clientHeight: element.clientHeight,
+            clientWidth: element.clientWidth,
+            scrollHeight: element.scrollHeight,
+            scrollWidth: element.scrollWidth,
+            text: element.textContent.trim(),
+            textOverflow: getComputedStyle(element).textOverflow,
+          })),
+        );
+      expect(captionGeometry).toHaveLength(captions.length);
+      expect(captionGeometry.map((geometry) => geometry.text)).toEqual(captions);
+      for (const geometry of captionGeometry) {
+        expect(geometry.textOverflow).not.toBe("ellipsis");
+        expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1);
+        expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.clientHeight + 1);
+      }
+    }
+
+    const lastCard = cards.last();
+    await lastCard.getByRole("button", { name: "Edit Send D effects", exact: true }).focus();
+    const [bankBox, lastCardBox] = await Promise.all([box(bank), box(lastCard)]);
+    expect(lastCardBox.y).toBeGreaterThanOrEqual(bankBox.y - 1);
+    expect(lastCardBox.y + lastCardBox.height).toBeLessThanOrEqual(
+      bankBox.y + bankBox.height + 1,
+    );
+  }
 });
 
 test("routes mixer controls and all four send returns through live output", async ({ browser }) => {

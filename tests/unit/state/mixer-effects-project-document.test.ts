@@ -229,6 +229,58 @@ describe("mixer and effects project document", () => {
     const rewritten = serializeProject(restored, OPTIONS);
     const reparsed = parseProjectDocument(rewritten, PARSE_OPTIONS);
     expect(reparsed.ok).toBe(true);
+
+    const unsupported = {
+      ...withAutomation,
+      automation: lanes.map((lane, index) =>
+        index === 0 ? { ...lane, parameterId: "unknown" } : lane,
+      ),
+    };
+    const unsupportedResult = parseProjectDocument(unsupported, PARSE_OPTIONS);
+    if (unsupportedResult.ok) throw new Error("Expected an invalid automation lane.");
+    expect(unsupportedResult.issues).toContainEqual({
+      path: "automation[0].parameterId",
+      message: "Mixer automation parameter is not supported.",
+    });
+    expect(unsupportedResult.issues).toContainEqual({
+      path: "automation[0].steps[0].value",
+      message: "Automation value has no supported parameter contract.",
+    });
+
+    const forbiddenMasterBypass = {
+      ...withAutomation,
+      automation: lanes.map((lane, index) =>
+        index === lanes.length - 1
+          ? { ...lane, parameterId: "effects-bypassed", steps: [{ tick: 0, value: true }] }
+          : lane,
+      ),
+    };
+    const forbiddenMasterBypassResult = parseProjectDocument(
+      forbiddenMasterBypass,
+      PARSE_OPTIONS,
+    );
+    if (forbiddenMasterBypassResult.ok) {
+      throw new Error("Expected master-effects bypass automation to be invalid.");
+    }
+    expect(forbiddenMasterBypassResult.issues).toContainEqual({
+      path: "automation[5].parameterId",
+      message: "Master automation parameter is not supported.",
+    });
+
+    const outOfRange = {
+      ...withAutomation,
+      automation: lanes.map((lane, index) =>
+        index === 0
+          ? { ...lane, steps: lane.steps.map((step) => ({ ...step, value: 2 })) }
+          : lane,
+      ),
+    };
+    const outOfRangeResult = parseProjectDocument(outOfRange, PARSE_OPTIONS);
+    if (outOfRangeResult.ok) throw new Error("Expected an out-of-range automation value.");
+    expect(outOfRangeResult.issues).toContainEqual({
+      path: "automation[0].steps[0].value",
+      message: "Automation value must be from 0 through 1.",
+    });
   });
 
   it("migrates format 2 effect stages through import, open, and autosave", async () => {

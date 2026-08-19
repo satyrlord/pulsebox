@@ -197,11 +197,30 @@ describe("external automation audio scheduling", () => {
       { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "gain", value: -3 },
       { atFrame: 4_800, scope: "effect", targetId: EFFECT, parameterId: "bypassed", value: false },
       { atFrame: 4_800, scope: "master", targetId: "master", parameterId: "level", value: 0.75 },
-      { atFrame: 4_800, scope: "master", targetId: "master", parameterId: "effects-bypassed", value: true },
     ]);
     expect(stub.parameters).toHaveLength(allocations);
     expect(stub.parameters.flatMap((one) => one.setValueAtTime.mock.calls).some((call) => call[1] === 0.1)).toBe(true);
     expect(scheduledEffectParameters).toHaveBeenCalledWith(4_800, "feedback", 0.3);
+    const scheduledCallCount = () =>
+      stub.parameters.reduce(
+        (total, one) =>
+          total +
+          one.cancelScheduledValues.mock.calls.length +
+          one.setValueAtTime.mock.calls.length +
+          one.linearRampToValueAtTime.mock.calls.length,
+        0,
+      );
+    const beforeForbiddenMasterBypass = scheduledCallCount();
+    graph.scheduleAutomation([
+      {
+        atFrame: 4_800,
+        scope: "master",
+        targetId: "master",
+        parameterId: "effects-bypassed",
+        value: true,
+      },
+    ]);
+    expect(scheduledCallCount()).toBe(beforeForbiddenMasterBypass);
     graph.clearAutomation(4_800);
     expect(clearedEffectParameters).toHaveBeenCalledWith(4_800);
     graph.dispose();
