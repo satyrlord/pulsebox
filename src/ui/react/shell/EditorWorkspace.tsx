@@ -21,7 +21,8 @@ import {
 import { AuditionButton } from "../controls/AuditionButton";
 import { PopupMenu, type PopupMenuItem } from "../controls/PopupMenu";
 import { useContinuousGesture } from "../controls/use-gesture-id";
-import { WHEEL_IDLE_MILLISECONDS } from "../controls/use-range-gesture";
+import { useRangeGesture, WHEEL_IDLE_MILLISECONDS } from "../controls/use-range-gesture";
+import { ValuePopover } from "../controls/ValuePopover";
 import { useAppStore, useDependencies } from "../store/app-store-context";
 import { PatternTools } from "./PatternTools";
 import styles from "./Shell.module.css";
@@ -2084,30 +2085,9 @@ function PianoRoll() {
   );
 }
 
-type PlaylistIconKind = "pattern" | "song" | "drag" | "menu" | "add";
+type PlaylistIconKind = "drag" | "menu" | "add";
 
 function PlaylistIcon(props: { readonly kind: PlaylistIconKind }) {
-  if (props.kind === "pattern") {
-    return (
-      <svg className={styles.playlistIcon} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <rect x="2" y="2" width="4.5" height="4.5" rx="0.75" fill="currentColor" />
-        <rect x="9.5" y="2" width="4.5" height="4.5" rx="0.75" fill="currentColor" />
-        <rect x="2" y="9.5" width="4.5" height="4.5" rx="0.75" fill="currentColor" />
-        <rect x="9.5" y="9.5" width="4.5" height="4.5" rx="0.75" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (props.kind === "song") {
-    return (
-      <svg className={styles.playlistIcon} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <path
-          d="M10.5 3v7.1a2.2 2.2 0 1 1-1-1.9V5l4.5-1.2v5.3a2.2 2.2 0 1 1-1-1.9V2z"
-          fill="currentColor"
-          fillRule="evenodd"
-        />
-      </svg>
-    );
-  }
   if (props.kind === "drag") {
     return (
       <svg className={styles.playlistIcon} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -2168,12 +2148,105 @@ function PlaylistPlaybackMarker(props: { readonly placementId: SongPlacementId }
     }
     return false;
   });
+  const marker = useRef<HTMLSpanElement | null>(null);
+
+  // The Playlist shows under two rows at the minimum viewport, so playback
+  // follows the current row into the scroll port.
+  useEffect(() => {
+    if (!isCurrentPlacement) return;
+    const row = marker.current?.closest("li");
+    if (typeof row?.scrollIntoView === "function") row.scrollIntoView({ block: "nearest" });
+  }, [isCurrentPlacement]);
 
   return isCurrentPlacement ? (
-    <span className={styles.playlistPlaybackMarker} data-component="playlist-playback-marker">
+    <span
+      ref={marker}
+      className={styles.playlistPlaybackMarker}
+      data-component="playlist-playback-marker"
+    >
       Playing
     </span>
   ) : null;
+}
+
+/**
+ * Repeats follows the shared continuous-control contract, spec-003 section 22:
+ * vertical drag, wheel, arrow keys, double-click reset, and typed entry through
+ * the shared entry field that appears on keyboard focus.
+ */
+function PlaylistRepeats(props: {
+  readonly rowNumber: string;
+  readonly value: number;
+  readonly onCommit: (value: number) => void;
+}) {
+  const { onCommit } = props;
+  const commit = useCallback(
+    (value: number) => {
+      onCommit(value);
+    },
+    [onCommit],
+  );
+  const {
+    displayValue,
+    dragging,
+    wheelRef,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onKeyDown,
+    onKeyUp,
+    onBlur,
+    onDoubleClick,
+    setFromNumeric,
+  } = useRangeGesture({
+    value: props.value,
+    min: 1,
+    max: 999,
+    step: 1,
+    defaultValue: 1,
+    // Four CSS pixels of travel per repeat, so a short drag lands on an exact
+    // count instead of mapping the whole 1-999 range onto the default range.
+    dragRange: 3992,
+    onInput: () => undefined,
+    onCommit: commit,
+  });
+
+  return (
+    <span className={styles.playlistRepeats} data-component="playlist-repeats">
+      <span
+        ref={wheelRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={`Playlist row ${props.rowNumber} repeat count`}
+        aria-valuemin={1}
+        aria-valuemax={999}
+        aria-valuenow={displayValue}
+        aria-valuetext={`${String(displayValue)} repeats`}
+        title={`Playlist row ${props.rowNumber} repeats: ${String(displayValue)}. Drag, scroll, or press the arrow keys.`}
+        data-dragging={dragging ? true : undefined}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
+        onBlur={onBlur}
+        onDoubleClick={onDoubleClick}
+      >
+        {`\u00d7${String(displayValue)}`}
+      </span>
+      <ValuePopover
+        label={`Playlist row ${props.rowNumber} repeat count value`}
+        value={String(displayValue)}
+        min={1}
+        max={999}
+        step={1}
+        className={styles.playlistRepeatsEntry}
+        onCommit={setFromNumeric}
+      />
+    </span>
+  );
 }
 
 function PlaylistSummary() {
@@ -2181,7 +2254,6 @@ function PlaylistSummary() {
   const song = useAppStore((state) => state.project.project.song);
   const activePatternId = useAppStore((state) => state.project.project.activePatternId);
   const selectPattern = useAppStore((state) => state.selectPattern);
-  const toggleSongMode = useAppStore((state) => state.toggleSongMode);
   const addSongPlacement = useAppStore((state) => state.addSongPlacement);
   const removeSongPlacement = useAppStore((state) => state.removeSongPlacement);
   const setSongPlacementRepeats = useAppStore((state) => state.setSongPlacementRepeats);
@@ -2193,12 +2265,24 @@ function PlaylistSummary() {
     | undefined
   >(undefined);
   const menuTogglePress = useRef(false);
+  const placementList = useRef<HTMLOListElement | null>(null);
+  const addPlacement = useRef<HTMLButtonElement | null>(null);
+  const revealAddedRow = useRef(false);
   const patternById = new Map(patterns.map((pattern) => [pattern.id, pattern]));
   const activePattern = patternById.get(activePatternId);
   const addedRowNumber = song.placements.length + 1;
   const addPlacementLabel = `Add ${activePattern?.name ?? "selected Pattern"} at the end as Playlist row ${String(addedRowNumber)}`;
-  const playbackMode = song.enabled ? "Song" : "Pattern";
-  const nextPlaybackMode = song.enabled ? "Pattern" : "Song";
+
+  // The list is taller than its scroll port, so an appended row lands outside
+  // it. Revealing the new row is the visible confirmation of the add.
+  useEffect(() => {
+    if (!revealAddedRow.current) return;
+    revealAddedRow.current = false;
+    const row = placementList.current?.lastElementChild;
+    if (row instanceof HTMLElement && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "nearest" });
+    }
+  }, [song.placements.length]);
 
   const menuItemsFor = (placementId: SongPlacementId): readonly PopupMenuItem[] => [
     {
@@ -2222,24 +2306,32 @@ function PlaylistSummary() {
     <aside className={styles.playlist} data-component="playlist-summary" aria-label="Playlist">
       <header className={styles.panelHeader}>
         <h2>Playlist</h2>
+        <span
+          className={styles.playlistEditingStatus}
+          title={`Pattern open in the editor: ${activePattern?.name ?? "Missing Pattern"}.`}
+        >
+          Editing {activePattern?.name ?? "Missing Pattern"}
+        </span>
         <button
           type="button"
-          className={styles.songModeToggle}
-          aria-label={`${playbackMode} playback mode`}
-          title={`Playlist playback mode: ${playbackMode}. Click to switch to ${nextPlaybackMode}.`}
-          aria-pressed={song.enabled}
-          onClick={toggleSongMode}
+          className={styles.playlistSkip}
+          onClick={() => {
+            addPlacement.current?.focus();
+          }}
         >
-          <PlaylistIcon kind={song.enabled ? "song" : "pattern"} />
+          Skip Playlist rows
         </button>
       </header>
-      <ol>
+      <ol ref={placementList}>
         {song.placements.length === 0 ? (
-          <li className={styles.emptyPlaylist}>The Playlist is empty.</li>
+          <li className={styles.emptyPlaylist}>The Playlist is empty. Add the selected Pattern below.</li>
         ) : (
           song.placements.map((placement, index) => {
             const pattern = patternById.get(placement.patternId);
             const rowNumber = String(index + 1);
+            const patternName = pattern?.name ?? "Missing Pattern";
+            const durationBars = pattern?.durationBars ?? 1;
+            const barsText = `${String(durationBars)} bar${durationBars === 1 ? "" : "s"}`;
             return (
               <li
                 key={placement.id}
@@ -2282,6 +2374,8 @@ function PlaylistSummary() {
                 <button
                   type="button"
                   className={styles.playlistSelection}
+                  aria-label={`Select ${patternName} in the editor: Playlist row ${rowNumber}, ${barsText}`}
+                  title={`Select ${patternName} in the editor.`}
                   aria-pressed={placement.patternId === activePatternId}
                   onClick={() => {
                     selectPattern(placement.patternId);
@@ -2290,15 +2384,12 @@ function PlaylistSummary() {
                   <span>{rowNumber.padStart(2, "0")}</span>
                   <i
                     className={styles.playlistPatternColor}
-                    style={{ backgroundColor: pattern?.color ?? "#E6A23C" }}
+                    style={{ backgroundColor: pattern?.color ?? "var(--pulse-color-status-warning)" }}
                     aria-hidden="true"
                   />
-                  <strong>{pattern?.name ?? "Missing Pattern"}</strong>
-                  <small>{`${String(pattern?.durationBars ?? 1)} bar${pattern?.durationBars === 1 ? "" : "s"}`}</small>
-                  <PlaylistPlaybackMarker placementId={placement.id} />
+                  <small>{barsText}</small>
                 </button>
-                <label className={styles.playlistPatternPicker}>
-                  <span className={styles.visuallyHidden}>Pattern</span>
+                <span className={styles.playlistPatternPicker}>
                   <select
                     aria-label={`Playlist row ${rowNumber} Pattern`}
                     title={`Choose the Pattern for Playlist row ${rowNumber}.`}
@@ -2313,24 +2404,29 @@ function PlaylistSummary() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label className={styles.playlistRepeats}>
-                  <span>Repeats</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={999}
-                    step={1}
-                    aria-label={`Playlist row ${rowNumber} repeat count`}
-                    value={placement.repeatCount}
-                    onChange={(event) => {
-                      const repeatCount = event.currentTarget.valueAsNumber;
-                      if (Number.isSafeInteger(repeatCount)) {
-                        setSongPlacementRepeats(placement.id, repeatCount);
-                      }
-                    }}
-                  />
-                </label>
+                  <svg
+                    className={styles.pickerChevron}
+                    viewBox="0 0 8 8"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path
+                      d="M1.5 3 4 5.5 6.5 3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+                <PlaylistPlaybackMarker placementId={placement.id} />
+                <PlaylistRepeats
+                  rowNumber={rowNumber}
+                  value={placement.repeatCount}
+                  onCommit={(repeatCount) => {
+                    setSongPlacementRepeats(placement.id, repeatCount);
+                  }}
+                />
                 <button
                   type="button"
                   aria-label={`Playlist row ${rowNumber} menu`}
@@ -2359,18 +2455,21 @@ function PlaylistSummary() {
         )}
       </ol>
       <button
+        ref={addPlacement}
         type="button"
         className={styles.addPattern}
         aria-label={addPlacementLabel}
         title={`${addPlacementLabel}.`}
         onClick={() => {
+          revealAddedRow.current = true;
           addSongPlacement(activePatternId);
         }}
       >
         <PlaylistIcon kind="add" />
         <span className={styles.addPatternCopy}>
-          <span className={styles.addPatternTarget}>Add at end. Row {String(addedRowNumber)}.</span>
+          <strong>Add</strong>
           <span className={styles.addPatternName}>{activePattern?.name ?? "selected Pattern"}</span>
+          <span className={styles.addPatternTarget}>to row {String(addedRowNumber)}</span>
         </span>
       </button>
       {openMenu === undefined ? null : (

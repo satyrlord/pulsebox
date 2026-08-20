@@ -854,8 +854,8 @@ test("changes transport scope without stopping and toggles meter analysis withou
     const probe = (window as unknown as { __meterModeProbe: { analysers: number } }).__meterModeProbe;
     return probe.analysers;
   })).toBeGreaterThanOrEqual(2);
-  await page.getByRole("button", { name: "Pattern playback mode" }).click();
-  await expect(page.getByRole("button", { name: "Song playback mode" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Song", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Song", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
 
   const playlist = page.locator('[data-component="playlist-summary"]');
@@ -886,9 +886,8 @@ test("changes transport scope without stopping and toggles meter analysis withou
 test("keeps the complete Playlist row contract at the compact supported width", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   const playlist = page.locator('[data-component="playlist-summary"]');
-  const mode = playlist.getByRole("button", { name: "Pattern playback mode" });
-  await expect(mode.locator("svg")).toBeVisible();
-  await expect(mode).toHaveAttribute("title", /switch to Song/u);
+  await expect(playlist.getByRole("button", { name: /playback mode/u })).toHaveCount(0);
+  await expect(playlist.getByText("Editing Verse", { exact: true })).toBeVisible();
 
   const handle = playlist.getByRole("button", { name: "Reorder Playlist row 1" });
   await expect(handle.locator("svg")).toBeVisible();
@@ -909,9 +908,35 @@ test("keeps the complete Playlist row contract at the compact supported width", 
 
   const add = playlist.getByRole("button", { name: "Add Verse at the end as Playlist row 6" });
   await expect(add.locator("svg")).toBeVisible();
-  await expect(add).toHaveText("Add at end. Row 6.Verse");
+  await expect(add.getByText("Add", { exact: true })).toBeVisible();
+  await expect(add.getByText("Verse", { exact: true })).toBeVisible();
+  await expect(add.getByText("to row 6", { exact: true })).toBeVisible();
   await expect(add).toHaveAttribute("title", "Add Verse at the end as Playlist row 6.");
+  const skipRows = playlist.getByRole("button", { name: "Skip Playlist rows" });
+  await skipRows.focus();
+  await expect(skipRows).toBeVisible();
+  await skipRows.click();
+  await expect(add).toBeFocused();
   expect(await playlist.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+  const repeats = playlist.getByRole("slider", { name: "Playlist row 1 repeat count" });
+  await expect(repeats).toBeVisible();
+  const repeatsTarget = await box(repeats);
+  expect(repeatsTarget.height).toBeGreaterThanOrEqual(24);
+
+  await add.click();
+  await expect(playlist.locator("li").last()).toBeInViewport();
+
+  await page.getByRole("button", { name: "Song", exact: true }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  const marker = playlist.locator('[data-component="playlist-playback-marker"]');
+  await expect(marker).toBeVisible();
+  const playingRow = marker.locator("..");
+  const playingIdentity = playingRow.getByRole("button", { name: /Select .* in the editor:/u });
+  const playingRepeats = playingRow.getByRole("slider", { name: /repeat count/u });
+  expect(targetsDoNotOverlap(await box(playingIdentity), await box(marker))).toBe(true);
+  expect(targetsDoNotOverlap(await box(marker), await box(playingRepeats))).toBe(true);
+  expect((await box(playingRow)).height).toBe((await box(playlist.locator("li").nth(1))).height);
 });
 
 test("collapses and restores the lower editor with its focus and scroll context", async ({

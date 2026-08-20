@@ -651,9 +651,9 @@ test("song mode chains Patterns and reports the chain length", async ({ page }) 
   await playlist.getByRole("button", { name: /Add .* at the end as Playlist row \d+/u }).click();
   await expect(playlist.locator("ol > li")).toHaveCount(7);
 
-  const songMode = page.getByRole("button", { name: "Pattern playback mode" });
+  const songMode = page.getByRole("button", { name: "Song", exact: true });
   await songMode.click();
-  await expect(page.getByRole("button", { name: "Song playback mode" })).toHaveAttribute("aria-pressed", "true");
+  await expect(songMode).toHaveAttribute("aria-pressed", "true");
 
   await startPlayback(page);
   await expect(page.locator(".audio-status")).toHaveText("Audio active");

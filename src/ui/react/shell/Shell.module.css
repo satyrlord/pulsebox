@@ -104,6 +104,10 @@
   contain: paint;
 }
 
+.playlist {
+  position: relative;
+}
+
 .moduleList {
   display: flex;
   flex-direction: column;
@@ -1522,22 +1526,61 @@
   list-style: none;
 }
 
+/* The row is one raised plate. Every cell sits flat on it, so the row spends
+   its height once rather than stacking a plate inside a plate. */
 .playlist li:not(.emptyPlaylist) {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 24px;
-  grid-template-areas:
-    "drag identity menu"
-    "drag pattern repeats";
-  gap: 3px;
+  grid-template-columns: 24px auto minmax(0, 1fr) auto auto 24px;
+  grid-template-areas: "drag identity picker marker repeats menu";
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  min-block-size: 34px;
+  padding: 2px 3px 2px 0;
+  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow:
+    var(--lift-1),
+    0 0 0 1px var(--edge-hairline);
 }
 
-.songModeToggle {
-  display: inline-grid;
-  place-items: center;
+/* The engaged row lights its perimeter and its ink, so the state is not
+   carried by color alone. */
+.playlist li:not(.emptyPlaylist):has(.playlistSelection[aria-pressed="true"]) {
+  box-shadow:
+    var(--lift-1),
+    inset 0 0 0 1px var(--accent-lamp);
+}
+
+.playlistEditingStatus {
   margin-inline-start: auto;
-  min-inline-size: 24px;
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  font-size: var(--pulse-type-12, 12px);
+  font-weight: var(--pulse-weight-medium, 500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlistSkip {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 3px;
+  inset-inline-end: 3px;
   min-block-size: 24px;
-  padding: 2px;
+  padding-inline: 6px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playlistSkip:focus {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panelHeader:has(.playlistSkip:focus) .playlistEditingStatus {
+  visibility: hidden;
 }
 
 .playlistAction {
@@ -1572,78 +1615,132 @@
 
 .playlistRepeats {
   grid-area: repeats;
-  display: grid;
-  gap: 1px;
-  align-content: center;
-  color: var(--pulse-color-text-muted, #919ba3);
-  font-size: var(--pulse-type-10, 10px);
+  position: relative;
+  display: inline-grid;
 }
 
+/* Repeats is a scrubbed readout: the same well and mono voice as every other
+   value, adjusted by vertical drag rather than by a bare spinner. */
+.playlistRepeats [role="slider"] {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 36px;
+  min-block-size: 24px;
+  padding-inline: 4px;
+  font-family: var(--pulse-font-mono, ui-monospace), monospace;
+  font-size: var(--pulse-type-12, 12px);
+  font-variant-numeric: tabular-nums;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  background: var(--surface-well);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: var(--sink-1);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+/* Typed entry covers the readout on keyboard focus, the knob-chip pattern. It
+   stays in the DOM so Tab reaches it after the scrub target. */
+.playlistRepeatsEntry {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  min-block-size: 0;
+  padding: 0;
+  text-align: center;
+  font-family: var(--pulse-font-mono, ui-monospace), monospace;
+  font-size: var(--pulse-type-12, 12px);
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playlistRepeats:focus-within .playlistRepeatsEntry {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.playlistRepeatsEntry::-webkit-outer-spin-button,
+.playlistRepeatsEntry::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* The Pattern name is the picker: one recessed readout instead of a plate
+   that names the Pattern and a second control that names it again. */
 .playlistPatternPicker {
-  grid-area: pattern;
+  grid-area: picker;
+  position: relative;
+  display: grid;
   min-inline-size: 0;
-  align-self: end;
 }
 
 .playlistPatternPicker select {
   inline-size: 100%;
   min-block-size: 24px;
-  padding-inline: 4px;
-  font-size: var(--pulse-type-10, 10px);
-}
-
-.playlistRepeats input {
-  inline-size: 4.5ch;
-  min-block-size: 24px;
-  padding-inline: 3px;
-}
-
-/* A playlist row is a raised plate. The engaged row lights its perimeter and
-   its ink, so the state is not carried by color alone. */
-.playlistSelection {
-  grid-area: identity;
-  display: grid;
-  grid-template-columns: 17px 6px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  min-block-size: 35px;
-  padding-inline: var(--pulse-space-2, 8px);
+  padding-inline: 6px 17px;
+  appearance: none;
   font-family: var(--pulse-font-ui);
   font-size: var(--pulse-type-12, 12px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.pickerChevron {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 5px;
+  translate: 0 -50%;
+  inline-size: 8px;
+  block-size: 8px;
+  color: var(--pulse-color-text-muted, #919ba3);
+  pointer-events: none;
+}
+
+/* The identity cell sits flat on the row plate: order and duration in the
+   mono value voice, spec-001 section 11.3. */
+.playlistSelection {
+  grid-area: identity;
+  display: inline-grid;
+  grid-template-columns: 2ch 6px auto;
+  align-items: center;
+  gap: 3px;
+  min-inline-size: 0;
+  min-block-size: 28px;
+  padding-inline: 3px 1px;
+  font-family: var(--pulse-font-mono, ui-monospace), monospace;
+  font-size: var(--pulse-type-12, 12px);
+  font-variant-numeric: tabular-nums;
   letter-spacing: normal;
   text-transform: none;
   text-align: start;
-  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
-  box-shadow:
-    var(--lift-1),
-    0 0 0 1px var(--edge-hairline);
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: none;
+  box-shadow: none;
+}
+
+.playlistSelection:active:not(:disabled) {
+  box-shadow: none;
 }
 
 .playlistSelection[aria-pressed="true"] {
   color: color-mix(in srgb, var(--accent-lamp) 55%, var(--pulse-color-text-primary, #f3f5f6));
-  background: linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
-  box-shadow:
-    var(--lift-1),
-    inset 0 0 0 1px var(--accent-lamp),
-    0 0 9px var(--accent-dim);
-}
-
-.playlistSelection strong {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: none;
+  box-shadow: none;
 }
 
 /* The word makes the transport state clear even when selection appears on
    more than one placement of the Pattern open in the editor. */
 .playlistPlaybackMarker {
-  padding: 1px 3px;
+  grid-area: marker;
+  padding: 1px 2px;
   color: var(--pulse-color-text-primary, #f3f5f6);
   font-size: var(--pulse-type-10, 10px);
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
   border: 1px solid var(--accent-lamp);
   background: var(--surface-inset);
 }
@@ -1655,14 +1752,18 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #000000 30%, transparent);
 }
 
-.playlist small,
+.playlistSelection small,
 .emptyPlaylist {
-  font-size: var(--pulse-type-10, 10px);
+  font-size: var(--pulse-type-12, 12px);
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
+.playlistSelection small {
+  white-space: nowrap;
+}
+
 /* An add affordance is a dashed outline, never a raised key: it invites rather
-   than claims to be a switch. */
+   than claims to be a switch. The visible verb names the operation. */
 .addPattern {
   display: grid;
   grid-template-columns: 19px minmax(0, 1fr);
@@ -1670,12 +1771,12 @@
   gap: var(--pulse-space-2, 8px);
   padding-inline: var(--pulse-space-2, 8px);
   text-align: start;
-  min-block-size: 46px;
+  min-block-size: 28px;
   margin: 0 8px 8px;
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-family: var(--pulse-font-ui);
+  font-size: var(--pulse-type-12, 12px);
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--pulse-color-text-muted, #919ba3);
   background: none;
   border: 1.4px dashed var(--pulse-color-text-muted, #919ba3);
@@ -1689,9 +1790,16 @@
 }
 
 .addPatternCopy {
-  display: grid;
-  gap: 1px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   min-inline-size: 0;
+}
+
+.addPatternCopy strong {
+  flex: none;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  font-weight: var(--pulse-weight-strong, 650);
 }
 
 .addPatternTarget {
@@ -1862,7 +1970,9 @@
 .moduleChoice button,
 .effectCard button,
 .inspectorActions button,
-.playlist button {
+.playlistAction,
+.playlistDragHandle,
+.playlistSkip {
   font-size: var(--pulse-type-10, 10px);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1891,5 +2001,20 @@
   .rollContext {
     flex-basis: 9ch;
     max-inline-size: 9ch;
+  }
+
+  /* The 224px panel cannot hold one line, so the name readout takes its own
+     line while the plate header keeps order, duration, state, and repeats. */
+  .playlist li:not(.emptyPlaylist) {
+    grid-template-columns: 24px minmax(0, 1fr) auto auto 24px;
+    grid-template-areas:
+      "drag identity marker repeats menu"
+      "drag picker picker picker menu";
+    row-gap: 3px;
+    padding-block: 3px;
+  }
+
+  .playlistPlaybackMarker {
+    justify-self: end;
   }
 }

@@ -315,7 +315,9 @@ describe("EditorWorkspace", () => {
       .filter((row) => row.getAttribute("aria-pressed") === "true");
     expect(selectedVerseRows).toHaveLength(2);
 
-    fireEvent.click(within(playlist).getByRole("button", { name: "Pattern playback mode" }));
+    act(() => {
+      harness.store.getState().toggleSongMode();
+    });
     await harness.store.getState().play();
     harness.store.getState().setPositionTicks(0);
 
@@ -327,10 +329,9 @@ describe("EditorWorkspace", () => {
     const harness = createHarness();
     renderWithHarness(<EditorWorkspace />, harness);
     const playlist = screen.getByRole("complementary", { name: "Playlist" });
-    const mode = within(playlist).getByRole("button", { name: "Pattern playback mode" });
 
-    expect(mode.querySelector("svg")).toBeInTheDocument();
-    expect(mode).toHaveAttribute("title", expect.stringContaining("switch to Song"));
+    expect(within(playlist).queryByRole("button", { name: /playback mode/u })).not.toBeInTheDocument();
+    expect(within(playlist).getByText(`Editing ${activePattern(harness).name}`)).toBeVisible();
 
     const firstPlacement = harness.domain.getState().project.song.placements[0];
     const firstPattern = harness.domain
@@ -341,6 +342,20 @@ describe("EditorWorkspace", () => {
       name: new RegExp(`${firstPattern?.name ?? ""}.*${String(firstPattern?.durationBars)} bar`, "u"),
     });
     expect(selection).toBeVisible();
+
+    const initialRepeats = firstPlacement?.repeatCount ?? 1;
+    const repeats = within(playlist).getByRole("slider", { name: "Playlist row 1 repeat count" });
+    expect(repeats).toHaveTextContent(`\u00d7${String(initialRepeats)}`);
+    fireEvent.keyDown(repeats, { key: "ArrowUp" });
+    fireEvent.keyUp(repeats, { key: "ArrowUp" });
+    expect(harness.domain.getState().project.song.placements[0]?.repeatCount).toBe(initialRepeats + 1);
+
+    const repeatsEntry = within(playlist).getByRole("spinbutton", {
+      name: "Playlist row 1 repeat count value",
+    });
+    fireEvent.change(repeatsEntry, { target: { value: "4" } });
+    fireEvent.blur(repeatsEntry);
+    expect(harness.domain.getState().project.song.placements[0]?.repeatCount).toBe(4);
 
     const handle = within(playlist).getByRole("button", { name: "Reorder Playlist row 1" });
     expect(handle.querySelector("svg")).toBeInTheDocument();
@@ -365,8 +380,10 @@ describe("EditorWorkspace", () => {
     const addLabel = `Add ${activePattern(harness).name} at the end as Playlist row ${String(addedRowNumber)}`;
     const add = within(playlist).getByRole("button", { name: addLabel });
     expect(add.querySelector("svg")).toBeInTheDocument();
-    expect(add).toHaveTextContent(`Add at end. Row ${String(addedRowNumber)}.${activePattern(harness).name}`);
+    expect(add).toHaveTextContent(`Add${activePattern(harness).name}to row ${String(addedRowNumber)}`);
     expect(add).toHaveAttribute("title", `${addLabel}.`);
+    fireEvent.click(within(playlist).getByRole("button", { name: "Skip Playlist rows" }));
+    expect(add).toHaveFocus();
     fireEvent.click(add);
     expect(harness.domain.getState().project.song.placements.at(-1)?.patternId).toBe(activePattern(harness).id);
   });

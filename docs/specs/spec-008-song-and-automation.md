@@ -50,13 +50,23 @@ placement shows a visible `Playing` marker during playback. This marker does
 not replace or change the selected state.
 
 On compact layouts, Playlist action buttons use original inline SVG icons. Each
-icon-only button has a full accessible name and a tooltip. The mode control also
-uses an icon. The Add control includes an icon and visible target text. The text
-names the selected Pattern and its new final Playlist row. Pattern names and
-repeat counts remain visible.
+icon-only button has a full accessible name and a tooltip. The application
+header contains the sole Pattern and Song mode control, as required by
+spec-003 section 8.3. The Playlist does not duplicate this control. Its header
+names the Pattern open in the editor. The Add control includes an icon, a
+visible `Add` verb, the selected Pattern, and its new final Playlist row.
+Pattern names and repeat counts remain visible.
 
 The drag handle is the row movement control. It supports pointer drag and Arrow
 Up and Arrow Down. The row menu contains Duplicate and Delete only.
+
+The Pattern picker in each row shows the referenced Pattern name. The repeat
+count control follows the shared continuous-control contract in spec-003
+section 22, with typed entry. During Song playback, the Playlist scrolls the
+current placement into view. After Add, the Playlist scrolls the new row into
+view. The compact row layout keeps the `Playing` marker separate from the row
+identity and repeat controls at each supported viewport. A keyboard user can
+skip the row controls and move focus to Add.
 
 In Pattern mode, the transport loops the selected named Pattern. In Song mode,
 it plays Playlist rows in order, honoring each row's repeat count. Switching
