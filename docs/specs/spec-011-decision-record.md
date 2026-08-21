@@ -33,8 +33,14 @@ contains the normative requirements. This table is the traceability record.
   new action evicts older history rather than failing for lack of history
   capacity.
 - **D07.** The supported editing workspace begins at 1280 CSS pixels wide.
-- **D08.** Deep effect editors use the established 760 × 680 playback-safe modal
-  overlay.
+- **D08.** Deep effect editors use the playback-safe modal overlay. [Sections
+  20.3](spec-007-mixer-and-effects.md#203-compact-a-d-effects-view) and
+  [20.6](spec-007-mixer-and-effects.md#206-master-chain) of the mixer and
+  effects specification own editor growth, scrolling, playback, and focus
+  behavior. [Sections 3.3](../THEMING.md#33-fixed-foundation-tokens),
+  [4](../THEMING.md#4-built-in-palette-values), and
+  [8.5](../THEMING.md#85-shadow) of THEMING.md own the modal layer and shadow
+  tokens.
 - **D09.** Compact faceplates expose the established fast controls. Deeper
   synthesis, sample, voice, pedalboard, and routing controls live in the expanded
   editor. Faceplates carry no step grid and no per-step editing, as recorded in
@@ -643,7 +649,7 @@ contains the normative requirements. This table is the traceability record.
   playback-safe, and excluded from automation. Early format-3 documents can
   omit these override fields and resolve them to `false`.
 - **D102.** Each compact send card shows complete visible parameter captions.
-  It uses the card width for controls and actions before it adds height. The
-  Effects view has its own visible vertical scrollbar, so all four send cards
-  remain reachable at each supported viewport. Section 20.3 of
+  It uses the card width for controls and actions before it adds height. All four
+  cards fit without a scrollbar at each supported viewport. The bus and manifest
+  family plates share one aligned 24-pixel-high heading row. Section 20.3 of
   [mixer and effects](spec-007-mixer-and-effects.md) owns this behavior.

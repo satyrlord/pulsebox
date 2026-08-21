@@ -210,6 +210,109 @@ describe("plugin manifest validation", () => {
     expect(validatePluginManifest(manifestWithGate()).ok).toBe(true);
   });
 
+  it("accepts parameter visibility controlled by a declared boolean parameter", () => {
+    const base = manifestWithGate();
+    expect(
+      validatePluginManifest({
+        ...base,
+        ui: {
+          ...base.ui,
+          parameterVisibility: [
+            {
+              parameterId: parameterId("cutoff"),
+              gateParameterId: parameterId("lofi-enabled"),
+              gateValue: true,
+            },
+          ],
+        },
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects duplicate parameter visibility target IDs", () => {
+    const base = manifestWithGate();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        parameterVisibility: [
+          {
+            parameterId: parameterId("cutoff"),
+            gateParameterId: parameterId("lofi-enabled"),
+            gateValue: true,
+          },
+          {
+            parameterId: parameterId("cutoff"),
+            gateParameterId: parameterId("lofi-enabled"),
+            gateValue: false,
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.issues.some(
+          (issue) =>
+            issue.path === "ui.parameterVisibility" &&
+            issue.message.toLowerCase().includes("unique"),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it.each([
+    [
+      "an undeclared target",
+      {
+        parameterId: parameterId("missing"),
+        gateParameterId: parameterId("lofi-enabled"),
+        gateValue: true,
+      },
+      "Visible parameter",
+    ],
+    [
+      "an undeclared gate parameter",
+      {
+        parameterId: parameterId("cutoff"),
+        gateParameterId: parameterId("missing"),
+        gateValue: true,
+      },
+      "Parameter visibility must reference a declared gate parameter",
+    ],
+    [
+      "a non-boolean gate parameter",
+      {
+        parameterId: parameterId("cutoff"),
+        gateParameterId: parameterId("cutoff"),
+        gateValue: true,
+      },
+      "boolean parameter",
+    ],
+    [
+      "a self-visibility rule",
+      {
+        parameterId: parameterId("cutoff"),
+        gateParameterId: parameterId("cutoff"),
+        gateValue: true,
+      },
+      "own visibility",
+    ],
+  ] as const)("rejects parameter visibility with %s", (_name, rule, message) => {
+    const base = manifestWithGate();
+    const result = validatePluginManifest({
+      ...base,
+      ui: {
+        ...base.ui,
+        parameterVisibility: [rule],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.message.includes(message))).toBe(true);
+    }
+  });
+
   it("rejects a parameter gate that references an undeclared parameter", () => {
     const base = manifestWithGate();
     const result = validatePluginManifest({

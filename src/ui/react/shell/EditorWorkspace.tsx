@@ -2384,7 +2384,10 @@ function PlaylistSummary() {
                   <span>{rowNumber.padStart(2, "0")}</span>
                   <i
                     className={styles.playlistPatternColor}
-                    style={{ backgroundColor: pattern?.color ?? "var(--pulse-color-status-warning)" }}
+                    style={{
+                      backgroundColor:
+                        pattern?.color ?? "var(--pulse-color-status-warning, #f2c14e)",
+                    }}
                     aria-hidden="true"
                   />
                   <small>{barsText}</small>

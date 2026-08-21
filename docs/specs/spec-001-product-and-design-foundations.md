@@ -106,6 +106,11 @@ file names, factory project data, and user-facing strings must not contain:
 - Community theme artwork.
 - Traced or recolored reference art.
 
+The product owner may direct an original Pulsebox interface anatomy. The owning
+specification must define the permitted arrangement, proportions, and behavior.
+This direction does not permit copied code, assets, measured values, trade
+dress, or third-party material. This section owns the rule.
+
 Named historical sources may appear only in the non-shipping `/research`
 directory. Production packages and public product documentation exclude that
 directory. Research can explain broad synthesis families. Factory
@@ -193,7 +198,9 @@ Avoid:
 - `BITS`: ghost blue.
 - `PERC`: turquoise.
 
-Accents identify modules. They do not become full panel colors.
+Instrument accents identify instruments. They do not become full instrument panel
+colors. Effect manifests use a separate fixed accent scope. Their muted value may
+provide the approved tint on an effect faceplate.
 
 Each instrument also declares one original SVG icon in its manifest. The icon
 is a maker's mark for the instrument: an acid smiley for `ACID`, a marching
@@ -215,9 +222,11 @@ Never rely on color alone. Pair every accent with the module short label or the
 module icon, whose shape is a non-color cue. Give selection, status, and
 disabled states a non-color cue that survives the high-contrast overlay.
 
-`THEMING.md` section 3.4 owns the normative token values for these six accents.
-A plugin declares its own accent in its manifest `moduleAccent`, which must match
-that table.
+`THEMING.md` section 3.4 owns the normative token values for these six
+instrument accents. Each instrument declares its values in `moduleAccent`, which
+must match that table. The same section owns one separate exact four-value tuple
+for each built-in effect. Each effect manifest must match its row. Shared UI
+consumes either manifest tuple generically.
 
 ### 11.3 Typography and icons
 

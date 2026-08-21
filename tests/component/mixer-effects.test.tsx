@@ -16,7 +16,7 @@ const SEND_A_ID = SEND_BUS_IDS[0];
 /** The Edit control of the named send card, not the first card in DOM order. */
 function sendEditorButton(send: "A" | "B" | "C" | "D"): HTMLElement {
   const card = screen
-    .getByRole("heading", { name: `Send ${send}` })
+    .getByRole("button", { name: `Select send ${send}` })
     .closest('[data-component="effect-slot"]');
   if (card === null) throw new Error(`Expected the Send ${send} effect card.`);
   return within(card as HTMLElement).getByRole("button", {
@@ -202,6 +202,32 @@ describe("mixer and effects surfaces", () => {
     expect(harness.domain.getState().history.canUndo).toBe(true);
   });
 
+  it("preserves manifest units and display precision in compact and detailed effect controls", () => {
+    const harness = createHarness();
+    renderWithHarness(<EffectsBank />, harness);
+
+    const compactTime = screen.getByRole("slider", {
+      name: "Send A Analog Echo Time macro",
+    });
+    expect(compactTime).toHaveAttribute("aria-valuetext", "375 milliseconds");
+    expect(compactTime).toHaveAttribute("title", "375 milliseconds");
+
+    fireEvent.click(sendEditorButton("A"));
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Analog Echo in Send A Tempo Sync",
+      }),
+    );
+    const detailedTime = screen.getByRole("slider", {
+      name: "Analog Echo in Send A Time",
+    });
+    expect(detailedTime).toHaveAttribute("aria-valuetext", "375 milliseconds");
+    expect(detailedTime).toHaveAttribute("title", "375 milliseconds");
+    expect(screen.getByRole("spinbutton", { name: "Analog Echo in Send A Time value" })).toHaveValue(
+      375,
+    );
+  });
+
   it("keeps per-effect Mix and Gain synchronized with commits and history", () => {
     const harness = createHarness();
     renderWithHarness(<EffectsBank />, harness);
@@ -301,6 +327,64 @@ describe("mixer and effects surfaces", () => {
     expect(parameter()).toHaveValue("tempo-sync");
   });
 
+  it("renders manifest sections before Output and hides inactive parameter representations", () => {
+    const harness = createHarness();
+    renderWithHarness(<EffectsBank />, harness);
+
+    fireEvent.click(sendEditorButton("A"));
+    const delayTitle = screen.getByText("Analog Echo", { selector: "strong" });
+    const delayPedal = delayTitle.closest("li");
+    if (delayPedal === null) throw new Error("Expected the Analog Echo pedal.");
+    expect(
+      [...delayPedal.querySelectorAll('[data-component="effect-parameter-section"]')].map(
+        (section) => section.getAttribute("data-section-id"),
+      ),
+    ).toEqual(["timing", "echo"]);
+    const output = delayPedal.querySelector('[data-component="effect-output-section"]');
+    const echo = delayPedal.querySelector('[data-section-id="echo"]');
+    if (output === null || echo === null) throw new Error("Expected sound-first pedal sections.");
+    expect(echo.compareDocumentPosition(output) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(
+      within(delayPedal).queryByRole("slider", {
+        name: "Analog Echo in Send A Time",
+      }),
+    ).toBeNull();
+    expect(
+      within(delayPedal).getByRole("slider", {
+        name: "Analog Echo in Send A Beat Time",
+      }),
+    ).toBeVisible();
+    fireEvent.click(
+      within(delayPedal).getByRole("checkbox", {
+        name: "Analog Echo in Send A Tempo Sync",
+      }),
+    );
+    expect(
+      within(delayPedal).getByRole("slider", {
+        name: "Analog Echo in Send A Time",
+      }),
+    ).toBeVisible();
+    expect(
+      within(delayPedal).queryByRole("slider", {
+        name: "Analog Echo in Send A Beat Time",
+      }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(sendEditorButton("B"));
+    const reverbTitle = screen.getByText("Plate Reverb", { selector: "strong" });
+    const reverbPedal = reverbTitle.closest("li");
+    if (reverbPedal === null) throw new Error("Expected the Plate Reverb pedal.");
+    expect(
+      within(reverbPedal).queryByRole("combobox", {
+        name: "Plate Reverb in Send B Mode",
+      }),
+    ).toBeNull();
+    expect(
+      within(reverbPedal).getByLabelText("Plate Reverb in Send B Mode: Plate"),
+    ).toHaveTextContent("Plate");
+  });
+
   it("shows four send cards and restores focus after closing the deep effect editor", () => {
     const harness = createHarness();
     renderWithHarness(<EffectsBank />, harness);
@@ -314,6 +398,14 @@ describe("mixer and effects surfaces", () => {
         screen.getByRole("button", { name: `Edit Send ${send} effects` }),
       ).toBeVisible();
     }
+    const sendACompactPedal = screen.getByRole("button", { name: "Select send A" }).closest("article");
+    if (sendACompactPedal === null) throw new Error("Expected the Send A compact pedal.");
+    expect(sendACompactPedal).toHaveAttribute("data-bypassed", "false");
+    expect(within(sendACompactPedal).getByText("ECHO")).toBeVisible();
+    expect(sendACompactPedal).toHaveStyle({
+      "--send-accent": "#B66B46",
+      "--send-accent-muted": "#5B3624",
+    });
     const edit = sendEditorButton("A");
     edit.focus();
     fireEvent.click(edit);
@@ -321,6 +413,10 @@ describe("mixer and effects surfaces", () => {
     expect(
       screen.getByText("This shared chain processes signal sent from any mixer channel."),
     ).toBeVisible();
+    const delayPedal = screen.getByText("Analog Echo", { selector: "strong" }).closest("li");
+    expect(delayPedal).toHaveAttribute("data-component", "effect-pedal");
+    expect(delayPedal).toHaveStyle({ "--effect-accent": "#B66B46" });
+    expect(within(delayPedal as HTMLElement).getByText("ECHO")).toBeVisible();
     fireEvent.change(screen.getByRole("combobox", { name: "Add an effect to Send A" }), {
       target: { value: "chorus" },
     });
@@ -391,7 +487,7 @@ describe("mixer and effects surfaces", () => {
 
   it("edits stable EQ bands directly by keyboard and pointer as one gesture", () => {
     const harness = createHarness();
-    renderWithHarness(<MasterPanel />, harness);
+    const view = renderWithHarness(<MasterPanel />, harness);
     fireEvent.click(screen.getByRole("button", { name: "Edit chain" }));
     const eqId = harness.domain.getState().project.effects.masterChain.find((effectId) =>
       effectId === null
@@ -401,16 +497,21 @@ describe("mixer and effects surfaces", () => {
     );
     if (eqId === null || eqId === undefined) throw new Error("Expected the default EQ.");
 
-    const mid = screen.getByRole("button", { name: "Edit mid EQ band" });
+    const mid = screen.getByRole("button", { name: /^Edit mid EQ band,/ });
+    expect(mid).toHaveTextContent("M");
     fireEvent.keyDown(mid, { key: "ArrowUp" });
     expect(harness.audio.previewEffectParameter).toHaveBeenCalledWith(eqId, "mid-gain", 0.1);
     expect(harness.domain.getState().project.effects.instances[eqId]?.state["mid-gain"]).toBe(0);
     fireEvent.keyUp(mid, { key: "ArrowUp" });
     expect(harness.domain.getState().project.effects.instances[eqId]?.state["mid-gain"]).toBe(0.1);
+    expect(
+      document.querySelector('[data-component="eq-response-curve"] output[aria-live]'),
+    ).toHaveTextContent("mid EQ: 1.2 kHz, +0.1 dB.");
     act(() => harness.store.getState().undo());
 
     const surface = document.querySelector<HTMLElement>('[data-component="eq-response-curve"]');
-    const low = screen.getByRole("button", { name: "Edit low EQ band" });
+    const low = screen.getByRole("button", { name: /^Edit low EQ band,/ });
+    expect(low).toHaveTextContent("L");
     if (surface === null) throw new Error("Expected the EQ curve surface.");
     Object.assign(low, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
     vi.spyOn(surface, "getBoundingClientRect").mockReturnValue({
@@ -432,6 +533,16 @@ describe("mixer and effects surfaces", () => {
     act(() => harness.store.getState().undo());
     expect(harness.domain.getState().project.effects.instances[eqId]?.state["low-frequency"]).toBe(120);
     expect(harness.domain.getState().project.effects.instances[eqId]?.state["low-gain"]).toBe(0);
+
+    fireEvent.keyDown(mid, { key: "ArrowUp" });
+    expect(harness.domain.getState().project.effects.instances[eqId]?.state["mid-gain"]).toBe(0);
+    fireEvent.blur(window);
+    expect(harness.domain.getState().project.effects.instances[eqId]?.state["mid-gain"]).toBe(0.1);
+    act(() => harness.store.getState().undo());
+
+    fireEvent.keyDown(mid, { key: "ArrowUp" });
+    view.unmount();
+    expect(harness.domain.getState().project.effects.instances[eqId]?.state["mid-gain"]).toBe(0.1);
   });
 
   it("edits a tempo-locked Pattern Filter cutoff lane in the Piano Roll", () => {

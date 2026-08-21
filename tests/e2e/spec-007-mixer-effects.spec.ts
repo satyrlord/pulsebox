@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { HIGH_CONTRAST_OVERLAY } from "../../src/themes/tokens";
 import { waitForAutosaveValue } from "./autosave-wait";
 
 const SUPPORTED_VIEWPORTS = [
@@ -9,6 +10,19 @@ const SUPPORTED_VIEWPORTS = [
 ] as const;
 
 const SENDS = ["A", "B", "C", "D"] as const;
+
+const USER_THEME_SOURCE = JSON.stringify({
+  formatVersion: 1,
+  name: "Test Slate",
+  tokens: {
+    ...HIGH_CONTRAST_OVERLAY,
+    "--pulse-color-app": "#050505",
+    "--pulse-color-surface-panel": "#050505",
+    "--pulse-color-surface-control": "#171717",
+    "--pulse-color-surface-inset": "#050505",
+    "--pulse-color-overlay": "#080808",
+  },
+});
 
 interface LiveAudioMetrics {
   readonly leftPeak: number;
@@ -238,6 +252,24 @@ async function box(locator: Locator) {
   return value;
 }
 
+async function expectTwoBandFocus(page: Page, locator: Locator): Promise<void> {
+  await locator.focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(locator).toBeFocused();
+  const focus = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      boxShadow: style.boxShadow,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+    };
+  });
+  expect(focus.outlineStyle).toBe("solid");
+  expect(focus.outlineWidth).toBe("2px");
+  expect(focus.boxShadow).not.toBe("none");
+}
+
 async function openStudio(page: Page, name: "Mixer" | "Effects" | "Master") {
   const studio = page.locator('[data-component="studio-panel"]');
   await studio.getByRole("tab", { name, exact: true }).click();
@@ -383,9 +415,15 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   await expect(cards.nth(0)).toContainText(/Analog echo/i);
   await expect(cards.nth(1)).toContainText(/Plate reverb/i);
   await expect(cards.nth(2)).toContainText(/Stereo width/i);
-  await expect(cards.nth(3)).toContainText(/Drive/i);
+  await expect(cards.nth(3)).toContainText(/Distortion/i);
 
   const card = cards.nth(0);
+  await expect(
+    card.getByRole("slider", { name: "Send A Analog Echo Time macro" }),
+  ).toHaveAttribute("aria-valuetext", "375 milliseconds");
+  await expect(
+    card.getByRole("slider", { name: "Send A Analog Echo Feedback Filter macro" }),
+  ).toHaveAttribute("aria-valuetext", "4800 hertz");
   const returnLevel = card.getByRole("slider", { name: "Send A Return Level" });
   const returnBefore = Number(await returnLevel.getAttribute("aria-valuenow"));
   await returnLevel.focus();
@@ -402,9 +440,32 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   const detail = page.locator('[data-component="effect-editor"]');
   await expect(detail).toBeVisible();
   await expect(detail).toHaveAttribute("aria-label", /Send A/i);
-  const detailBox = await box(detail);
-  expect(detailBox.width).toBeCloseTo(760, 0);
-  expect(detailBox.height).toBeCloseTo(680, 0);
+  const [modalLayer, transportLayer] = await Promise.all([
+    page
+      .locator('[data-component="effect-editor-backdrop"]')
+      .evaluate((element) => Number(getComputedStyle(element).zIndex)),
+    page
+      .locator('[data-component="transport-bar"]')
+      .evaluate((element) => Number(getComputedStyle(element).zIndex)),
+  ]);
+  expect(modalLayer).toBeGreaterThan(transportLayer);
+  const [modalHeaderBox, transportBox, detailBox] = await Promise.all([
+    box(detail.locator(":scope > header")),
+    box(page.locator('[data-component="transport-bar"]')),
+    box(detail),
+  ]);
+  const modalHeaderOverlapsTransport =
+    modalHeaderBox.x < transportBox.x + transportBox.width &&
+    modalHeaderBox.x + modalHeaderBox.width > transportBox.x &&
+    modalHeaderBox.y < transportBox.y + transportBox.height &&
+    modalHeaderBox.y + modalHeaderBox.height > transportBox.y;
+  expect(modalHeaderOverlapsTransport).toBe(false);
+  expect(detailBox.width).toBeGreaterThanOrEqual(760);
+  expect(detailBox.height).toBeGreaterThanOrEqual(680);
+  expect(detailBox.width).toBeLessThanOrEqual(1536 - 32);
+  expect(detailBox.height).toBeLessThanOrEqual(1024 - 32);
+  await expect(detail).toHaveAttribute("data-inline-constrained", "false");
+  await expect(detail).toHaveAttribute("data-block-constrained", "false");
 
   const add = detail.getByRole("combobox", { name: /Add an effect to Send A/i });
   await add.selectOption({ label: "Chorus" });
@@ -414,11 +475,81 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
     has: page.locator("strong").filter({ hasText: /^Chorus$/u }),
   });
   await expect(added).toBeVisible();
+  const delayPedal = rows.filter({
+    has: page.locator("strong").filter({ hasText: /^Analog Echo$/u }),
+  });
+  await expect(
+    delayPedal.locator('[data-component="effect-parameter-section"]').first(),
+  ).toHaveAttribute("data-section-id", "timing");
+  const sectionOrder = await delayPedal.evaluate((pedal) =>
+    [...pedal.querySelectorAll(
+      '[data-component="effect-parameter-section"], [data-component="effect-output-section"]',
+    )].map((section) =>
+      section.getAttribute("data-section-id") ?? section.getAttribute("data-component"),
+    ),
+  );
+  expect(sectionOrder).toEqual(["timing", "echo", "effect-output-section"]);
+  await expect(
+    delayPedal.getByRole("slider", { name: "Analog Echo in Send A Time", exact: true }),
+  ).toHaveCount(0);
+  const beatTime = delayPedal.getByRole("slider", {
+    name: "Analog Echo in Send A Beat Time",
+    exact: true,
+  });
+  await expect(beatTime).toBeVisible();
+  await expect(beatTime).toHaveAttribute("aria-valuetext", "0.50 beats");
+  await expect(
+    delayPedal.getByRole("slider", {
+      name: "Analog Echo in Send A Feedback Filter",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-valuetext", "4800 hertz");
+  const tempoSync = delayPedal.getByRole("checkbox", {
+    name: "Analog Echo in Send A Tempo Sync",
+  });
+  await tempoSync.click();
+  const freeTime = delayPedal.getByRole("slider", {
+    name: "Analog Echo in Send A Time",
+    exact: true,
+  });
+  await expect(freeTime).toBeVisible();
+  await expect(freeTime).toHaveAttribute("aria-valuetext", "375 milliseconds");
+  await expect(
+    delayPedal.getByRole("slider", { name: "Analog Echo in Send A Beat Time", exact: true }),
+  ).toHaveCount(0);
+  await tempoSync.click();
+  const pedalAppearance = await rows.evaluateAll((pedals) => ({
+    backgrounds: pedals.map((pedal) => getComputedStyle(pedal).backgroundImage),
+    fasteners: pedals.map((pedal) => getComputedStyle(pedal, "::before").backgroundImage),
+    positions: pedals.map((pedal) => pedal.getBoundingClientRect().x),
+    rackDisplay: getComputedStyle(pedals[0]?.parentElement ?? document.body).display,
+  }));
+  expect(pedalAppearance.rackDisplay).toBe("flex");
+  expect(pedalAppearance.positions[1]).toBeGreaterThan(pedalAppearance.positions[0] ?? 0);
+  expect(pedalAppearance.backgrounds.every((value) => value.includes("linear-gradient"))).toBe(true);
+  expect(pedalAppearance.fasteners.every((value) => value.includes("radial-gradient"))).toBe(true);
+  for (const [actionName, title] of [
+    ["Move Chorus in Send A earlier", "Move Chorus left."],
+    ["Move Chorus in Send A later", "Move Chorus right."],
+    ["Automate Chorus in Send A bypass", "Automate Chorus bypass."],
+    ["Remove Chorus in Send A", "Remove Chorus."],
+  ] as const) {
+    const action = added.getByRole("button", { name: actionName, exact: true });
+    await expect(action).toBeVisible();
+    await expect(action).toHaveAttribute("title", title);
+    await expect(action).toHaveText(actionName.startsWith("Automate") ? "Auto" : "");
+    await expect(action.locator('[data-component="effect-action-icon"]')).toHaveCount(1);
+    const actionBox = await box(action);
+    expect(actionBox.width).toBeGreaterThanOrEqual(24);
+    expect(actionBox.height).toBeGreaterThanOrEqual(24);
+    expect(await action.evaluate((button) => button.scrollWidth <= button.clientWidth)).toBe(true);
+  }
   const bypass = added.getByRole("button", { name: "Bypass Chorus in Send A", exact: true });
+  await expect(bypass).toHaveText("On");
   await bypass.click();
   await expect(
     added.getByRole("button", { name: "Bypassed Chorus in Send A", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  ).toHaveText("Bypassed");
 
   const mix = added.getByRole("slider", { name: "Chorus in Send A Mix" });
   const mixBefore = Number(await mix.getAttribute("aria-valuenow"));
@@ -431,6 +562,11 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   await gain.press("ArrowDown");
   const gainAfter = Number(await gain.getAttribute("aria-valuenow"));
   expect(gainAfter).toBeLessThan(0);
+  const depthAutomation = added.getByRole("button", {
+    name: "Automate Chorus in Send A Depth",
+  });
+  await expect(depthAutomation).toHaveText("Auto");
+  await expect(depthAutomation.locator('[data-component="effect-action-icon"]')).toHaveCount(1);
 
   const detailSliderNames = await detail.getByRole("slider").evaluateAll((controls) =>
     controls.map((control) => control.getAttribute("aria-label")),
@@ -438,13 +574,16 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   expect(new Set(detailSliderNames).size).toBe(detailSliderNames.length);
 
   const drag = added.getByRole("button", { name: /Drag Chorus in Send A to reorder/i });
+  await expect(drag).toBeVisible();
+  await expect(drag).toHaveAttribute("title", "Drag Chorus to reorder.");
+  await expect(drag.locator('[data-component="effect-action-icon"]')).toHaveCount(1);
   const dragBox = await box(drag);
   const targetBox = await box(rows.first());
   await page.mouse.move(dragBox.x + dragBox.width / 2, dragBox.y + dragBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(
     targetBox.x + targetBox.width / 2,
-    targetBox.y + targetBox.height / 2,
+    targetBox.y + 32,
     { steps: 4 },
   );
   await page.mouse.up();
@@ -461,11 +600,30 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   await earlier.press("Enter");
   await expect(rows.first().locator("strong").first()).toHaveText("Chorus");
 
+  await add.selectOption({ label: "Compressor" });
+  await expect.poll(async () => (await box(detail)).width).toBeGreaterThan(detailBox.width);
+  const expandedRack = detail.getByRole("list", { name: "Send A effect order" });
+  const expandedOverflow = await expandedRack.evaluate((rack) => ({
+    clientHeight: rack.clientHeight,
+    clientWidth: rack.clientWidth,
+    scrollHeight: rack.scrollHeight,
+    scrollWidth: rack.scrollWidth,
+  }));
+  expect(expandedOverflow.scrollWidth).toBeLessThanOrEqual(expandedOverflow.clientWidth + 1);
+  expect(expandedOverflow.scrollHeight).toBeLessThanOrEqual(expandedOverflow.clientHeight + 1);
+
   const pin = added.getByRole("button", {
     name: /Pin Chorus in Send A to the compact send card/i,
   });
+  await expect(pin).toBeVisible();
   await expect(pin).toBeEnabled();
+  await expect(pin).toHaveAttribute("title", "Pin Chorus to the compact send card.");
+  await expect(pin).toHaveText("");
+  await expect(pin.locator('[data-component="effect-action-icon"]')).toHaveCount(1);
+  const pinnedEffectId = await added.getAttribute("data-effect-id");
+  if (pinnedEffectId === null) throw new Error("Expected the Chorus effect ID.");
   await pin.click();
+  await expect(pin).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("Escape");
   await expect(detail).toBeHidden();
@@ -474,16 +632,29 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
 
   await waitForAutosaveValue(page, `"mix":${String(mixAfter)}`);
   await waitForAutosaveValue(page, `"gainDecibels":${String(gainAfter)}`);
+  await waitForAutosaveValue(page, `"pinnedEffectId":"${pinnedEffectId}"`);
   await page.reload();
   const reloadedEffects = await openStudio(page, "Effects");
   const reloadedEdit = reloadedEffects.locator('[data-component="effect-slot"]').first().getByRole("button", { name: "Edit Send A effects", exact: true });
   await reloadedEdit.click();
   const reloadedDetail = page.locator('[data-component="effect-editor"]');
+  const reloadedCard = reloadedEffects.locator('[data-component="effect-slot"]').first();
+  await expect(reloadedCard.locator("h3")).toHaveText("Chorus");
   await expect(
     reloadedDetail.locator("ol > li").filter({
       has: page.locator("strong").filter({ hasText: /^Chorus$/u }),
     }),
   ).toBeVisible();
+  await expect(reloadedDetail.locator("ol > li").first().locator("strong")).toHaveText("Chorus");
+  await expect(
+    reloadedDetail.getByRole("button", { name: "Bypassed Chorus in Send A", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    reloadedDetail.getByRole("button", {
+      name: "Pin Chorus in Send A to the compact send card",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(reloadedDetail.getByRole("slider", { name: "Chorus in Send A Mix" })).toHaveAttribute(
     "aria-valuenow",
     String(mixAfter),
@@ -492,9 +663,79 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
     "aria-valuenow",
     String(gainAfter),
   );
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Settings" }).click();
+  const settings = page.locator('[data-component="settings-page"]');
+  await settings.getByRole("checkbox", { name: /high contrast/i }).check();
+  await settings.getByRole("button", { name: "Close", exact: true }).click();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const contrastSendCard = reloadedEffects.locator('[data-component="effect-slot"]').first();
+  await expect(contrastSendCard).toHaveCSS("border-top-width", "2px");
+  await expect(contrastSendCard.locator('[data-component="effect-family-chip"]')).toHaveCSS(
+    "background-color",
+    "rgb(0, 229, 255)",
+  );
+  await reloadedEdit.click();
+  const contrastDetail = page.locator('[data-component="effect-editor"]');
+  await expect(contrastDetail).toHaveAttribute("data-block-constrained", "true");
+  const contrastBox = await box(contrastDetail);
+  expect(contrastBox.width).toBeGreaterThanOrEqual(760);
+  expect(contrastBox.width).toBeLessThanOrEqual(1280 - 32);
+  expect(contrastBox.height).toBeCloseTo(720 - 32, 0);
+  expect(contrastBox.x).toBeGreaterThanOrEqual(0);
+  expect(contrastBox.y).toBeGreaterThanOrEqual(0);
+  await expect(contrastDetail).toHaveAttribute("data-inline-constrained", "false");
+  const contrastPedal = contrastDetail.locator('[data-component="effect-pedal"]').first();
+  await expect(contrastPedal).toHaveCSS("border-top-width", "2px");
+  const lastToggle = contrastDetail.getByRole("checkbox", {
+    name: /Analog Echo in Send A Ping-Pong/i,
+  });
+  await lastToggle.focus();
+  const toggleAppearance = await lastToggle.evaluate((toggle) => ({
+    appearance: getComputedStyle(toggle).appearance,
+    mount: getComputedStyle(toggle, "::before").backgroundImage,
+    lever: getComputedStyle(toggle, "::after").transform,
+  }));
+  expect(toggleAppearance.appearance).toBe("none");
+  expect(toggleAppearance.mount).toContain("radial-gradient");
+  expect(toggleAppearance.lever).not.toBe("none");
+  const [rackBox, toggleBox] = await Promise.all([
+    box(contrastDetail.getByRole("list", { name: "Send A effect order" })),
+    box(lastToggle),
+  ]);
+  expect(toggleBox.y).toBeGreaterThanOrEqual(rackBox.y - 1);
+  expect(toggleBox.y + toggleBox.height).toBeLessThanOrEqual(rackBox.y + rackBox.height + 1);
+  expect(toggleBox.width).toBeGreaterThanOrEqual(24);
+  expect(toggleBox.height).toBeGreaterThanOrEqual(24);
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1366, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const supportedBox = await box(contrastDetail);
+    expect(supportedBox.width).toBeGreaterThanOrEqual(760);
+    expect(supportedBox.width).toBeLessThanOrEqual(viewport.width - 32);
+    expect(supportedBox.height).toBeGreaterThanOrEqual(680);
+    expect(supportedBox.height).toBeLessThanOrEqual(viewport.height - 32);
+    expect(supportedBox.x).toBeGreaterThanOrEqual(0);
+    expect(supportedBox.y).toBeGreaterThanOrEqual(0);
+    const blockConstrained = await contrastDetail.getAttribute("data-block-constrained");
+    const overflow = await contrastDetail
+      .getByRole("list", { name: "Send A effect order" })
+      .evaluate((rack) => ({
+        clientHeight: rack.clientHeight,
+        scrollHeight: rack.scrollHeight,
+      }));
+    if (blockConstrained === "true") {
+      expect(supportedBox.height).toBeCloseTo(viewport.height - 32, 0);
+      expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight);
+    } else {
+      expect(overflow.scrollHeight).toBeLessThanOrEqual(overflow.clientHeight + 1);
+    }
+  }
 });
 
-test("keeps every compact send card reachable and every parameter caption readable", async ({
+test("fits every compact send card without scrolling and aligns its identity plates", async ({
   page,
 }) => {
   const expectedCaptions = [
@@ -503,6 +744,7 @@ test("keeps every compact send card reachable and every parameter caption readab
     ["Width", "Side High-pass", "Side Low-pass"],
     ["Model", "Drive", "Tone"],
   ] as const;
+  const expectedFamilyLabels = ["ECHO", "PLAT", "WIDE", "DIST"] as const;
 
   for (const viewport of SUPPORTED_VIEWPORTS) {
     await page.setViewportSize(viewport);
@@ -522,15 +764,72 @@ test("keeps every compact send card reachable and every parameter caption readab
         clientWidth: element.clientWidth,
       };
     });
-    expect(overflow.overflowY).toBe("scroll");
-    expect(overflow.borderBoxWidth - overflow.clientWidth).toBeGreaterThanOrEqual(8);
+    expect(overflow.overflowY).toBe("hidden");
+    expect(overflow.borderBoxWidth - overflow.clientWidth).toBeLessThanOrEqual(1);
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
-    if (viewport.width === 1280) {
-      expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight);
-    }
+    expect(
+      overflow.scrollHeight,
+      `${viewport.width.toString()} by ${viewport.height.toString()} Effects bank`,
+    ).toBeLessThanOrEqual(overflow.clientHeight);
 
     for (const [index, captions] of expectedCaptions.entries()) {
       const card = cards.nth(index);
+      await expect(card.locator('[data-component="effect-family-chip"]')).toHaveText(
+        expectedFamilyLabels[index] ?? "",
+      );
+      const busPlate = card.getByRole("button", {
+        name: `Select send ${SENDS[index] ?? "A"}`,
+      });
+      const familyPlate = card.locator('[data-component="effect-family-chip"]');
+      const [busPlateBox, familyPlateBox] = await Promise.all([
+        box(busPlate),
+        box(familyPlate),
+      ]);
+      expect(busPlateBox.width).toBeCloseTo(24, 0);
+      expect(busPlateBox.height).toBeCloseTo(24, 0);
+      expect(familyPlateBox.width).toBeGreaterThanOrEqual(44);
+      expect(familyPlateBox.height).toBeCloseTo(24, 0);
+      expect(
+        Math.abs(
+          busPlateBox.y + busPlateBox.height / 2 -
+            (familyPlateBox.y + familyPlateBox.height / 2),
+        ),
+      ).toBeLessThanOrEqual(1);
+      const [busPlateStyle, familyPlateStyle] = await Promise.all([
+        busPlate.evaluate((plate) => ({
+          borderRadius: getComputedStyle(plate).borderRadius,
+          fontSize: getComputedStyle(plate).fontSize,
+        })),
+        familyPlate.evaluate((plate) => ({
+          borderRadius: getComputedStyle(plate).borderRadius,
+          fontSize: getComputedStyle(plate).fontSize,
+        })),
+      ]);
+      expect(familyPlateStyle).toEqual(busPlateStyle);
+      const pedalAppearance = await card.evaluate((pedal) => ({
+        background: getComputedStyle(pedal).backgroundImage,
+        fasteners: getComputedStyle(pedal, "::before").backgroundImage,
+      }));
+      expect(pedalAppearance.background).toContain("linear-gradient");
+      expect(pedalAppearance.fasteners).toContain("radial-gradient");
+      await expect(card.locator('[data-component="effect-macro-region"]')).toHaveAttribute(
+        "aria-label",
+        `Send ${SENDS[index] ?? "A"} effect controls`,
+      );
+      for (const region of ["effect-output-region", "effect-chain-region"]) {
+        await expect(card.locator(`[data-component="${region}"]`)).toHaveCSS(
+          "border-left-width",
+          "1px",
+        );
+      }
+      for (const actionName of [
+        `Automate send ${SENDS[index] ?? "A"} bypass`,
+        `Edit Send ${SENDS[index] ?? "A"} effects`,
+      ]) {
+        const action = card.getByRole("button", { name: actionName, exact: true });
+        await expect(action).toHaveText(actionName.startsWith("Automate") ? "Auto" : "");
+        await expect(action.locator('[data-component="effect-action-icon"]')).toHaveCount(1);
+      }
       const captionGeometry = await card
         .locator(
           '[data-component="effect-macros"] > [data-component="knob"] > span, [data-component="effect-macros"] > label > span',
@@ -554,13 +853,143 @@ test("keeps every compact send card reachable and every parameter caption readab
       }
     }
 
+    const sharedLayout = await cards.first().evaluate((card) => {
+      const heading = card.querySelector<HTMLElement>('[data-component="effect-heading"]');
+      const macroRegion = card.querySelector<HTMLElement>(
+        '[data-component="effect-macro-region"]',
+      );
+      const actions = Array.from(
+        card.querySelectorAll<HTMLButtonElement>('[data-component="effect-actions"] > button'),
+      );
+      if (heading === null || macroRegion === null || actions.length !== 3) return null;
+      const headingBox = heading.getBoundingClientRect();
+      const macroBox = macroRegion.getBoundingClientRect();
+      return {
+        headingGap: macroBox.top - headingBox.bottom,
+        actions: actions.map((button) => {
+          const actionBox = button.getBoundingClientRect();
+          return {
+            bottom: actionBox.bottom,
+            clientHeight: button.clientHeight,
+            clientWidth: button.clientWidth,
+            left: actionBox.left,
+            right: actionBox.right,
+            scrollHeight: button.scrollHeight,
+            scrollWidth: button.scrollWidth,
+            top: actionBox.top,
+          };
+        }),
+      };
+    });
+    expect(sharedLayout).not.toBeNull();
+    if (sharedLayout === null) throw new Error("Expected compact Effects layout geometry.");
+    expect(sharedLayout.headingGap).toBeGreaterThanOrEqual(7);
+    const [bypassBox, automateBox, editBox] = sharedLayout.actions;
+    expect(bypassBox).toBeDefined();
+    expect(automateBox).toBeDefined();
+    expect(editBox).toBeDefined();
+    if (bypassBox === undefined || automateBox === undefined || editBox === undefined) {
+      throw new Error("Expected compact Effects action geometry.");
+    }
+    expect(automateBox.top).toBeGreaterThan(bypassBox.bottom - 1);
+    expect(editBox.top).toBeCloseTo(automateBox.top, 0);
+    expect(bypassBox.left).toBeCloseTo(automateBox.left, 0);
+    expect(bypassBox.right).toBeCloseTo(editBox.right, 0);
+    for (const geometry of sharedLayout.actions) {
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+      expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.clientHeight);
+    }
+
     const lastCard = cards.last();
+    const scrollTopBeforeFocus = await bank.evaluate((element) => element.scrollTop);
     await lastCard.getByRole("button", { name: "Edit Send D effects", exact: true }).focus();
     const [bankBox, lastCardBox] = await Promise.all([box(bank), box(lastCard)]);
     expect(lastCardBox.y).toBeGreaterThanOrEqual(bankBox.y - 1);
     expect(lastCardBox.y + lastCardBox.height).toBeLessThanOrEqual(
       bankBox.y + bankBox.height + 1,
     );
+    expect(await bank.evaluate((element) => element.scrollTop)).toBe(scrollTopBeforeFocus);
+  }
+});
+
+test("keeps effect surfaces usable with a user theme and its high-contrast overlay", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  let settings = page.locator('[data-component="settings-page"]');
+  await settings.getByLabel("Import a user theme JSON file").setInputFiles({
+    name: "test-slate.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(USER_THEME_SOURCE),
+  });
+  await expect(settings.getByRole("radio", { name: "User theme: Test Slate" })).toBeChecked();
+  await settings.getByRole("button", { name: "Close", exact: true }).click();
+
+  for (const highContrast of [false, true]) {
+    if (highContrast) {
+      await page.getByRole("button", { name: "Settings" }).click();
+      settings = page.locator('[data-component="settings-page"]');
+      await settings.getByRole("checkbox", { name: "High contrast" }).check();
+      await settings.getByRole("button", { name: "Close", exact: true }).click();
+    }
+
+    for (const viewport of SUPPORTED_VIEWPORTS) {
+      await page.setViewportSize(viewport);
+      const expectedPanel = highContrast ? "#000000" : "#050505";
+      const expectedOverlay = highContrast ? "rgb(0, 0, 0)" : "rgb(8, 8, 8)";
+      expect(
+        await page.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--pulse-color-surface-panel")
+            .trim(),
+        ),
+      ).toBe(expectedPanel);
+
+      const studio = await openStudio(page, "Effects");
+      const bank = studio.locator('[data-component="effects-bank"]');
+      const cards = bank.locator('[data-component="effect-slot"]');
+      await expect(cards).toHaveCount(4);
+      const overflow = await bank.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        clientWidth: element.clientWidth,
+        scrollHeight: element.scrollHeight,
+        scrollWidth: element.scrollWidth,
+      }));
+      const themeViewport = `${highContrast ? "user plus high contrast" : "user"} ${viewport.width.toString()} by ${viewport.height.toString()}`;
+      expect(overflow.scrollHeight, themeViewport).toBeLessThanOrEqual(overflow.clientHeight);
+      expect(overflow.scrollWidth, themeViewport).toBeLessThanOrEqual(overflow.clientWidth);
+
+      const sendBadge = cards.first().getByRole("button", { name: "Select send A" });
+      await expectTwoBandFocus(page, sendBadge);
+      const edit = cards.first().getByRole("button", {
+        name: "Edit Send A effects",
+        exact: true,
+      });
+      await expectTwoBandFocus(page, edit);
+      await edit.click();
+
+      const detail = page.locator('[data-component="effect-editor"]');
+      await expect(detail).toBeVisible();
+      await expect(detail).toHaveCSS("background-color", expectedOverlay);
+      const detailBox = await box(detail);
+      expect(detailBox.x).toBeGreaterThanOrEqual(0);
+      expect(detailBox.y).toBeGreaterThanOrEqual(0);
+      expect(detailBox.x + detailBox.width).toBeLessThanOrEqual(viewport.width);
+      expect(detailBox.y + detailBox.height).toBeLessThanOrEqual(viewport.height);
+      const power = detail.getByRole("button", {
+        name: "Bypass Analog Echo in Send A",
+        exact: true,
+      });
+      await expectTwoBandFocus(page, power);
+      const tempoSync = detail.getByRole("checkbox", {
+        name: "Analog Echo in Send A Tempo Sync",
+      });
+      await expectTwoBandFocus(page, tempoSync);
+      const close = detail.getByRole("button", { name: "Close", exact: true });
+      await expectTwoBandFocus(page, close);
+      await close.click();
+      await expect(edit).toBeFocused();
+    }
   }
 });
 
@@ -772,13 +1201,35 @@ test("keeps master gain and the protected limiter active during user-effects byp
   }
 });
 
-test("keeps the pedalboard in the instrument rack", async ({ page }) => {
+test("keeps the pedalboard in the instrument rack and grows it before scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
   await openStudio(page, "Mixer");
 
   const rackModule = page.locator('[data-component="rack-module"]:not([data-label="Empty"])').first();
   await rackModule.getByRole("button", { name: "Effects" }).click();
-  await expect(page.getByRole("dialog", { name: /pedalboard effect editor/i })).toBeVisible();
+  const editor = page.getByRole("dialog", { name: /pedalboard effect editor/i });
+  await expect(editor).toBeVisible();
   await expect(page.getByText("This pedalboard processes only this instrument before its mixer channel.")).toBeVisible();
+  const initialBox = await box(editor);
+  const add = editor.getByRole("combobox", {
+    name: "Add an effect to Silver Serpent pedalboard",
+  });
+  for (const effectName of ["Distortion", "Compressor", "Analog Echo"]) {
+    await add.selectOption({ label: effectName });
+  }
+  await expect.poll(async () => (await box(editor)).width).toBeGreaterThan(initialBox.width);
+  const expandedBox = await box(editor);
+  expect(expandedBox.height).toBeGreaterThan(initialBox.height);
+  const rackOverflow = await editor
+    .getByRole("list", { name: "Silver Serpent pedalboard effect order" })
+    .evaluate((rack) => ({
+      clientHeight: rack.clientHeight,
+      clientWidth: rack.clientWidth,
+      scrollHeight: rack.scrollHeight,
+      scrollWidth: rack.scrollWidth,
+    }));
+  expect(rackOverflow.scrollWidth).toBeLessThanOrEqual(rackOverflow.clientWidth + 1);
+  expect(rackOverflow.scrollHeight).toBeLessThanOrEqual(rackOverflow.clientHeight + 1);
 });
 
 test("bypasses all Rack FX and Send FX with icon-only group controls", async ({ page }) => {
@@ -831,6 +1282,7 @@ test("bypasses all Rack FX and Send FX with icon-only group controls", async ({ 
 test("keeps the protected limiter and makes master-effects bypass undoable and persistent", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
   const studio = await openStudio(page, "Master");
   const master = studio.locator('[data-component="master-panel"]');
   await expect(master).toContainText(/6 effects loaded/u);
@@ -851,6 +1303,50 @@ test("keeps the protected limiter and makes master-effects bypass undoable and p
   await master.getByRole("button", { name: "Edit chain", exact: true }).click();
   const detail = page.locator('[data-component="effect-editor"]');
   await expect(detail).toBeVisible();
+  await expect.poll(async () => (await box(detail)).width).toBeGreaterThan(760);
+  const masterEditorBox = await box(detail);
+  expect(masterEditorBox.height).toBeGreaterThanOrEqual(680);
+  expect(masterEditorBox.width).toBeLessThanOrEqual(1536 - 32);
+  expect(masterEditorBox.height).toBeLessThanOrEqual(1024 - 32);
+  const masterRack = detail.getByRole("list", { name: "Master chain effect order" });
+  const masterOverflow = await masterRack.evaluate((rack) => ({
+    clientHeight: rack.clientHeight,
+    clientWidth: rack.clientWidth,
+    scrollHeight: rack.scrollHeight,
+    scrollWidth: rack.scrollWidth,
+  }));
+  const inlineConstrained = await detail.getAttribute("data-inline-constrained");
+  const blockConstrained = await detail.getAttribute("data-block-constrained");
+  if (inlineConstrained === "true") {
+    expect(masterEditorBox.width).toBeCloseTo(1536 - 32, 0);
+    expect(masterOverflow.scrollWidth).toBeGreaterThan(masterOverflow.clientWidth);
+  } else {
+    expect(masterOverflow.scrollWidth).toBeLessThanOrEqual(masterOverflow.clientWidth + 1);
+  }
+  if (blockConstrained === "true") {
+    expect(masterEditorBox.height).toBeCloseTo(1024 - 32, 0);
+    expect(masterOverflow.scrollHeight).toBeGreaterThan(masterOverflow.clientHeight);
+  } else {
+    expect(masterOverflow.scrollHeight).toBeLessThanOrEqual(masterOverflow.clientHeight + 1);
+  }
+  const compressorPedal = detail.locator("ol > li").filter({
+    has: page.locator("strong").filter({ hasText: /^Compressor$/u }),
+  });
+  await expect(
+    compressorPedal.locator('meter[aria-label="Compressor gain reduction"]'),
+  ).toHaveCSS("height", "8px");
+  const eqGrid = await detail
+    .locator('[data-component="eq-response-curve"] svg')
+    .evaluate((surface) => getComputedStyle(surface).backgroundImage);
+  expect(eqGrid).toContain("repeating-linear-gradient");
+  const eqSurface = detail.locator('[data-component="eq-response-curve"]');
+  await expect(eqSurface).toContainText("+180-18201k20k");
+  const midEqHandle = eqSurface.getByRole("button", { name: /^Edit mid EQ band,/ });
+  await expect(midEqHandle).toHaveText("M");
+  await expect(midEqHandle).toHaveAttribute(
+    "aria-label",
+    /Edit mid EQ band, 1\.2 kHz, 0\.0 dB/u,
+  );
   const limiter = detail.locator("ol > li").filter({
     has: page.locator("strong").filter({ hasText: /^Limiter$/u }),
   });

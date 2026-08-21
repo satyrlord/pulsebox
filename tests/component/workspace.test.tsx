@@ -948,10 +948,11 @@ describe("EffectsBank", () => {
     expect(screen.getByText("Plate Reverb")).toBeVisible();
     expect(screen.getByText("Stereo Width")).toBeVisible();
     const driveCard = screen
-      .getByRole("heading", { name: "Send D" })
+      .getByRole("button", { name: "Select send D" })
       .closest('[data-component="effect-slot"]');
     expect(driveCard).not.toBeNull();
-    expect(within(driveCard as HTMLElement).getByText("Drive", { selector: "p" })).toBeVisible();
+    expect(within(driveCard as HTMLElement).getByRole("heading", { name: "Distortion" })).toBeVisible();
+    expect(within(driveCard as HTMLElement).getByText("DIST")).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Send D Distortion Model macro" })).toHaveValue("drive");
     expect(screen.queryByRole("button", { name: "Details" })).toBeNull();
   });

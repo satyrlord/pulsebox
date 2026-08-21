@@ -132,9 +132,10 @@ highlight. Nothing floats. Nothing is styled for atmosphere.
 
 The system runs at high density on a dark chassis (`#0b0d0f`), with a four-step
 tonal ramp from app to panel to control to inset. Saturation is scarce and
-purposeful: the six instrument accents are the only strongly chromatic colors in
-the product, and they exist to answer "which machine am I touching?" Meters and
-status carry the remaining color, and they carry it as information. Type is
+purposeful: the six instrument accents are the strongly chromatic identity colors
+for the instruments, and they answer "which machine am I touching?" Effects use
+a separate fixed accent scope for pedal identity. Meters and status
+carry the remaining color, and they carry it as information. Type is
 small by design — 12px body, 10px labels — because operators read these strings
 thousands of times and the panel has to hold eight modules at once.
 
@@ -147,7 +148,7 @@ conventions entirely: Pulsebox is an instrument, not a pitch.
 **Key Characteristics:**
 
 - Dark chassis with a four-step tonal ramp (app → panel → control → inset)
-- Six instrument accents as the only saturated color, each paired with a short label
+- Six instrument accents for instrument identity, each paired with a short label
 - Physical control metaphors: raised caps, recessed bays, inset readouts
 - Compact type scale (10 / 12 / 14 / 16 / 20 px) with a monospace readout voice
 - 4px spacing grid; 4px control radii, 6px panel radii
@@ -168,13 +169,13 @@ level, and status.
   control tracks, so a track's filled length reads at a glance against
   **Track Steel** (`#6f7b84`).
 
-### Secondary — the module accents
+### Secondary — the instrument accents
 
 Six identity colors, one per instrument. These name a machine; they never fill a
-faceplate. Each appears on the name, a thin trim, selected-step LEDs, a small
-control-ring detail, the mixer header, and the overview marker. Each has a muted
-variant for filled areas, a brighter LED variant for lit indicators, and a ring
-variant for control outlines.
+full instrument faceplate. Each appears on the name, a thin trim, selected-step
+LEDs, a small control-ring detail, the mixer header, and the overview marker.
+Each has a muted variant for filled areas, a brighter LED variant for lit
+indicators, and a ring variant for control outlines.
 
 - **Acid Yellow** (`#F2D530`) — `ACID`, Silver Serpent
 - **Soldier Green** (`#6FDE76`) — `SNAP`, Tin Soldier
@@ -182,6 +183,15 @@ variant for control outlines.
 - **Violet** (`#B890FF`) — `MESH`, Twin Engine
 - **Ghost Blue** (`#A9C7E8`) — `BITS`, Gray Ghost
 - **Turquoise** (`#4ADFC7`) — `PERC`, Dusty Mosaic
+
+### Effect-scoped accents
+
+`THEMING.md` section 3.4 owns one fixed four-value accent tuple for each built-in
+effect. Each effect manifest declares its tuple. Shared UI consumes the tuple by
+field without a plugin-specific branch.
+
+The muted effect value may tint an effect faceplate. This exception does not
+permit an instrument accent to fill a full instrument faceplate.
 
 Each instrument also carries an original icon as a maker's mark, declared in
 its manifest and rendered in the accent: an acid smiley (`ACID`), a marching
@@ -215,10 +225,11 @@ the icon and the rack overview already say.
 
 ### Named Rules
 
-**The Named Machine Rule.** A module accent never appears without its short
+**The Named Machine Rule.** An instrument accent never appears without its short
 label. Color identifies which of six machines you are touching; the label is
 what makes that identification survive color blindness and the high-contrast
-overlay. An accent alone is an incomplete identity.
+overlay. Effect accents follow the same label rule. An accent alone is an
+incomplete identity.
 
 **The Scarce Saturation Rule.** Chroma is a budget. Only three things spend it:
 module identity, meter level, and status. A surface, a border, a label, or a
@@ -286,14 +297,15 @@ Recessed parts get an inner shadow (`inset 0 1px 3px 0 #00000073`) and a darker
 fill than their surroundings. Pressing a raised part inverts it: the highlight
 becomes an inset shadow, and the cap reads as depressed.
 
-Only two surfaces in the product genuinely float — the Undo notice and the
-Settings panel — and they are the only surfaces that use the panel drop shadow.
+Only three surfaces in the product genuinely float — the Undo notice, the
+Settings panel, and the modal effect editor. They are the only surfaces that use
+the panel drop shadow.
 
 ### Shadow Vocabulary
 
 - **Control** (`0px 1px 3px 0px #00000080`): under a raised cap. Paired with the
   1px top highlight; neither is used alone.
-- **Panel** (`0px 4px 12px 0px #00000099`): the two true overlays only. Not for
+- **Panel** (`0px 4px 12px 0px #00000099`): the three true overlays only. Not for
   module faceplates, mixer strips, or cards.
 - **Recess** (`inset 0 1px 3px 0 #00000073`): control bays, value readouts, and
   the pressed state of any button.
@@ -310,9 +322,9 @@ into the chassis or proud of it. Recessed takes a darker fill and an inner
 shadow. Raised takes a lighter fill, a top highlight, and a control shadow.
 A surface that is neither gets no shadow at all.
 
-**The Two Overlays Rule.** The panel drop shadow belongs to the Undo notice and
-the Settings panel. Anything else reaching for it is a card pretending to float,
-which this system does not do.
+**The Three Overlays Rule.** The panel drop shadow belongs to the Undo notice,
+the Settings panel, and the modal effect editor. Anything else reaching for it is
+a card pretending to float, which this system does not do.
 
 ## 5. Components
 
@@ -342,6 +354,58 @@ line in the module's LED color. Vertical drag (`cursor: ns-resize`), with a
 monospace tooltip above the dial during the gesture. Dragging brightens the cap
 stroke to the full module accent. The caption below is a 10px uppercase muted
 label; a keyboard-reachable numeric field carries the exact value.
+
+### Effect pedalboards
+
+The detailed effect editor is one horizontal processor rack. A dark rack slab
+mounts narrow powder-coated faceplates from left to right. Each faceplate has
+four decorative corner fasteners, a drag grip, a two-digit slot ordinal, and a
+live bypass lamp.
+
+The manifest short label identifies the effect family. The full effect name sits
+below it. Service actions form a compact rail above the Output and Effect control
+groups. The effect manifest accent tuple supplies the family chip, value arcs,
+and lamp. Its muted value supplies the faceplate tint. Bypass also changes text,
+border style, and control-body treatment.
+Boolean effect parameters use two-position metal toggle levers. The lever angle
+is the non-color state cue.
+
+Unambiguous service actions use original inline SVG icons. Detailed pedals use
+icons for move, remove, and pin. Replace uses a select. Compact cards use the
+edit icon to open this editor. Each icon-only button keeps its full accessible
+name and tooltip. Automation pairs its graph icon with the visible label `AUTO`.
+Bypass combines its lamp with visible `On` or `Bypassed` text in one button.
+
+Each pedal renders its manifest-defined sound sections first. The shared Output
+strip follows them. One-value enum parameters become static identity plates.
+Manifest visibility rules remove inactive alternate parameter representations.
+
+Each section legend ends in an engraved hairline. Gain-reduction meters sit in
+recessed bays with an effect-tinted fill. The parametric EQ uses a fine
+measurement grid behind its response curve. It also shows sparse frequency and
+gain anchors. Its `L`, `M`, and `H` handles expose current values accessibly.
+
+The family chip uses `--accent-ink` for its text. Its fill mixes 90 percent of
+the effect accent with 10 percent primary text ink. The deterministic built-in
+effect fixture derives this pair from every effect manifest and requires a
+minimum ratio of 4.5:1 in the rack theme. High contrast replaces both colors.
+
+The rack shows a visible scrollbar when the chain exceeds the editor. A
+faceplate can also extend the shared vertical scroll range for a large editor.
+The editor starts at 760 by 680 CSS pixels. It measures the current rack and
+grows in each axis before it shows a scrollbar. Growth stops 16 pixels from each
+viewport edge. The rack then scrolls only on the constrained axis.
+
+The compact Send A–D cards use the same faceplate grammar. Each card has four
+corner fasteners, a family chip, a bus plate, and a live activity lamp. The
+effect manifest accent tuple supplies the chip, control rings, and lamp. Its
+muted value supplies the faceplate tint. The bus and family plates share a
+24-pixel height and one center line. All four cards fit in
+the studio pane without a scrollbar. Engraved vertical dividers separate the
+Effect, Output, and Chain regions. The Chain rail places full-width bypass above
+compact Automation and Edit controls, so service actions do not compress the
+macros. The control row starts 7 pixels below the heading. The Edit control keeps
+a 24-pixel column, and Automation uses the remaining second-row width.
 
 ### Faders
 
@@ -403,9 +467,10 @@ ships no confirmation dialogs; the notice is the recovery path.
 
 ### Scrollbars
 
-Thin (10px) and always visible. Scrollbar Thumb over Scrollbar Track, with a 2px
-track-colored border insetting the thumb. Hiding a scrollbar is prohibited — in a
-dense workspace, the presence of overflow is information.
+Thin (10px) and always visible on a surface that can overflow. Scrollbar Thumb
+over Scrollbar Track, with a 2px track-colored border insetting the thumb. Do not
+hide real overflow. The compact Effects bank is not a scroll port. It must fit
+all four cards without overflow or a scrollbar.
 
 ## 6. Do's and Don'ts
 
@@ -425,7 +490,7 @@ dense workspace, the presence of overflow is information.
 - **Do** build on the 4px spacing grid and the 4px / 6px / 8px radius steps.
 - **Do** keep transitions at 80–220ms and provide the reduced-motion path — meters,
   LEDs, and playheads must keep signaling when motion is reduced, not go dark.
-- **Do** keep every scrollbar visible.
+- **Do** keep every scrollbar visible on surfaces that can overflow.
 - **Do** keep the detail that makes a control read as grabbable, marks a panel
   edge, or confirms an action. Affordance, legibility, orientation, and feedback
   are work. Strip only the detail that carries none of them.
@@ -443,10 +508,11 @@ dense workspace, the presence of overflow is information.
 - **Don't** use a colored side stripe (`border-left` or `border-right` above 1px)
   as an accent on any panel, row, or callout. Use a full border, a background
   tint, or the short label instead.
-- **Don't** reach for the panel drop shadow outside the Undo notice and the
-  Settings panel.
-- **Don't** let a module accent fill a faceplate. Accents are name, thin trim,
-  LED, ring detail, mixer header, and overview marker — nothing wider.
+- **Don't** reach for the panel drop shadow outside the Undo notice, the Settings
+  panel, and the modal effect editor.
+- **Don't** let an instrument accent fill a full instrument faceplate. Instrument
+  accents are name, thin trim, LED, ring detail, mixer header, and overview
+  marker. Effect-scoped accents may provide the approved muted effect tint.
 - **Don't** ship a visible control that does nothing. A dead control is a lie
   about what the machine can do.
 - **Don't** introduce a network-loaded webfont, an icon font, or emoji icons.

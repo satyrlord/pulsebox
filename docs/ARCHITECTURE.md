@@ -344,9 +344,11 @@ interface BasePluginManifest {
 }
 ```
 
-`PluginUiManifest.moduleAccent` declaratively supplies the four fixed module
-accent tokens owned by `THEMING.md`. Shared UI applies those values generically.
-It does not branch on a plugin ID, short label, or instrument name.
+`PluginUiManifest.moduleAccent` declaratively supplies four fixed accent values.
+For an instrument, the values use the instrument scope in `THEMING.md`. For an
+effect, the values use the separate exact tuple in `THEMING.md` section 3.4.
+Each manifest must match its owned row. Shared UI applies either scope
+generically. It does not branch on a plugin ID, short label, or instrument name.
 
 The optional `PluginUiManifest.icon` supplies the module's original iconography
 as one origin-anchored viewBox and one compound SVG path. The validator bounds
@@ -368,6 +370,13 @@ be a declared boolean parameter. The engine already ignores the gated
 parameter in that state, so the gate makes the faceplate agree with the audio
 path. Shared UI applies gates generically. It does not branch on a plugin ID,
 short label, or instrument name.
+
+The optional `parameterVisibility` list declares alternate detailed-editor
+representations. Each rule names one parameter, one declared boolean gate, and
+the gate value that makes the parameter visible. The inactive representation
+stays in plugin state and audio processing but is absent from the detailed UI.
+Target `parameterId` values are unique within one list. Duplicate targets fail
+manifest validation. Shared UI evaluates these rules without a plugin-ID branch.
 
 `pluginVersion` shall use semantic-version syntax. `stateSchemaVersion` shall be
 a positive integer and shall change only when serialized plugin state changes.

@@ -71,17 +71,25 @@ The merged MVP is complete only when:
     dry, and a non-zero value affects only that voice.
 23. **AC-023.** Module pedalboards work. The instrument rack is their only entry
     point. Each Output group has one icon-only `Bypass All` toggle. It bypasses
-    the complete pedalboard without changing any pedal bypass state.
+    the complete pedalboard without changing any pedal bypass state. The detailed
+    editor uses the specified horizontal rack and powder-coated pedal faceplates.
+    It grows to fit the current rack before it uses internal scrollbars.
+    It stays above the transport. Manifest sound sections appear before Output.
+    One-value enums are static identity, and inactive alternate parameters are absent.
 24. **AC-024.** Four modular send chains work. Each compact card uses a pinned
     focus effect and up to four declared compact controls from that plugin.
+    Each compact card uses the specified pedal-faceplate treatment.
     Each visible parameter caption is complete. The Effects view provides its
-    own visible vertical scrollbar when its cards exceed the available height.
+    own scrollbar-free fit for all four cards at each supported viewport. The
+    bus and manifest family plates share one aligned hardware row.
     The Mixer has one icon-only `Bypass All` toggle for all Send FX. It
     preserves each send chain's own bypass state.
-25. **AC-025.** The master chain works.
+25. **AC-025.** The master chain works. Its detailed editor uses the same
+    content-aware growth and viewport-limited scrollbar fallback.
 26. **AC-026.** All listed effects process audio. Each effect has one equal-power
     Mix and one post-mix Gain. Mix and Gain are automatable. The UI has no
-    `Wet/Dry` label.
+    `Wet/Dry` label. Automation actions show their icon and the label `AUTO`.
+    Parametric EQ handles show and expose their band, frequency, and gain.
 27. **AC-027.** A–D defaults match the approved compact effect design and use circular
     Return Level controls.
 28. **AC-028.** The reverb shimmer feature works.

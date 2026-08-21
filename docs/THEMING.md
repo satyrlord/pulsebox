@@ -148,6 +148,7 @@ JSON.
 | Radius             | `--pulse-radius-control: 4px`; `--pulse-radius-panel: 6px`; `--pulse-radius-dialog: 8px`; `--pulse-radius-round: 999px`           |
 | Border             | `--pulse-border-thin: 1px`; `--pulse-border-strong: 2px`                                                                          |
 | Target and control | `--pulse-target-min: 24px`; `--pulse-control-compact: 24px`; `--pulse-control-standard: 32px`; `--pulse-scrollbar-size: 10px`     |
+| Layer              | `--pulse-layer-modal: 70`                                                                                                         |
 | Focus              | `--pulse-focus-width: 2px`; `--pulse-focus-gap: 1px`                                                                              |
 | Motion             | `--pulse-duration-fast: 80ms`; `--pulse-duration-standard: 140ms`; `--pulse-duration-slow: 220ms`; `--pulse-motion-distance: 4px` |
 
@@ -181,8 +182,12 @@ Michroma, and Share Tech Mono. Rules for bundled typefaces:
 
 ### 3.4 Module-scoped accent tokens
 
-The rack module host sets all four tokens below. Descendant controls inherit
-them. These values identify the module but never fill the whole faceplate.
+The rack module host sets four fixed accent values for each instrument or effect.
+The manifest field names stay the same, but instrument and effect scopes stay
+separate. Descendant controls inherit the values from the active scope.
+
+Instrument scope identifies the machine but never fills a full instrument
+faceplate.
 
 | Module | `--module-accent` | `--module-accent-muted` | `--module-led` | `--module-control-ring` |
 | ------ | ----------------- | ----------------------- | -------------- | ----------------------- |
@@ -193,6 +198,27 @@ them. These values identify the module but never fill the whole faceplate.
 | `BITS` | `#A9C7E8`         | `#4E5D70`               | `#CFE3F6`      | `#86A6C8`               |
 | `PERC` | `#4ADFC7`         | `#2B6D63`               | `#7FF2DF`      | `#32B8A3`               |
 
+This table owns the exact tuple for each built-in effect. Each effect manifest
+must declare the values in its row:
+
+| Plugin ID | Effect | `accent` | `accentMuted` | `led` | `controlRing` |
+| --------- | ------ | -------- | ------------- | ----- | ------------- |
+| `lo-fi` | Lo-fi | `#B58B43` | `#594522` | `#E4B766` | `#927035` |
+| `pattern-filter` | Pattern Filter | `#50A384` | `#285243` | `#7ED6B4` | `#3F846B` |
+| `distortion` | Distortion | `#DC7A4B` | `#6D3D26` | `#FFAA79` | `#B85E35` |
+| `compressor` | Compressor | `#4E8DB8` | `#27475C` | `#78B9E3` | `#3D7194` |
+| `delay` | Analog Echo | `#B66B46` | `#5B3624` | `#E99970` | `#914F31` |
+| `reverb` | Plate Reverb | `#7A6AB5` | `#3E365B` | `#A99AE0` | `#615393` |
+| `chorus` | Chorus | `#4D9FA9` | `#285156` | `#7DD2DA` | `#3D7F87` |
+| `phaser` | Phaser | `#8C72B7` | `#463A5C` | `#BBA0E5` | `#705992` |
+| `parametric-eq` | Parametric EQ | `#65A052` | `#33512A` | `#91D47B` | `#507F41` |
+| `transient-shaper` | Transient Shaper | `#BE704F` | `#603928` | `#EBA07E` | `#985A3F` |
+| `stereo-width` | Stereo Width | `#4E99B3` | `#284D5A` | `#7BC9E1` | `#3E7B90` |
+| `limiter` | Limiter | `#C85151` | `#652929` | `#F17E7E` | `#9E4040` |
+
+The muted effect value may provide a low-strength tint on an effect faceplate.
+No instrument accent may fill a full instrument faceplate. Shared UI consumes
+either scope generically and does not branch on plugin ID or short label.
 Module identity also uses text, position, shape, or iconography. Components must
 fall back to the general accent tokens when no module scope exists.
 
@@ -567,6 +593,9 @@ Unit tests must cover:
   unknown token behavior.
 - deterministic canonicalization and complete sorted reporting.
 - contrast calculation against published reference color pairs.
+- the rack-theme family-chip contrast for every built-in effect manifest. The
+  fixture applies the documented 90 percent effect-accent and 10 percent
+  primary-ink mix and records the minimum ratio.
 - atomic rejection with an unchanged active and stored appearance.
 - corrupt preference fallback and cross-tab preference validation.
 - proof that project serialization and `.pulsebox` export contain no theme,
@@ -578,6 +607,8 @@ For each built-in theme, a valid user theme, and each with high contrast on:
 
 - assert all public tokens resolve to the expected computed value.
 - assert text, non-text, focus, accent-content, and meter contrast pairs.
+- assert the deterministic family-chip contrast result for every built-in effect
+  tuple.
 - keyboard through every shared control and assert visible, unobscured focus.
 - measure every operational pointer target as at least 24 by 24 CSS pixels.
   The Piano Roll keybed keys and event targets measure at least 24 by 16 CSS

@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 import {
   createGestureId,
   EFFECT_GAIN_MAXIMUM_DECIBELS,
   EFFECT_GAIN_MINIMUM_DECIBELS,
   type EffectInstanceId,
+  type ParameterDescriptor,
   type PluginId,
 } from "../../../contracts";
+import { EffectActionIcon } from "../controls/EffectActionIcon";
 import { Knob } from "../controls/Knob";
 import { automationShortcut } from "../controls/automation-shortcut";
+import { displayEnumValue } from "../controls/display-enum-value";
 import { useAppStore, useDependencies, useIdFactory } from "../store/app-store-context";
 import type { EffectChainTarget } from "../store/app-store";
 import styles from "./EffectEditor.module.css";
@@ -20,6 +30,22 @@ export interface EffectEditorProps {
   readonly protectedEffectId?: EffectInstanceId;
   readonly pinnedEffectId?: EffectInstanceId | null;
   readonly onClose: () => void;
+}
+
+const EDITOR_MINIMUM_INLINE_SIZE = 760;
+const EDITOR_MINIMUM_BLOCK_SIZE = 680;
+const EDITOR_VIEWPORT_INSET = 32;
+
+interface EditorDimensions {
+  readonly inlineSize: number;
+  readonly blockSize: number;
+  readonly inlineConstrained: boolean;
+  readonly blockConstrained: boolean;
+}
+
+function pixels(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function availableEffects(
@@ -102,10 +128,147 @@ function numericState(
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function DetailedEffectParameter(props: {
+  readonly effectId: EffectInstanceId;
+  readonly owner: string;
+  readonly parameter: ParameterDescriptor;
+  readonly value: string | number | boolean;
+}) {
+  const setEffectParameter = useAppStore((state) => state.setEffectParameter);
+  const previewEffectParameter = useAppStore((state) => state.previewEffectParameter);
+  const openExternalAutomationTarget = useAppStore(
+    (state) => state.openExternalAutomationTarget,
+  );
+  const enumValues = props.parameter.enumValues ?? [];
+  const fixedEnum = props.parameter.valueType === "enum" && enumValues.length === 1;
+  const automation =
+    props.parameter.automation === "step" && !fixedEnum
+      ? () =>
+          openExternalAutomationTarget({
+            scope: "effect",
+            targetId: props.effectId,
+            parameterId: props.parameter.id,
+          })
+      : undefined;
+  const automationEntry = automationShortcut(automation);
+  const normalizedPercent =
+    props.parameter.unit === "percent" &&
+    props.parameter.minimum === 0 &&
+    props.parameter.maximum === 1;
+  const control =
+    fixedEnum && typeof props.value === "string" ? (
+      <output
+        className={styles.parameterIdentity}
+        aria-label={`${props.owner} ${props.parameter.name}: ${displayEnumValue(props.value)}`}
+      >
+        {displayEnumValue(props.value)}
+      </output>
+    ) : props.parameter.valueType === "boolean" && typeof props.value === "boolean" ? (
+      <input
+        type="checkbox"
+        aria-label={`${props.owner} ${props.parameter.name}`}
+        aria-keyshortcuts={automationEntry.ariaKeyShortcuts}
+        checked={props.value}
+        onChange={(event) =>
+          setEffectParameter(props.effectId, props.parameter.id, event.currentTarget.checked)
+        }
+        onKeyDown={automationEntry.onKeyDown}
+        onContextMenu={automationEntry.onContextMenu}
+      />
+    ) : props.parameter.valueType === "enum" && typeof props.value === "string" ? (
+      <select
+        aria-label={`${props.owner} ${props.parameter.name}`}
+        aria-keyshortcuts={automationEntry.ariaKeyShortcuts}
+        value={props.value}
+        onChange={(event) =>
+          setEffectParameter(props.effectId, props.parameter.id, event.currentTarget.value)
+        }
+        onKeyDown={automationEntry.onKeyDown}
+        onContextMenu={automationEntry.onContextMenu}
+      >
+        {enumValues.map((option) => (
+          <option key={option} value={option}>
+            {displayEnumValue(option)}
+          </option>
+        ))}
+      </select>
+    ) : typeof props.value === "number" ? (
+      <Knob
+        controlId={`effect-${props.effectId}-${props.parameter.id}`}
+        label={`${props.owner} ${props.parameter.name}`}
+        caption={props.parameter.shortLabel ?? props.parameter.name}
+        min={props.parameter.minimum ?? 0}
+        max={props.parameter.maximum ?? 1}
+        step={props.parameter.step ?? 0.01}
+        value={props.value}
+        defaultValue={
+          typeof props.parameter.defaultValue === "number"
+            ? props.parameter.defaultValue
+            : props.value
+        }
+        precision={normalizedPercent ? 0 : props.parameter.displayPrecision}
+        unit={
+          normalizedPercent
+            ? "percent"
+            : props.parameter.unit === "none"
+              ? undefined
+              : props.parameter.unit
+        }
+        {...(normalizedPercent
+          ? {
+              formatValue: (next: number) => next * 100,
+              parseValue: (next: number) => next / 100,
+              displayMin: 0,
+              displayMax: 100,
+              displayStep: 1,
+            }
+          : {})}
+        onInput={(next) => previewEffectParameter(props.effectId, props.parameter.id, next)}
+        onCommit={(next, gestureId) =>
+          setEffectParameter(props.effectId, props.parameter.id, next, gestureId)
+        }
+        {...(automation === undefined ? {} : { onAutomate: automation })}
+      />
+    ) : null;
+  if (control === null) return null;
+  return (
+    <div
+      className={styles.parameter}
+      data-control-type={fixedEnum ? "identity" : props.parameter.valueType}
+    >
+      {props.parameter.valueType === "float" ? null : <span>{props.parameter.name}</span>}
+      {control}
+      {automation === undefined ? null : (
+        <button
+          type="button"
+          className={styles.parameterAutomation}
+          aria-label={`Automate ${props.owner} ${props.parameter.name}`}
+          title={`Automate ${props.parameter.name}.`}
+          onClick={automation}
+        >
+          <EffectActionIcon kind="automation" />
+          <span>Auto</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function frequencyX(frequency: number, width: number): number {
   const low = Math.log10(20);
   const high = Math.log10(20_000);
   return ((Math.log10(Math.max(20, Math.min(20_000, frequency))) - low) / (high - low)) * width;
+}
+
+function formatEqFrequency(frequency: number): string {
+  if (frequency < 1000) return `${Math.round(frequency).toString()} Hz`;
+  const kilohertz = frequency / 1000;
+  return `${kilohertz >= 10 ? Math.round(kilohertz).toString() : kilohertz.toFixed(1)} kHz`;
+}
+
+function formatEqGain(gain: number): string {
+  const prefix = gain > 0 ? "+" : "";
+  return `${prefix}${gain.toFixed(1)} dB`;
 }
 
 function EqResponseCurve(props: {
@@ -128,6 +291,7 @@ function EqResponseCurve(props: {
   const [preview, setPreview] = useState<
     Partial<Record<"low" | "mid" | "high", { readonly frequency: number; readonly gain: number }>>
   >({});
+  const [announcement, setAnnouncement] = useState("");
   const width = 540;
   const height = 150;
   const lowFrequency = preview.low?.frequency ?? numericState(props.state, "low-frequency", 120);
@@ -170,36 +334,58 @@ function EqResponseCurve(props: {
       [band.id]: { frequency: active.frequency, gain: active.gain },
     }));
   };
-  const finishGesture = (commit: boolean) => {
-    const active = gesture.current;
-    if (active === undefined) return;
-    gesture.current = undefined;
-    if (commit) {
-      if (active.frequency !== active.beforeFrequency) {
-        setEffectParameter(
+  const finishGesture = useCallback(
+    (commit: boolean) => {
+      const active = gesture.current;
+      if (active === undefined) return;
+      gesture.current = undefined;
+      if (commit) {
+        if (active.frequency !== active.beforeFrequency) {
+          setEffectParameter(
+            props.effectId,
+            `${active.bandId}-frequency`,
+            active.frequency,
+            active.id,
+          );
+        }
+        if (active.gain !== active.beforeGain) {
+          setEffectParameter(props.effectId, `${active.bandId}-gain`, active.gain, active.id);
+        }
+        if (
+          active.frequency !== active.beforeFrequency ||
+          active.gain !== active.beforeGain
+        ) {
+          setAnnouncement(
+            `${active.bandId} EQ: ${formatEqFrequency(active.frequency)}, ${formatEqGain(active.gain)}.`,
+          );
+        }
+      } else {
+        previewEffectParameter(
           props.effectId,
           `${active.bandId}-frequency`,
-          active.frequency,
-          active.id,
+          active.beforeFrequency,
         );
+        previewEffectParameter(props.effectId, `${active.bandId}-gain`, active.beforeGain);
       }
-      if (active.gain !== active.beforeGain) {
-        setEffectParameter(props.effectId, `${active.bandId}-gain`, active.gain, active.id);
-      }
-    } else {
-      previewEffectParameter(
-        props.effectId,
-        `${active.bandId}-frequency`,
-        active.beforeFrequency,
-      );
-      previewEffectParameter(props.effectId, `${active.bandId}-gain`, active.beforeGain);
-    }
-    setPreview((current) => {
-      return Object.fromEntries(
-        Object.entries(current).filter(([bandId]) => bandId !== active.bandId),
-      );
-    });
-  };
+      setPreview((current) => {
+        return Object.fromEntries(
+          Object.entries(current).filter(([bandId]) => bandId !== active.bandId),
+        );
+      });
+    },
+    [previewEffectParameter, props.effectId, setEffectParameter],
+  );
+
+  useEffect(() => {
+    const listeners = new AbortController();
+    window.addEventListener("blur", () => finishGesture(true), { signal: listeners.signal });
+    return () => {
+      listeners.abort();
+      // Match shared range controls: commit the last valid preview if the editor
+      // closes during a gesture so project state and audio cannot diverge.
+      finishGesture(true);
+    };
+  }, [finishGesture]);
   const responseAt = (frequency: number) => {
     const logFrequency = Math.log(frequency);
     const low = lowGain / (1 + Math.exp((logFrequency - Math.log(lowFrequency)) * 5));
@@ -226,14 +412,22 @@ function EqResponseCurve(props: {
         <line x1="0" y1={height / 2} x2={width} y2={height / 2} data-part="zero-line" />
         <path d={path} data-part="response" />
       </svg>
+      <div className={styles.eqAxisLabels} aria-hidden="true">
+        <span data-axis="gain-high">+18</span>
+        <span data-axis="gain-zero">0</span>
+        <span data-axis="gain-low">-18</span>
+        <span data-axis="frequency-low">20</span>
+        <span data-axis="frequency-mid">1k</span>
+        <span data-axis="frequency-high">20k</span>
+      </div>
       {bands.map((band) => (
         <button
           key={band.id}
           type="button"
           className={styles.eqBandHandle}
           data-band-id={band.id}
-          aria-label={`Edit ${band.id} EQ band`}
-          title="Drag to set frequency and gain. Use arrows for gain and Shift plus arrows for frequency."
+          aria-label={`Edit ${band.id} EQ band, ${formatEqFrequency(band.frequency)}, ${formatEqGain(band.gain)}`}
+          title={`${formatEqFrequency(band.frequency)}, ${formatEqGain(band.gain)}. Drag to set frequency and gain. Use arrows for gain and Shift plus arrows for frequency.`}
           style={{
             insetInlineStart: `${String((frequencyX(band.frequency, width) / width) * 100)}%`,
             insetBlockStart: `${String((yForGain(band.gain) / height) * 100)}%`,
@@ -289,8 +483,13 @@ function EqResponseCurve(props: {
             }
           }}
           onBlur={() => finishGesture(true)}
-        />
+        >
+          <span aria-hidden="true">{band.id.charAt(0).toUpperCase()}</span>
+        </button>
       ))}
+      <output className={styles.hiddenLabel} aria-live="polite">
+        {announcement}
+      </output>
     </div>
   );
 }
@@ -301,6 +500,9 @@ function EqResponseCurve(props: {
  */
 export function EffectEditor(props: EffectEditorProps) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const chainRef = useRef<HTMLOListElement | null>(null);
+  const footerRef = useRef<HTMLElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const onCloseRef = useRef(props.onClose);
   const [draggingEffectId, setDraggingEffectId] = useState<EffectInstanceId | undefined>(
@@ -310,6 +512,12 @@ export function EffectEditor(props: EffectEditorProps) {
   const [dragTargetEffectId, setDragTargetEffectId] = useState<EffectInstanceId | undefined>(
     undefined,
   );
+  const [editorDimensions, setEditorDimensions] = useState<EditorDimensions>({
+    inlineSize: EDITOR_MINIMUM_INLINE_SIZE,
+    blockSize: EDITOR_MINIMUM_BLOCK_SIZE,
+    inlineConstrained: false,
+    blockConstrained: false,
+  });
   const dragTargetEffectIdRef = useRef<EffectInstanceId | undefined>(undefined);
   const { manifestFor, addableEffectPluginIds = [] } = useDependencies();
   const instances = useAppStore((state) => state.project.project.effects.instances);
@@ -320,15 +528,16 @@ export function EffectEditor(props: EffectEditorProps) {
   const setEffectBypassed = useAppStore((state) => state.setEffectBypassed);
   const setEffectMix = useAppStore((state) => state.setEffectMix);
   const setEffectGain = useAppStore((state) => state.setEffectGain);
-  const setEffectParameter = useAppStore((state) => state.setEffectParameter);
   const previewEffectMix = useAppStore((state) => state.previewEffectMix);
   const previewEffectGain = useAppStore((state) => state.previewEffectGain);
-  const previewEffectParameter = useAppStore((state) => state.previewEffectParameter);
   const setSendFocus = useAppStore((state) => state.setSendFocus);
   const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
   const effects = props.slots.flatMap((id) => (id === null ? [] : [instances[id]])).filter(
     (effect): effect is NonNullable<typeof effect> => effect !== undefined,
   );
+  const layoutSignature = effects
+    .map((effect) => `${effect.id}:${effect.pluginId}`)
+    .join("|");
   const choices = availableEffects(props.chain, addableEffectPluginIds, manifestFor);
   const sendTargetId = props.chain.scope === "send" ? props.chain.targetId : undefined;
   const routingLabel =
@@ -416,17 +625,108 @@ export function EffectEditor(props: EffectEditorProps) {
     };
   }, []);
 
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const header = headerRef.current;
+    const chain = chainRef.current;
+    const footer = footerRef.current;
+    if (panel === null || header === null || chain === null || footer === null) return;
+
+    let resizeFrame = 0;
+    const measure = () => {
+      const chainStyle = getComputedStyle(chain);
+      const pedals = [...chain.children].filter(
+        (child): child is HTMLElement => child instanceof HTMLElement,
+      );
+      const gap = pixels(chainStyle.columnGap);
+      const inlinePadding =
+        pixels(chainStyle.paddingInlineStart) + pixels(chainStyle.paddingInlineEnd);
+      const blockPadding =
+        pixels(chainStyle.paddingBlockStart) + pixels(chainStyle.paddingBlockEnd);
+      const pedalInlineSize = pedals.reduce(
+        (total, pedal) => total + pedal.getBoundingClientRect().width,
+        0,
+      );
+      const pedalBlockSize = pedals.reduce(
+        (maximum, pedal) =>
+          Math.max(maximum, pedal.getBoundingClientRect().height, pedal.scrollHeight),
+        0,
+      );
+      const intrinsicChainInlineSize =
+        inlinePadding + pedalInlineSize + Math.max(0, pedals.length - 1) * gap;
+      const intrinsicChainBlockSize = blockPadding + pedalBlockSize;
+      const panelBounds = panel.getBoundingClientRect();
+      const panelInlineChrome = Math.max(0, panelBounds.width - chain.clientWidth);
+      const panelBlockChrome = Math.max(0, panelBounds.height - chain.clientHeight);
+      const desiredInlineSize = Math.ceil(
+        Math.max(
+          EDITOR_MINIMUM_INLINE_SIZE,
+          intrinsicChainInlineSize + panelInlineChrome,
+        ),
+      );
+      const desiredBlockSize = Math.ceil(
+        Math.max(
+          EDITOR_MINIMUM_BLOCK_SIZE,
+          intrinsicChainBlockSize + panelBlockChrome,
+        ),
+      );
+      const maximumInlineSize = Math.max(
+        0,
+        window.innerWidth - EDITOR_VIEWPORT_INSET,
+      );
+      const maximumBlockSize = Math.max(
+        0,
+        window.innerHeight - EDITOR_VIEWPORT_INSET,
+      );
+      const next: EditorDimensions = {
+        inlineSize: Math.min(maximumInlineSize, desiredInlineSize),
+        blockSize: Math.min(maximumBlockSize, desiredBlockSize),
+        inlineConstrained: desiredInlineSize > maximumInlineSize,
+        blockConstrained: desiredBlockSize > maximumBlockSize,
+      };
+      setEditorDimensions((current) =>
+        current.inlineSize === next.inlineSize &&
+        current.blockSize === next.blockSize &&
+        current.inlineConstrained === next.inlineConstrained &&
+        current.blockConstrained === next.blockConstrained
+          ? current
+          : next,
+      );
+    };
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(chain);
+    for (const pedal of chain.children) observer.observe(pedal);
+    window.addEventListener("resize", scheduleMeasure);
+    return () => {
+      cancelAnimationFrame(resizeFrame);
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+    };
+  }, [layoutSignature]);
+
   return (
     <div className={styles.backdrop} data-component="effect-editor-backdrop">
       <section
         ref={panelRef}
         className={styles.editor}
         data-component="effect-editor"
+        data-inline-constrained={editorDimensions.inlineConstrained}
+        data-block-constrained={editorDimensions.blockConstrained}
         role="dialog"
         aria-modal="true"
         aria-label={`${props.title} effect editor`}
+        style={{
+          inlineSize: editorDimensions.inlineSize,
+          blockSize: editorDimensions.blockSize,
+        }}
       >
-        <header>
+        <header ref={headerRef}>
           <div>
             <span>{routingLabel}</span>
             <h2>{props.title}</h2>
@@ -436,23 +736,67 @@ export function EffectEditor(props: EffectEditorProps) {
             Close
           </button>
         </header>
-        <ol className={styles.chain} aria-label={`${props.title} effect order`}>
+        <ol
+          ref={chainRef}
+          className={styles.chain}
+          aria-label={`${props.title} effect order`}
+        >
           {effects.length === 0 ? <li className={styles.empty}>No effects are in this chain.</li> : null}
           {effects.map((effect, index) => {
             const manifest = manifestFor(effect.pluginId);
             const effectName = manifest?.productName ?? effect.pluginId;
             const effectOwner = `${effectName} in ${props.title}`;
             const protectedEffect = effect.id === props.protectedEffectId;
+            const accent = manifest?.ui.moduleAccent;
+            const hasWideEditor =
+              (manifest?.parameters.length ?? 0) > 5 ||
+              manifest?.ui.detailedEditorSections.some((section) => section.id === "bands") === true;
+            const pedalStyle = {
+              "--effect-accent": accent?.accent ?? "var(--pulse-color-accent, #7ed9a3)",
+              "--effect-accent-muted":
+                accent?.accentMuted ?? "var(--pulse-color-selection, #244d38)",
+              "--effect-led": accent?.led ?? "var(--pulse-color-status-success, #62d28a)",
+              "--effect-control-ring":
+                accent?.controlRing ?? "var(--pulse-color-control-fill, #b0f2ca)",
+              "--module-control-ring":
+                accent?.controlRing ?? "var(--pulse-color-control-fill, #b0f2ca)",
+            } as CSSProperties;
+            const parameterById = new Map(
+              (manifest?.parameters ?? []).map((parameter) => [parameter.id, parameter]),
+            );
+            const visibilityByParameter = new Map(
+              (manifest?.ui.parameterVisibility ?? []).map((rule) => [rule.parameterId, rule]),
+            );
+            const parameterIsVisible = (parameter: ParameterDescriptor) => {
+              const rule = visibilityByParameter.get(parameter.id);
+              if (rule === undefined) return true;
+              const gateDescriptor = parameterById.get(rule.gateParameterId);
+              const gateValue =
+                effect.state[rule.gateParameterId] ?? gateDescriptor?.defaultValue;
+              return gateValue === rule.gateValue;
+            };
+            const sectionedParameterIds = new Set(
+              (manifest?.ui.detailedEditorSections ?? []).flatMap(
+                (section) => section.parameterIds,
+              ),
+            );
+            const unsectionedParameters = (manifest?.parameters ?? []).filter(
+              (parameter) =>
+                !sectionedParameterIds.has(parameter.id) && parameterIsVisible(parameter),
+            );
             return (
               <li
                 key={effect.id}
                 className={styles.pedal}
+                data-component="effect-pedal"
                 data-effect-id={effect.id}
                 data-bypassed={effect.bypassed}
+                data-wide={hasWideEditor}
                 data-dragging={draggingEffectId === effect.id}
                 data-drag-target={
                   draggingEffectId !== undefined && dragTargetEffectId === effect.id
                 }
+                style={pedalStyle}
                 onPointerEnter={() => {
                   if (draggingEffectIdRef.current !== undefined) {
                     updatePointerDragTarget(effect.id);
@@ -467,15 +811,13 @@ export function EffectEditor(props: EffectEditorProps) {
                   clearPointerDrag();
                 }}
               >
-                <div className={styles.pedalHead}>
-                  <strong>{effectName}</strong>
-                  <span>{`Slot ${String(index + 1)}`}</span>
-                </div>
-                <div className={styles.pedalActions}>
+                <div className={styles.pedalTop}>
                   <button
                     type="button"
+                    className={styles.dragHandle}
                     disabled={protectedEffect}
                     aria-label={`Drag ${effectOwner} to reorder`}
+                    title={`Drag ${effectName} to reorder.`}
                     onPointerDown={(event) => {
                       if (event.button !== 0) return;
                       event.preventDefault();
@@ -514,19 +856,51 @@ export function EffectEditor(props: EffectEditorProps) {
                       clearPointerDrag();
                     }}
                   >
-                    Drag
+                    <EffectActionIcon kind="drag" />
                   </button>
+                  <span className={styles.ordinal} aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                   <button
                     type="button"
+                    className={styles.power}
+                    aria-label={`${effect.bypassed ? "Bypassed" : "Bypass"} ${effectOwner}`}
+                    aria-pressed={effect.bypassed}
+                    title={effect.bypassed ? `Enable ${effectName}.` : `Bypass ${effectName}.`}
+                    onClick={() => setEffectBypassed(effect.id, !effect.bypassed)}
+                  >
+                    <span className={styles.powerLabel}>
+                      {effect.bypassed ? "Bypassed" : "On"}
+                    </span>
+                  </button>
+                </div>
+                <div className={styles.pedalHead}>
+                  <div>
+                    <span className={styles.familyChip}>{manifest?.shortLabel ?? "FX"}</span>
+                    <strong>{effectName}</strong>
+                  </div>
+                </div>
+                <div
+                  className={styles.pedalActions}
+                  data-has-pin={sendTargetId !== undefined}
+                >
+                  <button
+                    type="button"
+                    className={styles.moveAction}
+                    data-component="pedal-move-button"
                     aria-label={`Move ${effectOwner} earlier`}
+                    title={`Move ${effectName} left.`}
                     disabled={protectedEffect || index === 0}
                     onClick={() => reorderEffectInChain(effect.id, effects[index - 2]?.id)}
                   >
-                    Earlier
+                    <EffectActionIcon kind="move-left" />
                   </button>
                   <button
                     type="button"
+                    className={styles.moveAction}
+                    data-component="pedal-move-button"
                     aria-label={`Move ${effectOwner} later`}
+                    title={`Move ${effectName} right.`}
                     disabled={
                       protectedEffect ||
                       index === effects.length - 1 ||
@@ -534,18 +908,11 @@ export function EffectEditor(props: EffectEditorProps) {
                     }
                     onClick={() => reorderEffectInChain(effect.id, effects[index + 1]?.id)}
                   >
-                    Later
+                    <EffectActionIcon kind="move-right" />
                   </button>
                   <button
                     type="button"
-                    aria-label={`${effect.bypassed ? "Bypassed" : "Bypass"} ${effectOwner}`}
-                    aria-pressed={effect.bypassed}
-                    onClick={() => setEffectBypassed(effect.id, !effect.bypassed)}
-                  >
-                    {effect.bypassed ? "Bypassed" : "Bypass"}
-                  </button>
-                  <button
-                    type="button"
+                    className={styles.serviceAuto}
                     title={`Automate ${manifest?.productName ?? effect.pluginId} bypass.`}
                     aria-label={`Automate ${effectOwner} bypass`}
                     onClick={() =>
@@ -556,11 +923,19 @@ export function EffectEditor(props: EffectEditorProps) {
                       })
                     }
                   >
-                    Automate bypass
+                    <EffectActionIcon kind="automation" />
+                    <span>Auto</span>
                   </button>
                   <button
                     type="button"
+                    className={styles.removeAction}
+                    data-component="pedal-remove-button"
                     disabled={protectedEffect}
+                    title={
+                      protectedEffect
+                        ? `${effectName} is protected from removal.`
+                        : `Remove ${effectName}.`
+                    }
                     aria-label={
                       protectedEffect
                         ? `${effectOwner} is protected from removal`
@@ -568,9 +943,25 @@ export function EffectEditor(props: EffectEditorProps) {
                     }
                     onClick={() => removeEffectFromChain(effect.id)}
                   >
-                    Remove
+                    <EffectActionIcon kind="remove" />
                   </button>
-                  <label>
+                  {sendTargetId !== undefined ? (
+                    <button
+                      type="button"
+                      className={styles.pinAction}
+                      aria-label={`Pin ${effectOwner} to the compact send card`}
+                      aria-pressed={props.pinnedEffectId === effect.id}
+                      title={
+                        props.pinnedEffectId === effect.id
+                          ? `Keep ${effectName} pinned to the compact send card.`
+                          : `Pin ${effectName} to the compact send card.`
+                      }
+                      onClick={() => setSendFocus(sendTargetId, effect.id)}
+                    >
+                      <EffectActionIcon kind="pin" />
+                    </button>
+                  ) : null}
+                  <label className={styles.replaceAction}>
                     <span>Replace</span>
                     <select
                       aria-label={`Replace ${effectOwner}`}
@@ -592,172 +983,138 @@ export function EffectEditor(props: EffectEditorProps) {
                         ))}
                     </select>
                   </label>
-                  {sendTargetId !== undefined ? (
-                    <button
-                      type="button"
-                      aria-label={`Pin ${effectOwner} to the compact send card`}
-                      aria-pressed={props.pinnedEffectId === effect.id}
-                      onClick={() => setSendFocus(sendTargetId, effect.id)}
+                </div>
+                <div className={styles.pedalBody}>
+                  {(manifest?.ui.detailedEditorSections ?? []).map(
+                    (section, sectionIndex) => {
+                      const sectionParameters = section.parameterIds.flatMap((parameterId) => {
+                        const parameter = parameterById.get(parameterId);
+                        return parameter === undefined || !parameterIsVisible(parameter)
+                          ? []
+                          : [parameter];
+                      });
+                      const hasGainReduction =
+                        sectionIndex === 0 &&
+                        manifest?.meters.some((meter) => meter.id === "gain-reduction") === true;
+                      const hasEqCurve = section.id === "bands";
+                      if (
+                        sectionParameters.length === 0 &&
+                        !hasGainReduction &&
+                        !hasEqCurve
+                      ) {
+                        return null;
+                      }
+                      return (
+                        <section
+                          key={section.id}
+                          className={styles.parameterSection}
+                          data-component="effect-parameter-section"
+                          data-section-id={section.id}
+                        >
+                          <span className={styles.sectionLabel}>{section.name}</span>
+                          <div className={styles.parameterGrid}>
+                            {hasGainReduction ? (
+                              <EffectGainReduction
+                                effectId={effect.id}
+                                effectName={manifest.productName}
+                              />
+                            ) : null}
+                            {hasEqCurve ? (
+                              <EqResponseCurve effectId={effect.id} state={effect.state} />
+                            ) : null}
+                            {sectionParameters.map((parameter) => (
+                              <DetailedEffectParameter
+                                key={parameter.id}
+                                effectId={effect.id}
+                                owner={effectOwner}
+                                parameter={parameter}
+                                value={effect.state[parameter.id] ?? parameter.defaultValue}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    },
+                  )}
+                  {unsectionedParameters.length === 0 ? null : (
+                    <section
+                      className={styles.parameterSection}
+                      data-component="effect-parameter-section"
+                      data-section-id="other"
                     >
-                      {props.pinnedEffectId === effect.id ? "Pinned" : "Pin"}
-                    </button>
-                  ) : null}
-                </div>
-                <div className={styles.mix}>
-                  <span>Effect output</span>
-                  <Knob
-                    controlId={`effect-${effect.id}-mix`}
-                    label={`${effectOwner} Mix`}
-                    caption="Mix"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={effect.mix}
-                    defaultValue={manifest?.kind === "effect" ? manifest.defaultMix : 1}
-                    precision={2}
-                    onInput={(value) => previewEffectMix(effect.id, value)}
-                    onCommit={(value, gestureId) =>
-                      setEffectMix(effect.id, value, gestureId)
-                    }
-                    onAutomate={() =>
-                      openExternalAutomationTarget({
-                        scope: "effect",
-                        targetId: effect.id,
-                        parameterId: "mix",
-                      })
-                    }
-                  />
-                  <Knob
-                    controlId={`effect-${effect.id}-gain`}
-                    label={`${effectOwner} Gain`}
-                    caption="Gain"
-                    min={EFFECT_GAIN_MINIMUM_DECIBELS}
-                    max={EFFECT_GAIN_MAXIMUM_DECIBELS}
-                    step={0.1}
-                    value={effect.gainDecibels}
-                    defaultValue={0}
-                    unit="decibels"
-                    precision={1}
-                    onInput={(value) => previewEffectGain(effect.id, value)}
-                    onCommit={(value, gestureId) =>
-                      setEffectGain(effect.id, value, gestureId)
-                    }
-                    onAutomate={() =>
-                      openExternalAutomationTarget({
-                        scope: "effect",
-                        targetId: effect.id,
-                        parameterId: "gain",
-                      })
-                    }
-                  />
-                </div>
-                {manifest?.meters.some((meter) => meter.id === "gain-reduction") === true ? (
-                  <EffectGainReduction
-                    effectId={effect.id}
-                    effectName={manifest.productName}
-                  />
-                ) : null}
-                {manifest?.ui.detailedEditorSections.some((section) => section.id === "bands") === true ? (
-                  <EqResponseCurve effectId={effect.id} state={effect.state} />
-                ) : null}
-                {manifest?.parameters.map((parameter) => {
-                  const value = effect.state[parameter.id] ?? parameter.defaultValue;
-                  const owner = effectOwner;
-                  const automation =
-                    parameter.automation === "step"
-                      ? () =>
+                      <span className={styles.sectionLabel}>Other</span>
+                      <div className={styles.parameterGrid}>
+                        {unsectionedParameters.map((parameter) => (
+                          <DetailedEffectParameter
+                            key={parameter.id}
+                            effectId={effect.id}
+                            owner={effectOwner}
+                            parameter={parameter}
+                            value={effect.state[parameter.id] ?? parameter.defaultValue}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  <section
+                    className={styles.outputSection}
+                    data-component="effect-output-section"
+                  >
+                    <span className={styles.sectionLabel}>Output</span>
+                    <div className={styles.controlGrid}>
+                      <Knob
+                        controlId={`effect-${effect.id}-mix`}
+                        label={`${effectOwner} Mix`}
+                        caption="Mix"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={effect.mix}
+                        defaultValue={manifest?.kind === "effect" ? manifest.defaultMix : 1}
+                        precision={2}
+                        onInput={(value) => previewEffectMix(effect.id, value)}
+                        onCommit={(value, gestureId) =>
+                          setEffectMix(effect.id, value, gestureId)
+                        }
+                        onAutomate={() =>
                           openExternalAutomationTarget({
                             scope: "effect",
                             targetId: effect.id,
-                            parameterId: parameter.id,
+                            parameterId: "mix",
                           })
-                      : undefined;
-                  const automationEntry = automationShortcut(automation);
-                  const normalizedPercent =
-                    parameter.unit === "percent" &&
-                    parameter.minimum === 0 &&
-                    parameter.maximum === 1;
-                  const control =
-                    parameter.valueType === "boolean" && typeof value === "boolean" ? (
-                      <input
-                        type="checkbox"
-                        aria-label={`${owner} ${parameter.name}`}
-                        aria-keyshortcuts={automationEntry.ariaKeyShortcuts}
-                        checked={value}
-                        onChange={(event) =>
-                          setEffectParameter(effect.id, parameter.id, event.currentTarget.checked)
                         }
-                        onKeyDown={automationEntry.onKeyDown}
-                        onContextMenu={automationEntry.onContextMenu}
                       />
-                    ) : parameter.valueType === "enum" && typeof value === "string" ? (
-                      <select
-                        aria-label={`${owner} ${parameter.name}`}
-                        aria-keyshortcuts={automationEntry.ariaKeyShortcuts}
-                        value={value}
-                        onChange={(event) =>
-                          setEffectParameter(effect.id, parameter.id, event.currentTarget.value)
-                        }
-                        onKeyDown={automationEntry.onKeyDown}
-                        onContextMenu={automationEntry.onContextMenu}
-                      >
-                        {(parameter.enumValues ?? []).map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    ) : typeof value === "number" ? (
                       <Knob
-                        controlId={`effect-${effect.id}-${parameter.id}`}
-                        label={`${owner} ${parameter.name}`}
-                        caption={parameter.shortLabel ?? parameter.name}
-                        min={parameter.minimum ?? 0}
-                        max={parameter.maximum ?? 1}
-                        step={parameter.step ?? 0.01}
-                        value={value}
-                        defaultValue={
-                          typeof parameter.defaultValue === "number" ? parameter.defaultValue : value
+                        controlId={`effect-${effect.id}-gain`}
+                        label={`${effectOwner} Gain`}
+                        caption="Gain"
+                        min={EFFECT_GAIN_MINIMUM_DECIBELS}
+                        max={EFFECT_GAIN_MAXIMUM_DECIBELS}
+                        step={0.1}
+                        value={effect.gainDecibels}
+                        defaultValue={0}
+                        unit="decibels"
+                        precision={1}
+                        onInput={(value) => previewEffectGain(effect.id, value)}
+                        onCommit={(value, gestureId) =>
+                          setEffectGain(effect.id, value, gestureId)
                         }
-                        precision={normalizedPercent ? 0 : parameter.displayPrecision}
-                        unit={normalizedPercent ? "percent" : undefined}
-                        {...(normalizedPercent
-                          ? {
-                              formatValue: (next: number) => next * 100,
-                              parseValue: (next: number) => next / 100,
-                              displayMin: 0,
-                              displayMax: 100,
-                              displayStep: 1,
-                            }
-                          : {})}
-                        onInput={(next) => previewEffectParameter(effect.id, parameter.id, next)}
-                        onCommit={(next, gestureId) =>
-                          setEffectParameter(effect.id, parameter.id, next, gestureId)
+                        onAutomate={() =>
+                          openExternalAutomationTarget({
+                            scope: "effect",
+                            targetId: effect.id,
+                            parameterId: "gain",
+                          })
                         }
-                        {...(automation === undefined ? {} : { onAutomate: automation })}
                       />
-                    ) : null;
-                  if (control === null) return null;
-                  return (
-                    <div key={parameter.id} className={styles.parameter}>
-                      <span>{parameter.name}</span>
-                      {control}
-                      {parameter.automation === "step" ? (
-                        <button
-                          type="button"
-                          aria-label={`Automate ${owner} ${parameter.name}`}
-                          title={`Automate ${parameter.name}.`}
-                          onClick={automation}
-                        >
-                          Automate
-                        </button>
-                      ) : null}
                     </div>
-                  );
-                })}
+                  </section>
+                </div>
               </li>
             );
           })}
         </ol>
-        <footer>
+        <footer ref={footerRef}>
           <label>
             <span>Add effect</span>
             <select

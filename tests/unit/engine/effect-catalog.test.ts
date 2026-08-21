@@ -22,11 +22,28 @@ import {
   effectParameterSmoothing,
 } from "../../../src/engine/effects/registry/parameter-smoother";
 import { StereoWidthDsp } from "../../../src/engine/effects/stereo-width/dsp-core";
+import { contrastRatio } from "../../../src/themes/contrast";
+import { BUILT_IN_PALETTES } from "../../../src/themes/tokens";
 
 const EXPECTED_IDS = [
   "lo-fi", "pattern-filter", "distortion", "compressor", "delay", "reverb",
   "chorus", "phaser", "parametric-eq", "transient-shaper", "stereo-width", "limiter",
 ] as const;
+
+const EXPECTED_EFFECT_ACCENTS = {
+  "lo-fi": ["#B58B43", "#594522", "#E4B766", "#927035"],
+  "pattern-filter": ["#50A384", "#285243", "#7ED6B4", "#3F846B"],
+  distortion: ["#DC7A4B", "#6D3D26", "#FFAA79", "#B85E35"],
+  compressor: ["#4E8DB8", "#27475C", "#78B9E3", "#3D7194"],
+  delay: ["#B66B46", "#5B3624", "#E99970", "#914F31"],
+  reverb: ["#7A6AB5", "#3E365B", "#A99AE0", "#615393"],
+  chorus: ["#4D9FA9", "#285156", "#7DD2DA", "#3D7F87"],
+  phaser: ["#8C72B7", "#463A5C", "#BBA0E5", "#705992"],
+  "parametric-eq": ["#65A052", "#33512A", "#91D47B", "#507F41"],
+  "transient-shaper": ["#BE704F", "#603928", "#EBA07E", "#985A3F"],
+  "stereo-width": ["#4E99B3", "#284D5A", "#7BC9E1", "#3E7B90"],
+  limiter: ["#C85151", "#652929", "#F17E7E", "#9E4040"],
+} as const satisfies Readonly<Record<(typeof EXPECTED_IDS)[number], readonly string[]>>;
 
 const ACTIVE_FIXTURES: Readonly<Record<string, Readonly<Record<string, number | boolean | string>>>> = {
   "lo-fi": { bits: 5, rate: 0.2, character: 0.8 },
@@ -42,6 +59,19 @@ const ACTIVE_FIXTURES: Readonly<Record<string, Readonly<Record<string, number | 
   "stereo-width": { width: 1.8, "high-pass": 80, "low-pass": 16_000 },
   limiter: { ceiling: -2, input: 18, release: 40 },
 };
+
+function mixSrgb(first: string, second: string, firstWeight: number): string {
+  const firstHex = first.replace(/^#/, "");
+  const secondHex = second.replace(/^#/, "");
+  const channels = [0, 2, 4].map((offset) => {
+    const firstChannel = Number.parseInt(firstHex.slice(offset, offset + 2), 16);
+    const secondChannel = Number.parseInt(secondHex.slice(offset, offset + 2), 16);
+    return Math.round(firstChannel * firstWeight + secondChannel * (1 - firstWeight))
+      .toString(16)
+      .padStart(2, "0");
+  });
+  return `#${channels.join("")}`;
+}
 
 describe("built-in effect catalog", () => {
   it("registers the complete catalog with valid distinct manifests", () => {
@@ -59,6 +89,34 @@ describe("built-in effect catalog", () => {
         manifest.parameters.map((parameter) => parameter.id),
       );
     }
+  });
+
+  it("keeps every built-in effect family chip above the 4.5:1 ink contrast minimum", () => {
+    const rack = BUILT_IN_PALETTES.rack;
+    const ink = rack["--pulse-color-on-accent"];
+    const primary = rack["--pulse-color-text-primary"];
+    const failures = BUILT_IN_EFFECTS.flatMap(({ manifest }) => {
+      const fill = mixSrgb(manifest.ui.moduleAccent.accent, primary, 0.9);
+      const ratio = contrastRatio(ink, fill);
+      return ratio >= 4.5 ? [] : [{ effect: manifest.productName, fill, ratio }];
+    });
+    expect(failures).toEqual([]);
+  });
+
+  it("matches every built-in effect accent to the exact theming contract tuple", () => {
+    expect(
+      Object.fromEntries(
+        BUILT_IN_EFFECTS.map(({ manifest }) => [
+          manifest.pluginId,
+          [
+            manifest.ui.moduleAccent.accent,
+            manifest.ui.moduleAccent.accentMuted,
+            manifest.ui.moduleAccent.led,
+            manifest.ui.moduleAccent.controlRing,
+          ],
+        ]),
+      ),
+    ).toEqual(EXPECTED_EFFECT_ACCENTS);
   });
 
   it("maps every registered effect module key to one eager worklet processor factory", () => {
@@ -109,6 +167,14 @@ describe("built-in effect catalog", () => {
       expect(effect?.manifest.parameters.some((parameter) => parameter.id === "bpm")).toBe(false);
       expect(effect?.manifest.defaultState).not.toHaveProperty(EFFECT_TRANSPORT_TEMPO_PARAMETER);
     }
+  });
+
+  it("declares mutually exclusive synced and free delay time controls", () => {
+    const delay = BUILT_IN_EFFECTS.find((effect) => effect.manifest.pluginId === "delay");
+    expect(delay?.manifest.ui.parameterVisibility).toEqual([
+      { parameterId: "time", gateParameterId: "tempo-sync", gateValue: false },
+      { parameterId: "beat-time", gateParameterId: "tempo-sync", gateValue: true },
+    ]);
   });
 
   it.each([44_100, 48_000])(

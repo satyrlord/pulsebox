@@ -109,6 +109,7 @@
   --pulse-control-compact: 24px;
   --pulse-control-standard: 32px;
   --pulse-scrollbar-size: 10px;
+  --pulse-layer-modal: 70;
   --pulse-focus-width: 2px;
   --pulse-focus-gap: 1px;
   --pulse-duration-fast: 80ms;

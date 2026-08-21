@@ -85,6 +85,11 @@ interface EffectManifestDefinition {
   readonly parameters: readonly ParameterDescriptor[];
   readonly compact: readonly string[];
   readonly sections: readonly { readonly id: string; readonly name: string; readonly parameters: readonly string[] }[];
+  readonly visibility?: readonly {
+    readonly parameterId: string;
+    readonly gateParameterId: string;
+    readonly gateValue: boolean;
+  }[];
   readonly placements?: readonly EffectPlacement[];
   readonly channels?: readonly (1 | 2)[];
   readonly cpuClass?: EffectPluginManifest["cpuClass"];
@@ -131,6 +136,15 @@ export function defineEffectManifest(definition: EffectManifestDefinition): Effe
       },
       compactControls: definition.compact.map((id, position) => ({ position, parameterId: required(parseParameterId(id)) })),
       detailedEditorSections: sections,
+      ...(definition.visibility === undefined
+        ? {}
+        : {
+            parameterVisibility: definition.visibility.map((rule) => ({
+              parameterId: required(parseParameterId(rule.parameterId)),
+              gateParameterId: required(parseParameterId(rule.gateParameterId)),
+              gateValue: rule.gateValue,
+            })),
+          }),
     },
     automation: "step",
     cpuClass: definition.cpuClass ?? "moderate",

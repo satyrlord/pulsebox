@@ -497,62 +497,121 @@
 
 .effectsBank {
   --effects-return-width: calc(
-    var(--pulse-space-10, 40px) + var(--pulse-space-3, 12px) + var(--pulse-border-strong, 2px)
+    var(--pulse-space-10, 40px) + var(--pulse-space-5, 20px) + var(--pulse-space-1, 4px)
   );
   --effects-actions-width: calc(
     var(--pulse-space-10, 40px) + var(--pulse-space-10, 40px) +
-      var(--pulse-space-10, 40px) + var(--pulse-space-1, 4px)
+      var(--pulse-space-2, 8px) + var(--pulse-space-1, 4px)
   );
   --effects-macro-min-width: calc(
     var(--pulse-space-10, 40px) + var(--pulse-space-1, 4px)
   );
   --effects-macro-min-height: calc(
-    var(--pulse-space-10, 40px) + var(--pulse-space-3, 12px)
+    var(--pulse-space-10, 40px) + var(--pulse-space-2, 8px)
   );
   --effects-compact-control: calc(
-    var(--pulse-control-compact, 24px) + var(--pulse-space-1, 4px)
+    var(--pulse-control-compact, 24px)
   );
   flex: 1;
   block-size: 100%;
   box-sizing: border-box;
-  overflow-x: hidden;
-  overflow-y: scroll;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: var(--pulse-space-1, 4px);
+  padding: 0 var(--pulse-space-1, 4px);
+  overflow: hidden;
 }
 
-/* A send row and a master card are both raised plates on the chassis. The lit
-   slot letter is the row's identity, so the plate keeps a plain perimeter. */
 .effectCard,
 .masterPanel article {
   display: grid;
   gap: 6px;
   padding: 8px;
-  background: var(--mat-plate);
   border: 1px solid var(--edge-hairline);
   border-radius: var(--pulse-radius-control, 4px);
   box-shadow: var(--lift-1);
 }
 
+.masterPanel article {
+  background: var(--mat-plate);
+}
+
 .effectCard {
-  grid-template-columns: 24px minmax(0, 1fr);
+  --send-accent: var(--pulse-color-accent, #7ed9a3);
+  --send-accent-muted: var(--pulse-color-selection, #244d38);
+  --send-led: var(--pulse-color-status-success, #62d28a);
+  --send-face-top: color-mix(
+    in srgb,
+    var(--send-accent-muted) 24%,
+    var(--pulse-color-surface-panel, #15191d)
+  );
+  --send-face-bottom: color-mix(
+    in srgb,
+    var(--send-accent-muted) 14%,
+    var(--pulse-color-app, #0b0d0f)
+  );
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  min-block-size: 0;
+  padding: 2px 8px 0;
+  background: linear-gradient(160deg, var(--send-face-top), var(--send-face-bottom));
+  border-color: color-mix(in srgb, var(--send-accent) 26%, var(--edge-hairline));
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 14%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 35%, transparent);
+}
+
+.effectCard::before,
+.effectCard::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset-inline: 0;
+  block-size: 8px;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle 3.5px at 4px 4px,
+      var(--pulse-color-border-default, #6d7881) 0 1.6px,
+      color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 76%, transparent) 2.2px,
+      transparent 4px
+    ),
+    radial-gradient(
+      circle 3.5px at calc(100% - 4px) 4px,
+      var(--pulse-color-border-default, #6d7881) 0 1.6px,
+      color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 76%, transparent) 2.2px,
+      transparent 4px
+    );
+}
+
+.effectCard::before {
+  inset-block-start: 0;
+}
+
+.effectCard::after {
+  inset-block-end: 0;
+}
+
+.effectCard > * {
+  position: relative;
+  z-index: 1;
+}
+
+.effectCard[data-bypassed="true"] {
+  border-style: dashed;
+}
+
+.effectCard[data-bypassed="true"] .effectMacros,
+.effectCard[data-bypassed="true"] .effectReturn {
+  opacity: 0.72;
+  filter: grayscale(0.72);
 }
 
 .effectCard[data-selected="true"] {
   border-color: color-mix(in srgb, var(--send-accent, var(--accent-lamp)) 34%, var(--edge-hairline));
-  box-shadow:
-    var(--lift-1),
-    inset 0 0 0 1px var(--accent-lamp);
-}
-
-.effectCard[data-active="true"] .sendBadge::after {
-  content: "";
-  inline-size: 4px;
-  block-size: 4px;
-  border-radius: 50%;
-  background: var(--send-accent, var(--accent-lamp));
-  box-shadow: 0 0 4px var(--send-accent, var(--accent-lamp));
+  box-shadow: inset 0 0 0 1px var(--accent-lamp);
 }
 
 .sendBadge {
@@ -561,18 +620,38 @@
   inline-size: 24px;
   block-size: 24px;
   font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
   font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.1em;
   color: var(--accent-ink);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--accent-lamp) 88%, var(--pulse-color-focus-inner, #ffffff)) 0%,
-    var(--accent-lamp) 45%,
-    color-mix(in srgb, var(--accent-lamp) 96%, var(--pulse-color-focus-outer, #000000)) 100%
+    color-mix(in srgb, var(--send-accent) 82%, var(--pulse-color-text-primary, #f3f5f6)) 0%,
+    color-mix(in srgb, var(--send-accent) 90%, var(--pulse-color-text-primary, #f3f5f6)) 50%,
+    var(--send-accent) 100%
   );
   border-radius: var(--pulse-radius-control, 4px);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 30%, transparent),
-    0 0 7px color-mix(in srgb, var(--accent-lamp) 35%, transparent);
+    0 2px 6px color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 48%, transparent);
+}
+
+.sendBadge[aria-pressed="true"] {
+  color: var(--accent-ink);
+  background: color-mix(
+    in srgb,
+    var(--send-accent) 84%,
+    var(--pulse-color-text-primary, #f3f5f6)
+  );
+  border: 1px solid color-mix(
+    in srgb,
+    var(--send-accent) 56%,
+    var(--pulse-color-text-primary, #f3f5f6)
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 34%, transparent),
+    0 2px 7px color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 58%, transparent);
 }
 
 .effectCard h3,
@@ -589,13 +668,14 @@
 .effectSummary {
   min-inline-size: 0;
   display: grid;
-  gap: 4px;
+  align-content: start;
+  gap: calc(var(--pulse-space-2, 8px) - 1px);
 }
 
 .effectHeading {
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
 }
 
@@ -605,17 +685,129 @@
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
+.effectIdentity {
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.effectIdentity h3 {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.effectFamilyChip {
+  flex: none;
+  min-inline-size: 44px;
+  block-size: 24px;
+  padding-inline: 6px;
+  display: grid;
+  place-items: center;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  color: var(--accent-ink);
+  background: color-mix(
+    in srgb,
+    var(--send-accent) 90%,
+    var(--pulse-color-text-primary, #f3f5f6)
+  );
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 18%, transparent);
+}
+
+.effectCount {
+  min-inline-size: 30px;
+  padding: 2px 5px;
+  text-align: center;
+  background: color-mix(in srgb, var(--pulse-color-surface-inset, #080a0c) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 48%, transparent);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 8%, transparent);
+}
+
+.effectStatus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.effectStatus::before {
+  content: "";
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--pulse-color-disabled, #7b858d);
+  border: 1px solid color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 62%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--pulse-color-focus-inner, #ffffff) 12%, transparent);
+}
+
+.effectStatus[data-active="true"]::before {
+  background: var(--send-led);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--send-led) 58%, transparent);
+}
+
+:global([data-high-contrast="true"]) .effectCard {
+  --send-face-top: var(--pulse-color-surface-panel, #15191d);
+  --send-face-bottom: var(--pulse-color-surface-panel, #15191d);
+  border: 2px solid var(--pulse-color-border-default, #6d7881);
+  box-shadow: none;
+}
+
+:global([data-high-contrast="true"]) .effectFamilyChip,
+:global([data-high-contrast="true"]) .sendBadge,
+:global([data-high-contrast="true"]) .sendBadge[aria-pressed="true"] {
+  color: var(--pulse-color-on-accent, #07110b);
+  background: var(--pulse-color-accent, #7ed9a3);
+  border: 2px solid var(--pulse-color-border-default, #6d7881);
+  box-shadow: none;
+}
+
+:global([data-high-contrast="true"]) .effectStatus::before {
+  box-shadow: none;
+}
+
+.sendBadge:focus-visible {
+  outline: var(--pulse-focus-width, 2px) solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: var(--pulse-focus-gap, 1px);
+  box-shadow: 0 0 0 calc(var(--pulse-focus-width, 2px) * 2 + var(--pulse-focus-gap, 1px))
+    var(--pulse-color-focus-outer, #000000);
+}
+
 .effectBody {
   min-inline-size: 0;
+  block-size: var(--effects-macro-min-height);
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--effects-return-width) var(--effects-actions-width);
+  align-items: stretch;
+  gap: var(--pulse-space-2, 8px);
+}
+
+.effectControlGroup,
+.effectOutputGroup,
+.effectChainGroup {
+  min-inline-size: 0;
+  min-block-size: 0;
+  block-size: 100%;
+  display: grid;
   align-items: start;
-  gap: var(--pulse-space-1, 4px);
+}
+
+.effectOutputGroup,
+.effectChainGroup {
+  padding-inline-start: var(--pulse-space-2, 8px);
+  border-inline-start: 1px solid color-mix(in srgb, var(--edge-hairline) 72%, transparent);
 }
 
 .effectMacros {
   min-inline-size: 0;
   min-block-size: var(--effects-macro-min-height);
+  block-size: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(var(--effects-macro-min-width), 1fr));
   align-items: start;
@@ -636,9 +828,11 @@
 
 .effectMacros :global([data-component="knob"] > span) {
   max-inline-size: 100%;
+  max-block-size: none;
   overflow: hidden;
   white-space: normal;
   font-size: var(--pulse-type-10, 10px);
+  line-height: var(--pulse-line-tight, 1.2);
 }
 
 .compactSelect {
@@ -670,8 +864,14 @@
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
+.effectReturn {
+  display: grid;
+  align-items: start;
+}
+
 .effectReturn :global([data-component="knob"]) {
-  min-inline-size: var(--effects-return-width);
+  min-inline-size: 0;
+  inline-size: 100%;
   gap: var(--pulse-space-0, 0);
 }
 
@@ -687,8 +887,9 @@
 
 .effectActions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--pulse-space-1, 4px);
+  grid-template-columns: minmax(0, 1fr) var(--pulse-target-min, 24px);
+  column-gap: var(--pulse-space-1, 4px);
+  row-gap: 0;
 }
 
 .effectActions button,
@@ -698,8 +899,28 @@
   font-size: var(--pulse-type-10, 10px);
 }
 
-.effectActions button:last-child {
+.effectActions button {
+  display: grid;
+  place-items: center;
+}
+
+.effectActions button:first-child {
   grid-column: 1 / -1;
+}
+
+.effectActions button:nth-child(2) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-family: var(--type-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.effectActions button:last-child {
+  grid-column: auto;
 }
 .masterChainActions { display: flex; flex-wrap: wrap; gap: 6px; }
 .masterOutputActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
@@ -1410,7 +1631,7 @@
 }
 
 :global([data-high-contrast="true"]) .pointControl::before {
-  background: var(--pulse-color-control-fill, #00e5ff);
+  background: var(--pulse-color-control-fill, #b0f2ca);
 }
 
 :global([data-high-contrast="true"]) .pointControl::after {

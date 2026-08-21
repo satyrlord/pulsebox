@@ -273,16 +273,34 @@ Each compact slot contains:
 - Selection state.
 - Chain-count indicator.
 
+Each compact slot is a powder-coated pedal faceplate. It has four corner
+fasteners, a manifest family chip, the bus letter, and a live activity lamp.
+Its effect manifest accent tuple supplies the chip, control rings, and lamp. Its
+muted value supplies the faceplate tint. Bypass also changes the border and
+control-body treatment.
+
+The card groups its controls into Effect, Output, and Chain regions. Engraved
+vertical dividers separate the regions. The Chain rail places bypass above the
+Automation and Edit controls. This layout gives the effect macros the largest
+share of the card width. The Effect region starts at least 7 CSS pixels below
+the heading. Each action label stays inside its control.
+
 Each card shows the complete visible caption for every compact parameter. It
 does not shorten a caption with an ellipsis. The controls and actions use the
-available card width before the card adds height. The Effects view owns a
-vertical scroll port with a visible scrollbar. The user can reach all four
-cards at each supported viewport without page scrolling or horizontal studio
-scrolling.
+available card width before the card adds height. All four cards fit in the
+Effects view at every supported viewport. The Effects view has no scrollbar,
+page scrolling, or horizontal studio scrolling.
+
+The bus plate and manifest family plate share one heading row. The bus plate is
+24 by 24 CSS pixels. The family plate is 24 CSS pixels high and at least 44 CSS
+pixels wide. Their text, center line, radius, and hardware depth align.
 
 The Add effect row appends a plugin to the selected send chain. The detailed
 editor manages ordering, replacement, per-effect bypass, per-effect Mix, and
 per-effect Gain.
+
+`Edit` belongs to the compact card action rail and opens the detailed editor.
+Detailed pedals do not expose a second Edit action.
 
 The user pins one effect in the chain as the compact card focus. By default, the
 application pins the first effect. The macros use the pinned plugin's
@@ -294,12 +312,46 @@ The circular control has the visible label `Return Level`. It sets the
 send-chain return level from silence to unity. The source remains dry on its
 main path. Return Level is not an effect Mix control.
 
-Edit opens the established 760 × 680 detailed editor without stopping playback.
-Closing the editor restores focus to its opener.
+Edit opens the detailed editor without stopping playback. The editor starts at
+760 × 680 CSS pixels. It grows to fit its current pedals before it uses internal
+scrollbars. It stops 16 pixels from each viewport edge. Closing the editor
+restores focus to its opener.
+
+The modal layer stays above the transport and its popovers. No supported
+viewport can cover the editor title, routing description, Close control, or
+their focus indicators.
 
 ### 20.4 Pedalboard
 
 - Pedals flow left to right.
+- The detailed editor mounts the pedals in one dark horizontal rack.
+- Each pedal is a narrow powder-coated faceplate with four decorative corner fasteners.
+- The top row contains a drag grip, a two-digit slot ordinal, and the live bypass lamp.
+- The faceplate shows the manifest short label, the effect name, service actions,
+  the Output group, and the effect controls.
+- Move, remove, and pin use original inline SVG icons. Replace uses a select.
+- Edit is a compact-card action and is not a detailed-pedal action.
+- Each icon-only action has a full accessible name, tooltip, and 24-pixel target.
+- Each automation action pairs its icon with the visible label `AUTO`.
+- Bypass keeps visible state text.
+- The bypass lamp and `On` or `Bypassed` text form one operable button.
+- A boolean effect parameter uses a two-position metal toggle lever.
+- The effect manifest accent tuple supplies the family chip, value arcs, and
+  bypass lamp. Its muted value supplies the faceplate tint. This is the only
+  faceplate tint exception to the instrument-accent rule. `THEMING.md` section
+  3.4 records the exact tuples.
+- Bypass changes the lamp, status text, border style, and control-body treatment.
+- The editor grows in each axis to fit the current rack before it shows a scrollbar.
+- Growth stops 16 pixels from each viewport edge. A scrollbar then preserves access.
+- The editor renders manifest sections in their declared order.
+- Effect-specific sound sections appear before the shared Output section.
+- A manifest visibility rule shows only the active alternate parameter representation.
+- An enum parameter with one value renders as static identity, not as a select.
+- Parametric EQ shows frequency and gain axes plus `L`, `M`, and `H` handles.
+- Each EQ handle exposes its current frequency and gain in its accessible name.
+- A committed EQ handle edit sends a polite live announcement.
+- Window blur or editor close commits the last valid EQ preview as one gesture.
+  Project state and live audio must not diverge after interruption.
 - Reorder by pointer drag and keyboard commands.
 - Bypass per pedal.
 - One equal-power Mix per effect.
@@ -342,6 +394,13 @@ Closing the editor restores focus to its opener.
   gain and the protected limiter active.
 - Master-effects bypass is project-owned, undoable, playback-safe, and visually
   distinct from the limiter's own detailed bypass.
+- The master Edit action opens a detailed editor without stopping playback.
+- The editor starts at 760 × 680 CSS pixels and grows to fit the current rack.
+- Growth stops 16 pixels from each viewport edge. Internal scrollbars then
+  preserve access on each constrained axis.
+- Closing the editor restores focus to its opener.
+- The modal stays above the transport and popovers. It keeps the editor header,
+  Close control, and their focus indicators visible.
 - Peak reset.
 - Metering before and after the chain.
 

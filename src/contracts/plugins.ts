@@ -52,6 +52,17 @@ export interface ParameterGateDescriptor {
   readonly gateValue: boolean;
 }
 
+/**
+ * Declares one parameter that the detailed editor shows only while a boolean
+ * gate parameter holds the declared value. The state and audio contract remain
+ * complete while the inactive representation is hidden.
+ */
+export interface ParameterVisibilityDescriptor {
+  readonly parameterId: ParameterId;
+  readonly gateParameterId: ParameterId;
+  readonly gateValue: boolean;
+}
+
 export interface PluginModuleAccent {
   readonly accent: string;
   readonly accentMuted: string;
@@ -77,6 +88,7 @@ export interface PluginUiManifest {
   readonly voiceCompactControls?: readonly VoiceCompactControlDescriptor[];
   /** Parameters the UI disables while their gate parameter is unmet. */
   readonly parameterGates?: readonly ParameterGateDescriptor[];
+  readonly parameterVisibility?: readonly ParameterVisibilityDescriptor[];
   readonly detailedEditorSections: readonly PluginEditorSection[];
   readonly moduleAccent: PluginModuleAccent;
   /** Module iconography for the browser thumbnail and the faceplate badge. */
@@ -436,6 +448,41 @@ function validateUi(
       });
     }
   }
+  const visibilityRules = manifest.ui.parameterVisibility ?? [];
+  validateUniqueStrings(
+    visibilityRules.map((rule) => rule.parameterId),
+    "ui.parameterVisibility",
+    "Parameter visibility target IDs",
+    issues,
+  );
+  for (const [index, rule] of visibilityRules.entries()) {
+    const path = arrayPath("ui.parameterVisibility", index);
+    if (rule.parameterId === rule.gateParameterId) {
+      issues.push({ path, message: "A parameter cannot control its own visibility." });
+    }
+    if (!parameterIds.has(rule.parameterId)) {
+      issues.push({
+        path: `${path}.parameterId`,
+        message: "Visible parameter must reference a declared parameter.",
+      });
+    }
+    if (!parameterIds.has(rule.gateParameterId)) {
+      issues.push({
+        path: `${path}.gateParameterId`,
+        message: "Parameter visibility must reference a declared gate parameter.",
+      });
+      continue;
+    }
+    const gateDescriptor = manifest.parameters.find(
+      (one) => one.id === rule.gateParameterId,
+    );
+    if (gateDescriptor !== undefined && gateDescriptor.valueType !== "boolean") {
+      issues.push({
+        path: `${path}.gateParameterId`,
+        message: "Parameter visibility must reference a boolean parameter.",
+      });
+    }
+  }
 }
 
 export function validatePluginManifest(value: unknown): ValidationResult<PluginManifest> {
@@ -494,6 +541,15 @@ export function validatePluginManifest(value: unknown): ValidationResult<PluginM
             typeof gate.parameterId !== "string" ||
             typeof gate.gateParameterId !== "string" ||
             typeof gate.gateValue !== "boolean",
+        ))) ||
+    (raw.ui.parameterVisibility !== undefined &&
+      (!Array.isArray(raw.ui.parameterVisibility) ||
+        raw.ui.parameterVisibility.some(
+          (rule) =>
+            !isPlainRecord(rule) ||
+            typeof rule.parameterId !== "string" ||
+            typeof rule.gateParameterId !== "string" ||
+            typeof rule.gateValue !== "boolean",
         ))) ||
     !Array.isArray(raw.ui.detailedEditorSections) ||
     raw.ui.detailedEditorSections.some(

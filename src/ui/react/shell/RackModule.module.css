@@ -67,8 +67,8 @@
 
 :global([data-high-contrast="true"]) .module::before,
 :global([data-high-contrast="true"]) .module::after {
-  background: var(--pulse-color-surface-control, #111111);
-  box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #ffffff);
+  background: var(--pulse-color-surface-control, #242a30);
+  box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #6d7881);
 }
 
 .nameBlock {

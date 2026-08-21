@@ -137,8 +137,8 @@
 }
 
 :global([data-high-contrast="true"]) .dial::before {
-  background: var(--pulse-color-surface-control, #111111);
-  box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #ffffff);
+  background: var(--pulse-color-surface-control, #242a30);
+  box-shadow: inset 0 0 0 2px var(--pulse-color-border-default, #6d7881);
 }
 
 /* The cap is an absolutely positioned pseudo-element, so it paints above
@@ -216,7 +216,7 @@
 }
 
 :global([data-high-contrast="true"]) .cap {
-  fill: var(--pulse-color-surface-control, #111111);
+  fill: var(--pulse-color-surface-control, #242a30);
   stroke-width: 2;
   stroke-opacity: 1;
 }
