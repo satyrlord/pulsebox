@@ -17,7 +17,7 @@ You may know software but not rack conventions. The dense short labels
 and response rather than through documentation.
 
 The job is sound design and pattern work: build a groove, shape it, keep it.
-Success on first use is not pressing Play on the supplied loop. It is
+Success on first use is not pressing Play on the supplied song. It is
 **changing a sound and hearing the change** — the first deliberate edit, where
 turning a control produces an audible result that you caused on purpose.
 

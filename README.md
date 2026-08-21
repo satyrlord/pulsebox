@@ -28,8 +28,9 @@ one horizontal row. Output stays at the right edge. Each group can collapse
 independently. Faceplates carry mute, solo, audition, and selected-voice fast
 controls.
 The built-in `Neon Basement` template creates a fresh copy of the default
-project. The built-in `Acid Fable` template creates a fresh copy of the
-supplied demo song, an arranged acid track with an enabled Song chain and
+56-bar arranged song. Its five distinct Patterns form an enabled Intro, Verse,
+Break, Drop, and Outro Song chain. The built-in `Acid Fable` template creates a
+fresh copy of the supplied acid song, with an enabled Song chain and
 filter-cutoff automation. The project selector contains New, Open, Import, and
 Export. A New action saves the active project before it loads the template.
 

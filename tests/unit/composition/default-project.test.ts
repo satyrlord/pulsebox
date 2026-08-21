@@ -42,8 +42,8 @@ describe("default project", () => {
     }
   });
 
-  it("ships the named, ID-based Song playlist disabled", () => {
-    expect(project.song.enabled).toBe(false);
+  it("ships the named, ID-based Song playlist enabled", () => {
+    expect(project.song.enabled).toBe(true);
     expect(project.song.placements.map((placement) => ({
       name: required(project.patterns.find((pattern) => pattern.id === placement.patternId)).name,
       repeatCount: placement.repeatCount,
@@ -70,7 +70,7 @@ describe("default project", () => {
     ]);
   });
 
-  it("names the five default Patterns, selects Verse, and keeps data on Pattern parts", () => {
+  it("names five arranged Patterns, selects Verse, and gives each section distinct data", () => {
     expect(project.patterns.map((pattern) => pattern.name)).toEqual([
       "Intro",
       "Verse",
@@ -79,11 +79,40 @@ describe("default project", () => {
       "Outro",
     ]);
     expect(project.activePatternId).toBe(verse.id);
-    const verseParts = modulesInRackOrder
+    expect(
+      project.patterns.map((pattern) =>
+        Object.values(pattern.parts).reduce((total, part) => total + part.events.length, 0),
+      ),
+    ).toEqual([17, 41, 20, 56, 16]);
+
+    const participatingModuleIds = new Set(
+      project.patterns.flatMap((pattern) => Object.keys(pattern.parts)),
+    );
+    for (const module of modulesInRackOrder) {
+      if (module !== undefined) expect(participatingModuleIds.has(module.id)).toBe(true);
+    }
+
+    const signatures = project.patterns.map((pattern) =>
+      JSON.stringify(
+        Object.values(pattern.parts).map((part) =>
+          part.events.map((event) => [event.positionTicks, event.data.note, event.data.velocity]),
+        ),
+      ),
+    );
+    expect(new Set(signatures).size).toBe(project.patterns.length);
+  });
+
+  it("starts the Intro with the three core first-sound modules", () => {
+    const intro = required(project.patterns.find((pattern) => pattern.name === "Intro"));
+    const soundingAtStepZero = modulesInRackOrder
       .filter((module) => module !== undefined)
-      .map((module) => verse.parts[module.id]);
-    for (const part of verseParts) expect(part?.events.length).toBeGreaterThan(0);
-    expect(project.patterns.filter((pattern) => pattern.id !== verse.id).every((pattern) => Object.keys(pattern.parts).length === 0)).toBe(true);
+      .filter((module) => intro.parts[module.id]?.events.some((event) => event.positionTicks === 0))
+      .map((module) => module.pluginId);
+    expect(soundingAtStepZero).toEqual([
+      "bass-mono",
+      "drum-analog-small",
+      "drum-analog-large",
+    ]);
   });
 
   it("leaves the required master and module headroom", () => {

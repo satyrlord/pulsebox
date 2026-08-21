@@ -100,8 +100,8 @@ const DEFAULT_PATTERN_NAMES = ["Intro", "Verse", "Break", "Drop", "Outro"] as co
 const DEFAULT_PATTERN_COLORS = ["#E6A23C", "#F26D6D", "#58B8F6", "#A87CFF", "#63C78F"] as const;
 
 /**
- * The section 9.1 default project name. The section 9.2 starter template creates
- * a copy of that project, so this is also the template's name.
+ * The section 9.1 project name. The section 9.2 starter template creates a copy
+ * of that project, so this is also the template's name.
  */
 export const DEFAULT_PROJECT_NAME = "Neon Basement";
 
@@ -119,11 +119,9 @@ export function createEmptyPatternPart(
 }
 
 /**
- * Seeds fill the rack from slot one upward, in order. Passing several is how the
- * default project ships more than one instrument.
- *
- * The section 9.1 name and tempo are fixed. Section 9.2 has no separate content,
- * so no caller overrides them.
+ * Seeds fill the rack from slot one upward, in order. This factory supplies the
+ * minimal state used by state-layer consumers and tests. Composition builders
+ * own the complete built-in song content.
  */
 export function createDefaultState(
   idFactory: IdFactory,
@@ -201,9 +199,9 @@ export function createDefaultState(
       patterns: Object.freeze(patterns),
       activePatternId: verse.id,
       automationLanes: Object.freeze({}),
-      // Section 9.1: the bar counts describe the default Song chain. Each
-      // Pattern is one bar of sixteen steps, so a bar count is a repeat count.
-      // The chain ships disabled; enabling Song mode plays the arrangement.
+      // Each Pattern is one bar of sixteen steps, so a bar count is a repeat
+      // count. This minimal state starts in Pattern mode. Composition builders
+      // choose the initial mode for each shipped project.
       song: Object.freeze({
         enabled: false,
         placements: Object.freeze([
@@ -345,10 +343,9 @@ export interface SuppliedProjectSeed {
 }
 
 /**
- * Builds a complete supplied project from declarative data. Unlike section 9.1's
- * fixed factory, a supplied seed owns its name, tempo, per-Pattern content,
- * module automation lanes, and Song chain. Section 9.3 uses this for the
- * `Acid Fable` demo song.
+ * Builds a complete supplied project from declarative data. A supplied seed
+ * owns its name, tempo, per-Pattern content, module automation lanes, and Song
+ * chain. Sections 9.1 and 9.3 use this for the built-in songs.
  */
 export function createSuppliedProjectState(
   idFactory: IdFactory,

@@ -22,6 +22,7 @@ describe("audio state projection", () => {
 
     expect(projectState.revision).toBe(state.project.revision);
     expect(projectState.modules).toHaveLength(Object.keys(state.project.modules).length);
+    expect(projectState.arrangement.songEnabled).toBe(true);
     expect(projectState.arrangement.songEntries).toEqual([
       { patternIndex: 0, repeats: 8 },
       { patternIndex: 1, repeats: 16 },

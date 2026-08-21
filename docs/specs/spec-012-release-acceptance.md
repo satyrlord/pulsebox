@@ -246,12 +246,16 @@ The merged MVP is complete only when:
     analysis toggle. The toggle changes no audio, project state, automation,
     Undo, or export.
 77. **AC-077.** A fresh persistent Chrome profile at
-    `http://127.0.0.1:4173` loads the supplied `Neon Basement` loop. The project
+    `http://127.0.0.1:4173` loads the supplied `Neon Basement` song. The project
     selector reads `Current project: Neon Basement`. Six rack modules are loaded.
-    The Play control has title `Play. Space.`. The selected Pattern has a stable
-    UUID. The `Silver Serpent events in Verse` group is visible. The stored
-    project list reads `No stored projects yet.`. The owner-run procedure is in
-    `tests/e2e/first-sound-release.spec.ts`.
+    Song mode is active. The Playlist shows Intro ×8, Verse ×16, Break ×8,
+    Drop ×16, and Outro ×8. The five Patterns contain distinct event data, and
+    all six modules participate across the arrangement. The Play control has
+    title `Play. Space.`. The selected Pattern has a stable UUID. The
+    `Silver Serpent events in Verse` group is visible. The stored project list
+    reads `No stored projects yet.`. The owner-run procedure is in
+    `tests/e2e/first-sound-release.spec.ts`. The composition unit test checks
+    the Pattern data and module participation.
 78. **AC-078.** Development and built-product launch use
     `http://127.0.0.1:4173`. A busy port fails visibly instead of selecting a
     different origin.

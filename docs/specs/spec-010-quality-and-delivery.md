@@ -169,7 +169,7 @@ Playwright:
   the unsupported-size notice below either minimum dimension.
 - Change theme from Settings during playback.
 - Canonical-origin and strict-port launch behavior.
-- First-run supplied-loop path from empty browser storage.
+- First-run supplied-song path from empty browser storage.
 - Missing-pack degraded load and recovery.
 - Storage persistence status and quota failure recovery.
 - Eight active modules during Tempo, Swing, and Humanize interaction at 44.1

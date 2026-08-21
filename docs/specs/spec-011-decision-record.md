@@ -703,3 +703,9 @@ contains the normative requirements. This table is the traceability record.
   default content, and a new installation still opens `Neon Basement`. Section
   9.3 owns the demo-song content. Section 9.2 owns the shared template action
   for both templates and holds no content of its own.
+- **D108.** `Neon Basement` is a complete 56-bar arranged song, not a single
+  demo Pattern. Its five named Patterns contain distinct original event data,
+  and all six loaded modules participate across the arrangement. The Song chain
+  ships enabled, so Play starts with Intro and follows the complete chain. This
+  supersedes the disabled-chain behavior in `D92`. Section 9.1 of
+  [rack and instruments](spec-005-rack-and-instruments.md) owns the content.

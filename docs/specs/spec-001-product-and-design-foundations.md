@@ -23,7 +23,7 @@ Pulsebox requirements:
 - A music-production application with working controls.
 - Built around a dense rack, an eight-channel studio mixer, a four-bus effects
   area, pattern editing, piano-roll editing, and song arrangement.
-- A new user can start the supplied loop within one minute.
+- A new user can start the supplied song within one minute.
 - Playback continues while modules, effects, patterns, themes, and project data
   change.
 - Original in artwork, naming, control layout, code, sample content, and sound

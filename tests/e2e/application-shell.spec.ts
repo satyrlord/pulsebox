@@ -873,8 +873,12 @@ test("changes transport scope without stopping and toggles meter analysis withou
     const probe = (window as unknown as { __meterModeProbe: { analysers: number } }).__meterModeProbe;
     return probe.analysers;
   })).toBeGreaterThanOrEqual(2);
+  await page.getByRole("button", { name: "Pattern", exact: true }).click();
   await page.getByRole("button", { name: "Song", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Song", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Song", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
 
   const playlist = page.locator('[data-component="playlist-summary"]');
@@ -949,7 +953,6 @@ test("keeps the complete Playlist row contract at the compact supported width", 
   await add.click();
   await expect(playlist.locator("li").last()).toBeInViewport();
 
-  await page.getByRole("button", { name: "Song", exact: true }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
   const marker = playlist.locator('[data-component="playlist-playback-marker"]');
   await expect(marker).toBeVisible();

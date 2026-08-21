@@ -47,7 +47,11 @@ Rack order:
 The MVP rack contains exactly eight slots.
 
 Default named Patterns: Intro, Verse, Break, Drop, and Outro. Each Pattern is
-one bar of sixteen steps.
+one bar of sixteen steps. Each Pattern has its own original multi-module event
+data. Intro starts sparsely, Verse establishes the main groove, Break removes
+the driving kick, Drop uses the densest six-module pattern, and Outro reduces
+the song to its root pulse. All six loaded modules participate in the complete
+arrangement.
 
 The default Song chain plays the Patterns in this order:
 
@@ -57,9 +61,9 @@ The default Song chain plays the Patterns in this order:
 4. Drop, 16 bars.
 5. Outro, 8 bars.
 
-A bar count is the entry's repeat count in the chain. The chain ships
-disabled. Song mode plays the chain when the user enables it. Decision `D92`
-records this reading of the bar counts.
+A bar count is the entry's repeat count in the chain. The chain ships enabled,
+so Play performs the complete 56-bar arrangement. Decision `D92` records the
+bar-count reading. Decision `D108` records the enabled full-song behavior.
 
 Select Verse by default.
 
@@ -78,7 +82,7 @@ Default master chain:
 
 The limiter occupies the protected final slot and starts enabled.
 
-Create an original coherent demo loop. Do not use copied patterns, presets,
+Create an original coherent arranged song. Do not use copied patterns, presets,
 samples, or note data.
 
 ### 9.2 Built-in templates

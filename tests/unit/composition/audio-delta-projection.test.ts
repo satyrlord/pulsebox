@@ -45,7 +45,7 @@ describe("audio delta projection", () => {
     const projected = toTransportDelta(delta(state, "song-set", {}), state);
 
     expect(projected.payload).toEqual({
-      enabled: false,
+      enabled: true,
       entries: [
         { patternIndex: 0, repeats: 8 },
         { patternIndex: 1, repeats: 16 },

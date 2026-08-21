@@ -113,6 +113,30 @@ async function assertFreshProfileGuidance(page: Page): Promise<void> {
   const selector = page.getByRole("button", { name: /Project selector/ });
   await expect(selector).toHaveAccessibleName(/Current project: Neon Basement/);
   await expect(page.locator(LOADED_RACK_MODULE)).toHaveCount(6);
+  await expect(page.getByRole("button", { name: "Song", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const playlist = page.locator('[data-component="playlist-summary"]');
+  const placements = [
+    ["Intro", "8"],
+    ["Verse", "16"],
+    ["Break", "8"],
+    ["Drop", "16"],
+    ["Outro", "8"],
+  ] as const;
+  await expect(playlist.locator("ol > li")).toHaveCount(placements.length);
+  for (const [index, [patternName, repeatCount]] of placements.entries()) {
+    const rowNumber = String(index + 1);
+    await expect(
+      playlist
+        .getByRole("combobox", { name: `Playlist row ${rowNumber} Pattern` })
+        .locator("option:checked"),
+    ).toHaveText(patternName);
+    await expect(
+      playlist.getByRole("slider", { name: `Playlist row ${rowNumber} repeat count` }),
+    ).toHaveAttribute("aria-valuenow", repeatCount);
+  }
   await expect(page.getByRole("button", { name: /^play$/i })).toHaveAttribute(
     "title",
     "Play. Space.",
@@ -388,7 +412,7 @@ async function measureFirstSound(
 }
 
 /** This checks the AC-077 single-owner fresh-storage startup contract. */
-test("fresh storage exposes the supplied loop, Play control, and selected Pattern", async ({ browser }, testInfo) => {
+test("fresh storage exposes the supplied song, Play control, and selected Pattern", async ({ browser }, testInfo) => {
   const context = await launchPersistentContext(
     browser,
     testInfo.outputPath("ac-077-fresh-profile"),

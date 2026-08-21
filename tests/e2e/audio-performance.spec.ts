@@ -102,7 +102,7 @@ interface CrossRateCapture {
     readonly baseLatency: number;
     readonly outputLatency: number;
   };
-  /** The shared absolute frame carried by the supplied loop's step zero. */
+  /** The shared absolute frame carried by the supplied song's step zero. */
   readonly startFrame: number;
 }
 
@@ -1266,7 +1266,7 @@ test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ br
       const stepZeroFrames = capture.nodes.flatMap((node) =>
         node.onsets.filter((onset) => onset.sourceStep === 0).map((onset) => onset.audioFrame),
       );
-      // The supplied loop starts Bass Mono, Drumline Six, and Boom Eight on
+      // The supplied song starts Bass Mono, Drumline Six, and Boom Eight on
       // step zero. They must receive the known transport anchor at both rates.
       expect(stepZeroFrames).toHaveLength(3);
       expect(new Set(stepZeroFrames).size).toBe(1);
