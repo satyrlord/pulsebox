@@ -11,6 +11,7 @@ import {
   createGestureId,
   EFFECT_GAIN_MAXIMUM_DECIBELS,
   EFFECT_GAIN_MINIMUM_DECIBELS,
+  PROTECTED_LIMITER_EFFECT_PLUGIN_ID,
   type EffectInstanceId,
   type ParameterDescriptor,
   type PluginId,
@@ -57,7 +58,11 @@ function availableEffects(
     chain.scope === "module" ? "module-pedalboard" : chain.scope === "send" ? "send-chain" : "master-chain";
   return pluginIds.filter((pluginId) => {
     const manifest = manifestFor(pluginId);
-    return manifest?.kind === "effect" && manifest.placements.includes(placement);
+    return (
+      manifest?.kind === "effect" &&
+      manifest.placements.includes(placement) &&
+      !(chain.scope === "master" && pluginId === PROTECTED_LIMITER_EFFECT_PLUGIN_ID)
+    );
   });
 }
 
@@ -160,6 +165,8 @@ function DetailedEffectParameter(props: {
       <output
         className={styles.parameterIdentity}
         aria-label={`${props.owner} ${props.parameter.name}: ${displayEnumValue(props.value)}`}
+        aria-description={props.parameter.description}
+        title={props.parameter.description}
       >
         {displayEnumValue(props.value)}
       </output>
@@ -167,7 +174,9 @@ function DetailedEffectParameter(props: {
       <input
         type="checkbox"
         aria-label={`${props.owner} ${props.parameter.name}`}
+        aria-description={props.parameter.description}
         aria-keyshortcuts={automationEntry.ariaKeyShortcuts}
+        title={props.parameter.description}
         checked={props.value}
         onChange={(event) =>
           setEffectParameter(props.effectId, props.parameter.id, event.currentTarget.checked)
@@ -178,7 +187,9 @@ function DetailedEffectParameter(props: {
     ) : props.parameter.valueType === "enum" && typeof props.value === "string" ? (
       <select
         aria-label={`${props.owner} ${props.parameter.name}`}
+        aria-description={props.parameter.description}
         aria-keyshortcuts={automationEntry.ariaKeyShortcuts}
+        title={props.parameter.description}
         value={props.value}
         onChange={(event) =>
           setEffectParameter(props.effectId, props.parameter.id, event.currentTarget.value)
@@ -197,6 +208,7 @@ function DetailedEffectParameter(props: {
         controlId={`effect-${props.effectId}-${props.parameter.id}`}
         label={`${props.owner} ${props.parameter.name}`}
         caption={props.parameter.shortLabel ?? props.parameter.name}
+        description={props.parameter.description}
         min={props.parameter.minimum ?? 0}
         max={props.parameter.maximum ?? 1}
         step={props.parameter.step ?? 0.01}
@@ -1066,6 +1078,7 @@ export function EffectEditor(props: EffectEditorProps) {
                         controlId={`effect-${effect.id}-mix`}
                         label={`${effectOwner} Mix`}
                         caption="Mix"
+                        description="Blends this effect with its dry input before Gain. At zero, only dry signal passes. At one, only the effect passes."
                         min={0}
                         max={1}
                         step={0.01}
@@ -1088,6 +1101,7 @@ export function EffectEditor(props: EffectEditorProps) {
                         controlId={`effect-${effect.id}-gain`}
                         label={`${effectOwner} Gain`}
                         caption="Gain"
+                        description="Sets this effect's level after Mix and before the next effect. It does not change the dry-to-effect balance."
                         min={EFFECT_GAIN_MINIMUM_DECIBELS}
                         max={EFFECT_GAIN_MAXIMUM_DECIBELS}
                         step={0.1}

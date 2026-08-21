@@ -46,6 +46,10 @@ export interface RoutingMeterFrame {
   readonly right: number;
   readonly mid: number;
   readonly side: number;
+  readonly truePeakLeft: number;
+  readonly truePeakRight: number;
+  readonly truePeakMid: number;
+  readonly truePeakSide: number;
   readonly peak: boolean;
 }
 
@@ -89,13 +93,14 @@ interface MeterNodes extends MeterBuffers {
 
 interface LimiterCeilingNodes {
   readonly shaper: WaveShaperNode;
+  readonly safety: WaveShaperNode;
   readonly gain: GainNode;
 }
 
 const MIX_RAMP_SECONDS = 0.01;
 const EFFECT_PARAMETER_RAMP_SECONDS = 0.008;
 const CHAIN_CONTROL_RAMP_SECONDS = 0.004;
-const PEAK_DISPLAY_THRESHOLD = 0.98;
+const PEAK_DISPLAY_THRESHOLD = 1;
 
 export interface RoutingAutomationChange {
   readonly atFrame: number;
@@ -124,10 +129,7 @@ export class MixerRoutingGraph {
   readonly #limiterBypass: GainNode;
   readonly #programOutput: GainNode;
   readonly #output: GainNode;
-  readonly #analyserLeft: AnalyserNode;
-  readonly #analyserRight: AnalyserNode;
-  readonly #analysisLeft: Float32Array<ArrayBuffer>;
-  readonly #analysisRight: Float32Array<ArrayBuffer>;
+  readonly #mainMeter: MeterBuffers;
   #preMasterMeter: MeterNodes | undefined;
   #postMasterMeter: MeterNodes | undefined;
   #peakLatched = false;
@@ -188,16 +190,20 @@ export class MixerRoutingGraph {
 
     const splitter = context.createChannelSplitter(2);
     this.#output.connect(splitter);
-    this.#analyserLeft = context.createAnalyser();
-    this.#analyserRight = context.createAnalyser();
-    for (const analyser of [this.#analyserLeft, this.#analyserRight]) {
+    const analyserLeft = context.createAnalyser();
+    const analyserRight = context.createAnalyser();
+    for (const analyser of [analyserLeft, analyserRight]) {
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0;
     }
-    splitter.connect(this.#analyserLeft, 0);
-    splitter.connect(this.#analyserRight, 1);
-    this.#analysisLeft = new Float32Array(this.#analyserLeft.fftSize);
-    this.#analysisRight = new Float32Array(this.#analyserRight.fftSize);
+    splitter.connect(analyserLeft, 0);
+    splitter.connect(analyserRight, 1);
+    this.#mainMeter = {
+      left: analyserLeft,
+      right: analyserRight,
+      leftData: new Float32Array(analyserLeft.fftSize),
+      rightData: new Float32Array(analyserRight.fftSize),
+    };
 
     this.#programOutput.gain.value = 1;
     this.#limiterDry.gain.value = 0;
@@ -833,14 +839,9 @@ export class MixerRoutingGraph {
   }
 
   getMeter(): RoutingMeterFrame {
-    const frame = readMeter({
-      left: this.#analyserLeft,
-      right: this.#analyserRight,
-      leftData: this.#analysisLeft,
-      rightData: this.#analysisRight,
-    });
-    this.#peakLatched ||= frame.peak;
-    return { ...frame, peak: this.#peakLatched };
+    const frame = readMeter(this.#mainMeter, this.#peakLatched);
+    this.#peakLatched = frame.peak;
+    return frame;
   }
 
   resetPeak(): void {
@@ -915,7 +916,7 @@ export class MixerRoutingGraph {
       this.#programLimiter,
       ...(this.#programCeiling === undefined
         ? []
-        : [this.#programCeiling.shaper, this.#programCeiling.gain]),
+        : [this.#programCeiling.shaper, this.#programCeiling.safety, this.#programCeiling.gain]),
       this.#limiterDrive,
       this.#limiterDry,
       this.#limiterWet,
@@ -924,8 +925,8 @@ export class MixerRoutingGraph {
       this.#limiterBypass,
       this.#programOutput,
       this.#output,
-      this.#analyserLeft,
-      this.#analyserRight,
+      this.#mainMeter.left,
+      this.#mainMeter.right,
     ]) node.disconnect();
   }
 
@@ -995,22 +996,114 @@ export class MixerRoutingGraph {
 
 }
 
-function readMeter(meter: MeterBuffers): RoutingMeterFrame {
+function readMeter(meter: MeterBuffers, peakLatched = false): RoutingMeterFrame {
   meter.left.getFloatTimeDomainData(meter.leftData);
   meter.right.getFloatTimeDomainData(meter.rightData);
   let left = 0;
   let right = 0;
   let mid = 0;
   let side = 0;
-  for (let index = 0; index < meter.leftData.length; index += 1) {
+  let truePeakLeft = 0;
+  let truePeakRight = 0;
+  let truePeakMid = 0;
+  let truePeakSide = 0;
+  const sampleCount = Math.min(meter.leftData.length, meter.rightData.length);
+  for (let index = 0; index < sampleCount; index += 1) {
     const oneLeft = meter.leftData[index] ?? 0;
     const oneRight = meter.rightData[index] ?? 0;
+    const oneMid = (oneLeft + oneRight) / 2;
+    const oneSide = (oneLeft - oneRight) / 2;
     left = Math.max(left, Math.abs(oneLeft));
     right = Math.max(right, Math.abs(oneRight));
-    mid = Math.max(mid, Math.abs((oneLeft + oneRight) / 2));
-    side = Math.max(side, Math.abs((oneLeft - oneRight) / 2));
+    mid = Math.max(mid, Math.abs(oneMid));
+    side = Math.max(side, Math.abs(oneSide));
+    truePeakLeft = Math.max(truePeakLeft, Math.abs(oneLeft));
+    truePeakRight = Math.max(truePeakRight, Math.abs(oneRight));
+    truePeakMid = Math.max(truePeakMid, Math.abs(oneMid));
+    truePeakSide = Math.max(truePeakSide, Math.abs(oneSide));
   }
-  return { left, right, mid, side, peak: Math.max(left, right) >= PEAK_DISPLAY_THRESHOLD };
+  for (let index = 1; index < sampleCount - 2; index += 1) {
+    const leftBefore = meter.leftData[index - 1] ?? 0;
+    const leftStart = meter.leftData[index] ?? 0;
+    const leftEnd = meter.leftData[index + 1] ?? 0;
+    const leftAfter = meter.leftData[index + 2] ?? 0;
+    const rightBefore = meter.rightData[index - 1] ?? 0;
+    const rightStart = meter.rightData[index] ?? 0;
+    const rightEnd = meter.rightData[index + 1] ?? 0;
+    const rightAfter = meter.rightData[index + 2] ?? 0;
+    truePeakLeft = estimateCubicPeak(
+      truePeakLeft,
+      leftBefore,
+      leftStart,
+      leftEnd,
+      leftAfter,
+    );
+    truePeakRight = estimateCubicPeak(
+      truePeakRight,
+      rightBefore,
+      rightStart,
+      rightEnd,
+      rightAfter,
+    );
+    truePeakMid = estimateCubicPeak(
+      truePeakMid,
+      (leftBefore + rightBefore) / 2,
+      (leftStart + rightStart) / 2,
+      (leftEnd + rightEnd) / 2,
+      (leftAfter + rightAfter) / 2,
+    );
+    truePeakSide = estimateCubicPeak(
+      truePeakSide,
+      (leftBefore - rightBefore) / 2,
+      (leftStart - rightStart) / 2,
+      (leftEnd - rightEnd) / 2,
+      (leftAfter - rightAfter) / 2,
+    );
+  }
+  const peak = Math.max(truePeakLeft, truePeakRight) >= PEAK_DISPLAY_THRESHOLD;
+  return {
+    left,
+    right,
+    mid,
+    side,
+    truePeakLeft,
+    truePeakRight,
+    truePeakMid,
+    truePeakSide,
+    peak: peakLatched || peak,
+  };
+}
+
+function estimateCubicPeak(
+  peak: number,
+  before: number,
+  start: number,
+  end: number,
+  after: number,
+): number {
+  return Math.max(
+    peak,
+    Math.abs(cubicInterpolate(before, start, end, after, 0.25)),
+    Math.abs(cubicInterpolate(before, start, end, after, 0.5)),
+    Math.abs(cubicInterpolate(before, start, end, after, 0.75)),
+  );
+}
+
+function cubicInterpolate(
+  before: number,
+  start: number,
+  end: number,
+  after: number,
+  phase: number,
+): number {
+  const phaseSquared = phase * phase;
+  const phaseCubed = phaseSquared * phase;
+  return 0.5 * (
+    2 * start +
+    (-before + end) * phase +
+    (2 * before - 5 * start + 4 * end - after) * phaseSquared +
+    (-before + 3 * start - 3 * end + after) * phaseCubed
+  );
 }
 
 function createProtectedLimiter(context: AudioContext): DynamicsCompressorNode {
@@ -1032,7 +1125,19 @@ export function createLimiterCeilingCurve(
   const curve = new Float32Array(size);
   for (let index = 0; index < size; index += 1) {
     const input = (index / (size - 1)) * 2 - 1;
-    curve[index] = clamp(input, -ceiling, ceiling);
+    const magnitude = Math.abs(input);
+    if (magnitude <= 0.9) {
+      curve[index] = input * ceiling;
+      continue;
+    }
+    const phase = (magnitude - 0.9) / 0.1;
+    const phaseSquared = phase * phase;
+    const phaseCubed = phaseSquared * phase;
+    const eased =
+      (2 * phaseCubed - 3 * phaseSquared + 1) * 0.9 +
+      (phaseCubed - 2 * phaseSquared + phase) * 0.1 +
+      (-2 * phaseCubed + 3 * phaseSquared);
+    curve[index] = Math.sign(input) * eased * ceiling;
   }
   return curve;
 }
@@ -1044,14 +1149,25 @@ function createLimiterCeiling(
   const host = context as unknown as { createWaveShaper?: () => WaveShaperNode };
   if (typeof host.createWaveShaper !== "function") return undefined;
   const shaper = host.createWaveShaper();
+  const safety = host.createWaveShaper();
   const gain = context.createGain();
   shaper.curve = createLimiterCeilingCurve(0);
-  // Oversampling can ring past a hard clip boundary. The final safety stage
-  // uses the host-rate curve so its post-gain ceiling remains absolute.
-  shaper.oversample = "none";
+  shaper.oversample = "4x";
+  safety.curve = createHardCeilingCurve();
+  safety.oversample = "none";
   gain.gain.value = decibelGain(clamp(ceilingDecibels, -12, 0));
-  shaper.connect(gain);
-  return { shaper, gain };
+  shaper.connect(safety);
+  safety.connect(gain);
+  return { shaper, safety, gain };
+}
+
+function createHardCeilingCurve(length = 4097): Float32Array<ArrayBuffer> {
+  const size = Math.max(3, Math.floor(length));
+  const curve = new Float32Array(size);
+  for (let index = 0; index < size; index += 1) {
+    curve[index] = (index / (size - 1)) * 2 - 1;
+  }
+  return curve;
 }
 
 function ramp(parameter: AudioParam | undefined, value: number, now: number, seconds: number): void {

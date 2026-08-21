@@ -146,13 +146,7 @@ describe("mixer and effects surfaces", () => {
 
     expect(document.querySelectorAll('[data-component="channel-strip"]')).toHaveLength(8);
     expect(document.querySelector('[data-component="master-strip"]')).not.toBeNull();
-    const masterBypass = screen.getByRole("button", { name: "Bypass master effects" });
-    expect(masterBypass).toHaveTextContent("FX ON");
-    fireEvent.click(masterBypass);
-    expect(masterBypass).toHaveTextContent("FX OFF");
-    expect(harness.domain.getState().project.effects.masterEffectsBypassed).toBe(true);
-    act(() => harness.store.getState().undo());
-    expect(harness.domain.getState().project.effects.masterEffectsBypassed).toBe(false);
+    expect(screen.queryByRole("button", { name: "Bypass master effects" })).toBeNull();
     expect(screen.getByRole("status", { name: /Silver Serpent output clip indicator, clear/i })).toBeVisible();
     act(() => harness.store.getState().setMeterLevel(firstModuleId(harness), 0.99));
     expect(screen.getByRole("status", { name: /Silver Serpent output clip indicator, clipping/i })).toBeVisible();
@@ -210,21 +204,45 @@ describe("mixer and effects surfaces", () => {
       name: "Send A Analog Echo Time macro",
     });
     expect(compactTime).toHaveAttribute("aria-valuetext", "375 milliseconds");
-    expect(compactTime).toHaveAttribute("title", "375 milliseconds");
+    expect(compactTime).toHaveAttribute(
+      "title",
+      "375 milliseconds. Sets delay time in milliseconds when Tempo Sync is off. Tempo Sync replaces it with Beat Time.",
+    );
+
+    const returnLevel = screen.getByRole("slider", { name: "Send A Return Level" });
+    expect(returnLevel).toHaveAttribute(
+      "title",
+      "1.00. Sets how much of this send chain reaches the master mix. Channel send amounts set how much signal enters the chain.",
+    );
 
     fireEvent.click(sendEditorButton("A"));
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: "Analog Echo in Send A Tempo Sync",
-      }),
+    const tempoSync = screen.getByRole("checkbox", {
+      name: "Analog Echo in Send A Tempo Sync",
+    });
+    expect(tempoSync).toHaveAttribute(
+      "title",
+      "Uses transport tempo and Beat Time instead of Time. Feedback and Feedback Filter do not change.",
     );
+    fireEvent.click(tempoSync);
     const detailedTime = screen.getByRole("slider", {
       name: "Analog Echo in Send A Time",
     });
     expect(detailedTime).toHaveAttribute("aria-valuetext", "375 milliseconds");
-    expect(detailedTime).toHaveAttribute("title", "375 milliseconds");
+    expect(detailedTime).toHaveAttribute(
+      "title",
+      "375 milliseconds. Sets delay time in milliseconds when Tempo Sync is off. Tempo Sync replaces it with Beat Time.",
+    );
     expect(screen.getByRole("spinbutton", { name: "Analog Echo in Send A Time value" })).toHaveValue(
       375,
+    );
+
+    expect(screen.getByRole("slider", { name: "Analog Echo in Send A Mix" })).toHaveAttribute(
+      "title",
+      "0.35. Blends this effect with its dry input before Gain. At zero, only dry signal passes. At one, only the effect passes.",
+    );
+    expect(screen.getByRole("slider", { name: "Analog Echo in Send A Gain" })).toHaveAttribute(
+      "title",
+      "0.0 decibels. Sets this effect's level after Mix and before the next effect. It does not change the dry-to-effect balance.",
     );
   });
 
@@ -302,11 +320,7 @@ describe("mixer and effects surfaces", () => {
     expect(parameter()).toHaveValue("mix");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
-    fireEvent.contextMenu(
-      within(screen.getByRole("region", { name: "Master routing" })).getByRole("slider", {
-        name: "Master level",
-      }),
-    );
+    fireEvent.contextMenu(screen.getByRole("slider", { name: "Master level" }));
     expect(parameter()).toHaveValue("level");
 
     fireEvent.contextMenu(
@@ -488,7 +502,7 @@ describe("mixer and effects surfaces", () => {
   it("edits stable EQ bands directly by keyboard and pointer as one gesture", () => {
     const harness = createHarness();
     const view = renderWithHarness(<MasterPanel />, harness);
-    fireEvent.click(screen.getByRole("button", { name: "Edit chain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Parametric EQ in Master chain" }));
     const eqId = harness.domain.getState().project.effects.masterChain.find((effectId) =>
       effectId === null
         ? false
@@ -578,23 +592,92 @@ describe("mixer and effects surfaces", () => {
     );
   });
 
-  it("toggles the project-owned master effects bypass and opens the master editor", () => {
+  it("uses state plates for bypass and edge handles for accessible reorder", () => {
     const harness = createHarness();
     renderWithHarness(<MasterPanel />, harness);
-    const bypass = screen.getByRole("button", { name: "Bypass master effects" });
+    expect(screen.getByRole("list", { name: "Mastering pedal chain" })).toBeVisible();
+    expect(document.querySelectorAll('[data-component="master-pedal"]')).toHaveLength(3);
+    expect(screen.getByText("Compressor")).toBeVisible();
+    expect(screen.getByText("Parametric EQ")).toBeVisible();
+    expect(screen.getByText("True Peak Limiter")).toBeVisible();
+    expect(screen.getByText("Protected final")).toBeVisible();
+    expect(screen.queryByText("COMP")).toBeNull();
+    expect(screen.queryByText("EQ")).toBeNull();
+    expect(screen.queryByText("LIM")).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Master level" })).toBeNull();
+    const compressorSlot = screen.getByRole("button", {
+      name: /Master slot 01, Compressor active/u,
+    });
+    fireEvent.click(compressorSlot);
+    expect(harness.domain.getState().project.effects.masterEffectsBypassed).toBe(false);
+    const bypassedCompressor = screen.getByRole("button", { name: /Master slot 01, Compressor bypassed/u });
+    expect(bypassedCompressor).toHaveAttribute("aria-pressed", "true");
+    expect(bypassedCompressor).toHaveAttribute("title", "Compressor is bypassed. Click to enable.");
 
-    expect(bypass).not.toHaveAttribute("aria-keyshortcuts");
-    expect(screen.queryByTitle("Automate master effects bypass.")).toBeNull();
-    fireEvent.click(bypass);
+    const bypassAll = screen.getByRole("button", { name: "Bypass all mastering effects" });
+    fireEvent.click(bypassAll);
     expect(harness.domain.getState().project.effects.masterEffectsBypassed).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Reset peak" }));
-    expect(harness.audio.resetMasterPeak).toHaveBeenCalledOnce();
-    expect(screen.getByRole("meter", { name: "Before master effects" })).toBeVisible();
-    expect(screen.getByRole("meter", { name: "After master effects" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Edit chain" }));
+    expect(bypassAll).toHaveAttribute("title", expect.stringContaining("True Peak Limiter remains active"));
+    fireEvent.click(screen.getByRole("button", { name: "Enable all mastering effects" }));
+    expect(bypassedCompressor).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(bypassedCompressor);
+
+    const compressorCard = screen.getByText("Compressor").closest<HTMLElement>("[data-effect-id]");
+    const equalizerCard = screen.getByText("Parametric EQ").closest<HTMLElement>("[data-effect-id]");
+    if (compressorCard === null || equalizerCard === null) throw new Error("Expected Master pedals.");
+    const compressorEndHandle = compressorCard.querySelector<HTMLElement>(
+      '[data-component="master-pedal-handle"][data-edge="end"]',
+    );
+    if (compressorEndHandle === null) throw new Error("Expected the right-edge drag surface.");
+    expect(compressorEndHandle.tagName).toBe("DIV");
+    expect(compressorEndHandle).toHaveAttribute("aria-hidden", "true");
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => equalizerCard),
+    });
+    const compressorHandle = screen.getByRole("button", { name: /Reorder Compressor/u });
+    Object.defineProperties(compressorHandle, {
+      setPointerCapture: { configurable: true, value: vi.fn() },
+      hasPointerCapture: { configurable: true, value: vi.fn(() => true) },
+      releasePointerCapture: { configurable: true, value: vi.fn() },
+    });
+    fireEvent.pointerDown(compressorHandle, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(compressorHandle, { pointerId: 1, clientX: 10, clientY: 0 });
+    expect(equalizerCard).toHaveAttribute("data-drag-target", "true");
+    fireEvent.pointerUp(compressorHandle, { pointerId: 1, clientX: 10, clientY: 0 });
+    Reflect.deleteProperty(document, "elementFromPoint");
+    expect(
+      harness.domain.getState().project.effects.masterChain
+        .filter((id) => id !== null)
+        .slice(0, 2)
+        .map((id) => harness.domain.getState().project.effects.instances[id]?.pluginId),
+    ).toEqual(["parametric-eq", "compressor"]);
+
+    const movedCompressor = screen.getByRole("button", { name: /Reorder Compressor/u });
+    fireEvent.keyDown(movedCompressor, { key: "ArrowUp" });
+    expect(
+      harness.domain.getState().project.effects.masterChain
+        .filter((id) => id !== null)
+        .slice(0, 2)
+        .map((id) => harness.domain.getState().project.effects.instances[id]?.pluginId),
+    ).toEqual(["compressor", "parametric-eq"]);
+
+    expect(screen.getByRole("button", { name: /Reorder True Peak Limiter/u })).toBeDisabled();
+    expect(harness.domain.getState().project.effects.masterChain.at(-1)).toBe(
+      harness.domain.getState().project.effects.masterChain.find(
+        (id) => id !== null && harness.domain.getState().project.effects.instances[id]?.pluginId === "limiter",
+      ),
+    );
+    expect(screen.queryByRole("button", { name: "Bypass Compressor in Master chain" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Compressor in Master chain" }));
     expect(screen.getByRole("dialog", { name: "Master chain effect editor" })).toBeVisible();
+    const addEffect = screen.getByRole("combobox", { name: "Add an effect to Master chain" });
+    const replaceCompressor = screen.getByRole("combobox", { name: "Replace Compressor in Master chain" });
+    expect(within(addEffect).queryByRole("option", { name: "True Peak Limiter" })).toBeNull();
+    expect(within(replaceCompressor).queryByRole("option", { name: "True Peak Limiter" })).toBeNull();
     expect(screen.getByRole("meter", { name: "Compressor gain reduction" })).toBeVisible();
-    expect(screen.getByRole("meter", { name: "Limiter gain reduction" })).toBeVisible();
+    expect(screen.getByRole("meter", { name: "True Peak Limiter gain reduction" })).toBeVisible();
     const curve = screen.getByRole("img", { name: "Parametric EQ response curve" });
     const before = curve.querySelector('[data-part="response"]')?.getAttribute("d");
     const midGain = screen.getByRole("slider", { name: "Parametric EQ in Master chain Mid Gain" });
@@ -607,38 +690,36 @@ describe("mixer and effects surfaces", () => {
     expect(screen.queryByRole("dialog", { name: "Master chain effect editor" })).toBeNull();
   });
 
-  it("shows silent master-chain meters after Stop and after the Master panel remounts", () => {
+  it("shows a full Master true-peak meter with a resettable clip indicator", () => {
     const harness = createHarness();
-    const view = renderWithHarness(<MasterPanel />, harness);
-    act(() => {
-      harness.domain.dispatch(harness.domain.createCommand("transport-play", {}));
-      harness.store.getState().setMasterChainMeterFrames(
-        { left: 0.7, right: 0.5, mid: 0.6, side: 0.1, peak: false },
-        { left: 0.6, right: 0.4, mid: 0.5, side: 0.1, peak: false },
-      );
-    });
-    expect(screen.getByRole("meter", { name: "Before master effects" })).toHaveAttribute(
-      "aria-valuenow",
-      "0.7",
-    );
-
-    act(() => {
-      harness.domain.dispatch(harness.domain.createCommand("transport-stop", {}));
-    });
-    expect(screen.getByRole("meter", { name: "Before master effects" })).toHaveAttribute(
-      "aria-valuenow",
-      "0",
-    );
-    expect(screen.getByRole("meter", { name: "After master effects" })).toHaveAttribute(
-      "aria-valuenow",
-      "0",
-    );
-
-    view.unmount();
     renderWithHarness(<MasterPanel />, harness);
-    expect(screen.getByRole("meter", { name: "Before master effects" })).toHaveAttribute(
-      "aria-valuenow",
-      "0",
-    );
+    expect(screen.getByLabelText("Master true peak meter")).toBeVisible();
+    expect(screen.getByRole("meter", { name: "Master true peak left" })).toBeVisible();
+    expect(screen.getByRole("meter", { name: "Master true peak right" })).toBeVisible();
+    const meterMode = screen.getByRole("button", { name: "Master meter mode: left and right" });
+    fireEvent.click(meterMode);
+    expect(screen.getByRole("button", { name: "Master meter mode: mid and side" })).toBeVisible();
+    expect(screen.getByRole("meter", { name: "Master true peak mid" })).toBeVisible();
+    expect(screen.getByRole("meter", { name: "Master true peak side" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Master meter mode: mid and side" }));
+    act(() => {
+      harness.store.getState().setMasterMeterFrame({
+        left: 0.9,
+        right: 0.8,
+        mid: 0.85,
+        side: 0.05,
+        truePeakLeft: 1.08,
+        truePeakRight: 0.96,
+        truePeakMid: 0.85,
+        truePeakSide: 0.05,
+        peak: true,
+      });
+    });
+    expect(screen.getByRole("status", { name: "Master true peak level" })).toHaveTextContent("0.7 dBTP");
+    const clip = screen.getByRole("button", { name: "Reset master true peak clip" });
+    expect(clip).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(clip);
+    expect(harness.audio.resetMasterPeak).toHaveBeenCalledOnce();
+    expect(clip).toHaveAttribute("aria-pressed", "false");
   });
 });

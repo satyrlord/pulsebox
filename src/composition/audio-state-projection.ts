@@ -4,6 +4,7 @@ import type {
   SendBusId,
   StateRevision,
 } from "../contracts";
+import { PROTECTED_LIMITER_EFFECT_PLUGIN_ID } from "../contracts";
 import type { PluginManifest } from "../contracts/plugins";
 import type {
   RoutingEffectInstance,
@@ -146,12 +147,16 @@ export function createAudioStateProjector(manifestFor: ManifestLookup): AudioSta
       effectsBypassed: state.project.effects.sendEffectsBypassed || chain.bypassed,
     }));
     const masterEffects = resolveEffectChain(state, state.project.effects.masterChain);
-    const limiter = masterEffects.at(-1);
+    const finalMasterEffect = masterEffects.at(-1);
+    const limiter =
+      finalMasterEffect?.pluginId === PROTECTED_LIMITER_EFFECT_PLUGIN_ID
+        ? finalMasterEffect
+        : undefined;
     return {
       sends,
       master: {
         level: state.project.masterLevel,
-        effects: limiter === undefined ? [] : masterEffects.slice(0, -1),
+        effects: limiter === undefined ? masterEffects : masterEffects.slice(0, -1),
         effectsBypassed: state.project.effects.masterEffectsBypassed,
         limiterBypassed: limiter?.bypassed ?? false,
         ...(limiter === undefined

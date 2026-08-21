@@ -1,12 +1,14 @@
 /* The transport is the machine's front plate: brushed metal under a lit top
    edge, throwing a shadow onto the workspace below it. */
 .bar {
+  position: relative;
+  z-index: 20;
   min-inline-size: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 168px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 0 12px 0 10px;
+  padding: 0 10px;
   /* The tempo objection floats below the bar, so the plate must not clip it. */
   overflow: visible;
   color: var(--pulse-color-text-primary, #f3f5f6);
@@ -14,38 +16,6 @@
   background-image:
     var(--mat-speckle), linear-gradient(180deg, var(--surface-plate-top), var(--surface-plate-bot));
   border-block-end: 1px solid var(--edge-hairline);
-  box-shadow:
-    inset 0 1px 0 var(--edge-highlight),
-    0 4px 8px #00000099;
-  z-index: 40;
-}
-
-.left,
-.right {
-  min-inline-size: 0;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-/* Anchors the tempo validation message, which sits out of flow so it cannot
-   move the transport controls. */
-.left {
-  position: relative;
-}
-
-.right {
-  justify-content: flex-end;
-}
-
-/* Plain engraved type on the plate, optically centred in the fixed middle
-   column. The negative end margin cancels the trailing letter-space that
-   tracking adds after the final glyph. */
-.mark {
-  justify-self: center;
-  inline-size: 168px;
-  margin-inline-end: -0.17em;
-  font-family: var(--type-brand, var(--type-display));
   font-size: var(--pulse-type-16, 16px);
   font-weight: 400;
   letter-spacing: 0.17em;
@@ -55,6 +25,30 @@
   text-shadow:
     0 1px 2px #000000d9,
     0 0 14px #ffffff12;
+}
+
+.left,
+.right {
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.left {
+  justify-self: start;
+}
+
+.right {
+  justify-self: end;
+}
+
+.mark {
+  justify-self: center;
+  font-family: var(--type-brand);
+  font-size: var(--pulse-type-16, 16px);
+  font-weight: 400;
+  letter-spacing: 0.17em;
 }
 
 /* Grouped keys sit inside a recessed channel. The channel is what gives the
@@ -184,6 +178,11 @@
 
 /* Readout glass, matching the shared SegmentDisplay pane. The tempo field is
    an input rather than a display, so it carries the same glass directly. */
+.tempoControl {
+  position: relative;
+  flex: none;
+}
+
 .tempo {
   position: relative;
   overflow: hidden;
@@ -289,27 +288,6 @@
     0 0 0 1px var(--edge-hairline);
 }
 
-/* The peak lamp and its engraved label. */
-.peak {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.peak > span {
-  font:
-    var(--pulse-type-10, 10px) / 1 var(--type-display);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--pulse-color-text-muted, #919ba3);
-}
-
-.peak[data-lit="true"] > span {
-  color: var(--pulse-color-status-danger, #ff8178);
-}
-
 /* Master dB on readout glass, fixed width so decay never shifts the layout. */
 .masterDb {
   flex: none;
@@ -385,26 +363,6 @@
   filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 
-/* The meter mode is a bare label on the plate, not a key. */
-.meterMode {
-  inline-size: 41px;
-  block-size: 40px;
-  flex: none;
-  padding: 0;
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-12, 12px);
-  letter-spacing: 0.04em;
-  color: var(--pulse-color-text-secondary, #bac2c8);
-  background: none;
-  box-shadow: none;
-}
-
-.meterMode[aria-pressed="true"] {
-  color: var(--pulse-color-text-primary, #f3f5f6);
-  background: none;
-  box-shadow: inset 0 -2px 0 var(--accent-lamp);
-}
-
 /* The channel letters read at the 10px floor. The ladders keep their slim bars,
    centred in the taller row. */
 .masterMeters {
@@ -455,10 +413,6 @@
     gap: 3px;
   }
 
-  .mark {
-    font-size: 19px;
-  }
-
   /* The grouped keys narrow evenly. Tracking is what overflows first at this
      width, so the engraved letter-space closes before the key does. */
   .modeToggle {
@@ -475,10 +429,6 @@
   }
 
   .iconButton {
-    inline-size: 34px;
-  }
-
-  .meterMode {
     inline-size: 34px;
   }
 

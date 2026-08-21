@@ -44,6 +44,10 @@ export interface MasterMeterView {
   readonly right: number;
   readonly mid: number;
   readonly side: number;
+  readonly truePeakLeft: number;
+  readonly truePeakRight: number;
+  readonly truePeakMid: number;
+  readonly truePeakSide: number;
   readonly peak: boolean;
 }
 
@@ -52,6 +56,10 @@ export const SILENT_MASTER_METER: MasterMeterView = Object.freeze({
   right: 0,
   mid: 0,
   side: 0,
+  truePeakLeft: 0,
+  truePeakRight: 0,
+  truePeakMid: 0,
+  truePeakSide: 0,
   peak: false,
 });
 
@@ -70,6 +78,10 @@ function sameMeterFrame(left: MasterMeterView, right: MasterMeterView): boolean 
     left.right === right.right &&
     left.mid === right.mid &&
     left.side === right.side &&
+    left.truePeakLeft === right.truePeakLeft &&
+    left.truePeakRight === right.truePeakRight &&
+    left.truePeakMid === right.truePeakMid &&
+    left.truePeakSide === right.truePeakSide &&
     left.peak === right.peak
   );
 }
@@ -296,7 +308,7 @@ export interface AppState {
   readonly masterMeter: MasterMeterView;
   readonly masterChainPreMeter: MasterMeterView;
   readonly masterChainPostMeter: MasterMeterView;
-  /** The header peak lamp, latched briefly after the last peak frame. */
+  /** Master true-peak clip state. It remains set until resetMasterPeak runs. */
   readonly masterPeakHeld: boolean;
   /** Pattern-launch boundary in sixteenth steps. A global UI preference. */
   readonly launchQuantizationSteps: number;
@@ -522,8 +534,6 @@ export interface AppState {
 
 export type AppStore = StoreApi<AppState>;
 
-const PEAK_HOLD_MILLISECONDS = 1_500;
-
 /** Default Pattern-launch boundary: one bar of sixteenth steps. */
 const DEFAULT_LAUNCH_QUANTIZATION_STEPS = 16;
 
@@ -535,7 +545,6 @@ const DEFAULT_LAUNCH_QUANTIZATION_STEPS = 16;
 export function createAppStore(dependencies: AppStoreDependencies): AppStore {
   const { store, audio } = dependencies;
   let noticeSequence = 0;
-  let lastPeakAt = 0;
   /** First transport tick that may write an armed live take after its count-in. */
   let recordCaptureAfterTicks: number | undefined;
   /** Blocks a second Play while the first is still activating the engine. */
@@ -704,20 +713,12 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     setMasterMeterFrame: (frame) => {
-      // One over-threshold analysis frame is shorter than a glance, so the
-      // peak lamp latches briefly instead of following the frame exactly.
-      const now = performance.now();
-      if (frame.peak) lastPeakAt = now;
-      const masterPeakHeld =
-        frame.peak || (lastPeakAt > 0 && now - lastPeakAt < PEAK_HOLD_MILLISECONDS);
-      const current = get().masterMeter;
+      const currentState = get();
+      const masterPeakHeld = currentState.masterPeakHeld || frame.peak;
+      const current = currentState.masterMeter;
       if (
-        masterPeakHeld === get().masterPeakHeld &&
-        current.left === frame.left &&
-        current.right === frame.right &&
-        current.mid === frame.mid &&
-        current.side === frame.side &&
-        current.peak === frame.peak
+        masterPeakHeld === currentState.masterPeakHeld &&
+        sameMeterFrame(current, frame)
       ) {
         return;
       }
@@ -736,7 +737,6 @@ export function createAppStore(dependencies: AppStoreDependencies): AppStore {
     },
 
     resetMasterPeak: () => {
-      lastPeakAt = 0;
       audio.resetMasterPeak?.();
       set({ masterPeakHeld: false, masterMeter: { ...get().masterMeter, peak: false } });
     },

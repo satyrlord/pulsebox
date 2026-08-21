@@ -11,6 +11,8 @@ import { ValuePopover } from "./ValuePopover";
 export interface KnobProps {
   readonly controlId: string;
   readonly label: string;
+  /** Short help text for the control and its related controls. */
+  readonly description?: string | undefined;
   /**
    * Engraved caption when the accessible name is too long for the panel, as on
    * a mixer strip where the name must still say which channel it belongs to.
@@ -136,6 +138,7 @@ export function Knob(props: KnobProps) {
   const pointer = useMemo(() => ({ from: polar(angle, 3), to: polar(angle, RADIUS - 4) }), [angle]);
   const formatted = formatValue(displayValue).toFixed(precision);
   const text = unit === undefined ? formatted : `${formatted} ${unit}`;
+  const title = props.description === undefined ? text : `${text}. ${props.description}`;
 
   // The default marker sits with the tick ring, spec-003 section 22.1, so the
   // double-click reset target is visible before the first adjustment.
@@ -163,10 +166,10 @@ export function Knob(props: KnobProps) {
         aria-valuemax={displayMax}
         aria-valuenow={formatValue(displayValue)}
         aria-valuetext={text}
-        aria-describedby={readoutId}
+        aria-description={props.description}
         aria-disabled={disabled === true ? true : undefined}
         aria-keyshortcuts={automation.ariaKeyShortcuts}
-        title={text}
+        title={title}
         className={cx(styles.dial, dragging && styles.dragging)}
         onPointerDown={disabled === true ? undefined : onPointerDown}
         onPointerMove={onPointerMove}

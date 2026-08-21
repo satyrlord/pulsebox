@@ -2,10 +2,11 @@ import { OnePoleLowpass } from "../../dsp/primitives";
 import { enumState, finite, numberState, writeStereoFrame, type EffectFrameProcessor, type EffectState, type StereoFrame } from "../dsp";
 export type DistortionModel = "drive" | "fold" | "asymmetric";
 export function distortSample(input: number, drive: number, model: DistortionModel): number {
-  const source = finite(input); const gain = Math.max(1, drive);
-  if (model === "fold") { const folded = Math.abs(((source * gain + 1) % 4 + 4) % 4 - 2) - 1; return finite(folded / gain); }
-  if (model === "asymmetric") { const driven = source * gain; return finite((driven >= 0 ? Math.tanh(driven) : Math.tanh(driven * 0.55)) / gain); }
-  return finite(Math.tanh(source * gain) / gain);
+  // Unity-peak compensation per decision D103: full scale in keeps full scale out.
+  const source = finite(input); const gain = Math.max(1, drive); const peak = Math.tanh(gain);
+  if (model === "fold") { const folded = Math.abs(((source * gain + 1) % 4 + 4) % 4 - 2) - 1; return finite(folded); }
+  if (model === "asymmetric") { const driven = source * gain; return finite((driven >= 0 ? Math.tanh(driven) : Math.tanh(driven * 0.55)) / peak); }
+  return finite(Math.tanh(source * gain) / peak);
 }
 export class DistortionDsp implements EffectFrameProcessor {
   readonly #left = new OnePoleLowpass(); readonly #right = new OnePoleLowpass(); readonly #sampleRate: number; readonly #state: EffectState;

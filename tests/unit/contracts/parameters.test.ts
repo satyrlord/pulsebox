@@ -20,6 +20,19 @@ describe("parameter contracts", () => {
     expect(validateParameterDescriptor(createFloatParameter()).ok).toBe(true);
   });
 
+  it("bounds an optional user-facing description", () => {
+    const base = createFloatParameter();
+    expect(
+      validateParameterDescriptor({
+        ...base,
+        description: "Sets the filter edge. Resonance emphasizes this frequency.",
+      }).ok,
+    ).toBe(true);
+    expect(validateParameterDescriptor({ ...base, description: " " }).ok).toBe(false);
+    expect(validateParameterDescriptor({ ...base, description: "x".repeat(241) }).ok).toBe(false);
+    expect(validateParameterDescriptor({ ...base, description: 42 }).ok).toBe(false);
+  });
+
   it("rejects defaults outside their range", () => {
     const descriptor: ParameterDescriptor = {
       ...createFloatParameter(),

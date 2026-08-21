@@ -28,8 +28,10 @@ one horizontal row. Output stays at the right edge. Each group can collapse
 independently. Faceplates carry mute, solo, audition, and selected-voice fast
 controls.
 The built-in `Neon Basement` template creates a fresh copy of the default
-project. The project selector contains New, Open, Import, and Export. A New
-action saves the active project before it loads the template.
+project. The built-in `Acid Fable` template creates a fresh copy of the
+supplied demo song, an arranged acid track with an enabled Song chain and
+filter-cutoff automation. The project selector contains New, Open, Import, and
+Export. A New action saves the active project before it loads the template.
 
 The specification 007 mixer and effects slice is also runnable. It includes
 eight fixed instrument strips, four send chains, module pedalboards, the master
@@ -37,7 +39,13 @@ chain, and the complete effect catalog, including the protected master-chain
 limiter. The fixed main path and A–D channel sends are implemented. Project
 state retains routing, effect instances, pinned send focus, Rack FX group
 bypass, Send FX group bypass, and master-effects bypass. The Rack Output group
-and Mixer use icon-only controls for their group bypasses.
+and Mixer use icon-only controls for their group bypasses. The Master studio
+view is an ordered list of live mastering pedals with compact controls,
+individual bypass, edge-handle reorder, and an icon-only detailed-editor entry.
+Each slot-number plate shows green active or gray bypassed state. A full-height
+stereo true-peak meter shows L/R or M/S dBTP and owns held-clip reset. Master
+owns the user-effects `Bypass All` control. The protected True Peak Limiter
+remains active. The Mixer master strip owns master level and its compact meter.
 
 The authoritative product contract starts at the
 [specification index](docs/specs/spec-000-index.md). Its child specifications

@@ -418,13 +418,20 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
   await expect(cards.nth(3)).toContainText(/Distortion/i);
 
   const card = cards.nth(0);
-  await expect(
-    card.getByRole("slider", { name: "Send A Analog Echo Time macro" }),
-  ).toHaveAttribute("aria-valuetext", "375 milliseconds");
+  const compactTime = card.getByRole("slider", { name: "Send A Analog Echo Time macro" });
+  await expect(compactTime).toHaveAttribute("aria-valuetext", "375 milliseconds");
+  await expect(compactTime).toHaveAttribute(
+    "title",
+    "375 milliseconds. Sets delay time in milliseconds when Tempo Sync is off. Tempo Sync replaces it with Beat Time.",
+  );
   await expect(
     card.getByRole("slider", { name: "Send A Analog Echo Feedback Filter macro" }),
   ).toHaveAttribute("aria-valuetext", "4800 hertz");
   const returnLevel = card.getByRole("slider", { name: "Send A Return Level" });
+  await expect(returnLevel).toHaveAttribute(
+    "title",
+    "1.00. Sets how much of this send chain reaches the master mix. Channel send amounts set how much signal enters the chain.",
+  );
   const returnBefore = Number(await returnLevel.getAttribute("aria-valuenow"));
   await returnLevel.focus();
   await returnLevel.press("ArrowLeft");
@@ -475,6 +482,16 @@ test("opens one send-chain editor, supports add, Mix, Gain, bypass, focus, and k
     has: page.locator("strong").filter({ hasText: /^Chorus$/u }),
   });
   await expect(added).toBeVisible();
+  await expect(added.getByRole("slider", { name: "Chorus in Send A Rate" })).toHaveAttribute(
+    "title",
+    "0.70 hertz. Sets modulation speed in hertz when Tempo Sync is off. Tempo Sync replaces Rate with transport tempo.",
+  );
+  await expect(
+    added.getByRole("checkbox", { name: "Chorus in Send A Tempo Sync" }),
+  ).toHaveAttribute(
+    "title",
+    "Follows transport tempo instead of Rate. Depth and Delay still set the modulation range and center.",
+  );
   const delayPedal = rows.filter({
     has: page.locator("strong").filter({ hasText: /^Analog Echo$/u }),
   });
@@ -1151,7 +1168,7 @@ test("keeps master gain and the protected limiter active during user-effects byp
     await page.goto("http://127.0.0.1:4173/");
     const setupStudio = await openStudio(page, "Master");
     const setupMaster = setupStudio.locator('[data-component="master-panel"]');
-    await setupMaster.getByRole("button", { name: "Edit chain", exact: true }).click();
+    await setupMaster.getByRole("button", { name: "Edit Compressor in Master chain" }).click();
     const setupEditor = page.locator('[data-component="effect-editor"]');
     await expect(setupEditor).toBeVisible();
     await setupEditor
@@ -1161,7 +1178,7 @@ test("keeps master gain and the protected limiter active during user-effects byp
       .getByRole("slider", { name: "Compressor in Master chain Makeup" })
       .press("End");
     await setupEditor
-      .getByRole("slider", { name: "Limiter in Master chain Gain" })
+      .getByRole("slider", { name: "True Peak Limiter in Master chain Gain" })
       .press("End");
     await page.keyboard.press("Escape");
     await expect(setupEditor).toBeHidden();
@@ -1170,16 +1187,15 @@ test("keeps master gain and the protected limiter active during user-effects byp
 
     const studio = await openStudio(page, "Master");
     const master = studio.locator('[data-component="master-panel"]');
-    await expect(master).toContainText(/6 effects loaded/u);
+    await expect(master.getByRole("list", { name: "Mastering pedal chain" })).toBeVisible();
+    await expect(master.locator('[data-component="master-pedal"]')).toHaveCount(3);
 
     const before = await liveAudioProbe(page);
     const active = await holdAudition(page);
     assertSignal(active);
     expect(active.peak).toBeLessThan(0.95);
 
-    const bypass = master.getByRole("button", {
-      name: /Bypass master effects|Master effects bypassed/iu,
-    });
+    const bypass = master.getByRole("button", { name: /all mastering effects/u });
     await bypass.click();
     await expect(bypass).toHaveAttribute("aria-pressed", "true");
     const bypassed = await holdAudition(page);
@@ -1187,7 +1203,8 @@ test("keeps master gain and the protected limiter active during user-effects byp
     expect(bypassed.peak).toBeLessThan(0.95);
     expect(Math.abs(active.leftRms - bypassed.leftRms) + Math.abs(active.rightRms - bypassed.rightRms)).toBeGreaterThan(1e-4);
 
-    const masterFader = master.getByRole("slider", { name: "Master level" });
+    const mixer = await openStudio(page, "Mixer");
+    const masterFader = mixer.locator('[data-component="master-strip"]').getByRole("slider", { name: "Master level" });
     await masterFader.press("Home");
     assertSilent(await holdAudition(page, "Silver Serpent", false));
     await masterFader.press("End");
@@ -1196,6 +1213,65 @@ test("keeps master gain and the protected limiter active during user-effects byp
     const after = await liveAudioProbe(page);
     expect(after.contextCount).toBe(before.contextCount);
     expect(after.analyserCount).toBe(before.analyserCount);
+  } finally {
+    await context.close();
+  }
+});
+
+test("holds and resets an injected inter-sample true peak in production Chrome", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const context = await browser.newContext({ viewport: { width: 1536, height: 1024 } });
+  const page = await context.newPage();
+  try {
+    await installLiveAudioProbe(page, 48_000);
+    await page.goto("http://127.0.0.1:4173/");
+    await primeLiveAudio(page);
+    const studio = await openStudio(page, "Master");
+    const meter = studio.locator('[data-component="mastering-meter"]');
+    const clip = meter.getByRole("button", { name: "Reset master true peak clip" });
+
+    await page.evaluate(() => {
+      const state = window as unknown as {
+        __spec007AudioProbe: {
+          analysers: AnalyserNode[];
+          interSamplePeak: boolean;
+        };
+      };
+      const probe = state.__spec007AudioProbe;
+      probe.interSamplePeak = true;
+      // All source samples remain below 1.0. The routing graph's four-times
+      // reconstruction reaches 1.0125 between the two adjacent 0.9 samples.
+      const pattern = new Float32Array([0, 0.9, 0.9, 0]);
+      for (const analyser of probe.analysers.slice(0, 2)) {
+        const readNativeFrame = analyser.getFloatTimeDomainData.bind(analyser);
+        Object.defineProperty(analyser, "getFloatTimeDomainData", {
+          configurable: true,
+          value(target: Float32Array<ArrayBuffer>) {
+            if (!probe.interSamplePeak) {
+              readNativeFrame(target);
+              return;
+            }
+            target.fill(0);
+            target.set(pattern);
+          },
+        });
+      }
+    });
+
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(clip).toHaveAttribute("aria-pressed", "true");
+    await expect(meter.getByRole("status", { name: "Master true peak level" })).toHaveText(
+      "0.1 dBTP",
+    );
+
+    await page.evaluate(() => {
+      const state = window as unknown as {
+        __spec007AudioProbe: { interSamplePeak: boolean };
+      };
+      state.__spec007AudioProbe.interSamplePeak = false;
+    });
+    await clip.click();
+    await expect(clip).toHaveAttribute("aria-pressed", "false");
   } finally {
     await context.close();
   }
@@ -1285,22 +1361,95 @@ test("keeps the protected limiter and makes master-effects bypass undoable and p
   await page.setViewportSize({ width: 1536, height: 1024 });
   const studio = await openStudio(page, "Master");
   const master = studio.locator('[data-component="master-panel"]');
-  await expect(master).toContainText(/6 effects loaded/u);
+  await expect(master.getByRole("list", { name: "Mastering pedal chain" })).toBeVisible();
+  await expect(master.locator('[data-component="master-pedal"]')).toHaveCount(3);
+  const truePeakMeter = master.locator('[data-component="mastering-meter"]');
+  await expect(truePeakMeter).toBeVisible();
+  await expect(truePeakMeter.getByRole("meter", { name: "Master true peak left" })).toBeVisible();
+  await expect(truePeakMeter.getByRole("meter", { name: "Master true peak right" })).toBeVisible();
+  await expect(truePeakMeter.getByRole("status", { name: "Master true peak level" })).toHaveCSS(
+    "font-size",
+    "12px",
+  );
+  await expect(truePeakMeter.getByRole("button", { name: "Reset master true peak clip" })).toBeEnabled();
+  const meterMode = truePeakMeter.getByRole("button", { name: "Master meter mode: left and right" });
+  await meterMode.click();
+  await expect(truePeakMeter.getByRole("meter", { name: "Master true peak mid" })).toBeVisible();
+  await expect(truePeakMeter.getByRole("meter", { name: "Master true peak side" })).toBeVisible();
+  await truePeakMeter.getByRole("button", { name: "Master meter mode: mid and side" }).click();
+  const masterBox = await box(master);
+  const truePeakBox = await box(truePeakMeter);
+  expect(truePeakBox.height).toBeCloseTo(masterBox.height, 0);
+  expect(truePeakBox.x + truePeakBox.width).toBeCloseTo(masterBox.x + masterBox.width - 4, 0);
 
-  const bypass = studio.getByRole("button", { name: /bypass master effects|master effects bypass/iu });
+  const compressorSlot = master.getByRole("button", { name: /Master slot 01, Compressor active/u });
+  await expect(compressorSlot).toBeVisible();
+  await expect(compressorSlot).toHaveAttribute("title", "Compressor is active. Click to bypass.");
+  await expect(master.locator('[data-component="effect-family-chip"]')).toHaveCount(0);
+  await expect(master.getByText("Active", { exact: true })).toHaveCount(0);
+  await expect(master.getByRole("button", { name: "Bypass Compressor in Master chain" })).toHaveCount(0);
+  const equalizerPedal = master.locator('[data-component="master-pedal"]').filter({
+    has: page.getByRole("heading", { name: "Parametric EQ" }),
+  });
+  const compressorHandle = master.getByRole("button", { name: /Reorder Compressor/u });
+  const compressorSlotBox = await box(compressorHandle);
+  const equalizerBox = await box(equalizerPedal);
+  await page.mouse.move(
+    compressorSlotBox.x + compressorSlotBox.width / 2,
+    compressorSlotBox.y + compressorSlotBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(equalizerBox.x + equalizerBox.width / 2, equalizerBox.y + equalizerBox.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(() => master.locator('[data-component="master-pedal"] h3').allTextContents())
+    .toEqual(["Parametric EQ", "Compressor", "True Peak Limiter"]);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect
+    .poll(() => master.locator('[data-component="master-pedal"] h3').allTextContents())
+    .toEqual(["Compressor", "Parametric EQ", "True Peak Limiter"]);
+
+  const compressorEndHandle = master
+    .locator('[data-component="master-pedal-handle"][data-edge="end"]')
+    .first();
+  await expect(compressorEndHandle).toHaveAttribute("aria-hidden", "true");
+  expect(await compressorEndHandle.evaluate((element) => element.tagName)).toBe("DIV");
+  const compressorEndBox = await box(compressorEndHandle);
+  await page.mouse.move(
+    compressorEndBox.x + compressorEndBox.width / 2,
+    compressorEndBox.y + compressorEndBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(equalizerBox.x + equalizerBox.width / 2, equalizerBox.y + equalizerBox.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(() => master.locator('[data-component="master-pedal"] h3').allTextContents())
+    .toEqual(["Parametric EQ", "Compressor", "True Peak Limiter"]);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect
+    .poll(() => master.locator('[data-component="master-pedal"] h3').allTextContents())
+    .toEqual(["Compressor", "Parametric EQ", "True Peak Limiter"]);
+
+  const bypass = master.getByRole("button", { name: /all mastering effects/u });
+  await compressorSlot.click();
+  const bypassedCompressorSlot = master.getByRole("button", {
+    name: /Master slot 01, Compressor bypassed/u,
+  });
+  await expect(bypassedCompressorSlot).toHaveAttribute("aria-pressed", "true");
   await expect(bypass).toHaveAttribute("aria-pressed", "false");
   await bypass.click();
   await expect(bypass).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: /Master effects bypass/i })).not.toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
 
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(bypass).toHaveAttribute("aria-pressed", "false");
+  await expect(bypassedCompressorSlot).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Redo", exact: true }).click();
   await expect(bypass).toHaveAttribute("aria-pressed", "true");
-  await master.getByRole("button", { name: "Edit chain", exact: true }).click();
+  await master.getByRole("button", { name: "Edit Compressor in Master chain" }).click();
   const detail = page.locator('[data-component="effect-editor"]');
   await expect(detail).toBeVisible();
   await expect.poll(async () => (await box(detail)).width).toBeGreaterThan(760);
@@ -1348,19 +1497,83 @@ test("keeps the protected limiter and makes master-effects bypass undoable and p
     /Edit mid EQ band, 1\.2 kHz, 0\.0 dB/u,
   );
   const limiter = detail.locator("ol > li").filter({
-    has: page.locator("strong").filter({ hasText: /^Limiter$/u }),
+    has: page.locator("strong").filter({ hasText: /^True Peak Limiter$/u }),
   });
   await expect(limiter).toBeVisible();
   await expect(limiter.getByRole("button", { name: /protected from removal/i })).toBeDisabled();
-  await expect(limiter.getByRole("button", { name: "Bypass Limiter in Master chain", exact: true })).toBeEnabled();
+  await expect(limiter.getByRole("button", { name: "Bypass True Peak Limiter in Master chain", exact: true })).toBeEnabled();
   await page.keyboard.press("Escape");
   await waitForAutosaveValue(page, '"masterEffectsBypassed":true');
   await page.reload();
   const reloadedMaster = await openStudio(page, "Master");
-  await expect(reloadedMaster.getByRole("button", { name: /bypass master effects|master effects bypass/i })).toHaveAttribute(
+  await expect(reloadedMaster.getByRole("button", { name: "Enable all mastering effects" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+
+  const transport = page.locator('[data-component="transport-bar"]');
+  const transportGeometry = await transport.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(transportGeometry.scrollWidth).toBeLessThanOrEqual(transportGeometry.clientWidth);
+  const markBox = await box(page.getByText("PULSEBOX", { exact: true }));
+  expect(markBox.x + markBox.width / 2).toBeCloseTo(1536 / 2, 0);
+});
+
+test("keeps the refined Master controls and transport aligned at supported viewports", async ({ page }) => {
+  for (const viewport of [
+    { width: 1536, height: 1024 },
+    { width: 1440, height: 900 },
+    { width: 1366, height: 768 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const studio = await openStudio(page, "Master");
+    const master = studio.locator('[data-component="master-panel"]');
+    const meter = master.locator('[data-component="mastering-meter"]');
+    const masterBox = await box(master);
+    const meterBox = await box(meter);
+    expect(meterBox.height).toBeCloseTo(masterBox.height, 0);
+    expect(meterBox.x + meterBox.width).toBeCloseTo(masterBox.x + masterBox.width - 4, 0);
+    await expect(master.locator('[data-component="master-pedal-handle"]')).toHaveCount(6);
+    await expect(master.locator('[data-component="effect-family-chip"]')).toHaveCount(0);
+
+    const state = master.getByRole("button", { name: /Master slot 01, Compressor/u });
+    await expect(state).toHaveCSS("background-color", "rgb(98, 210, 138)");
+    await state.click();
+    await expect(state).toHaveCSS("background-color", "rgb(123, 133, 141)");
+    await expect(state).toHaveAttribute("title", "Compressor is bypassed. Click to enable.");
+    await state.click();
+
+    const editBox = await box(master.getByRole("button", { name: "Edit Compressor in Master chain" }));
+    expect(editBox.width).toBeLessThanOrEqual(24);
+    expect(editBox.height).toBeLessThanOrEqual(24);
+    const modeBox = await box(meter.getByRole("button", { name: /Master meter mode/u }));
+    const resetBox = await box(meter.getByRole("button", { name: "Reset master true peak clip" }));
+    expect(Math.abs(modeBox.y - resetBox.y)).toBeLessThanOrEqual(1);
+    expect(resetBox.x - (modeBox.x + modeBox.width)).toBeLessThanOrEqual(4);
+
+    const transport = page.locator('[data-component="transport-bar"]');
+    const transportGeometry = await transport.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(transportGeometry.scrollWidth).toBeLessThanOrEqual(transportGeometry.clientWidth);
+    const markBox = await box(page.getByText("PULSEBOX", { exact: true }));
+    expect(Math.abs(markBox.x + markBox.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
+    await expect(page.getByText("PULSEBOX", { exact: true })).toHaveCSS("font-size", "16px");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  }
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  const settings = page.locator('[data-component="settings-page"]');
+  await settings.getByRole("checkbox", { name: "High contrast" }).check();
+  await settings.getByRole("button", { name: "Close", exact: true }).click();
+  const studio = await openStudio(page, "Master");
+  await expect(
+    studio.getByRole("button", { name: /Master slot 01, Compressor active/u }),
+  ).toHaveCSS("border-top-width", "3px");
 });
 
 test("keeps studio panes mutually exclusive and keyboard-operable", async ({ page }) => {

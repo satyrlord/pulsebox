@@ -332,12 +332,17 @@ describe("mixer routing graph", () => {
     expect(graph.getEffectMeter(limiterId, "gain-reduction")).toBe(3);
     const ceiling = 10 ** (-1 / 20);
     const shaper = stub.waveShapers[0];
-    const ceilingGain = shaper?.connect.mock.calls[0]?.[0] as
+    const safety = shaper?.connect.mock.calls[0]?.[0] as
+      | (StubNode & { readonly oversample: string })
+      | undefined;
+    const ceilingGain = safety?.connect.mock.calls[0]?.[0] as
       | (StubNode & { readonly gain: ReturnType<typeof parameter> })
       | undefined;
     expect(shaper).toBeDefined();
+    expect(safety).toBeDefined();
     expect(ceilingGain).toBeDefined();
-    expect(shaper?.oversample).toBe("none");
+    expect(shaper?.oversample).toBe("4x");
+    expect(safety?.oversample).toBe("none");
     expect(
       stub.gains.filter((gain) =>
         gain.connect.mock.calls.some(([target]) => target === shaper),
@@ -367,7 +372,10 @@ describe("mixer routing graph", () => {
       readonly threshold: ReturnType<typeof parameter>;
       readonly release: ReturnType<typeof parameter>;
     };
-    const ceilingGain = stub.waveShapers[0]?.connect.mock.calls[0]?.[0] as
+    const safety = stub.waveShapers[0]?.connect.mock.calls[0]?.[0] as
+      | StubNode
+      | undefined;
+    const ceilingGain = safety?.connect.mock.calls[0]?.[0] as
       | (StubNode & { readonly gain: ReturnType<typeof parameter> })
       | undefined;
     if (ceilingGain === undefined) throw new Error("Expected the live ceiling gain.");
@@ -446,7 +454,7 @@ describe("mixer routing graph", () => {
     if (left === undefined || right === undefined) throw new Error("Expected physical analysers.");
     left.getFloatTimeDomainData = (data) => {
       data.fill(0);
-      data[0] = 0.99;
+      data[0] = 1.01;
     };
     expect(graph.getMeter().peak).toBe(true);
     left.getFloatTimeDomainData = (data) => data.fill(0);
@@ -454,5 +462,32 @@ describe("mixer routing graph", () => {
     graph.resetPeak();
     expect(graph.getMeter().peak).toBe(false);
     graph.dispose();
+  });
+
+  it("does not allocate typed arrays while it reads initialized meters", () => {
+    const stub = context();
+    const graph = new MixerRoutingGraph(stub.result, undefined, FIRST);
+    graph.getMasterChainMeter("pre");
+    graph.getMasterChainMeter("post");
+    const float32ArrayDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Float32Array");
+    if (float32ArrayDescriptor === undefined) throw new Error("Expected the Float32Array constructor.");
+    const allocationGuard = new Proxy(Float32Array, {
+      construct: () => {
+        throw new Error("A meter read must reuse its typed-array buffers.");
+      },
+    });
+
+    try {
+      Object.defineProperty(globalThis, "Float32Array", {
+        ...float32ArrayDescriptor,
+        value: allocationGuard,
+      });
+      expect(graph.getMeter()).toMatchObject({ peak: false });
+      expect(graph.getMasterChainMeter("pre")).toMatchObject({ peak: false });
+      expect(graph.getMasterChainMeter("post")).toMatchObject({ peak: false });
+    } finally {
+      Object.defineProperty(globalThis, "Float32Array", float32ArrayDescriptor);
+      graph.dispose();
+    }
   });
 });

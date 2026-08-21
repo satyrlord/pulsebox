@@ -104,7 +104,9 @@ function StripMeter(props: { readonly moduleId: ModuleInstanceId; readonly label
 
 /** Leaf meter subscription for the master strip, for the same reason. */
 function MasterStripMeter() {
-  const level = useAppStore((state) => masterMeterDisplayLevel(state.masterMeter));
+  const level = useAppStore((state) =>
+    state.project.transport.status === "playing" ? masterMeterDisplayLevel(state.masterMeter) : 0,
+  );
   return <LevelMeter label="Master output" level={level} width={6} stretch />;
 }
 
@@ -114,16 +116,12 @@ export function Mixer() {
   const rackSlots = useAppStore((state) => state.project.project.rackSlots);
   const modules = useAppStore((state) => state.project.project.modules);
   const masterLevel = useAppStore((state) => state.project.project.masterLevel);
-  const masterEffectsBypassed = useAppStore(
-    (state) => state.project.project.effects.masterEffectsBypassed,
-  );
   const selectedModuleId = useAppStore((state) => state.project.ui.selectedModuleId);
   const toggleMute = useAppStore((state) => state.toggleMute);
   const toggleSolo = useAppStore((state) => state.toggleSolo);
   const setChannelLevel = useAppStore((state) => state.setChannelLevel);
   const setChannelPan = useAppStore((state) => state.setChannelPan);
   const setMasterLevel = useAppStore((state) => state.setMasterLevel);
-  const toggleMasterEffectsBypass = useAppStore((state) => state.toggleMasterEffectsBypass);
   const previewChannelMix = useAppStore((state) => state.previewChannelMix);
   const previewMasterLevel = useAppStore((state) => state.previewMasterLevel);
   const selectModule = useAppStore((state) => state.selectModule);
@@ -399,17 +397,6 @@ export function Mixer() {
           />
           <MasterStripMeter />
         </div>
-        <button
-          type="button"
-          className={styles.masterBypass}
-          aria-label="Bypass master effects"
-          aria-pressed={masterEffectsBypassed}
-          data-bypassed={masterEffectsBypassed}
-          title="Bypass all user master effects. The master gain and protected limiter stay active."
-          onClick={toggleMasterEffectsBypass}
-        >
-          {masterEffectsBypassed ? "FX OFF" : "FX ON"}
-        </button>
       </article>
       {openSendSurface !== undefined ? (() => {
         const module = modules[openSendSurface.moduleId];

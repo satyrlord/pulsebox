@@ -97,10 +97,10 @@ For the studio mixer:
   Keep all eight strips visible at the same time. Empty rack slots retain
   disabled strips. Each disabled strip shows its two-digit slot number, such as
   `07` or `08`, and exposes its Empty state in accessible text.
-- Show one master strip with master level, metering, and master-effects bypass.
-  It has no A–D grid. The mix bus is not a send source. Its processing uses a
-  master chain, not four send chains. Therefore, send-bus content belongs to the
-  Effects and Master views.
+- Show one master strip with master level and metering. It has no A–D grid. The
+  mix bus is not a send source. Its processing uses a master chain, not four
+  send chains. Therefore, send-bus content belongs to the Effects and Master
+  views.
 - Arrange four A–D send buttons in a visible 2 × 2 grid inside each instrument
   strip. Keep empty-channel send buttons visible but disabled.
 - Show one icon-only `Bypass All` toggle for all Send FX in the Mixer view
@@ -137,7 +137,20 @@ At every supported width:
 - Mixer presents the strips and controls that section 8.4 specifies.
 - Effects replaces the Mixer view and presents the four modular send-chain
   summaries. Show a detailed-chain entry point only when its editor exists.
-- Master opens master routing, master-chain, and output metering.
+- Master shows the ordered list of live mastering pedals. A full-height stereo
+  true-peak meter stays at the right edge of the view. It includes the held clip
+  indicator, reset action, and one `L/R` or `M/S` analysis toggle.
+- Each mastering pedal uses its slot-number plate for active or bypassed state
+  and individual bypass. Active uses a green fill. Bypassed uses a gray fill.
+  The tooltip names the current state and available action. Do not show a lamp
+  or separate active-status label.
+- Each pedal has one drag handle at each edge. The leading handle provides
+  keyboard reorder. The protected True Peak Limiter cannot move.
+- Do not show compact family abbreviations such as `COMP`, `EQ`, or `LIM`.
+  Use one compact icon-only Edit control.
+- Master owns one `Bypass All` control for user mastering effects. It leaves
+  master gain and the protected True Peak Limiter active. Mixer does not
+  duplicate this control. Master does not duplicate master level.
 - Show only the active studio view. Make only that view interactive. Hide
   inactive panes. Remove them from keyboard navigation and the accessibility
   tree.

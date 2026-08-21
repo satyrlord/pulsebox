@@ -150,11 +150,16 @@ Playwright:
 - Change sends.
 - Toggle the Rack FX and Send FX group bypasses.
 - Enable and reorder effects.
+- Reorder Master pedals by pointer and keyboard while the protected limiter
+  stays final.
+- Detect and reset a post-master inter-sample clip from the Master true-peak
+  meter.
 - Open detailed effect editor.
 - Rename and reorder a named Pattern.
 - Reorder the Playlist and change a row repeat count.
 - Switch the header meter between L/R and M/S without changing audio.
-- Toggle master-effects bypass while the protected limiter stays active.
+- Toggle master-effects bypass from the Master panel while the protected
+  limiter stays active.
 - Save and reload.
 - Crash recovery.
 - Export and import.
@@ -195,8 +200,10 @@ Visual regression:
 | Rack FX and Send FX group bypass | `tests/unit/state/pattern-bank-and-mixer.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | Each icon-only control uses one Undo entry, persists, and preserves the individual bypass states. |
 | Effect stages and sends | `tests/unit/engine/effect-chain-node.test.ts`, `tests/unit/engine/mixer-routing-graph.test.ts`, `tests/unit/state/project-document.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | Every effect has one Mix and one Gain. No `Wet/Dry` label appears. The saved document uses `mix` and `gainDecibels`. Effect order is DSP, Mix, then Gain. Sends use only the pre-fader tap. |
 | Detailed effect editor | `tests/unit/contracts/plugins.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | Manifest sections and visibility rules render generically. Units and precision match descriptors. EQ gestures converge after blur or close. The modal grows before it scrolls and restores focus. |
+| Effect help and unity-peak drive | `tests/unit/engine/effect-catalog.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | Every built-in numeric parameter has non-empty manifest help no longer than 240 characters. Compact and detailed tooltips show current value, audible purpose, and relationship text for Tempo Sync, Mix, Gain, and Return Level. Pattern Filter full-scale drive stays above 0.9 after 4,000 frames. Distortion Drive and Asymmetric keep full-scale input at unity, and Drive, Fold, and Asymmetric keep every tested output at or below unity. |
 | Compact Send effect cards | `tests/component/mixer-effects.test.tsx` and `tests/e2e/spec-007-mixer-effects.spec.ts` | All four cards fit each supported viewport. Captions, actions, tooltips, pinned focus, bypass, order, themes, and persistence match section 20.3. |
 | Effect accent tuples | `tests/unit/engine/effect-catalog.test.ts`, `tests/unit/themes/token-discipline.test.ts`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | Each built-in manifest matches the exact tuple in `THEMING.md`. Family-chip contrast is at least 4.5:1. Rack, user-theme, and high-contrast surfaces keep the required token behavior. |
+| Master pedals, true-peak meter, and Bypass All | `tests/unit/engine/transport-timing-and-master.test.ts`, `tests/component/mixer-effects.test.tsx`, and `tests/e2e/spec-007-mixer-effects.spec.ts` | The Master view lists the live pedals with True Peak Limiter final and protected. Slot plates show and toggle active or bypassed state. Both edge handles support pointer reorder. The leading handle also supports keyboard reorder. Undo restores order, and the limiter handles are disabled. The meter exposes L/R and M/S dBTP values, latches a clip at or above 0 dBTP, and resets it. Master `Bypass All` bypasses user effects while the protected limiter stays active, then survives Undo, Redo, and reload. |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

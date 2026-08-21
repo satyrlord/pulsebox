@@ -10,6 +10,7 @@ import {
   type EffectFrameProcessor,
 } from "../../../src/engine/effects/dsp";
 import { LimiterDsp } from "../../../src/engine/effects/limiter/dsp-core";
+import { PatternFilterDsp } from "../../../src/engine/effects/pattern-filter/dsp-core";
 import { PhaserDsp } from "../../../src/engine/effects/phaser/dsp-core";
 import { ReverbDsp } from "../../../src/engine/effects/reverb/dsp-core";
 import { BUILT_IN_EFFECTS } from "../../../src/engine/effects/registry";
@@ -117,6 +118,30 @@ describe("built-in effect catalog", () => {
         ]),
       ),
     ).toEqual(EXPECTED_EFFECT_ACCENTS);
+  });
+
+  it("provides concise relationship help for every built-in effect parameter", () => {
+    for (const { manifest } of BUILT_IN_EFFECTS) {
+      for (const parameter of manifest.parameters) {
+        expect(parameter.description, `${manifest.productName} ${parameter.name}`).toBeTypeOf(
+          "string",
+        );
+        expect(parameter.description?.trim().length).toBeGreaterThan(0);
+        expect(parameter.description?.length).toBeLessThanOrEqual(240);
+      }
+    }
+
+    for (const pluginId of ["chorus", "phaser"] as const) {
+      const manifest = BUILT_IN_EFFECTS.find(
+        (effect) => effect.manifest.pluginId === pluginId,
+      )?.manifest;
+      expect(manifest?.parameters.find((parameter) => parameter.id === "rate")?.description).toMatch(
+        /Tempo Sync/u,
+      );
+      expect(
+        manifest?.parameters.find((parameter) => parameter.id === "tempo-sync")?.description,
+      ).toMatch(/Rate/u);
+    }
   });
 
   it("maps every registered effect module key to one eager worklet processor factory", () => {
@@ -389,12 +414,29 @@ describe("built-in effect catalog", () => {
     },
   );
 
-  it("keeps fixed Drive compensation at or below the input magnitude", () => {
-    for (const input of [-1, -0.28, -0.05, 0, 0.05, 0.28, 1]) {
-      expect(Math.abs(distortSample(input, 3.2, "drive"))).toBeLessThanOrEqual(Math.abs(input));
+  it("normalizes every Distortion model to unity peak per decision D103", () => {
+    expect(distortSample(1, 3.2, "drive")).toBeCloseTo(1, 6);
+    expect(distortSample(-1, 12, "drive")).toBeCloseTo(-1, 6);
+    expect(distortSample(1, 3.2, "asymmetric")).toBeCloseTo(1, 6);
+    // Higher drive boosts small signals instead of attenuating the output.
+    expect(Math.abs(distortSample(0.05, 12, "drive"))).toBeGreaterThan(0.05);
+    for (const gain of [1, 3.2, 12]) {
+      for (const input of [-1, -0.28, -0.05, 0, 0.05, 0.28, 1]) {
+        for (const model of ["drive", "fold", "asymmetric"] as const) {
+          expect(Math.abs(distortSample(input, gain, model))).toBeLessThanOrEqual(1);
+        }
+      }
     }
     expect(distortSample(0.38, 5, "fold")).not.toBe(distortSample(0.38, 5, "drive"));
     expect(distortSample(-0.38, 5, "asymmetric")).not.toBe(distortSample(0.38, 5, "asymmetric"));
+  });
+
+  it("keeps a full-scale sample at full scale through Pattern Filter drive", () => {
+    const filter = new PatternFilterDsp(48_000, { cutoff: 1_000, resonance: 0.5, drive: 1 });
+    let output = { left: 0, right: 0 };
+    for (let frame = 0; frame < 4_000; frame += 1) output = filter.process(1, 1);
+    expect(output.left).toBeGreaterThan(0.9);
+    expect(output.right).toBeGreaterThan(0.9);
   });
 
   it("enforces the limiter ceiling for hostile finite input", () => {

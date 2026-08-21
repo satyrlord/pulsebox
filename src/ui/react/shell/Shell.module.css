@@ -489,6 +489,40 @@
   overflow: hidden;
 }
 
+.masterPedalBay {
+  min-inline-size: 0;
+  min-block-size: 0;
+  display: grid;
+  grid-template-rows: 28px minmax(0, 1fr);
+  gap: var(--pulse-space-1, 4px);
+}
+
+.masterPanelToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulse-space-2, 8px);
+  padding-inline: var(--pulse-space-1, 4px);
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-muted, #919ba3);
+}
+
+.masterPanelToolbar button {
+  min-block-size: var(--pulse-target-min, 24px);
+  padding-inline: var(--pulse-space-2, 8px);
+  font-size: var(--pulse-type-10, 10px);
+  text-transform: uppercase;
+}
+
+.masterPanelToolbar button[aria-pressed="true"] {
+  color: var(--pulse-color-app, #0b0d0f);
+  background: var(--pulse-color-status-warning, #f2c14e);
+  border-style: double;
+}
+
 .effectsBank,
 .masterPanel {
   gap: 6px;
@@ -522,18 +556,13 @@
   overflow: hidden;
 }
 
-.effectCard,
-.masterPanel article {
+.effectCard {
   display: grid;
   gap: 6px;
   padding: 8px;
   border: 1px solid var(--edge-hairline);
   border-radius: var(--pulse-radius-control, 4px);
   box-shadow: var(--lift-1);
-}
-
-.masterPanel article {
-  background: var(--mat-plate);
 }
 
 .effectCard {
@@ -654,8 +683,7 @@
     0 2px 7px color-mix(in srgb, var(--pulse-color-focus-outer, #000000) 58%, transparent);
 }
 
-.effectCard h3,
-.masterPanel h3 {
+.effectCard h3 {
   margin: 0;
   font-family: var(--type-display);
   font-size: var(--pulse-type-12, 12px);
@@ -892,8 +920,7 @@
   row-gap: 0;
 }
 
-.effectActions button,
-.masterChainActions button {
+.effectActions button {
   min-block-size: var(--pulse-target-min, 24px);
   padding-inline: var(--pulse-space-1, 4px);
   font-size: var(--pulse-type-10, 10px);
@@ -922,30 +949,328 @@
 .effectActions button:last-child {
   grid-column: auto;
 }
-.masterChainActions { display: flex; flex-wrap: wrap; gap: 6px; }
-.masterOutputActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.masterChainMeters {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 4px 8px;
-  font-family: var(--type-display);
-  font-size: var(--pulse-type-10, 10px);
-  color: var(--pulse-color-text-muted, #919ba3);
-}
-
-.effectCard p,
-.masterPanel p {
+.effectCard p {
   margin: 2px 0 0;
   font-size: var(--pulse-type-10, 10px);
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
-.masterOutput {
-  display: flex;
+.masterPanel {
+  --effects-macro-min-width: calc(
+    var(--pulse-space-10, 40px) + var(--pulse-space-1, 4px)
+  );
+  --effects-macro-min-height: calc(
+    var(--pulse-space-10, 40px) + var(--pulse-space-2, 8px)
+  );
+  --effects-compact-control: var(--pulse-control-compact, 24px);
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  block-size: 100%;
+  box-sizing: border-box;
+  gap: var(--pulse-space-2, 8px);
+  padding: 0 var(--pulse-space-1, 4px) 0 0;
+  overflow: hidden;
+}
+
+.masterPedalList {
+  display: grid;
+  align-content: start;
+  gap: var(--pulse-space-1, 4px);
+  min-block-size: 0;
+  margin: 0;
+  padding: 0 var(--pulse-space-1, 4px);
+  list-style: none;
+  overflow: auto;
+  scrollbar-color: var(--pulse-color-scrollbar-thumb, #6d7881)
+    var(--pulse-color-scrollbar-track, #111519);
+}
+
+.masterPedal {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 2px 18px 4px;
+}
+
+.masterPedal[data-protected="true"] {
+  border-style: double;
+}
+
+.masterPedalHeading {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
+  gap: var(--pulse-space-1, 4px);
+}
+
+.masterPedalSlot {
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  min-block-size: 24px;
+  padding: 0;
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-10, 10px);
+  color: var(--pulse-color-app, #0b0d0f);
+  background: var(--pulse-color-disabled, #7b858d);
+  border: var(--pulse-border-thin, 1px) solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: inset 0 1px 3px 0 #00000073;
+  cursor: pointer;
+}
+
+.masterPedalSlot[data-active="true"] {
+  color: var(--pulse-color-app, #0b0d0f);
+  background: var(--pulse-color-status-success, #62d28a);
+  border-style: double;
+  border-color: var(--pulse-color-text-primary, #f3f5f6);
+}
+
+.masterPedalSlot[data-active="false"][aria-pressed="true"] {
+  color: var(--pulse-color-app, #0b0d0f);
+  background: var(--pulse-color-disabled, #7b858d);
+  border-style: dashed;
+  box-shadow: inset 0 1px 3px #00000073;
+}
+
+.masterPedalHandle {
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  inline-size: 14px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--pulse-radius-control, 4px);
+  cursor: grab;
+  touch-action: none;
+}
+
+.masterPedalHandleStart {
+  inset-inline-start: 0;
+}
+
+.masterPedalHandleEnd {
+  inset-inline-end: 0;
+}
+
+.masterPedalHandle > span {
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 50%;
+  inline-size: 3px;
+  translate: -50% 0;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--pulse-color-text-muted, #919ba3) 0 2px,
+    transparent 2px 5px
+  );
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.masterPedalHandle:hover > span,
+.masterPedalHandle:focus-visible > span {
+  opacity: 1;
+}
+
+.masterPedalHandle:focus-visible {
+  outline: var(--pulse-focus-width) solid var(--pulse-color-focus-inner, #ffffff);
+  outline-offset: calc(var(--pulse-focus-width) * -1);
+}
+
+.masterPedalHandle:disabled {
+  cursor: not-allowed;
+}
+
+.masterPedalHandle:disabled > span {
+  opacity: 0.24;
+}
+
+.masterPedalHandle[data-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.masterPedalHandle[data-disabled="true"] > span {
+  opacity: 0.24;
+}
+
+.masterPedal[data-dragging="true"] {
+  opacity: 0.72;
+}
+
+.masterPedal[data-dragging="true"] .masterPedalHandle {
+  cursor: grabbing;
+}
+
+.masterPedalList > li[data-drag-target="true"] .masterPedal {
+  outline: var(--pulse-border-strong, 2px) solid
+    var(--pulse-color-text-primary, #f3f5f6);
+  outline-offset: -2px;
+}
+
+.masterPedalName {
+  min-inline-size: 0;
+}
+
+.masterPedalName > span {
+  display: block;
+  margin-block-start: 1px;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  line-height: var(--pulse-line-tight, 1.2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pulse-color-text-secondary, #bac2c8);
+}
+
+.masterPedalBody {
+  min-inline-size: 0;
+  min-block-size: 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: var(--pulse-space-2, 8px);
+}
+
+.masterPedal .effectMacros {
+  min-block-size: 88px;
+  block-size: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+}
+
+.masterPedalActions {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pulse-space-1, 4px);
+  padding-inline-start: var(--pulse-space-2, 8px);
+  border-inline-start: 1px solid color-mix(in srgb, var(--edge-hairline) 72%, transparent);
+}
+
+.masterPedalActions button {
+  inline-size: var(--pulse-target-min, 24px);
+  min-block-size: var(--pulse-target-min, 24px);
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.masterPedalActions svg {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+.masteringMeter {
+  min-block-size: 0;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--pulse-space-1, 4px);
+  padding: var(--pulse-space-1, 4px);
+  color: var(--pulse-color-text-secondary, #bac2c8);
+  background: var(--pulse-color-surface-inset, #080a0c);
+  border: var(--pulse-border-thin, 1px) solid var(--pulse-color-border-default, #6d7881);
+  border-radius: var(--pulse-radius-control, 4px);
+  box-shadow: inset 0 1px 4px #0000008c;
+}
+
+.masteringMeterHeading {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 1px;
+  text-align: center;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  line-height: var(--pulse-line-tight, 1.2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.masteringMeterHeading output {
+  overflow: hidden;
+  color: var(--pulse-color-text-primary, #f3f5f6);
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-12, 12px);
+  letter-spacing: 0;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.masteringMeterScale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-block-end: 14px;
+  text-align: end;
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-10, 10px);
+  line-height: 1;
+}
+
+.masteringMeterLadders {
+  min-block-size: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 10px);
   justify-content: center;
-  gap: 10px;
+  gap: 3px;
+}
+
+.masteringMeterLadders > div {
+  min-block-size: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 12px;
+  gap: 2px;
+  text-align: center;
+  font-family: var(--pulse-font-mono, ui-monospace, monospace);
+  font-size: var(--pulse-type-10, 10px);
+  line-height: 12px;
+}
+
+.masteringClip {
+  min-block-size: var(--pulse-target-min, 24px);
+  padding: 0;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.masteringMeterActions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.masteringMeterActions button {
+  min-inline-size: 0;
+  min-block-size: var(--pulse-target-min, 24px);
+  padding: 0;
+  font-family: var(--type-display);
+  font-size: var(--pulse-type-10, 10px);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.masteringMeterMode[aria-pressed="true"] {
+  color: var(--pulse-color-app, #0b0d0f);
+  background: var(--pulse-color-accent, #7ed9a3);
+  border-style: double;
+}
+
+.masteringClip[data-clipped="true"] {
+  color: var(--pulse-color-app, #0b0d0f);
+  background: var(--pulse-color-status-danger, #ff8178);
+  border-style: double;
+  border-color: var(--pulse-color-text-primary, #f3f5f6);
+}
+
+:global([data-high-contrast="true"]) .masterPedalSlot[data-active="true"],
+:global([data-high-contrast="true"]) .masteringClip[data-clipped="true"] {
+  border-style: double;
+  border-width: 3px;
 }
 
 .patternInspector label,
@@ -2237,5 +2562,9 @@
 
   .playlistPlaybackMarker {
     justify-self: end;
+  }
+
+  .masterPedalBody {
+    grid-template-columns: minmax(0, 1fr) 76px;
   }
 }

@@ -25,7 +25,7 @@ references only.
    criteria, and the decision record in the same change.
 4. Never resolve a contradiction by removing required functionality. Report any
    conflict that the current repository cannot resolve.
-5. Keep global section numbers, decision IDs `D01` through `D102`, and release
+5. Keep global section numbers, decision IDs `D01` through `D107`, and release
    acceptance numbers stable. These identifiers provide cross-file
    traceability. An unqualified numbered-section reference resolves through the
    section ownership in the build-order table below.
@@ -71,7 +71,7 @@ earlier specification must not depend on a later feature implementation.
 | 2 | [Technical foundations](spec-002-technical-foundations.md) | `spec-001` | Sections 4-7: technology, layers, plugin contracts, state, commands, and Undo foundations | `AC-001`-`AC-003`, `AC-033`, `AC-043`, `AC-071`, `AC-078`, `AC-084` |
 | 3 | [Application shell and controls](spec-003-application-shell-and-controls.md) | `spec-002` | Sections 8, 10, and 22: application composition, UI components, navigation, responsive behavior, and shared controls | `AC-004`-`AC-005`, `AC-042`, `AC-059`, `AC-064`-`AC-066` |
 | 4 | [Audio engine and transport](spec-004-audio-engine-and-transport.md) | `spec-003` | Sections 12, 17, and 21: transport, timing, AudioWorklet, scheduling, sample boundaries, and live audio | `AC-031`, `AC-044`-`AC-050`, `AC-063`, `AC-073` |
-| 5 | [Rack and instruments](spec-005-rack-and-instruments.md) | `spec-004` | Sections 9 and 13-15: default projects, unified module browser, rack behavior, and instrument modules | `AC-007`-`AC-010`, `AC-021`, `AC-077`, `AC-080` |
+| 5 | [Rack and instruments](spec-005-rack-and-instruments.md) | `spec-004` | Sections 9 and 13-15: default projects, unified module browser, rack behavior, and instrument modules | `AC-007`-`AC-010`, `AC-021`, `AC-077`, `AC-080`, `AC-087` |
 | 6 | [Pattern editing](spec-006-pattern-editing.md) | `spec-005` | Section 16: named project Patterns, one module-aware Piano Roll as the single pattern and automation editing surface, live input, generators, and transforms | `AC-011`-`AC-017`, `AC-069`, `AC-072`, `AC-079`, `AC-086` |
 | 7 | [Mixer and effects](spec-007-mixer-and-effects.md) | `spec-006` | Sections 19-20: mixer, routing, pedalboards, send chains, master chain, and effects | `AC-018`-`AC-020`, `AC-022`-`AC-028`, `AC-062`, `AC-068`, `AC-074`-`AC-076`, `AC-085` |
 | 8 | [Song and automation](spec-008-song-and-automation.md) | `spec-007` | Section 18: ordered named-Pattern Playlist and Pattern step automation | `AC-029`-`AC-030`, `AC-032`, `AC-070` |

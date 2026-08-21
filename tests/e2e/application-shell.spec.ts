@@ -402,6 +402,25 @@ test("omits redundant rack and module-browser controls", async ({ page }) => {
   await expect(page.getByRole("menuitem", { name: "Swap to Tin Soldier" })).toBeVisible();
 });
 
+test("anchors a rejected Tempo value below the Tempo readout", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const tempo = page.locator('[data-field="tempo"]');
+  const tempoPlate = page.locator("label").filter({ has: tempo });
+  await tempo.fill("900");
+  await tempo.press("Enter");
+  const error = page.getByRole("alert");
+  await expect(error).toHaveText("Tempo must be between 40 and 240 BPM.");
+
+  const [tempoBox, errorBox, headerBox] = await Promise.all([
+    box(tempoPlate),
+    box(error),
+    box(page.locator('[data-component="transport-bar"]')),
+  ]);
+  expect(Math.abs(errorBox.x - tempoBox.x)).toBeLessThanOrEqual(1);
+  expect(errorBox.y).toBeGreaterThanOrEqual(tempoBox.y + tempoBox.height - 7);
+  expect(errorBox.y + errorBox.height).toBeGreaterThan(headerBox.y + headerBox.height);
+});
+
 test("collapses one faceplate group without hiding the other groups", async ({ page }) => {
   const soundToggle = page.getByRole("button", {
     name: "Collapse Silver Serpent sound controls",
@@ -862,13 +881,16 @@ test("changes transport scope without stopping and toggles meter analysis withou
   await expect(playlist.locator('[data-component="playlist-playback-marker"]')).toHaveCount(1);
   await expect(playlist.getByText("Playing", { exact: true })).toBeVisible();
 
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  const redo = page.getByRole("button", { name: "Redo", exact: true });
+  const historyBefore = { undoDisabled: await undo.isDisabled(), redoDisabled: await redo.isDisabled() };
+  const studio = page.locator('[data-component="studio-panel"]');
+  await studio.getByRole("tab", { name: "Master" }).click();
+  await expect(studio.locator('[data-component="master-panel"]')).toBeVisible();
   const before = await page.evaluate(() => {
     const probe = (window as unknown as { __meterModeProbe: MeterModeProbe }).__meterModeProbe;
     return { ...probe };
   });
-  const undo = page.getByRole("button", { name: "Undo", exact: true });
-  const redo = page.getByRole("button", { name: "Redo", exact: true });
-  const historyBefore = { undoDisabled: await undo.isDisabled(), redoDisabled: await redo.isDisabled() };
   const meterMode = page.getByRole("button", { name: "Master meter mode: left and right" });
   await meterMode.click();
   await expect(page.getByRole("button", { name: "Master meter mode: mid and side" })).toHaveText(

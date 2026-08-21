@@ -135,7 +135,6 @@ function MasterMeterReadout(props: {
   readonly meterMode: "lr" | "ms";
 }) {
   const masterMeter = useAppStore((state) => state.masterMeter);
-  const peakHeld = useAppStore((state) => state.masterPeakHeld);
   const { playing, meterMode } = props;
   const rendering = playing;
   const channelOne = rendering ? (meterMode === "lr" ? masterMeter.left : masterMeter.mid) : 0;
@@ -159,10 +158,6 @@ function MasterMeterReadout(props: {
           height={6}
           orientation="horizontal"
         />
-      </div>
-      <div className={styles.peak} data-lit={peakHeld}>
-        <Led label="Master peak" lit={peakHeld} />
-        <span aria-hidden="true">Peak</span>
       </div>
       <output className={styles.masterDb} aria-label="Master level in decibels">
         {formatMasterDb(rendering ? Math.max(masterMeter.left, masterMeter.right) : 0)}
@@ -190,7 +185,6 @@ export function TransportBar() {
   const setTempo = useAppStore((state) => state.setTempo);
   const previewTempo = useAppStore((state) => state.previewTempo);
   const toggleSongMode = useAppStore((state) => state.toggleSongMode);
-  const toggleMeterMode = useAppStore((state) => state.toggleMeterMode);
   const toggleMetronome = useAppStore((state) => state.toggleMetronome);
   const togglePower = useAppStore((state) => state.togglePower);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
@@ -380,50 +374,57 @@ export function TransportBar() {
             <TransportIcon kind="record" />
           </button>
         </div>
-        <label
-          className={styles.tempo}
-          title="Beats per minute. Drag vertically or type a value."
-        >
-          <span className={styles.srOnly}>Tempo</span>
-          <span className={styles.srOnly} id="tempo-description">
-            Beats per minute
-          </span>
-          <input
-            data-field="tempo"
-            type="number"
-            min={TEMPO_MINIMUM}
-            max={TEMPO_MAXIMUM}
-            step={1}
-            inputMode="numeric"
-            aria-label="Tempo"
-            aria-invalid={tempoError !== undefined}
-            aria-describedby={
-              tempoError === undefined ? "tempo-description" : "tempo-description tempo-error"
-            }
-            value={tempoDraft}
-            onChange={(event) => {
-              setDraft(event.currentTarget.value);
-              // Clear the objection as soon as the user starts correcting it.
-              if (tempoError !== undefined) setTempoError(undefined);
-            }}
-            onBlur={commitTempo}
-            onPointerDown={onTempoPointerDown}
-            onPointerMove={onTempoPointerMove}
-            onPointerUp={onTempoPointerEnd}
-            onPointerCancel={onTempoPointerCancel}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setDraft(undefined);
-                setTempoError(undefined);
-                return;
+        <div className={styles.tempoControl}>
+          <label
+            className={styles.tempo}
+            title="Beats per minute. Drag vertically or type a value."
+          >
+            <span className={styles.srOnly}>Tempo</span>
+            <span className={styles.srOnly} id="tempo-description">
+              Beats per minute
+            </span>
+            <input
+              data-field="tempo"
+              type="number"
+              min={TEMPO_MINIMUM}
+              max={TEMPO_MAXIMUM}
+              step={1}
+              inputMode="numeric"
+              aria-label="Tempo"
+              aria-invalid={tempoError !== undefined}
+              aria-describedby={
+                tempoError === undefined ? "tempo-description" : "tempo-description tempo-error"
               }
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              commitTempo();
-            }}
-          />
-        </label>
+              value={tempoDraft}
+              onChange={(event) => {
+                setDraft(event.currentTarget.value);
+                // Clear the objection as soon as the user starts correcting it.
+                if (tempoError !== undefined) setTempoError(undefined);
+              }}
+              onBlur={commitTempo}
+              onPointerDown={onTempoPointerDown}
+              onPointerMove={onTempoPointerMove}
+              onPointerUp={onTempoPointerEnd}
+              onPointerCancel={onTempoPointerCancel}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setDraft(undefined);
+                  setTempoError(undefined);
+                  return;
+                }
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                commitTempo();
+              }}
+            />
+          </label>
+          {tempoError === undefined ? null : (
+            <p className={styles.fieldError} id="tempo-error" role="alert">
+              {tempoError}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           className={styles.tapTempo}
@@ -433,11 +434,6 @@ export function TransportBar() {
         >
           Tap
         </button>
-        {tempoError === undefined ? null : (
-          <p className={styles.fieldError} id="tempo-error" role="alert">
-            {tempoError}
-          </p>
-        )}
       </div>
 
       <span className={styles.mark}>PULSEBOX</span>
@@ -464,19 +460,6 @@ export function TransportBar() {
           onClick={() => void togglePower()}
         >
           <PowerIcon />
-        </button>
-        <button
-          type="button"
-          className={styles.meterMode}
-          aria-label={
-            meterMode === "lr"
-              ? "Master meter mode: left and right"
-              : "Master meter mode: mid and side"
-          }
-          aria-pressed={meterMode === "ms"}
-          onClick={toggleMeterMode}
-        >
-          {meterMode === "lr" ? "L/R" : "M/S"}
         </button>
         <MasterMeterReadout
           playing={playing}

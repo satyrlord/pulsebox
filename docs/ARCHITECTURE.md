@@ -396,6 +396,7 @@ interface ParameterDescriptor {
   readonly id: ParameterId;
   readonly name: string;
   readonly shortLabel?: string;
+  readonly description?: string;
   readonly valueType: "float" | "integer" | "boolean" | "enum";
   readonly minimum?: number;
   readonly maximum?: number;
@@ -424,6 +425,10 @@ interface ParameterDescriptor {
 ```
 
 Numeric defaults, resets, and enum values shall validate against the descriptor.
+When present, `description` supplies short user-facing help for the control and
+its related parameters. It shall contain 1 through 240 characters.
+Each built-in effect parameter shall supply a description. Shared UI shall use
+it without a plugin-ID branch.
 `minimum`, `maximum`, `step`, and precision shall be finite. An exponential
 smoother shall not cross or target zero. A parameter exposed to automation shall
 have `automation: "step"`. Step values may still be smoothed in the engine to
@@ -1017,6 +1022,17 @@ The header meters shall observe the post-master signal through
 a non-audible analysis branch. L/R mode displays channel magnitudes. M/S mode
 derives `M = (L + R) / 2` and `S = (L - R) / 2` for analysis only. Switching
 meter mode shall not reconnect, sum, or otherwise alter the audible path.
+
+The same post-master analysis frame shall include left, right, mid, and side
+true-peak estimates. The engine shall reconstruct three values between each
+sample with cubic interpolation. Thus, it evaluates each analysis channel at
+four times the source sample rate. The Master meter shall latch a clip when
+either left or right estimate reaches 0 dBTP. Meter reads, mode changes, and
+clip reset shall not alter the audible path.
+
+The protected True Peak Limiter shall use a four-times oversampled live ceiling
+stage. The master-effects override shall bypass only user mastering effects.
+It shall leave master gain and the protected True Peak Limiter active.
 
 Mute and global solo shall gate both a channel's program path and its four sends
 as specified. Graph changes shall alter gains or bounded switches and shall not

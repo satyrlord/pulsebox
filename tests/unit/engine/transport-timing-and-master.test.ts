@@ -236,7 +236,7 @@ interface StubAnalyser {
   getFloatTimeDomainData: (data: Float32Array) => void;
 }
 
-function stubContext() {
+function stubContext(sampleRate = 48_000) {
   const analysers: StubAnalyser[] = [];
   const oscillators: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }[] = [];
   const nodes = stubMixerNodes();
@@ -272,7 +272,7 @@ function stubContext() {
       return oscillator;
     }),
     resume: vi.fn().mockResolvedValue(undefined),
-    sampleRate: 48_000,
+    sampleRate,
   };
   return { context, analysers, oscillators };
 }
@@ -1391,8 +1391,8 @@ describe("master chain and analysis", () => {
     runtime.dispose();
   });
 
-  it("derives L/R and M/S analysis from the post-limiter branch", async () => {
-    const { context, analysers } = stubContext();
+  it.each([44_100, 48_000])("derives true peaks at %d Hz from the post-limiter branch", async (sampleRate) => {
+    const { context, analysers } = stubContext(sampleRate);
     const adapter = recordingAdapter();
     const runtime = runtimeWith(context, adapter);
     await runtime.replaceFromCurrentState([bassModule([steps(36)])], REVISION);
@@ -1416,13 +1416,26 @@ describe("master chain and analysis", () => {
     expect(frame.right).toBeCloseTo(0.25, 6);
     expect(frame.mid).toBeCloseTo(0.125, 6);
     expect(frame.side).toBeCloseTo(0.375, 6);
+    expect(frame.truePeakLeft).toBeCloseTo(0.5, 6);
+    expect(frame.truePeakRight).toBeCloseTo(0.25, 6);
+    expect(frame.truePeakMid).toBeCloseTo(0.125, 6);
+    expect(frame.truePeakSide).toBeCloseTo(0.375, 6);
     expect(frame.peak).toBe(false);
 
     left.getFloatTimeDomainData = (data) => {
       data.fill(0);
-      data[0] = 0.999;
+      data[0] = 1.001;
     };
     expect(runtime.getMasterMeter().peak).toBe(true);
+
+    left.getFloatTimeDomainData = (data) => {
+      data.fill(0);
+      data.set([-1, 1, 1, -1], 1);
+    };
+    const interSampleFrame = runtime.getMasterMeter();
+    expect(interSampleFrame.left).toBe(1);
+    expect(interSampleFrame.truePeakLeft).toBeGreaterThan(1);
+    expect(interSampleFrame.peak).toBe(true);
 
     runtime.dispose();
   });
@@ -1435,6 +1448,10 @@ describe("master chain and analysis", () => {
       right: 0,
       mid: 0,
       side: 0,
+      truePeakLeft: 0,
+      truePeakRight: 0,
+      truePeakMid: 0,
+      truePeakSide: 0,
       peak: false,
     });
     runtime.dispose();

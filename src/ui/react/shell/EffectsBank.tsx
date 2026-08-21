@@ -1,107 +1,12 @@
 import { useState, type CSSProperties } from "react";
 
-import { type EffectInstanceId } from "../../../contracts";
 import { EffectActionIcon } from "../controls/EffectActionIcon";
 import { Knob } from "../controls/Knob";
-import { automationShortcut } from "../controls/automation-shortcut";
-import { displayEnumValue } from "../controls/display-enum-value";
 import { useAppStore, useDependencies } from "../store/app-store-context";
+import { CompactEffectEnumMacro, CompactEffectMacro } from "./CompactEffectControls";
 import { EffectEditor } from "./EffectEditor";
 import { SENDS, sendIdFor } from "./sends";
 import styles from "./Shell.module.css";
-
-function CompactMacro(props: {
-  readonly effectId: EffectInstanceId;
-  readonly owner: string;
-  readonly effectName: string;
-  readonly parameterId: string;
-  readonly label: string;
-  readonly value: number;
-  readonly minimum: number;
-  readonly maximum: number;
-  readonly step: number;
-  readonly resetValue: number;
-  readonly precision: number;
-  readonly unit: string | undefined;
-  readonly normalizedPercent: boolean;
-}) {
-  const setEffectParameter = useAppStore((state) => state.setEffectParameter);
-  const previewEffectParameter = useAppStore((state) => state.previewEffectParameter);
-  const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
-  return (
-    <Knob
-      controlId={`effect-${props.effectId}-${props.parameterId}`}
-      label={`${props.owner} ${props.effectName} ${props.label} macro`}
-      caption={props.label}
-      value={props.value}
-      min={props.minimum}
-      max={props.maximum}
-      step={props.step}
-      defaultValue={props.resetValue}
-      precision={props.normalizedPercent ? 0 : props.precision}
-      unit={props.normalizedPercent ? "percent" : props.unit}
-      {...(props.normalizedPercent
-        ? {
-            formatValue: (value: number) => value * 100,
-            parseValue: (value: number) => value / 100,
-            displayMin: 0,
-            displayMax: 100,
-            displayStep: 1,
-          }
-        : {})}
-      onInput={(value) => previewEffectParameter(props.effectId, props.parameterId, value)}
-      onCommit={(value, gestureId) => setEffectParameter(props.effectId, props.parameterId, value, gestureId)}
-      onAutomate={() =>
-        openExternalAutomationTarget({
-          scope: "effect",
-          targetId: props.effectId,
-          parameterId: props.parameterId,
-        })
-      }
-    />
-  );
-}
-
-function CompactEnumMacro(props: {
-  readonly effectId: EffectInstanceId;
-  readonly owner: string;
-  readonly effectName: string;
-  readonly parameterId: string;
-  readonly label: string;
-  readonly value: string;
-  readonly values: readonly string[];
-}) {
-  const setEffectParameter = useAppStore((state) => state.setEffectParameter);
-  const openExternalAutomationTarget = useAppStore((state) => state.openExternalAutomationTarget);
-  const automation = automationShortcut(() =>
-    openExternalAutomationTarget({
-      scope: "effect",
-      targetId: props.effectId,
-      parameterId: props.parameterId,
-    }),
-  );
-  return (
-    <label className={styles.compactSelect}>
-      <span>{props.label}</span>
-      <select
-        aria-label={`${props.owner} ${props.effectName} ${props.label} macro`}
-        aria-keyshortcuts={automation.ariaKeyShortcuts}
-        value={props.value}
-        onChange={(event) =>
-          setEffectParameter(props.effectId, props.parameterId, event.currentTarget.value)
-        }
-        onKeyDown={automation.onKeyDown}
-        onContextMenu={automation.onContextMenu}
-      >
-        {props.values.map((value) => (
-          <option key={value} value={value}>
-            {displayEnumValue(value)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 export function EffectsBank() {
   const [editorSend, setEditorSend] = useState<number | undefined>(undefined);
@@ -225,13 +130,14 @@ export function EffectsBank() {
                           descriptor.enumValues !== undefined
                         ) {
                           return (
-                            <CompactEnumMacro
+                            <CompactEffectEnumMacro
                               key={macro.parameterId}
                               effectId={focus.id}
                               owner={`Send ${send}`}
                               effectName={manifest?.productName ?? focus.pluginId}
                               parameterId={macro.parameterId}
                               label={descriptor.shortLabel ?? descriptor.name}
+                              description={descriptor.description}
                               value={value}
                               values={descriptor.enumValues}
                             />
@@ -239,13 +145,14 @@ export function EffectsBank() {
                         }
                         if (typeof value !== "number") return null;
                         return (
-                          <CompactMacro
+                          <CompactEffectMacro
                             key={macro.parameterId}
                             effectId={focus.id}
                             owner={`Send ${send}`}
                             effectName={manifest?.productName ?? focus.pluginId}
                             parameterId={macro.parameterId}
                             label={descriptor.shortLabel ?? descriptor.name}
+                            description={descriptor.description}
                             value={value}
                             minimum={descriptor.minimum ?? 0}
                             maximum={descriptor.maximum ?? 1}
@@ -278,6 +185,7 @@ export function EffectsBank() {
                         controlId={`send-return-${send}`}
                         label={`Send ${send} Return Level`}
                         caption="Return Level"
+                        description="Sets how much of this send chain reaches the master mix. Channel send amounts set how much signal enters the chain."
                         value={chain.returnLevel}
                         min={0}
                         max={1}

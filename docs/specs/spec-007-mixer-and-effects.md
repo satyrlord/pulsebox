@@ -41,8 +41,7 @@ The established visible mixer contains:
 - Exactly eight visible instrument channel strips, including disabled empty
   strips identified by two-digit slot number.
 - One fixed compact strip geometry for every instrument channel.
-- One master strip carrying master level, metering, and master-effects bypass,
-  with no A–D grid.
+- One master strip carrying master level and metering, with no A–D grid.
 - Four A–D send buttons per instrument channel in a visible 2 × 2 grid.
 - Meter.
 - Vertical fader.
@@ -336,6 +335,13 @@ their focus indicators.
 - Bypass keeps visible state text.
 - The bypass lamp and `On` or `Bypassed` text form one operable button.
 - A boolean effect parameter uses a two-position metal toggle lever.
+- Each built-in numeric effect parameter supplies a non-empty manifest
+  description. A compact or detailed control tooltip shows its current value,
+  audible purpose, and relation to the controls that change the same result.
+- Tempo Sync and its related Rate, Time, or Beat Time controls state which
+  value is active. They also state when transport tempo replaces a free value.
+- Shared Mix, Gain, and Return Level tooltips state their order in the signal
+  path and distinguish dry balance, stage level, and send return level.
 - The effect manifest accent tuple supplies the family chip, value arcs, and
   bypass lamp. Its muted value supplies the faceplate tint. This is the only
   faceplate tint exception to the instrument-accent rule. `THEMING.md` section
@@ -363,6 +369,8 @@ their focus indicators.
 - Automation follows the effect instance when moved.
 - The Output-group `Bypass All` toggle bypasses the complete pedalboard and
   preserves every pedal bypass state.
+- Tests compare every built-in numeric effect parameter with non-empty manifest
+  help and verify representative compact and detailed tooltips in Chrome.
 
 ### 20.5 Send buses
 
@@ -387,13 +395,30 @@ their focus indicators.
 - Serial.
 - At least six slots.
 - Compressor and EQ available by default.
-- Limiter in the last slot.
-- Limiter is protected from removal or movement and is master-chain-only.
-- The user may bypass the limiter.
+- True Peak Limiter in the last slot.
+- The True Peak Limiter is protected from removal or movement and is
+  master-chain-only. The user may bypass it individually.
 - One master-effects bypass toggles all user master effects while leaving master
   gain and the protected limiter active.
 - Master-effects bypass is project-owned, undoable, playback-safe, and visually
   distinct from the limiter's own detailed bypass.
+- The Master view owns the `Bypass All` control. The Mixer does not duplicate
+  it. This control leaves master gain and the protected True Peak Limiter active.
+- The Master view shows an ordered list of loaded mastering pedals. Each pedal
+  has compact controls and one icon-only detailed-editor entry. Do not show the
+  manifest family abbreviation. Its slot-number plate shows active or bypassed
+  state and toggles individual bypass. Active uses green. Bypassed uses gray.
+  The state tooltip updates after each toggle. Do not show a status lamp.
+- Each pedal has one drag handle at its left edge and one at its right edge.
+  A pointer can drag from either handle. Arrow Up and Arrow Down on the leading
+  handle provide keyboard reorder. One reorder creates one Undo entry. The
+  final True Peak Limiter has visible disabled handles and cannot move.
+- A fixed stereo true-peak meter spans the Master view height at its right edge.
+  It uses a four-times cubic inter-sample estimate from the post-master signal.
+  It shows dBTP and a held clip indicator at 0 dBTP. One adjacent toggle selects
+  left-right or mid-side ladders. The indicator resets from this meter rail.
+- The Mixer master strip owns master level and its compact output meter. The
+  Master view does not duplicate master level.
 - The master Edit action opens a detailed editor without stopping playback.
 - The editor starts at 760 × 680 CSS pixels and grows to fit the current rack.
 - Growth stops 16 pixels from each viewport edge. Internal scrollbars then
@@ -401,8 +426,7 @@ their focus indicators.
 - Closing the editor restores focus to its opener.
 - The modal stays above the transport and popovers. It keeps the editor header,
   Close control, and their focus indicators visible.
-- Peak reset.
-- Metering before and after the chain.
+- Post-master four-times inter-sample true-peak estimation and held clip reset.
 
 ### 20.7 DSP requirements
 
@@ -433,14 +457,22 @@ Pattern controlled filter:
 - Tempo-locked editable cutoff pattern.
 - Fully editable lane.
 - No preset-only workflow.
+- Unity-peak input drive saturation. The saturator applies
+  `x * (1 + 6 * drive) / (1 + 6 * drive * |x|)`, so a full-scale sample keeps
+  its level and an input inside [-1, 1] cannot exceed unity.
 
 Distortion:
 
 - Multiple original models.
-- Safe level compensation.
+- Unity-peak level compensation (decision `D103`).
 
-The first fixed Drive mode uses a `3.2` transfer drive and its reciprocal output
-gain. It does not increase the absolute magnitude of an input sample.
+Each model normalizes its shaped output to unity peak. An input inside the
+[-1, 1] range cannot produce an output magnitude above 1, and a full-scale
+input keeps a full-scale output ceiling. The fixed Drive mode uses a `3.2`
+transfer drive. The Drive and Asymmetric models divide the shaped result by
+`tanh(drive)`. The Fold model output is already bounded at unity and uses no
+division. Higher drive adds saturation without a level loss, so the user does
+not need post-mix Gain makeup.
 
 Compressor:
 
@@ -454,6 +486,8 @@ Compressor:
 Limiter:
 
 - Compact controls are Ceiling, Input, and Release.
+- The product name is `True Peak Limiter`.
+- The live ceiling stage uses four-times oversampling.
 - Ceiling is the output level nothing passes.
 - Input sets the level driven into the limiter.
 - Visible gain reduction.

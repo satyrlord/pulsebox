@@ -35,4 +35,33 @@ describe("audio state projection", () => {
     expect(projectState.routing.master.level).toBe(state.project.masterLevel);
     expect(projectState.routing.sends).toHaveLength(4);
   });
+
+  it("keeps a non-limiter final master effect in the regular master chain", () => {
+    const state = createDefaultProjectState(deterministicIds());
+    const manifests = new Map(
+      [...BUILT_IN_MODULES, ...BUILT_IN_EFFECTS].map((entry) => [entry.manifest.pluginId, entry.manifest]),
+    );
+    const finalEffectId = state.project.effects.masterChain[0];
+    if (finalEffectId === null || finalEffectId === undefined) {
+      throw new Error("Expected a non-limiter default master effect.");
+    }
+    const masterChain = [...state.project.effects.masterChain];
+    masterChain[masterChain.length - 1] = finalEffectId;
+    const projected = createAudioStateProjector(
+      (pluginId: PluginId) => manifests.get(pluginId),
+    ).routing({
+      ...state,
+      project: {
+        ...state.project,
+        effects: {
+          ...state.project.effects,
+          masterChain,
+        },
+      },
+    });
+
+    expect(projected.master.effects.at(-1)).toEqual(state.project.effects.instances[finalEffectId]);
+    expect(projected.master.limiterEffectId).toBeUndefined();
+    expect(projected.master.limiterState).toBeUndefined();
+  });
 });

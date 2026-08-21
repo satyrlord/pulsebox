@@ -73,6 +73,14 @@ describe("Knob", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  it("adds control help to the hover title and accessible description", () => {
+    const description = "Sets the filter edge. Resonance emphasizes this frequency.";
+    const { dial } = renderKnob({ unit: "Hz", description });
+
+    expect(dial).toHaveAttribute("title", `500 Hz. ${description}`);
+    expect(dial).toHaveAccessibleDescription(description);
+  });
+
   it("steps with the arrow keys and commits once on release", () => {
     const { recorded, dial } = renderKnob();
 

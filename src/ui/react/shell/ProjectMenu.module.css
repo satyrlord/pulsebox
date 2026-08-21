@@ -59,6 +59,7 @@
 
 .popover > button,
 .entry {
+  display: block;
   inline-size: 100%;
   min-block-size: 28px;
   padding-inline: 9px;

@@ -9,7 +9,9 @@ export class PatternFilterDsp implements EffectFrameProcessor {
     // cutoff pattern. The DSP consumes that scheduled cutoff directly.
     const cutoff = clamp(numberState(this.#state, "cutoff", 2400, 40, 18000), 40, this.#sampleRate / 6); const damping = 2 - numberState(this.#state, "resonance", 0.25, 0, 1) * 1.6;
     const drive = numberState(this.#state, "drive", 0, 0, 1);
-    const drivenLeft = finite(left) / (1 + drive * Math.abs(finite(left)) * 6); const drivenRight = finite(right) / (1 + drive * Math.abs(finite(right)) * 6);
+    // Unity-peak saturator per decision D103: bounded at 1 for in-range input.
+    const driveMakeup = 1 + drive * 6;
+    const drivenLeft = finite(left) * driveMakeup / (1 + drive * Math.abs(finite(left)) * 6); const drivenRight = finite(right) * driveMakeup / (1 + drive * Math.abs(finite(right)) * 6);
     this.#left.process(drivenLeft, cutoff, damping, this.#sampleRate); this.#right.process(drivenRight, cutoff, damping, this.#sampleRate);
     return writeStereoFrame(output, finite(this.#left.low), finite(this.#right.low));
   }

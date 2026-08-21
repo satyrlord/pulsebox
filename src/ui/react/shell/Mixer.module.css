@@ -148,18 +148,6 @@
   color: var(--pulse-color-text-muted, #919ba3);
 }
 
-.masterBypass {
-  inline-size: 100%;
-  min-block-size: 24px;
-  padding-inline: 1px;
-  font-size: var(--pulse-type-10, 10px);
-  letter-spacing: 0;
-}
-
-.masterBypass[data-bypassed="true"] {
-  text-decoration: line-through;
-}
-
 /* The pan ring keeps its engraved caption. The hover readout shows the value. */
 .panControl {
   block-size: 44px;
@@ -226,6 +214,10 @@
 
 .faderWell :global([data-component="level-meter"]) {
   flex: 0 0 auto;
+}
+
+.master .faderWell {
+  margin-block-end: 40px;
 }
 
 .meterStack {

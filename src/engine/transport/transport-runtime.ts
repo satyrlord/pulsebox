@@ -118,7 +118,15 @@ export interface MasterMeterFrame {
   readonly mid: number;
   /** `S = (L - R) / 2` for displayed analysis. */
   readonly side: number;
-  /** True when the post-limiter peak reached the display threshold. */
+  /** Four-times reconstructed inter-sample peak for the left channel. */
+  readonly truePeakLeft: number;
+  /** Four-times reconstructed inter-sample peak for the right channel. */
+  readonly truePeakRight: number;
+  /** Four-times reconstructed inter-sample peak for the mid channel. */
+  readonly truePeakMid: number;
+  /** Four-times reconstructed inter-sample peak for the side channel. */
+  readonly truePeakSide: number;
+  /** True when the post-limiter true-peak estimate reached the display threshold. */
   readonly peak: boolean;
 }
 
@@ -127,6 +135,10 @@ const SILENT_MASTER_METER: MasterMeterFrame = Object.freeze({
   right: 0,
   mid: 0,
   side: 0,
+  truePeakLeft: 0,
+  truePeakRight: 0,
+  truePeakMid: 0,
+  truePeakSide: 0,
   peak: false,
 });
 

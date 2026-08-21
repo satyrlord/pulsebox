@@ -46,6 +46,10 @@ import {
   drumVoiceIdsFor,
   toParameterValues,
 } from "./composition/default-project";
+import {
+  ACID_FABLE_PROJECT_NAME,
+  createAcidFableProjectState,
+} from "./composition/acid-fable-project";
 import { createBrowserProjectRepository } from "./composition/project-repository";
 import { mountPulseboxApp, type PulseboxAppHandle } from "./ui/public";
 
@@ -410,30 +414,33 @@ const app = mountPulseboxApp({
   manifestFor: (pluginId) => registry.get(pluginId)?.manifest,
   store,
   visibleSlotCount,
+  // Section 9.2: the two built-in templates share one create transaction and
+  // differ only in the fresh content they copy.
   templates: [
-    {
-      id: "neon-basement",
-      name: DEFAULT_PROJECT_NAME,
-      create: () =>
-        createProjectFromTemplate({
-          storageAvailable: repositorySelection.durable,
-          save: projectsService.save,
-          currentRevision: () => store.getState().project.revision,
-          createFresh: () => createDefaultProjectState(browserIdFactory, createEffectInstance),
-          activateFresh: (next) => {
-            if (!activateTemplateProject(store, next, () => audio.stop())) return false;
-            const now = new Date().toISOString();
-            committedMetadata = {
-              createdAt: now,
-              modifiedAt: now,
-              revision: nextProjectRevision(undefined, browserIdFactory),
-            };
-            queueFullAudioProjection();
-            return true;
-          },
-        }),
-    },
-  ],
+    { id: "neon-basement", name: DEFAULT_PROJECT_NAME, createFresh: createDefaultProjectState },
+    { id: "acid-fable", name: ACID_FABLE_PROJECT_NAME, createFresh: createAcidFableProjectState },
+  ].map(({ id, name, createFresh }) => ({
+    id,
+    name,
+    create: () =>
+      createProjectFromTemplate({
+        storageAvailable: repositorySelection.durable,
+        save: projectsService.save,
+        currentRevision: () => store.getState().project.revision,
+        createFresh: () => createFresh(browserIdFactory, createEffectInstance),
+        activateFresh: (next) => {
+          if (!activateTemplateProject(store, next, () => audio.stop())) return false;
+          const now = new Date().toISOString();
+          committedMetadata = {
+            createdAt: now,
+            modifiedAt: now,
+            revision: nextProjectRevision(undefined, browserIdFactory),
+          };
+          queueFullAudioProjection();
+          return true;
+        },
+      }),
+  })),
   projects: projectsService,
 });
 appReference.current = app;

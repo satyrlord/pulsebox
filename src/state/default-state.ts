@@ -1,6 +1,7 @@
 import {
   RACK_SLOT_IDS,
   SEND_BUS_IDS,
+  createAutomationLaneId,
   createEffectInstanceId,
   createModuleInstanceId,
   createNoteEventId,
@@ -9,9 +10,12 @@ import {
   createProjectLineageId,
   createSongPlacementId,
   createStateRevisionEpoch,
+  type AutomationLaneId,
   type EffectInstanceId,
   type IdFactory,
   type ModuleInstanceId,
+  type PatternId,
+  type SendBusId,
   type VoiceId,
 } from "../contracts/ids";
 import {
@@ -25,13 +29,15 @@ import {
   type ModuleEffectChainState,
 } from "../contracts/effects";
 import type { ParameterValue, PluginId } from "../contracts/parameters";
-import type {
-  PatternEvent,
-  PatternEventDataInput,
-  PatternPartState,
-  PatternState,
-  PulseState,
-  RackModuleState,
+import {
+  PATTERN_TICKS_PER_STEP,
+  type AutomationLaneState,
+  type PatternEvent,
+  type PatternEventDataInput,
+  type PatternPartState,
+  type PatternState,
+  type PulseState,
+  type RackModuleState,
 } from "./model";
 
 export type PatternEventSeed =
@@ -54,6 +60,10 @@ export interface ModuleSeed {
   readonly events: readonly PatternEventSeed[];
   /** Drum voice IDs let state validate trigger events without importing engine manifests. */
   readonly voiceIds?: readonly VoiceId[];
+  /** Optional mixer position. A supplied project can pre-balance its channels. */
+  readonly level?: number;
+  readonly pan?: number;
+  readonly sends?: Readonly<Partial<Record<SendBusId, number>>>;
 }
 
 /** The composition boundary can provide manifest defaults without making state import engine code. */
@@ -299,6 +309,176 @@ function materializeEvent(idFactory: IdFactory, event: PatternEventSeed): Patter
   });
 }
 
+/** One module of a supplied project. Pattern content lives on the Pattern seeds. */
+export type SuppliedModuleSeed = Omit<ModuleSeed, "events">;
+
+export interface SuppliedAutomationSeed {
+  /** Module index into the supplied rack. */
+  readonly module: number;
+  readonly parameterId: string;
+  readonly steps: readonly { readonly step: number; readonly value: ParameterValue }[];
+}
+
+export interface SuppliedPatternSeed {
+  readonly name: string;
+  readonly color: string;
+  /** Events keyed by module index into the supplied rack. */
+  readonly parts: Readonly<Record<number, readonly PatternEventSeed[]>>;
+  readonly automation?: readonly SuppliedAutomationSeed[];
+}
+
+export interface SuppliedProjectSeed {
+  readonly name: string;
+  readonly tempo: number;
+  readonly swing?: number;
+  readonly modules: readonly SuppliedModuleSeed[];
+  readonly patterns: readonly SuppliedPatternSeed[];
+  /** Index of the initially selected Pattern. */
+  readonly activePattern: number;
+  readonly song: {
+    readonly enabled: boolean;
+    readonly placements: readonly {
+      readonly pattern: number;
+      readonly repeatCount: number;
+    }[];
+  };
+}
+
+/**
+ * Builds a complete supplied project from declarative data. Unlike section 9.1's
+ * fixed factory, a supplied seed owns its name, tempo, per-Pattern content,
+ * module automation lanes, and Song chain. Section 9.3 uses this for the
+ * `Acid Fable` demo song.
+ */
+export function createSuppliedProjectState(
+  idFactory: IdFactory,
+  seed: SuppliedProjectSeed,
+  now: () => string = () => new Date().toISOString(),
+  createEffectInstance?: DefaultEffectInstanceFactory,
+): PulseState {
+  const projectId = createProjectId(idFactory);
+  const lineageId = createProjectLineageId(idFactory);
+  const epoch = createStateRevisionEpoch(idFactory);
+  const modules = seed.modules
+    .slice(0, RACK_SLOT_IDS.length)
+    .map((one) => createModule(idFactory, { ...one, events: [] }));
+  const moduleAt = (index: number): RackModuleState => {
+    const module = modules[index];
+    if (module === undefined) throw new Error("A supplied project seed names a missing module.");
+    return module;
+  };
+  const effects = createInitialEffectsState(idFactory, modules, createEffectInstance);
+  const timestamp = now();
+  const automationLanes: Record<AutomationLaneId, AutomationLaneState> = {};
+  const patterns = seed.patterns.map((patternSeed) => {
+    const id = createPatternId(idFactory);
+    const partEvents = new Map<ModuleInstanceId, readonly PatternEvent[]>();
+    for (const [moduleIndex, events] of Object.entries(patternSeed.parts)) {
+      partEvents.set(
+        moduleAt(Number(moduleIndex)).id,
+        events.map((event) => materializeEvent(idFactory, event)),
+      );
+    }
+    const patternLaneIds: AutomationLaneId[] = [];
+    const laneIdsByModule = new Map<ModuleInstanceId, AutomationLaneId[]>();
+    for (const lane of patternSeed.automation ?? []) {
+      const moduleId = moduleAt(lane.module).id;
+      const laneId = createAutomationLaneId(idFactory);
+      automationLanes[laneId] = Object.freeze({
+        id: laneId,
+        scope: "module",
+        targetId: moduleId,
+        parameterId: lane.parameterId,
+        patternId: id,
+        stepTicks: PATTERN_TICKS_PER_STEP,
+        steps: Object.freeze(
+          lane.steps.map((step) =>
+            Object.freeze({ tick: step.step * PATTERN_TICKS_PER_STEP, value: step.value }),
+          ),
+        ),
+      } satisfies AutomationLaneState);
+      patternLaneIds.push(laneId);
+      laneIdsByModule.set(moduleId, [...(laneIdsByModule.get(moduleId) ?? []), laneId]);
+    }
+    const partModuleIds = new Set([...partEvents.keys(), ...laneIdsByModule.keys()]);
+    const parts: Record<ModuleInstanceId, PatternPartState> = {};
+    for (const moduleId of partModuleIds) {
+      parts[moduleId] = Object.freeze({
+        moduleId,
+        length: PATTERN_STEP_COUNT,
+        voiceCycleLengths: Object.freeze({}),
+        events: Object.freeze(partEvents.get(moduleId) ?? []),
+        automationLaneIds: Object.freeze(laneIdsByModule.get(moduleId) ?? []),
+      });
+    }
+    return Object.freeze({
+      id,
+      name: patternSeed.name,
+      color: patternSeed.color,
+      durationBars: 1,
+      scale: "Chromatic",
+      humanize: DEFAULT_PATTERN_HUMANIZE,
+      seed: patternSeedFromId(id),
+      parts: Object.freeze(parts),
+      automationLaneIds: Object.freeze(patternLaneIds),
+      createdAt: timestamp,
+      modifiedAt: timestamp,
+    } satisfies PatternState);
+  });
+  const patternIdAt = (index: number): PatternId => {
+    const pattern = patterns[index];
+    if (pattern === undefined) throw new Error("A supplied project seed names a missing Pattern.");
+    return pattern.id;
+  };
+  return Object.freeze({
+    project: Object.freeze({
+      id: projectId,
+      lineageId,
+      revision: Object.freeze({ epoch, counter: 0 }),
+      name: seed.name,
+      tempo: seed.tempo,
+      swing: seed.swing ?? 0,
+      masterLevel: DEFAULT_MASTER_LEVEL,
+      rackSlots: Object.freeze(
+        RACK_SLOT_IDS.map((id, index) => {
+          const module = modules[index];
+          return Object.freeze(module === undefined ? { id } : { id, moduleId: module.id });
+        }),
+      ),
+      modules: Object.freeze(Object.fromEntries(modules.map((module) => [module.id, module]))),
+      effects,
+      patterns: Object.freeze(patterns),
+      activePatternId: patternIdAt(seed.activePattern),
+      automationLanes: Object.freeze(automationLanes),
+      song: Object.freeze({
+        enabled: seed.song.enabled,
+        placements: Object.freeze(
+          seed.song.placements.map((placement) =>
+            Object.freeze({
+              id: createSongPlacementId(idFactory),
+              patternId: patternIdAt(placement.pattern),
+              repeatCount: placement.repeatCount,
+            }),
+          ),
+        ),
+      }),
+    }),
+    transport: Object.freeze({
+      status: "stopped",
+      recordArmed: false,
+      positionTicks: 0,
+      startMarkerTicks: 0,
+    }),
+    ui: Object.freeze({
+      selectedModuleId: modules[0]?.id,
+      pianoRollSelection: undefined,
+      pianoRollParameter: "velocity",
+      pianoRollAutomationTarget: undefined,
+    }),
+    history: Object.freeze({ canUndo: false, canRedo: false }),
+  });
+}
+
 export function createModule(
   idFactory: IdFactory,
   seed: ModuleSeed,
@@ -310,11 +490,11 @@ export function createModule(
     parameters: Object.freeze({ ...(source?.parameters ?? seed.parameters) }),
     muted: source?.muted ?? false,
     solo: source?.solo ?? false,
-    level: source?.level ?? DEFAULT_MODULE_LEVEL,
-    pan: source?.pan ?? 0,
+    level: source?.level ?? seed.level ?? DEFAULT_MODULE_LEVEL,
+    pan: source?.pan ?? seed.pan ?? 0,
     sends: Object.freeze(Object.fromEntries(SEND_BUS_IDS.map((id) => {
       const send = source?.sends[id];
-      return [id, Object.freeze({ amount: send?.amount ?? 0 })];
+      return [id, Object.freeze({ amount: send?.amount ?? seed.sends?.[id] ?? 0 })];
     }))),
   });
 }

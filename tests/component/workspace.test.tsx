@@ -7,7 +7,7 @@ import { browserIdFactory } from "../../src/composition/browser-id-factory";
 import { DEFAULT_MASTER_LEVEL, PATTERN_TICKS_PER_STEP } from "../../src/state/public";
 import { EditorWorkspace } from "../../src/ui/react/shell/EditorWorkspace";
 import { EffectsBank } from "../../src/ui/react/shell/EffectsBank";
-import { MasterPanel } from "../../src/ui/react/shell/MasterPanel";
+import { MasteringMeter } from "../../src/ui/react/shell/MasteringMeter";
 import { Mixer } from "../../src/ui/react/shell/Mixer";
 import { ProjectMenu } from "../../src/ui/react/shell/ProjectMenu";
 import { StudioPanel } from "../../src/ui/react/shell/StudioPanel";
@@ -827,9 +827,10 @@ describe("Mixer", () => {
     // The master strip binds the engine's post-master analysis frame, not a
     // UI approximation, so the two master meters can never disagree.
     act(() => {
+      harness.domain.dispatch(harness.domain.createCommand("transport-play", {}));
       harness.store
         .getState()
-        .setMasterMeterFrame({ left: 0.42, right: 0.3, mid: 0.36, side: 0.06, peak: false });
+        .setMasterMeterFrame({ left: 0.42, right: 0.3, mid: 0.36, side: 0.06, truePeakLeft: 0.42, truePeakRight: 0.3, truePeakMid: 0.36, truePeakSide: 0.06, peak: false });
     });
     expect(screen.getByRole("meter", { name: "Master output" })).toHaveAttribute(
       "aria-valuenow",
@@ -865,42 +866,106 @@ describe("Mixer", () => {
     expect(harness.domain.getState().history.canUndo).toBe(true);
   });
 
-  // D74 and spec-005 section 4 fix the master near -6 dB. The Mixer and the
-  // Master view drive one value, so both must reset to that same default.
-  it("resets the master fader to the shipped default from either studio view", () => {
-    const mixerHarness = createHarness();
-    const mixer = renderWithHarness(<Mixer />, mixerHarness);
-    const mixerFader = screen.getByRole("slider", { name: "Master level" });
-    fireEvent.keyDown(mixerFader, { key: "ArrowUp" });
-    fireEvent.keyUp(mixerFader, { key: "ArrowUp" });
-    fireEvent.doubleClick(mixerFader);
-    expect(mixerHarness.domain.getState().project.masterLevel).toBeCloseTo(DEFAULT_MASTER_LEVEL, 5);
-    mixer.unmount();
-
-    const panelHarness = createHarness();
-    renderWithHarness(<MasterPanel />, panelHarness);
-    const panelFader = screen.getByRole("slider", { name: "Master level" });
-    fireEvent.keyDown(panelFader, { key: "ArrowUp" });
-    fireEvent.keyUp(panelFader, { key: "ArrowUp" });
-    fireEvent.doubleClick(panelFader);
-    expect(panelHarness.domain.getState().project.masterLevel).toBeCloseTo(DEFAULT_MASTER_LEVEL, 5);
+  it("resets the Mixer master fader to the shipped default", () => {
+    const harness = createHarness();
+    renderWithHarness(<Mixer />, harness);
+    const masterFader = screen.getByRole("slider", { name: "Master level" });
+    fireEvent.keyDown(masterFader, { key: "ArrowUp" });
+    fireEvent.keyUp(masterFader, { key: "ArrowUp" });
+    fireEvent.doubleClick(masterFader);
+    expect(harness.domain.getState().project.masterLevel).toBeCloseTo(DEFAULT_MASTER_LEVEL, 5);
   });
 });
 
 describe("master meter", () => {
-  it("shows the louder engine analysis channel in the Master view", () => {
+  it("updates the true-peak UI when only true-peak fields change", () => {
     const harness = createHarness();
-    const view = renderWithHarness(<MasterPanel />, harness);
+    renderWithHarness(<MasteringMeter />, harness);
+    const firstFrame = {
+      left: 0.4,
+      right: 0.3,
+      mid: 0.35,
+      side: 0.05,
+      truePeakLeft: 0.25,
+      truePeakRight: 0.2,
+      truePeakMid: 0.22,
+      truePeakSide: 0.04,
+      peak: false,
+    };
+    const secondFrame = {
+      ...firstFrame,
+      truePeakLeft: 0.5,
+      truePeakRight: 0.4,
+      truePeakMid: 0.44,
+      truePeakSide: 0.08,
+    };
+
+    act(() => {
+      harness.store.getState().setMasterMeterFrame(firstFrame);
+    });
+    expect(harness.store.getState().masterMeter).toEqual(firstFrame);
+    expect(screen.getByLabelText("Master true peak level")).toHaveTextContent("-12.0 dBTP");
+
+    act(() => {
+      harness.store.getState().setMasterMeterFrame(secondFrame);
+    });
+    expect(harness.store.getState().masterMeter).toEqual(secondFrame);
+    expect(screen.getByLabelText("Master true peak level")).toHaveTextContent("-6.0 dBTP");
+    expect(harness.store.getState().masterPeakHeld).toBe(false);
+  });
+
+  it("keeps the master clip latched after a silent frame until Reset", () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      renderWithHarness(<MasteringMeter />, harness);
+      const peakFrame = {
+        left: 0.7,
+        right: 0.6,
+        mid: 0.65,
+        side: 0.05,
+        truePeakLeft: 1.1,
+        truePeakRight: 0.9,
+        truePeakMid: 1,
+        truePeakSide: 0.1,
+        peak: true,
+      };
+
+      act(() => {
+        harness.store.getState().setMasterMeterFrame(peakFrame);
+      });
+      const reset = screen.getByRole("button", { name: "Reset master true peak clip" });
+      expect(harness.store.getState().masterPeakHeld).toBe(true);
+      expect(reset).toHaveAttribute("aria-pressed", "true");
+
+      act(() => {
+        vi.advanceTimersByTime(1_501);
+        harness.store.getState().setMasterMeterFrame(SILENT_MASTER_METER);
+      });
+      expect(harness.store.getState().masterPeakHeld).toBe(true);
+      expect(reset).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.click(reset);
+      expect(harness.store.getState().masterPeakHeld).toBe(false);
+      expect(reset).toHaveAttribute("aria-pressed", "false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the louder engine analysis channel in the Mixer master strip", () => {
+    const harness = createHarness();
+    const view = renderWithHarness(<Mixer />, harness);
     const valueNow = () =>
       Number(
-        screen.getByRole("meter", { name: "Master output level" }).getAttribute("aria-valuenow"),
+        screen.getByRole("meter", { name: "Master output" }).getAttribute("aria-valuenow"),
       );
 
     act(() => {
       harness.domain.dispatch(harness.domain.createCommand("transport-play", {}));
       harness.store
         .getState()
-        .setMasterMeterFrame({ left: 0.3, right: 0.8, mid: 0.55, side: 0.25, peak: false });
+        .setMasterMeterFrame({ left: 0.3, right: 0.8, mid: 0.55, side: 0.25, truePeakLeft: 0.3, truePeakRight: 0.8, truePeakMid: 0.55, truePeakSide: 0.25, peak: false });
     });
     expect(valueNow()).toBeCloseTo(0.8, 5);
 
@@ -917,18 +982,18 @@ describe("master meter", () => {
     expect(valueNow()).toBe(0);
 
     view.unmount();
-    renderWithHarness(<MasterPanel />, harness);
+    renderWithHarness(<Mixer />, harness);
     expect(valueNow()).toBe(0);
   });
 
   it("reads the engine frame while the runtime and transport are active", () => {
-    const frame = { left: 0.6, right: 0.2, mid: 0.4, side: 0.2, peak: false };
+    const frame = { left: 0.6, right: 0.2, mid: 0.4, side: 0.2, truePeakLeft: 0.6, truePeakRight: 0.2, truePeakMid: 0.4, truePeakSide: 0.2, peak: false };
     const readFrame = () => frame;
     expect(masterMeterFrameFor("active", "playing", readFrame)).toBe(frame);
   });
 
   it("holds silence while the runtime or transport is not rendering", () => {
-    const frame = { left: 1, right: 1, mid: 1, side: 0, peak: true };
+    const frame = { left: 1, right: 1, mid: 1, side: 0, truePeakLeft: 1, truePeakRight: 1, truePeakMid: 1, truePeakSide: 0, peak: true };
     const readFrame = vi.fn(() => frame);
     for (const state of ["locked", "suspended", "unavailable"] as const) {
       expect(masterMeterFrameFor(state, "playing", readFrame)).toBe(SILENT_MASTER_METER);

@@ -715,6 +715,78 @@ test("creating a starter saves the initial project and copies the default projec
   await expect(page.locator('[data-field="tempo"]')).toHaveValue("101");
 });
 
+test("creating the Acid Fable demo loads the arranged song from the project selector", async ({
+  page,
+}) => {
+  const projectMenu = page.locator('[data-component="project-menu"]');
+  const selector = projectMenu.getByRole("button", { name: /Project selector/ });
+
+  await selector.click();
+  await projectMenu.getByRole("button", { name: "New: Acid Fable" }).click();
+  await expect(selector).toHaveAccessibleName(/Current project: Acid Fable/);
+
+  // Section 9.3: 134 BPM, eight slots with seven loaded modules, one empty.
+  await expect(page.locator('[data-field="tempo"]')).toHaveValue("134");
+  await expect(page.locator(RACK_MODULE)).toHaveCount(8);
+  await expect(page.locator(`${RACK_MODULE}[data-label="Empty"]`)).toHaveCount(1);
+  await expect(page.locator(`${RACK_MODULE}[data-label="Silver Serpent"]`)).toHaveCount(2);
+
+  // Section 9.3 starts in Song mode with The Serpent selected for editing.
+  await expect(page.getByRole("button", { name: "Song", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const selectedPattern = page.getByRole("combobox", { name: "Selected Pattern" });
+  await expect(selectedPattern.locator("option:checked")).toHaveText("The Serpent");
+
+  const playlist = page.locator('[data-component="playlist-summary"]');
+  const placements = [
+    ["Once Upon", 4],
+    ["First Steps", 8],
+    ["The Serpent", 8],
+    ["Deep Woods", 4],
+    ["Full Cry", 16],
+    ["Ever After", 4],
+  ] as const;
+  await expect(playlist.locator("ol > li")).toHaveCount(placements.length);
+  for (const [index, [patternName, repeatCount]] of placements.entries()) {
+    const row = playlist.locator("ol > li").nth(index);
+    await expect(
+      row.getByRole("combobox", { name: `Playlist row ${String(index + 1)} Pattern` }).locator("option:checked"),
+    ).toHaveText(patternName);
+    await expect(
+      row.getByRole("slider", { name: `Playlist row ${String(index + 1)} repeat count` }),
+    ).toHaveAttribute("aria-valuenow", String(repeatCount));
+  }
+
+  // Select the low Silver Serpent through the editor controls to expose its
+  // stored The Serpent cutoff lane in the active Piano Roll lower lane.
+  const pianoRollModule = page.getByRole("combobox", { name: "Piano Roll module" });
+  await pianoRollModule.selectOption({ index: 0 });
+  await page.getByRole("combobox", { name: "Piano Roll parameter" }).selectOption({ label: "Cutoff" });
+  const cutoffLane = page.getByRole("group", { name: "Cutoff lane" });
+  await expect(cutoffLane).toBeVisible();
+  await expect(cutoffLane.locator('[data-automation-step="true"]')).toHaveCount(8);
+  await expect(cutoffLane.locator('[data-automation-step="true"]').first()).toBeVisible();
+
+  // The two Silver Serpents expose their non-zero pre-fader Send A amounts.
+  await expect(
+    page.getByRole("button", {
+      name: "Edit active send A for Silver Serpent. 22 percent, pre-fader.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Edit active send A for Silver Serpent. 35 percent, pre-fader.",
+    }),
+  ).toBeVisible();
+
+  // The fresh copy is stored at creation and appears in the picker.
+  await selector.click();
+  const storedProjects = page.getByRole("list", { name: "Stored projects" });
+  await expect(storedProjects.getByRole("button", { name: /Acid Fable/ })).toHaveCount(1);
+});
+
 test("portable export produces a ZIP that imports through the validated archive path", async ({
   page,
 }) => {

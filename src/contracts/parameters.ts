@@ -37,6 +37,8 @@ export interface ParameterDescriptor {
   readonly id: ParameterId;
   readonly name: string;
   readonly shortLabel?: string;
+  /** Short user-facing help for the control and its related parameters. */
+  readonly description?: string;
   readonly valueType: "float" | "integer" | "boolean" | "enum";
   readonly minimum?: number;
   readonly maximum?: number;
@@ -110,6 +112,7 @@ export function validateParameterDescriptor(
     typeof value.id !== "string" ||
     typeof value.name !== "string" ||
     (value.shortLabel !== undefined && typeof value.shortLabel !== "string") ||
+    (value.description !== undefined && typeof value.description !== "string") ||
     (value.enumValues !== undefined &&
       (!Array.isArray(value.enumValues) ||
         value.enumValues.some((entry) => typeof entry !== "string"))) ||
@@ -150,6 +153,15 @@ export function validateParameterDescriptor(
     issues.push({
       path: `${path}.shortLabel`,
       message: "Short label must not be empty when present.",
+    });
+  }
+  if (
+    descriptor.description !== undefined &&
+    (descriptor.description.trim().length === 0 || descriptor.description.length > 240)
+  ) {
+    issues.push({
+      path: `${path}.description`,
+      message: "Description must contain 1 through 240 characters when present.",
     });
   }
   if (!Number.isSafeInteger(descriptor.displayPrecision) || descriptor.displayPrecision < 0) {

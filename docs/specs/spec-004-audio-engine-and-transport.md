@@ -46,12 +46,14 @@ Master group:
 
 - Metronome toggle.
 - Audio-engine power.
-- One two-state analysis toggle labeled `L/R` or `M/S`.
 - Two master meter bars. In `L/R` they show left and right. In `M/S` they
-  show mid and side.
-- Peak indicator.
+  show mid and side. The Master studio meter owns the analysis toggle.
 - Master dB value.
 - Settings.
+
+Keep the left group, centered app mark, and right group stable at every
+supported width. A meter-control ownership change must not shift the app mark
+or break either group.
 
 The header has no theme selector. Theme and high-contrast selection exists only
 on the Settings page when that page exists.

@@ -221,7 +221,7 @@ describe("TransportBar", () => {
     const harness = createHarness();
     renderWithHarness(<TransportBar />, harness);
     fireEvent.click(screen.getByRole("button", { name: "Metronome" }));
-    fireEvent.click(screen.getByRole("button", { name: "Master meter mode: left and right" }));
+    act(() => harness.store.getState().toggleMeterMode());
     expect(harness.store.getState().metronomeEnabled).toBe(true);
     expect(harness.store.getState().meterMode).toBe("ms");
     expect(harness.domain.getState().history.canUndo).toBe(false);
@@ -281,11 +281,11 @@ describe("TransportBar", () => {
     expect(harness.audio.setPower).toHaveBeenLastCalledWith(false);
   });
 
-  it("shows the master dB readout and the peak indicator", () => {
+  it("shows the master dB readout without duplicating the Master clip indicator", () => {
     const harness = createHarness();
     renderWithHarness(<TransportBar />, harness);
     expect(screen.getByLabelText("Master level in decibels")).toHaveTextContent("-inf");
-    expect(screen.getByRole("img", { name: "Master peak: idle" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset master true peak clip" })).toBeNull();
   });
 
   it("labels the meter pair L/R or M/S from the analysis mode", () => {
@@ -293,7 +293,7 @@ describe("TransportBar", () => {
     renderWithHarness(<TransportBar />, harness);
     expect(screen.getByText("L")).toBeInTheDocument();
     expect(screen.getByText("R")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Master meter mode: left and right" }));
+    act(() => harness.store.getState().toggleMeterMode());
     expect(screen.getByText("M")).toBeInTheDocument();
     expect(screen.getByText("S")).toBeInTheDocument();
   });

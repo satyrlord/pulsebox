@@ -84,12 +84,30 @@ The merged MVP is complete only when:
     bus and manifest family plates share one aligned hardware row.
     The Mixer has one icon-only `Bypass All` toggle for all Send FX. It
     preserves each send chain's own bypass state.
-25. **AC-025.** The master chain works. Its detailed editor uses the same
+25. **AC-025.** The master chain works. The Master studio pane shows its ordered
+    live mastering pedals and one full-height stereo true-peak meter at the
+    right edge. Each slot-number plate toggles bypass and shows green active or
+    gray bypassed state without a lamp. Two edge handles provide pointer reorder.
+    The leading handle provides keyboard reorder. The view has no compact family
+    abbreviations and uses an icon-only Edit control. The protected True Peak
+    Limiter stays final and individually bypassable. The meter switches between
+    L/R and M/S, shows dBTP, and latches a clip at 0 dBTP until reset. One Master
+    `Bypass All` control bypasses user effects but not the protected limiter.
+    The Mixer does not duplicate this control. The detailed editor uses the same
     content-aware growth and viewport-limited scrollbar fallback.
 26. **AC-026.** All listed effects process audio. Each effect has one equal-power
     Mix and one post-mix Gain. Mix and Gain are automatable. The UI has no
     `Wet/Dry` label. Automation actions show their icon and the label `AUTO`.
     Parametric EQ handles show and expose their band, frequency, and gain.
+    Every built-in numeric effect parameter has a non-empty manifest
+    description. Compact and detailed tooltips show the current value, audible
+    purpose, and relation to controls that change the same result. Tempo Sync
+    identifies the active Rate, Time, or Beat Time value. Mix, Gain, and Return
+    Level tooltips identify their signal-path order and role. Pattern Filter
+    drive uses `x * (1 + 6 * drive) / (1 + 6 * drive * |x|)`. Distortion Drive
+    and Asymmetric divide their shaped result by `tanh(drive)`, while Fold
+    stays bounded. Inputs in [-1, 1] cannot exceed unity, and full-scale input
+    stays full-scale.
 27. **AC-027.** A–D defaults match the approved compact effect design and use circular
     Return Level controls.
 28. **AC-028.** The reverb shimmer feature works.
@@ -283,3 +301,13 @@ The merged MVP is complete only when:
     transforms them. In each supplied theme, they have color and a non-color
     cue. Ghost display persists only as a local view preference. It creates no
     undo entry and does not travel in `.pulsebox` files.
+87. **AC-087.** The project selector creates the original `Acid Fable` arranged
+    demo. It has seven loaded modules in the section 9.3 rack order, with two
+    independent Silver Serpents and one empty slot. It opens at 134 BPM with
+    `The Serpent` selected, zero Swing and Humanize, and one-bar Patterns. Its
+    enabled Song chain plays `Once Upon` for 4 bars, `First Steps` for 8,
+    `The Serpent` for 8, `Deep Woods` for 4, `Full Cry` for 16, and
+    `Ever After` for 4. The low Silver Serpent has cutoff automation in
+    `The Serpent` and `Full Cry`. The two Serpents have independent sound, mix,
+    and send settings. Every occupied module has note data, and the supplied
+    content is original with the specified headroom.

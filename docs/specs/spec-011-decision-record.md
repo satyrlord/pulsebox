@@ -653,3 +653,53 @@ contains the normative requirements. This table is the traceability record.
   cards fit without a scrollbar at each supported viewport. The bus and manifest
   family plates share one aligned 24-pixel-high heading row. Section 20.3 of
   [mixer and effects](spec-007-mixer-and-effects.md) owns this behavior.
+- **D103.** Effect drive stages use unity-peak level compensation instead of
+  reciprocal-drive attenuation. Each Distortion model normalizes its shaped
+  output to unity peak. The Drive and Asymmetric models divide the shaped
+  result by `tanh(drive)`, and the bounded Fold output uses no division. The
+  Pattern Filter drive saturator applies
+  `x * (1 + 6 * drive) / (1 + 6 * drive * |x|)`. An input inside [-1, 1]
+  cannot produce an output magnitude above 1, and a full-scale input keeps a
+  full-scale output ceiling. The rejected reciprocal compensation attenuated
+  the peak output to `1 / drive` and forced post-mix Gain makeup for a usable
+  level. Section 20.7 of [mixer and effects](spec-007-mixer-and-effects.md)
+  owns this behavior.
+- **D104.** The Master view is an ordered list of live mastering pedals only.
+  Each pedal exposes compact controls, individual bypass, and a detailed-editor
+  entry. The final limiter has a visible protected marker but stays bypassable.
+  The Mixer master strip is the one location for master level, output metering,
+  and chain-wide bypass. The transport peak indicator owns peak reset. Sections 8.5 of
+  [application shell and controls](spec-003-application-shell-and-controls.md)
+  and 20.6 of [mixer and effects](spec-007-mixer-and-effects.md) own this
+  behavior.
+- **D105.** The Master view adds one fixed full-height stereo true-peak meter at
+  its right edge. This meter owns dBTP display, held clipping, and clip reset.
+  Each pedal's slot-number plate now owns its active or bypassed state, bypass
+  control, pointer drag, and keyboard reorder. A pedal has no separate bypass
+  button or active-status label. The protected final limiter cannot move but
+  remains individually bypassable. This decision supersedes the meter, peak
+  reset, and pedal-bypass presentation in `D104`. Sections 8.5 of
+  [application shell and controls](spec-003-application-shell-and-controls.md)
+  and 20.6 of [mixer and effects](spec-007-mixer-and-effects.md) own this
+  behavior.
+- **D106.** Each Master pedal separates state from reorder. Its slot-number
+  plate toggles bypass and uses green for active or gray for bypassed. It has no
+  lamp. Two edge handles own pointer reorder. The leading handle also owns
+  keyboard reorder. Master hides compact family abbreviations and uses one
+  icon-only Edit control. The Master meter owns the `L/R` or `M/S` toggle and TP
+  reset. The Master view is the single location for the user-effects `Bypass
+  All` control. This override leaves the protected True Peak Limiter active.
+  The protected limiter uses a four-times oversampled live ceiling stage. The
+  transport keeps its fixed left, center, and right group geometry. This
+  decision supersedes the control ownership and drag presentation in `D105`.
+  Sections 8.5 and 20.6 own this behavior.
+- **D107.** Pulsebox ships a second built-in template, `Acid Fable`. It is an
+  original supplied demo song with an enabled Song chain, two Silver Serpent
+  instances, channel sends, and filter-cutoff Pattern automation. It shows a
+  complete arranged project from the project selector. This supersedes the
+  one-template count in `D88`. The `D88` reasoning stands for the first-start
+  project: section 9.1 of
+  [rack and instruments](spec-005-rack-and-instruments.md) still owns the
+  default content, and a new installation still opens `Neon Basement`. Section
+  9.3 owns the demo-song content. Section 9.2 owns the shared template action
+  for both templates and holds no content of its own.

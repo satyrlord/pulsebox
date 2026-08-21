@@ -24,6 +24,7 @@ function effectPluginId(value: string): PluginId {
 interface NumericParameter {
   readonly id: string;
   readonly name: string;
+  readonly description: string;
   readonly minimum: number;
   readonly maximum: number;
   readonly defaultValue: number;
@@ -37,6 +38,7 @@ export function numericParameter(value: NumericParameter): ParameterDescriptor {
   return {
     id: required(parseParameterId(value.id)),
     name: value.name,
+    description: value.description,
     valueType: "float",
     minimum: value.minimum,
     maximum: value.maximum,
@@ -55,9 +57,14 @@ export function numericParameter(value: NumericParameter): ParameterDescriptor {
   };
 }
 
-export function booleanParameter(id: string, name: string, defaultValue: boolean): ParameterDescriptor {
+export function booleanParameter(
+  id: string,
+  name: string,
+  description: string,
+  defaultValue: boolean,
+): ParameterDescriptor {
   return {
-    id: required(parseParameterId(id)), name, valueType: "boolean", defaultValue,
+    id: required(parseParameterId(id)), name, description, valueType: "boolean", defaultValue,
     unit: "none", displayPrecision: 0, resetValue: defaultValue,
     smoothing: { curve: "none", durationMilliseconds: 0 }, workletRate: "message",
     automation: "step", modulation: "none",
@@ -67,11 +74,12 @@ export function booleanParameter(id: string, name: string, defaultValue: boolean
 export function enumParameter(
   id: string,
   name: string,
+  description: string,
   values: readonly string[],
   defaultValue: string,
 ): ParameterDescriptor {
   return {
-    id: required(parseParameterId(id)), name, valueType: "enum", enumValues: values,
+    id: required(parseParameterId(id)), name, description, valueType: "enum", enumValues: values,
     defaultValue, unit: "none", displayPrecision: 0, resetValue: defaultValue,
     smoothing: { curve: "none", durationMilliseconds: 0 }, workletRate: "message",
     automation: "step", modulation: "none",

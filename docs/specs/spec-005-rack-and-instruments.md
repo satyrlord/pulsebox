@@ -6,8 +6,8 @@
 **Depends on:** [Audio engine and transport](spec-004-audio-engine-and-transport.md)  
 **Owns:** Default projects, the unified module browser, rack behavior, and instrument
 modules.  
-**Acceptance IDs:** `AC-007` through `AC-010`, `AC-021`, `AC-077`, and
-`AC-080` in [release acceptance](spec-012-release-acceptance.md).
+**Acceptance IDs:** `AC-007` through `AC-010`, `AC-021`, `AC-077`, `AC-080`, and
+`AC-087` in [release acceptance](spec-012-release-acceptance.md).
 
 ---
 
@@ -81,16 +81,19 @@ The limiter occupies the protected final slot and starts enabled.
 Create an original coherent demo loop. Do not use copied patterns, presets,
 samples, or note data.
 
-### 9.2 Starter template
+### 9.2 Built-in templates
 
-Pulsebox has one built-in template, `Neon Basement`. It creates a fresh copy of
-the section 9.1 default project. The template has no separate rack order, tempo,
-pattern set, or note data. Section 9.1 is the single owner of that content.
+Pulsebox has two built-in templates. `Neon Basement` creates a fresh copy of
+the section 9.1 default project. `Acid Fable` creates a fresh copy of the
+section 9.3 supplied demo song. A template has no separate rack order, tempo,
+pattern set, or note data. Section 9.1 and section 9.3 are the single owners
+of that content. Decision `D107` records the second template.
 
-A new installation opens the same content on first start, so the startup project
-and the template stay identical by construction.
+A new installation opens the section 9.1 content on first start, so the
+startup project and the `Neon Basement` template stay identical by
+construction.
 
-The user creates a fresh project from the template through the project selector.
+The user creates a fresh project from a template through the project selector.
 Before replacement, Pulsebox saves the current project. If that save fails,
 Pulsebox keeps the current project active and reports that the template was not
 created. A successful action creates a new project and lineage ID, and the new
@@ -100,6 +103,67 @@ After replacement, Pulsebox stores the fresh copy at once. Both projects then
 appear in the project selector, and the save control does not report unsaved
 edits for a project the user has not edited. When storage is unavailable,
 Pulsebox still creates the fresh project and leaves it unsaved.
+
+### 9.3 Supplied demo song
+
+Project name: `Acid Fable`
+
+The demo song shows a complete arranged project. All of its note data,
+parameter settings, and automation are original and hand-authored. Do not use
+copied patterns, presets, samples, or note data.
+
+Transport and timing:
+
+- Tempo: 134.0 BPM.
+- Swing: 0%, global to the project.
+- Humanize: 0%.
+- Pattern length: 16 steps. Each Pattern is one bar.
+- Transport: stopped.
+- Mixer fader level: approximately -8 dB on every occupied slot, except the
+  high Silver Serpent, which sits lower so the low line leads.
+- Master level: approximately -6 dB.
+
+Rack order:
+
+1. Silver Serpent, the low acid line.
+2. Silver Serpent, the high answering line.
+3. Tin Soldier.
+4. Soft Thunder.
+5. Twin Engine.
+6. Gray Ghost.
+7. Dusty Mosaic.
+8. Empty.
+
+The two Silver Serpent instances show that one plugin can occupy two rack
+slots with independent parameters, mix settings, and note data.
+
+Named Patterns, in order: `Once Upon`, `First Steps`, `The Serpent`,
+`Deep Woods`, `Full Cry`, and `Ever After`. Select `The Serpent` by default.
+
+The Song chain ships enabled and plays the Patterns in this order:
+
+1. Once Upon, 4 bars.
+2. First Steps, 8 bars.
+3. The Serpent, 8 bars.
+4. Deep Woods, 4 bars.
+5. Full Cry, 16 bars.
+6. Ever After, 4 bars.
+
+A bar count is the entry's repeat count in the chain, as decision `D92` reads
+it. Because the chain ships enabled, Play performs the full arrangement at
+once.
+
+The demo song uses channel sends and Pattern automation as capability
+evidence:
+
+- The low Silver Serpent carries a filter-cutoff automation lane in
+  `The Serpent` and in `Full Cry`. The first lane rises across the bar. The
+  second lane peaks and falls.
+- The two Silver Serpent channels use the send A echo. Gray Ghost and Dusty
+  Mosaic use the send B reverb.
+
+Default send effects, the default master chain, and the protected limiter
+follow section 9.1.
 
 ---
 
