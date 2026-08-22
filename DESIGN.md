@@ -29,12 +29,12 @@ colors:
   disabled: "#7b858d"
   focus-inner: "#ffffff"
   focus-outer: "#000000"
-  module-bass: "#F2D530"
-  module-six: "#6FDE76"
+  module-acid: "#F2D530"
+  module-snap: "#6FDE76"
   module-boom: "#FF6B5F"
-  module-nine: "#B890FF"
-  module-sev: "#A9C7E8"
-  module-five: "#4ADFC7"
+  module-mesh: "#B890FF"
+  module-bits: "#A9C7E8"
+  module-perc: "#4ADFC7"
 typography:
   brand:
     fontFamily: '"Michroma", "Barlow Semi Condensed", system-ui, sans-serif'
@@ -97,6 +97,12 @@ components:
   button-disabled:
     backgroundColor: "{colors.surface-control}"
     textColor: "{colors.disabled}"
+    rounded: "{rounded.control}"
+  toggle:
+    backgroundColor: "{colors.surface-control}"
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.control}"
+    size: "24px"
   readout:
     backgroundColor: "{colors.surface-inset}"
     textColor: "{colors.text-primary}"
@@ -111,6 +117,7 @@ components:
     backgroundColor: "{colors.surface-panel}"
     textColor: "{colors.text-primary}"
     rounded: "{rounded.panel}"
+    padding: "8px"
   overlay-notice:
     backgroundColor: "{colors.overlay}"
     textColor: "{colors.text-primary}"
@@ -120,7 +127,7 @@ components:
 
 # Design System: Pulsebox
 
-## 1. Overview
+## Overview
 
 **Creative North Star: "The Powder-Coated Machine"**
 
@@ -154,7 +161,7 @@ conventions entirely: Pulsebox is an instrument, not a pitch.
 - 4px spacing grid; 4px control radii, 6px panel radii
 - Fast, short motion (80 / 140 / 220 ms) with a full reduced-motion path
 
-## 2. Colors
+## Colors
 
 A near-monochrome graphite system where saturation is reserved for identity,
 level, and status.
@@ -216,8 +223,8 @@ the icon and the rack overview already say.
 - **Control Steel** (`#242a30`): the face of any raised control — buttons, inputs, selects.
 - **Well Black** (`#080a0c`): recessed bays and value readouts. Darker than the
   chassis, which is what makes a well read as cut into the panel.
-- **Overlay Slate** (`#101317`): the Undo notice and the Settings panel — the two
-  surfaces that genuinely sit above the workspace.
+- **Overlay Slate** (`#101317`): the Undo notice, the Settings panel, and the
+  modal effect editor — the three surfaces that genuinely sit above the workspace.
 - **Text Primary** (`#f3f5f6`), **Text Secondary** (`#bac2c8`), **Text Muted**
   (`#919ba3`): the readable ramp. Muted is for labels at 10px, never for prose.
 - **Border Default** (`#6d7881`), **Border Strong** (`#aab4bc`): every part has a
@@ -240,7 +247,7 @@ error — must remain distinguishable when the high-contrast overlay flattens al
 surfaces to black and all borders to white. If a state reads only as a fill
 color, it is broken. Add an outline, a weight change, a glyph, or a position cue.
 
-## 3. Typography
+## Typography
 
 **UI Font:** "Barlow", system-ui, sans-serif
 **Label Font:** "Barlow Semi Condensed", "Barlow", system-ui, sans-serif
@@ -284,7 +291,27 @@ below 10px.
 reserved for short technical labels — module short labels, control captions, and
 the application mark. Uppercase is a category marker, never emphasis.
 
-## 4. Elevation
+## Layout
+
+Pulsebox uses one fixed desktop instrument surface. The transport spans the top.
+The rack overview and workspace occupy the center. The mixer, effects, editor,
+and bottom bar stay in stable regions that the operator can learn by position.
+The layout uses CSS Grid and Flexbox on a 4px spacing rhythm. It favors compact
+controls and visible density over large empty areas.
+
+The supported workspace starts at 1280 by 720 CSS pixels. At supported sizes,
+the instrument keeps eight rack slots, eight visible mixer strips, one master
+strip, and four compact send-effect cards. Narrower or shorter viewports show the
+unsupported-size state instead of compressing the controls below their usable
+geometry. Scrollbars remain visible on real overflow surfaces. The compact send
+bank must fit without a scrollbar.
+
+Detailed effect editors start as a 760 by 680 CSS pixel modal rack. They grow to
+fit their content until they reach a 16px viewport inset. After that point, only
+the constrained axis scrolls. Piano Roll rows use a 16px pitch grid, and the
+audition keybed keeps a fixed 76px lane.
+
+## Elevation & Depth
 
 **Layered panel hierarchy.** Depth communicates nesting, not float. The system
 reads as four mounted layers: chassis → panel → control → inset well. Each step
@@ -326,7 +353,25 @@ A surface that is neither gets no shadow at all.
 the Settings panel, and the modal effect editor. Anything else reaching for it is
 a card pretending to float, which this system does not do.
 
-## 5. Components
+## Shapes
+
+The form language is compact and machined. Controls use slightly softened 4px
+corners. Mounted panels use 6px corners. Dialogs use 8px corners. The 999px
+rounding token is limited to circles and compact switch tracks. It does not
+permit pill-shaped panels or large actions.
+
+Every mounted part has a visible edge. Raised parts combine a border, a lit top
+edge, and a short shadow. Recessed parts combine a darker well, a border, and an
+inset shadow. Circular LEDs, knob caps, screw heads, and fader-slot ends are the
+main round forms. Rectangular plates and rails define the larger structure.
+
+**The Honest Edge Rule.** A border must describe a real part boundary, control
+state, or focus state. Do not add an ornamental side stripe.
+
+**The Round Token Rule.** Use the round token only when the control geometry is
+circular or when a compact switch track requires it.
+
+## Components
 
 ### Buttons
 
@@ -472,7 +517,7 @@ over Scrollbar Track, with a 2px track-colored border insetting the thumb. Do no
 hide real overflow. The compact Effects bank is not a scroll port. It must fit
 all four cards without overflow or a scrollbar.
 
-## 6. Do's and Don'ts
+## Do's and Don'ts
 
 ### Do:
 
