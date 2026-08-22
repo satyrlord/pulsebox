@@ -397,6 +397,7 @@ for (const requestedSampleRate of [44_100, 48_000]) {
     }
     await expect(page.locator(LOADED_RACK_MODULE)).toHaveCount(8);
 
+    await page.getByRole("button", { name: "Pattern", exact: true }).click();
     await page.getByRole("button", { name: /^play$/i }).click();
     await expect(page.locator(".audio-status")).toHaveText("Audio active");
     await page.evaluate(() => {
@@ -1127,6 +1128,7 @@ test("live Chrome schedules matching event time at 44.1 and 48 kHz", async ({ br
         );
       }, requestedSampleRate);
       await page.goto("http://127.0.0.1:4173/");
+      await page.getByRole("button", { name: "Pattern", exact: true }).click();
       // The first Play creates the context and worklet nodes. Stop it before
       // measuring, then restart from the transport marker with every node
       // ready. This prevents node construction time from hiding the first
