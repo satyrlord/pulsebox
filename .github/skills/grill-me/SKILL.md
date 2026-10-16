@@ -53,4 +53,4 @@ If a concrete question sequence is useful, read [EXAMPLES.md](EXAMPLES.md).
 
 The session is complete after you resolve or defer every inventoried branch.
 Each deferral must name an owner, reason, and verification step. Route authorized
-implementation to `add-feature`, `refactor`, or `diagnose` as applicable.
+implementation to `add-feature` or `refactor` as applicable.

@@ -13,10 +13,8 @@ skill.
 | `dead-code-audit` | Prove reachability and remove proven dead items. |
 | `design-pulsebox-ui` | Design, audit, implement, or repair the React interface. |
 | `deslop` | Remove evidence-backed slop without changing true behavior. |
-| `diagnose` | Reproduce and isolate a difficult failure. |
 | `full-code-review` | Review changes. If the user requests a repair, repair confirmed findings. |
 | `grill-me` | Before implementation, resolve open decisions. |
-| `handoff` | Transfer verified state to a fresh agent. |
 | `improve-codebase-architecture` | Improve ownership boundaries and reduce structural friction. |
 | `refactor` | Improve structure without changing behavior. |
 | `run-quality-gate` | Run or repair configured repository checks. |
@@ -24,3 +22,6 @@ skill.
 
 Keep each skill concise. Put branch-only detail behind a direct pointer. If a
 current skill owns the action, do not add a skill.
+
+Each indexed skill must have a matching directory with a `SKILL.md` file.
+The documentation tests check this requirement in CI.

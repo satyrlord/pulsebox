@@ -109,7 +109,7 @@ Owning contract documents:
   Avoid overlapping edits.
 - `.github/skills/` holds the repository workflows, including add-feature,
   design-pulsebox-ui, run-quality-gate, full-code-review, verify, refactor,
-  dead-code-audit, and handoff. If the correct workflow is unclear, read
+  and dead-code-audit. If the correct workflow is unclear, read
   `.github/skills/SKILLS.md`.
 - Use a higher reasoning level for architecture, audio, persistence, security,
   concurrency, and ambiguous product contracts.
