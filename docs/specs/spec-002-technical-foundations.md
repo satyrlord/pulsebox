@@ -14,6 +14,11 @@ Undo foundations.
 
 ## 4. Technology and repository rules
 
+The build and test toolchain requires Node.js `>=24.22.1 <25`.
+CI and Pages builds use the exact version in `.node-version`.
+The minimum includes the Brotli decoder fix in the
+[Node.js 24.22.1 security release](https://nodejs.org/en/blog/release/v24.22.1).
+
 Use:
 
 - TypeScript with strict mode.

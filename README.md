@@ -91,6 +91,10 @@ Current owners:
 
 ## Commands
 
+Use Node.js 24.22.1 or a later Node 24 release, with npm 12.0.1.
+CI and Pages builds use the exact Node version in `.node-version`.
+This baseline includes the Brotli decoder security fix for CVE-2026-111497.
+
 The command surface is:
 
 ```text
