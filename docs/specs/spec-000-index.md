@@ -88,6 +88,10 @@ Supporting traceability records:
 - [Release acceptance](spec-012-release-acceptance.md) is the complete MVP gate.
   Every criterion has one primary owner in the table above, even when
   verification crosses several domains.
+- [Known gaps and candidate extensions](spec-013-known-gaps-and-candidate-extensions.md)
+  lists section 28: incomplete approved requirements, post-MVP work, and
+  candidate extensions. It creates no requirement. Behavior remains owned by
+  specifications 001 through 010.
 
 ## Domain contract relationship
 
