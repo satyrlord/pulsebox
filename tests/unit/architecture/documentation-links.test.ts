@@ -53,6 +53,20 @@ function localPath(target: string): string | undefined {
 }
 
 describe("documentation links", () => {
+  it("keeps every indexed repository skill on disk with an entry document", () => {
+    const index = readFileSync(resolve(ROOT, ".github/skills/SKILLS.md"), "utf8");
+    const entries = [...index.matchAll(/^\| `([^`]+)` \|/gmu)];
+    expect(entries.length).toBeGreaterThan(0);
+
+    const missing = entries.flatMap((entry) => {
+      const path = `.github/skills/${entry[1]}/SKILL.md`;
+      const absolutePath = resolve(ROOT, path);
+      return existsSync(absolutePath) && statSync(absolutePath).isFile() ? [] : [path];
+    });
+
+    expect(missing).toEqual([]);
+  });
+
   it("keeps every repository-relative Markdown link inside the repository and on disk", () => {
     const broken: string[] = [];
     const markdownFiles = DOCUMENTATION_ROOTS.flatMap(collectMarkdownFiles).sort();
